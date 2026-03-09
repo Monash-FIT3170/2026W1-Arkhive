@@ -12,3 +12,4 @@
 - Aryan Cyrus - Aryan.m10@yahoo.com
 - Jasper Wan - jasperwan1508@gmail.com
 - Lii Gang Hah - liiganghah24@gmail.com
+- Ray Zheng - ziqinrayzheng@gmail.com
