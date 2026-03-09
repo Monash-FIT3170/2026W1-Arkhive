@@ -1,2 +1,4 @@
 # 2026W1-Arkhive
-## Aryan Cyrus 33114242
+Mubashar Ali Doostizadah - mubashardoostizadah@gmail.com
+Aryan Punekar - aryan.punekar5@gmail.com
+Muhammad Mubashir Shah - 2004mubashir@gmail.com
