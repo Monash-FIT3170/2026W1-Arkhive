@@ -14,3 +14,4 @@
 - Lii Gang Hah - liiganghah24@gmail.com
 - Ray Zheng - ziqinrayzheng@gmail.com
 - Gautam kumar - gautam.work.kumar@gmail.com
+- Kanishk Srivastava - kanishk.srivastava4@gmail.com
