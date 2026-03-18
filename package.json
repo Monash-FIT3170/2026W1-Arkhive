@@ -1,0 +1,24 @@
+{
+  "dependencies": {
+    "@google-cloud/vision": "^5.3.4"
+  },
+  "name": "2026w1-arkhive",
+  "version": "1.0.0",
+  "description": "- Mubashar Ali Doostizadah - mubashardoostizadah@gmail.com\r - Aryan Punekar - aryanpunekarwork@gmail.com\r - Muhammad Mubashir Shah - 2004mubashir@gmail.com\r - Ronak - tahronak2005@gmail.com\r - Frank Fang Shi - frank2004au@gmail.com\r - Harsha Vardhan Sharma - harsha.sharma2105@gmail.com\r - Simon Katsiamakis - skatsi07@icloud.com\r - Vanrick Nguyen - vanricknguyen@gmail.com\r - Aryan Cyrus - Aryan.m10@yahoo.com\r - Jasper Wan - jasperwan1508@gmail.com\r - Lii Gang Hah - liiganghah24@gmail.com\r - Ray Zheng - ziqinrayzheng@gmail.com\r - Gautam kumar - gautam.work.kumar@gmail.com\r - Kanishk Srivastava - kanishk.srivastava4@gmail.com",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Monash-FIT3170/2026W1-Arkhive.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Monash-FIT3170/2026W1-Arkhive/issues"
+  },
+  "homepage": "https://github.com/Monash-FIT3170/2026W1-Arkhive#readme"
+}

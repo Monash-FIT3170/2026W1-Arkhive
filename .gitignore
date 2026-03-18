@@ -1,0 +1,12 @@
+# Node
+node_modules/
+
+# Node
+credentials/
+
+# Google Cloud key
+arkhive-ocr-c9455fcc9903.json
+
+# Environment files
+.env
+.env.local
