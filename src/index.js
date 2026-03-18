@@ -4,6 +4,9 @@
 //Created:     2026-03/18
 //Description: Tech Spike for Google Vision OCR
 //Version:     1.0
+//NOTE: this file only works with API credentials stored in 2026W1Arkhive/credentials (which is unique for each person)
+
+
 //Last Updated:2026-03-18 by Aryan Cyrus
 //============================================================
 
