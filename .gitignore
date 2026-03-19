@@ -10,3 +10,7 @@ arkhive-ocr-c9455fcc9903.json
 # Environment files
 .env
 .env.local
+
+# Meteor
+src/arkhive-mongo-spike/.meteor/local
+
