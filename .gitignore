@@ -1,7 +1,7 @@
 # Node
 node_modules/
 
-# Node
+# Credentials
 credentials/
 
 # Google Cloud key
@@ -13,4 +13,5 @@ arkhive-ocr-c9455fcc9903.json
 
 # Meteor
 src/arkhive-mongo-spike/.meteor/local
+src/arkhive-mongo-spike/.meteor/dev_bundle
 
