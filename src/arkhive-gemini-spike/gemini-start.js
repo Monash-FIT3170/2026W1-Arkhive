@@ -35,5 +35,6 @@ async function run() {
     const text = response.text()
     //print response
     console.log(text)
-
 }
+
+run();
