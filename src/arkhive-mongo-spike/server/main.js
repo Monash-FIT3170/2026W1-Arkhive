@@ -5,8 +5,6 @@
 //Description: Tech Spike for mongoDB accessed through meteor
 //Version:     1.0
 
-
-
 //Last Updated:2026-03-19 by Aryan Cyrus
 //============================================================
 

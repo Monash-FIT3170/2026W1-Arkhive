@@ -8,7 +8,7 @@
 //============================================================
 
 //importing google visiob
-const vision = require('@google-cloud/vision');
+import vision from '@google-cloud/vision';
 //crearubg new client using JSON credentials
 const client = new vision.ImageAnnotatorClient({
     keyFilename: './credentials/arkhive-ocr-c9455fcc9903.json'
@@ -24,7 +24,10 @@ async function main() {
     //getting full text from response 
     const fullText = result.fullTextAnnotation.text;
     //print results
-    console.log(result);
+    console.log(fullText);
+    //Uncomment this if you want to see the WHOLE output JSON
+    //console.log(JSON.stringify(result, null, 2));
+
 }
 
 //running the asychronous function
