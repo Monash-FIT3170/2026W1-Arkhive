@@ -23,14 +23,14 @@ const genAI = new GoogleGenerativeAI(API_KEY)
 //Function to run generative AI model
 async function run() {
     //Generate AI model using google's "gemeni-pro" model
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
 
-    //provide a custom prompt for AI to respond to
+    //provide a custom prompt for AI to respond to (feel free to experiment with different prompts)
     const prompt = "Briefly explain the concept of OCR and describe its uses"
     //feed prompts into gemeni-pro and get a result
     const result = await model.generateContent(prompt);
     //obtain actual response from result object
-    const response = await result.response;
+    const response = result.response;
     //turn response into text
     const text = response.text()
     //print response
