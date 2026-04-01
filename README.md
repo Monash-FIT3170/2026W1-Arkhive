@@ -1,6 +1,6 @@
 # 2026W1-Arkhive
 ## Description / Overview
-"Am OCR (Optical Character Recognition) solution that converts photos of documents, receipts, forms, and tables into structured, exportable data. Users simply upload images (JPG, PNG, HEIC), and the system extracts text and tables using OCR technology. It then employs Large Language Models (e.g., GPT) to let users validate and refine the extracted content through natural, chat-based interactions"
+"An OCR (Optical Character Recognition) solution that converts photos of documents, receipts, forms, and tables into structured, exportable data. Users simply upload images (JPG, PNG, HEIC), and the system extracts text and tables using OCR technology. It then employs Large Language Models (e.g., GPT) to let users validate and refine the extracted content through natural, chat-based interactions"
 
 ## Installation
 To be determined
