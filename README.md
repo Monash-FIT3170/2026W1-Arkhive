@@ -20,8 +20,8 @@ Key features as per project requirements are as follows:
 - AI chat interface where AI asks users questions to ensure the AI understands extracted data correctly (e.g., AI: "What are the columns?" – User:"The columns are X,Y,Z".)
 - Side-by-side view showing original image and extracted data simultaneously
 - Data export to:
-    > CSV format with column headers
-    > Raw text export as TXT file download
+    - CSV format with column headers
+    - Raw text export as TXT file download
 - Loading states during OCR processing and error handling for failed uploads
 "
 ## Tech Stack / Built With
