@@ -1,0 +1,103 @@
+# -----------------------------
+# Global
+# -----------------------------
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.temp
+*.swp
+*.lock
+*.pid
+
+# Environment variables / secrets
+.env
+.env.*
+*.env.local
+credentials/
+secrets/
+service-account.json
+
+# Local storage (backend uploads)
+uploads/
+storage/
+tmp/
+
+# -----------------------------
+# Node / JS / TS
+# -----------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+.cache/
+.eslintcache
+
+# -----------------------------
+# Frontend (Vite)
+# -----------------------------
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.vite-cache/
+
+# -----------------------------
+# Backend (Express)
+# -----------------------------
+backend/node_modules/
+backend/dist/
+backend/build/
+backend/.cache/
+
+# -----------------------------
+# TypeScript
+# -----------------------------
+*.tsbuildinfo
+
+# -----------------------------
+# IDEs
+# -----------------------------
+
+# VS Code
+.vscode/
+.history/
+
+# IntelliJ / WebStorm / IDEA
+.idea/
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# -----------------------------
+# OS-specific
+# -----------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
