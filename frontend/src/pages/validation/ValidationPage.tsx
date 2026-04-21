@@ -2,9 +2,15 @@ import { useState } from "react";
 import DocumentPanel from "./components/document/DocumentPanel";
 import ExtractedDataPanel from "./components/extracted-data/ExtractedDataPanel";
 import ChatPanel from "./components/chat/ChatPanel";
+import type { ChatMessage } from "../../models/message";
 
 function ValidationPage() {
 	const [isChatOpen, setIsChatOpen] = useState(true);
+	const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+	const addMessage = (message: ChatMessage) => {
+		setMessages((prev) => [...prev, message]);
+	};
 
 	return (
 		<>
@@ -21,6 +27,7 @@ function ValidationPage() {
 					<ChatPanel
 						isOpen={isChatOpen}
 						onToggle={() => setIsChatOpen(!isChatOpen)}
+						messages={messages}
 					/>
 				</div>
 			</div>

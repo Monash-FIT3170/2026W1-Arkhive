@@ -1,9 +1,12 @@
+import type { ChatMessage } from "../../../../models/message";
+
 function ChatPanel({
 	isOpen,
 	onToggle
 }: {
 	isOpen: boolean;
 	onToggle: () => void;
+	messages: ChatMessage[];
 }) {
 	return (
 		<>
