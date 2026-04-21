@@ -9,14 +9,14 @@ function ValidationPage() {
 	return (
 		<>
 			<div className="flex w-full p-3 gap-3 overflow-hidden h-screen">
-				<div className="flex-1">
+				<div className="flex-1 h-full">
 					<DocumentPanel />
 				</div>
-				<div className="flex-1">
+				<div className="flex-1 h-full">
 					<ExtractedDataPanel />
 				</div>
 				<div
-					className={`transition-all duration-300 ease-in-out ${isChatOpen ? "flex-[0.8]" : "flex-[0.05]"}`}
+					className={`transition-all duration-300 ease-in-out h-full ${isChatOpen ? "flex-[0.8]" : "flex-[0.05]"}`}
 				>
 					<ChatPanel
 						isOpen={isChatOpen}
