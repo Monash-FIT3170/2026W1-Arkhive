@@ -14,7 +14,9 @@ function ExtractedDataPanel() {
   return (
     <>
       <div className="h-full w-full bg-base-200 border border-gray-200 rounded-lg">
-        <h1>EXTRACTED DATA PANEL</h1>
+        <h2 className="text-xl font-semibold text-base-content p-4">
+          EXTRACTED DATA PANEL
+        </h2>
 
         <div className="overflow-x-auto">
           <table className="table w-full">
