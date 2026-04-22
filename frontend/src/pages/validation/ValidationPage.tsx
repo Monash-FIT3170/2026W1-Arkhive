@@ -28,6 +28,7 @@ function ValidationPage() {
 						isOpen={isChatOpen}
 						onToggle={() => setIsChatOpen(!isChatOpen)}
 						messages={messages}
+						onAddMessage={addMessage}
 					/>
 				</div>
 			</div>

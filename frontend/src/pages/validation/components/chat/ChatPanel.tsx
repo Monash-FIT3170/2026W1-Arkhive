@@ -1,17 +1,48 @@
 import { ChevronsLeft, ChevronsRight, Bot, Send } from "lucide-react";
 import type { ChatMessage } from "../../../../models/Message";
 import MessageItem from "./MessageItem";
+import { useEffect, useRef, useState } from "react";
 
 function ChatPanel({
 	isOpen,
 	onToggle,
-	messages
+	messages,
+	onAddMessage
 }: {
 	isOpen: boolean;
 	onToggle: () => void;
 	messages: ChatMessage[];
+	onAddMessage: (msg: ChatMessage) => void;
 }) {
-	const chatMessages = messages.map((msg) => <MessageItem msg={msg} />);
+	const [input, setInput] = useState("");
+	const messagesEndRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		//whenever messages changes it scrolls to the button of the chat
+		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+	}, [messages]);
+
+	const handleSend = () => {
+		if (!input.trim()) return;
+
+		const userMsg: ChatMessage = {
+			id: crypto.randomUUID(),
+			role: "user",
+			content: input.trim(),
+			timestamp: new Date().toISOString()
+		};
+
+		onAddMessage(userMsg);
+		setInput("");
+	};
+
+	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+		if (e.key === "Enter" && !e.shiftKey) {
+			e.preventDefault();
+			handleSend();
+		}
+	};
+
 	// Styling of the chat when the window is collapsed
 	if (!isOpen) {
 		return (
@@ -93,7 +124,10 @@ function ChatPanel({
 						nah all good, cheers
 					</div>
 				</div>
-				{chatMessages}
+				{messages.map((msg) => (
+					<MessageItem key={msg.id} msg={msg} />
+				))}
+				<div ref={messagesEndRef} />
 			</div>
 
 			{/* text input area */}
@@ -102,10 +136,14 @@ function ChatPanel({
 					<textarea
 						className="textarea textarea-bordered w-full resize-none h-12 min-h-[1rem] focus:outline-none"
 						placeholder="Type a correction or instruction..."
+						value={input}
+						onChange={(e) => setInput(e.target.value)}
+						onKeyDown={(e) => handleKeyDown(e)}
 					></textarea>
 					<button
 						className="btn btn-primary btn-square"
 						title="Send message"
+						onClick={handleSend}
 					>
 						<Send className="w-5 h-5" />
 					</button>
