@@ -101,3 +101,10 @@ bin/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+
+
+#--------------------------------
+# Playground for testing (Harsha)
+#-------------------------------
+backend/playground
