@@ -1,14 +1,17 @@
 import { ChevronsLeft, ChevronsRight, Bot, Send } from "lucide-react";
 import type { ChatMessage } from "../../../../models/Message";
+import MessageItem from "./MessageItem";
 
 function ChatPanel({
 	isOpen,
-	onToggle
+	onToggle,
+	messages
 }: {
 	isOpen: boolean;
 	onToggle: () => void;
 	messages: ChatMessage[];
 }) {
+	const chatMessages = messages.map((msg) => <MessageItem msg={msg} />);
 	// Styling of the chat when the window is collapsed
 	if (!isOpen) {
 		return (
@@ -90,6 +93,7 @@ function ChatPanel({
 						nah all good, cheers
 					</div>
 				</div>
+				{chatMessages}
 			</div>
 
 			{/* text input area */}
