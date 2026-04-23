@@ -11,16 +11,39 @@ import { application } from 'express';
 const API_KEY = process.env.API_SECRET;
 
 const prompt = `Perform a granular table analysis. 
-1. Identify the main table grid.
-2. Detect EVERY individual cell (intersection of row and column).
-3. Return each cell's [ymin, xmin, ymax, xmax] normalized 0-1000.
-4. Label each box with the text found inside that specific cell.
+1. Identify the main table grid and every individual cell.
+2. Return coordinates [ymin, xmin, ymax, xmax] normalized 0-1000.
+3. For each cell, provide:
+   - "text": The content found inside.
+   - "confidence": A score between 0.0 and 1.0 based on how legible the text is and how clear the cell boundaries are.
 Output strictly in JSON.`;
 
 const ai = new GoogleGenAI({ apiKey: API_KEY, apiVersion: 'v1beta' });
+const schema = {
+  type: "object",
+  properties: {
+    cells: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          bbox: { type: "array", items: { type: "number" }, minItems: 4, maxItems: 4 },
+          text: { type: "string" },
+          // Add this property
+          confidence: { 
+            type: "number", 
+            description: "A value from 0.0 to 1.0 indicating extraction certainty" 
+          }
+        },
+        required: ["bbox", "text", "confidence"]
+      }
+    }
+  }
+};
 
 // function for getting bounding boxes
 async function getBoundingBoxes(imageBuffer: Buffer, mimeType: string) {
+  
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: [
@@ -39,17 +62,18 @@ async function getBoundingBoxes(imageBuffer: Buffer, mimeType: string) {
     ],
     config: {
       responseMimeType: "application/json",
-      thinkingConfig: {
-    includeThoughts: false
-  },
-  // Reducing temperature can sometimes increase speed in 'Flash' models
-  temperature: 0.1,
-  maxOutputTokens: 1000  
+      responseJsonSchema: schema
     }
   });
   const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
   return text ? JSON.parse(text) : null;
 }
+
+const filePath = 'Screenshot 2026-04-23 002946.png';
+const imageBuffer = fs.readFileSync(filePath);
+console.log(imageBuffer);
+const result = await getBoundingBoxes(imageBuffer, "image/png");
+console.log("Final Result:", JSON.stringify(result, null, 2));
 
 // function for getting individual confidence score
 
