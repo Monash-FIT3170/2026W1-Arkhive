@@ -1,4 +1,4 @@
-import { ChevronsLeft, ChevronsRight, Bot, Send } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, ChevronsUp, ChevronsDown, Bot, Send } from "lucide-react";
 import type { ChatMessage } from "../../../../models/Message";
 import MessageItem from "./MessageItem";
 import { useEffect, useRef, useState } from "react";
@@ -46,17 +46,26 @@ function ChatPanel({
 	// Styling of the chat when the window is collapsed
 	if (!isOpen) {
 		return (
-			<div className="h-full w-full bg-base-200 border border-gray-200 rounded-lg flex flex-col items-center py-4 transition-all">
+			<div className="h-full w-full bg-base-200 border border-gray-200 rounded-lg flex flex-row lg:flex-col items-center justify-between lg:justify-start px-4 lg:px-0 py-0 lg:py-4 transition-all">
+				{/* horizontal AI assistant label (mobile only) */}
+				<div className="flex items-center justify-center lg:hidden">
+					<span className="text-base-content/50 uppercase tracking-widest font-semibold">
+						AI Assistant
+					</span>
+				</div>
+				
 				{/* Expand Button */}
 				<button
 					onClick={onToggle}
 					className="btn btn-ghost btn-circle"
 					title="Expand Chat"
 				>
-					<ChevronsLeft className="w-6 h-6" />
+					<ChevronsLeft className="w-6 h-6 hidden lg:block" />
+					<ChevronsDown className="w-6 h-6 lg:hidden" />
 				</button>
-				{/* Vertical AI Assistant label */}
-				<div className="flex-1 flex items-center justify-center">
+				
+				{/* Vertical AI Assistant label (Desktop only) */}
+				<div className="hidden lg:flex flex-1 items-center justify-center lg:mt-4">
 					<span className="[writing-mode:vertical-rl] text-base-content/50 uppercase tracking-widest font-semibold">
 						AI Assistant
 					</span>
@@ -78,7 +87,8 @@ function ChatPanel({
 					className="btn btn-ghost btn-sm btn-circle"
 					title="Collapse Chat"
 				>
-					<ChevronsRight className="w-7 h-7" />
+					<ChevronsRight className="w-7 h-7 hidden lg:block" />
+					<ChevronsUp className="w-7 h-7 lg:hidden" />
 				</button>
 			</div>
 
