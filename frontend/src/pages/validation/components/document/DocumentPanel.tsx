@@ -9,18 +9,23 @@ function DocumentPanel() {
         </h2>
 
         {/*Added container for image*/}
-        <div className="flex-1 w-full overflow-hidden rounded-md">
-          <img
-            src={mockImage}
-            alt="Mock Image for Document Panel"
-            className="w-full h-auto object-cover rounded-lg"
-          />
-        </div>
+        <div className="flex flex-col lg:flex-row h-full w-full gap-4">
+          {/* Image panel */}
+          <div className="flex-1 min-h-[250px] lg:min-h-full flex items-center justify-center">
+            <img
+              src={mockImage}
+              alt="Document"
+              className="w-full h-full object-contain"
+            />
+          </div>
 
-        {/*Confidence scoring*/}
-        <div className="mt-4 border-t border-base-300 pt-3 text-sm text-base-content/70">
-          Confidence Score:{" "}
-          <span className="font-medium text-base-content">92%</span>
+          {/* Content panel */}
+          <div className="w-full lg:w-1/3 flex flex-col">
+
+            <div className="mt-auto border-t pt-3 text-sm text-base-content/70">
+              Confidence Score: <span className="font-medium">92%</span>
+            </div>
+          </div>
         </div>
       </div>
     </>

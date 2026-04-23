@@ -22,11 +22,10 @@ function ValidationPage() {
 					<ExtractedDataPanel />
 				</div>
 				<div
-					className={`transition-all duration-300 ease-in-out w-full lg:h-full ${
-						isChatOpen 
-							? "h-[50vh] lg:h-auto lg:flex-[0.8]" 
-							: "h-20 lg:h-auto lg:flex-[0.05]"
-					}`}
+					className={`transition-all duration-300 ease-in-out w-full lg:h-full ${isChatOpen
+						? "h-[50vh] lg:h-auto lg:flex-[0.8]"
+						: "h-20 lg:h-auto lg:flex-[0.05]"
+						}`}
 				>
 					<ChatPanel
 						isOpen={isChatOpen}
