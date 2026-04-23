@@ -69,12 +69,6 @@ async function getBoundingBoxes(imageBuffer: Buffer, mimeType: string) {
   return text ? JSON.parse(text) : null;
 }
 
-const filePath = 'Screenshot 2026-04-23 002946.png';
-const imageBuffer = fs.readFileSync(filePath);
-console.log(imageBuffer);
-const result = await getBoundingBoxes(imageBuffer, "image/png");
-console.log("Final Result:", JSON.stringify(result, null, 2));
-
 // function for getting individual confidence score
 
 
