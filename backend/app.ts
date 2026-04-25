@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { extractTextFromSampleImage } from './src/services/ocr/ocr';
+import { extractTextFromSampleImage, textExtraction } from './src/services/ocr/ocr';
 
 const app = express();
 app.use(express.json());
@@ -30,5 +30,6 @@ app.get('/ocr/test', async (_req: Request, res: Response) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`[server]: Server is running locally at :${PORT}`);
+  console.log(`Server is running locally at ${PORT}`);
+  console.log('Test OCR at http://localhost:3000/ocr/test');
 });
