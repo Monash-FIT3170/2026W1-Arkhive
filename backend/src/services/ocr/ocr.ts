@@ -1,76 +1,37 @@
 
 //importing google vision
-import { GoogleGenAI } from '@google/genai'
+import something from '@google-cloud/vision'
 import fs from 'fs'
-import { application } from 'express';
+import { findAverageAccuracyForAllWords, flattenPagesToWordMap } from './utils/utils.js';
+import { OCRBoundingBoxes }from './types/boundingBoxTypes.js';
 //creating new client using JSON credentials
 
 
 //creating a client
 
-const API_KEY = process.env.API_SECRET;
+const API_KEY = JSON.parse(fs.readFileSync(process.env.API_SECRET!, 'utf-8'));
 
-const prompt = `Perform a granular table analysis. 
-1. Identify the main table grid and every individual cell.
-2. Return coordinates [ymin, xmin, ymax, xmax] normalized 0-1000.
-3. For each cell, provide:
-   - "text": The content found inside.
-   - "confidence": A score between 0.0 and 1.0 based on how legible the text is and how clear the cell boundaries are.
-Output strictly in JSON.`;
+const visionClient = new something.ImageAnnotatorClient({ credentials: API_KEY})
 
-const ai = new GoogleGenAI({ apiKey: API_KEY, apiVersion: 'v1beta' });
-const schema = {
-  type: "object",
-  properties: {
-    cells: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          bbox: { type: "array", items: { type: "number" }, minItems: 4, maxItems: 4 },
-          text: { type: "string" },
-          // Add this property
-          confidence: { 
-            type: "number", 
-            description: "A value from 0.0 to 1.0 indicating extraction certainty" 
-          }
-        },
-        required: ["bbox", "text", "confidence"]
-      }
-    }
-  }
-};
 
-// function for getting bounding boxes
-async function getBoundingBoxes(imageBuffer: Buffer, mimeType: string) {
+// function for getting bounding boxes for all words detected and drawing a
+//  
+async function getBoundingBoxes(imageBuffer: Buffer) {
   
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: prompt },
-          { 
-            inlineData: { 
-              data: imageBuffer.toString("base64"), 
-              mimeType: mimeType 
-            } 
-          }
-        ]
-      }
-    ],
-    config: {
-      responseMimeType: "application/json",
-      responseJsonSchema: schema
-    }
-  });
-  const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
-  return text ? JSON.parse(text) : null;
+  const [response] = await visionClient.documentTextDetection(imageBuffer);
+  const fullTextAnnotation = response.fullTextAnnotation;
+  return flattenPagesToWordMap(fullTextAnnotation!.pages!)
 }
 
-// function for getting individual confidence score
+// function for getting overall averaged confidence score for all words
+async function getAverageConfidenceScore(imageBuffer: Buffer) {
+
+  const [response] = await visionClient.documentTextDetection(imageBuffer);
+  const fullTextAnnotation = response.fullTextAnnotation;
+  return findAverageAccuracyForAllWords(fullTextAnnotation?.pages!);
+}
 
 
+function drawBoundingBoxes(imageBuffer: Buffer, OCRBoundingBoxes: OCRBoundingBoxes){};
 
 // function for getting overall averaged confidence score
