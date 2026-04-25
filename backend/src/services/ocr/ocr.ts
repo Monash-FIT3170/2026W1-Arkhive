@@ -1,13 +1,26 @@
-
-//importing google vision
+import path from 'path';
+import vision from '@google-cloud/vision';
 import something from '@google-cloud/vision'
 import fs from 'fs'
 import { findAverageAccuracyForAllWords, flattenPagesToWordMap } from './utils/utils.js';
 import { OCRBoundingBoxes }from './types/boundingBoxTypes.js';
+
+const client = new vision.ImageAnnotatorClient({
+  keyFilename: path.resolve(process.cwd(), 'credentials/google-vision-key.json'),
+});
+
+export async function extractTextFromSampleImage(): Promise<string> {
+  const imagePath = path.resolve(process.cwd(), 'assets/sample-page-1.png');
+
+  const [result] = await client.documentTextDetection(imagePath);
+
+  const extractedText = result.fullTextAnnotation?.text ?? '';
+
+  return extractedText;
+}
+
+
 //creating new client using JSON credentials
-
-
-//creating a client
 
 const API_KEY = JSON.parse(fs.readFileSync(process.env.API_SECRET!, 'utf-8'));
 
@@ -35,3 +48,7 @@ async function getAverageConfidenceScore(imageBuffer: Buffer) {
 function drawBoundingBoxes(imageBuffer: Buffer, OCRBoundingBoxes: OCRBoundingBoxes){};
 
 // function for getting overall averaged confidence score
+
+const jsonOut = JSON.stringify(await getBoundingBoxes(fs.readFileSync("Screenshot 2026-04-25 195541.png")), null, 2)
+
+fs.writeFileSync("boundingBox.json", jsonOut, 'utf-8')
