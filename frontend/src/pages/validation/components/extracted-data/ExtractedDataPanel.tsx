@@ -1,76 +1,267 @@
+import { useState } from "react";
 import mockOcrData from "../../../../mock-data/mockOcrData.json";
 
-// Helper function to format price as currency (since mock is given in IDR)
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
-
 function ExtractedDataPanel() {
-  const products = mockOcrData?.products ?? [];
+  const { products } = mockOcrData;
 
-  const headers = products.length > 0 ? Object.keys(products[0]) : []; //dynamically get keys
+  // state management for products -> sub-models -> parts
+  const [openProducts, setOpenProducts] = useState<string[]>([]);
+  const [openSubModels, setOpenSubModels] = useState<string[]>([]);
+  const [openParts, setOpenParts] = useState<string[]>([]);
+
+  {
+    /* Functions /*/
+  }
+
+  // Table Header (fetched dynamically)
+  const productHeaders =
+    products.length > 0
+      ? Object.keys(products[0]).filter((key) => key !== "components")
+      : [];
+
+  // Currency formatting function
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+    }).format(amount);
+  };
+
+  // Collapse function for Product
+  const toggleProduct = (modelCode: string) => {
+    if (openProducts.includes(modelCode)) {
+      setOpenProducts(openProducts.filter((item) => item !== modelCode));
+    } else {
+      setOpenProducts([...openProducts, modelCode]);
+    }
+  };
+
+  // Collapse function for Sub-Model
+  const toggleSubModel = (code: string) => {
+    if (openSubModels.includes(code)) {
+      setOpenSubModels(openSubModels.filter((item) => item !== code));
+    } else {
+      setOpenSubModels([...openSubModels, code]);
+    }
+  };
+
+  // Collapse function for Parts
+  const togglePart = (code: string) => {
+    if (openParts.includes(code)) {
+      setOpenParts(openParts.filter((item) => item !== code));
+    } else {
+      setOpenParts([...openParts, code]);
+    }
+  };
 
   return (
-    <>
-      {/* Outer Container */}
-      <div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 shadow-sm">
-        <h2 className="text-xl font-semibold text-base-content p-4">
-          EXTRACTED DATA PANEL
-        </h2>
+    <div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm">
+      <h2 className="mb-4 text-xl font-semibold text-base-content">
+        EXTRACTED DATA
+      </h2>
 
-        {/* Inner container for spacing */}
-        <div className="bg-base-100 rounded-md p-3">
-          <div className="overflow-x-auto">
-            {/*Header row*/}
-            <table className="table w-full border border-base-300 rounded-md">
-              <thead>
-                <tr className="bg-base-300/30 text-base-content">
-                  {headers.map((key) => (
-                    <th
-                      key={key}
-                      className="p-3 text-left border-b border-base-300"
-                    >
-                      {key.replace(/_/g, " ").toUpperCase()}{" "}
-                    </th>
-                  ))}
+      {/* Table */}
+      <div className="overflow-auto max-h-[500px]">
+        <table className="table w-full border border-base-600">
+          {/* Table Header */}
+          <thead>
+            <tr className="text-base-content/70">
+              {productHeaders.map((key) => (
+                <th key={key} className="p-3 text-left">
+                  {key
+                    .replace(/_/g, " ")
+                    .replace(/\b\w/g, (c) => c.toUpperCase())}
+                </th>
+              ))}
+            </tr>
+          </thead>
+
+          {/* Table Body */}
+          <tbody>
+            {products.map((product) => (
+              <>
+                {/* Product Row */}
+                <tr
+                  key={product.model_code}
+                  onClick={() => toggleProduct(product.model_code)}
+                  className="border-b border-base-300 cursor-pointer hover:bg-base-300/40"
+                >
+                  {productHeaders.map((key) => {
+                    let value = (product as any)[key];
+
+                    if (key.includes("price") && typeof value === "number") {
+                      value = formatCurrency(value);
+                    }
+
+                    return (
+                      <td key={key} className="p-3 text-base-content">
+                        {key === "item_number" && (
+                          <span className="mr-2">
+                            {openProducts.includes(product.model_code)
+                              ? "▼"
+                              : "▶"}
+                          </span>
+                        )}
+                        {value}
+                      </td>
+                    );
+                  })}
                 </tr>
-              </thead>
 
-              {/*Body*/}
-              <tbody>
-                {products.map((product, index) => (
-                  <tr
-                    key={product.model_code || index}
-                    className="hover:bg-base-300/40 border-b border-base-300"
-                  >
-                    {headers.map((key) => {
-                      let value = (product as any)[key];
+                {/* Collapsable rows */}
 
-                      if (
-                        key.toLowerCase().includes("price") &&
-                        typeof value === "number"
-                      ) {
-                        value = formatCurrency(value);
-                      }
-
+                {openProducts.includes(product.model_code) &&
+                  product.components?.map((component: any, index: number) => {
+                    // CASE 1 (submodel has parts Item -> SubModel -> Parts)
+                    if (component.parts) {
                       return (
-                        <td key={key} className="p-3 text-base-content">
-                          {typeof value === "object" ? "None" : value}
-                        </td>
+                        <>
+                          {/* SubModel Row (Item -> SubModel) */}
+                          <tr
+                            key={component.sub_model || index}
+                            onClick={() => toggleSubModel(component.sub_model)}
+                            className="bg-base-300/20 cursor-pointer"
+                          >
+                            {/* SUBMODEL ICON */}
+                            <td className="p-3 pl-8">
+                              <span className="mr-2">
+                                {openSubModels.includes(component.sub_model)
+                                  ? "▼"
+                                  : "▶"}
+                              </span>
+                              {component.sub_model}
+                            </td>
+
+                            <td className="p-3"></td>
+
+                            <td className="p-3 text-right">
+                              {component.sub_total_price
+                                ? formatCurrency(component.sub_total_price)
+                                : "-"}
+                            </td>
+                          </tr>
+
+                          {/* Parts inside the submodel (Item -> SubModel -> Parts) */}
+                          {openSubModels.includes(component.sub_model) &&
+                            component.parts.map((part: any) => (
+                              <>
+                                <tr
+                                  key={part.code}
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // Prevent triggering submodel collapse
+                                    if (part.details) {
+                                      togglePart(part.code);
+                                    }
+                                  }}
+                                  className={`bg-base-300/10 border-b border-base-300 ${
+                                    part.details
+                                      ? "cursor-pointer hover:bg-base-300/30"
+                                      : ""
+                                  }`}
+                                >
+                                  {/* PART ICON */}
+                                  <td className="p-3 pl-16">
+                                    {part.details && (
+                                      <span className="mr-2">
+                                        {openParts.includes(part.code)
+                                          ? "▼"
+                                          : "▶"}
+                                      </span>
+                                    )}
+                                    {part.code}
+                                  </td>
+
+                                  <td className="p-3"></td>
+
+                                  <td className="p-3 text-right">
+                                    {formatCurrency(part.price)}
+                                  </td>
+                                </tr>
+
+                                {/* PART DETAILS */}
+
+                                {openParts.includes(part.code) &&
+                                  part.details?.map((detail: any) => (
+                                    <tr
+                                      key={detail.code}
+                                      className="bg-base-300/5 border-b border-base-300"
+                                    >
+                                      <td className="p-3 pl-24">
+                                        {detail.code}
+                                      </td>
+
+                                      <td className="p-3"></td>
+
+                                      <td className="p-3 text-right">
+                                        {formatCurrency(detail.price)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                              </>
+                            ))}
+                        </>
                       );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                    }
+
+                    // CASE 2 (submodel has no parts, Item -> SubModel OR Item -> Part -> Detail)
+                    return (
+                      <>
+                        <tr
+                          key={component.code || index}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (component.details) {
+                              togglePart(component.code);
+                            }
+                          }}
+                          className={`bg-base-300/20 ${component.details ? "cursor-pointer hover:bg-base-300/30" : ""}`}
+                        >
+                          {/* SUBMODEL ICON */}
+                          <td className="p-3 pl-8">
+                            {component.details && (
+                              <span className="mr-2">
+                                {openParts.includes(component.code) ? "▼" : "▶"}
+                              </span>
+                            )}
+                            {component.code || component.sub_model}
+                          </td>
+
+                          <td className="p-3"></td>
+
+                          <td className="p-3 text-right">
+                            {component.price !== undefined
+                              ? formatCurrency(component.price)
+                              : component.sub_total_price
+                                ? formatCurrency(component.sub_total_price)
+                                : "-"}
+                          </td>
+                        </tr>
+
+                        {/* PART DETAILS */}
+                        {openParts.includes(component.code) &&
+                          component.details?.map((detail: any) => (
+                            <tr
+                              key={detail.code}
+                              className="bg-base-300/5 border-b border-base-300"
+                            >
+                              <td className="p-3 pl-16">{detail.code}</td>
+
+                              <td className="p-3"></td>
+
+                              <td className="p-3 text-right">
+                                {formatCurrency(detail.price)}
+                              </td>
+                            </tr>
+                          ))}
+                      </>
+                    );
+                  })}
+              </>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </>
+    </div>
   );
 }
 
