@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { extractTextFromSampleImage, textExtraction } from './src/services/ocr/ocr';
+import { testOCR, textExtraction } from './src/services/ocr/ocr';
 
 const app = express();
 app.use(express.json());
@@ -12,20 +12,12 @@ app.get('/', (_req: Request, res: Response) => {
 
 // testing ocr endpoint
 app.get('/ocr/test', async (_req: Request, res: Response) => {
-  try {
-    const text = await extractTextFromSampleImage();
-
-    res.json({
-      success: true,
-      text,
-    });
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      success: false,
-      message: 'OCR failed',
-    });
+try {
+    const data = await testOCR();
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("OCR failed");
   }
 });
 
