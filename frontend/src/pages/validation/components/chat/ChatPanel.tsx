@@ -2,6 +2,8 @@ import { ChevronsLeft, ChevronsRight, ChevronsUp, ChevronsDown, Bot, Send } from
 import type { ChatMessage } from "../../../../models/Message";
 import MessageItem from "./MessageItem";
 import { useEffect, useRef, useState } from "react";
+import { sendMessageToGemini } from "./aiService";
+
 
 function ChatPanel({
 	isOpen,
@@ -22,7 +24,7 @@ function ChatPanel({
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [messages]);
 
-	const handleSend = () => {
+	const handleSend = async () => {
 		if (!input.trim()) return;
 
 		const userMsg: ChatMessage = {
@@ -34,8 +36,21 @@ function ChatPanel({
 
 		onAddMessage(userMsg);
 		setInput("");
-	};
 
+		const allMessages = [...messages, userMsg].map(m => ({
+			role: m.role === "user" ? "user" as const : "model" as const,
+			content: m.content
+		}));
+
+		const reply = await sendMessageToGemini(allMessages);
+
+		onAddMessage({
+			id: crypto.randomUUID(),
+			role: "model",
+			content: reply,
+			timestamp: new Date().toISOString()
+		});
+	};
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
@@ -94,21 +109,7 @@ function ChatPanel({
 
 			{/* messages area */}
 			<div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-				<div className="chat chat-start">
-					<div className="chat-image avatar">
-						<div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
-							<Bot className="w-7 h-7 text-primary" />
-						</div>
-					</div>
-					<div className="chat-header text-xs opacity-50 mb-1">
-						AI Assistant
-					</div>
-					<div className="chat-bubble chat-bubble-primary text-primary-content">
-						Hello! I've extracted the data from your document. You
-						can review it in the table. Let me know if anything
-						needs correcting.
-					</div>
-				</div>
+
 				<div className="chat chat-end">
 					<div className="chat-bubble chat-bubble-neutral">
 						Yo bro, the invoice number looks wrong, it should be

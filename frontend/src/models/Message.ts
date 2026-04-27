@@ -1,7 +1,7 @@
 export type ChatMessage = {
 	// For UI display
 	id: string;
-	role: "user" | "llm";
+	role: "user" | "model";
 	content: string;
 	timestamp: string;
 };

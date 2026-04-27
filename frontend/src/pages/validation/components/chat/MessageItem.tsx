@@ -2,7 +2,7 @@ import { Bot } from "lucide-react";
 import type { ChatMessage } from "../../../../models/Message";
 
 function MessageItem({ msg }: { msg: ChatMessage }) {
-	const isUser = (msg.role = "user");
+	const isUser = msg.role === "user";  // ✅
 
 	return (
 		<div className={`chat ${isUser ? "chat-end" : "chat-start"}`}>
@@ -24,11 +24,10 @@ function MessageItem({ msg }: { msg: ChatMessage }) {
 
 			{/* Message bubble */}
 			<div
-				className={`chat-bubble ${
-					isUser
-						? "chat-bubble-neutral"
-						: "chat-bubble-primary text-primary-content"
-				}`}
+				className={`chat-bubble ${isUser
+					? "chat-bubble-neutral"
+					: "chat-bubble-primary text-primary-content"
+					}`}
 			>
 				{msg.content}
 			</div>
