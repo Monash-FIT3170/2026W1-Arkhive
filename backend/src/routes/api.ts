@@ -1,5 +1,5 @@
 import express, {Request ,Response, Router } from "express"
-import { extractTextFromSampleImage } from "../services/ocr/ocr";
+import { testOCR } from "../services/ocr/ocr";
 
 const apiRouter = Router();
 
@@ -19,7 +19,7 @@ apiRouter.patch("/changeDataFields", (req, res) => {
 // testing ocr endpoint (author: Jasper)
 apiRouter.get('/ocr/test', async (_req: Request, res: Response) => {
   try {
-    const text = await extractTextFromSampleImage();
+    const text = await testOCR();
 
     res.json({
       success: true,
