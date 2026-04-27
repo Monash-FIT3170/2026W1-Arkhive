@@ -31,6 +31,11 @@ function MessageItem({ msg }: { msg: ChatMessage }) {
 			>
 				{msg.content}
 			</div>
+
+			{/*Use Local time to add timestamp - NOTE: on deployment will need GMT -> Melbourne Time converter*/}
+			<div className="chat-footer text-xs opacity-50 mt-1">
+				{new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+			</div>
 		</div>
 	);
 }

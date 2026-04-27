@@ -109,6 +109,17 @@ function ChatPanel({
 
 			{/* messages area */}
 			<div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+				<div className="chat chat-start">
+					<div className="chat-image avatar">
+						<div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
+							<Bot className="w-7 h-7 text-primary" />
+						</div>
+					</div>
+					<div className="chat-header text-xs opacity-50 mb-1">AI Assistant</div>
+					<div className="chat-bubble chat-bubble-primary text-primary-content">
+						Hi there, I'm Arkhive's Virtual Assistant. What would you like to do today?
+					</div>
+				</div>
 				{messages.map((msg) => (
 					<MessageItem key={msg.id} msg={msg} />
 				))}
