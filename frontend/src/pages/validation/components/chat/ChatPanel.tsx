@@ -53,7 +53,7 @@ function ChatPanel({
 						AI Assistant
 					</span>
 				</div>
-				
+
 				{/* Expand Button */}
 				<button
 					onClick={onToggle}
@@ -63,7 +63,7 @@ function ChatPanel({
 					<ChevronsLeft className="w-6 h-6 hidden lg:block" />
 					<ChevronsDown className="w-6 h-6 lg:hidden" />
 				</button>
-				
+
 				{/* Vertical AI Assistant label (Desktop only) */}
 				<div className="hidden lg:flex flex-1 items-center justify-center lg:mt-4">
 					<span className="[writing-mode:vertical-rl] text-base-content/50 uppercase tracking-widest font-semibold">
