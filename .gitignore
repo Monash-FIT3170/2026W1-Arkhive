@@ -108,3 +108,9 @@ Desktop.ini
 # Playground for testing (Harsha)
 #-------------------------------
 backend/playground
+backend/src/services/ocr/utils/utils.js
+backend/src/services/ocr/types/boundingBoxTypes.js
+backend/src/services/ocr/Screenshot 2026-04-25 195541.png
+backend/src/services/ocr/ocr.js
+backend/src/services/ocr/boundingBox.json
+AI_PROMPTS.MD
