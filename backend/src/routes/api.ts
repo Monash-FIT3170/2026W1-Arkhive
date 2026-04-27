@@ -7,7 +7,7 @@ apiRouter.post("/api/txtOutput", (req, res) => {
   return res.status(204).send("image sent to be txt processed");
 });
 
-apiRouter.post("/api/csvOutput", (req, res) => {
+apiRouter.post("/api/csvOutput", (req: Request, res) => {
   return res.status(204).send("image sent to be csv processed");
 });
 
