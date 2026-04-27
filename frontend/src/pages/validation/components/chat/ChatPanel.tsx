@@ -116,7 +116,7 @@ function ChatPanel({
 						</div>
 					</div>
 					<div className="chat-header text-xs opacity-50 mb-1">AI Assistant</div>
-					<div className="chat-bubble chat-bubble-primary text-primary-content">
+					<div className="chat-bubble chat-bubble-primary text-primary-content" style={{ boxShadow: "var(--color-secondary)" }}>
 						Hi there, I'm Arkhive's Virtual Assistant. What would you like to do today?
 					</div>
 				</div>
@@ -128,10 +128,19 @@ function ChatPanel({
 
 			{/* text input area */}
 			<div className="p-4 border-t border-gray-300 bg-base-300/30">
-				<div className="flex gap-2 items-end">
+				<div className="flex gap-2 items-center">
 					<textarea
-						className="textarea textarea-bordered w-full resize-none h-12 min-h-[1rem] focus:outline-none"
-						placeholder="Type a correction or instruction..."
+						className="
+							textarea textarea-bordered w-full resize-none h-12 min-h-[1rem]
+							rounded-xl bg-base-100
+							border border-base-300
+							focus:border-primary
+							transition-[border-color,box-shadow] duration-200 ease-out
+							focus:outline-none
+							
+						"
+
+						placeholder="Type your message here"
 						value={input}
 						onChange={(e) => setInput(e.target.value)}
 						onKeyDown={(e) => handleKeyDown(e)}
@@ -145,7 +154,7 @@ function ChatPanel({
 					</button>
 				</div>
 			</div>
-		</div>
+		</div >
 	);
 }
 
