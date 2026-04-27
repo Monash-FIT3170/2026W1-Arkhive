@@ -1,7 +1,6 @@
 import { Bot } from "lucide-react";
 import type { ChatMessage } from "../../../../models/Message";
-import ReactMarkdown from "react-markdown";
-
+//import ReactMarkdown from "react-markdown";
 
 function MessageItem({ msg }: { msg: ChatMessage }) {
 	const isUser = msg.role === "user";
@@ -26,19 +25,22 @@ function MessageItem({ msg }: { msg: ChatMessage }) {
 
 			{/* Message bubble */}
 			<div
-				className={`chat-bubble ${isUser
-					? "chat-bubble-neutral"
-					: "chat-bubble-primary text-primary-content"
-					} left-0`}
+				className={`chat-bubble ${
+					isUser
+						? "chat-bubble-neutral"
+						: "chat-bubble-primary text-primary-content"
+				} left-0`}
 				style={{ boxShadow: "--color-secondary" }}
 			>
-				<ReactMarkdown>{msg.content}</ReactMarkdown>
-
+				{msg.content}
 			</div>
 
 			{/*Use Local time to add timestamp - NOTE: on deployment will need GMT -> Melbourne Time converter*/}
 			<div className="chat-footer text-xs opacity-50 mt-1">
-				{new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+				{new Date(msg.timestamp).toLocaleTimeString([], {
+					hour: "2-digit",
+					minute: "2-digit"
+				})}
 			</div>
 		</div>
 	);

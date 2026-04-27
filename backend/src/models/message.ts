@@ -1,12 +1,4 @@
-import type { ExtractedData } from "./TableData";
-
-export type ChatMessage = {
-	// For UI display
-	id: string;
-	role: "user" | "model";
-	content: string;
-	timestamp: string;
-};
+import { ExtractedData } from "./TableData";
 
 export interface Message {
 	role: "user" | "model";
@@ -16,7 +8,7 @@ export interface Message {
 export interface ChatRequest {
 	// for API request
 	messages: Message[];
-	documentContext: ExtractedData;
+	documentContext?: ExtractedData;
 }
 
 export interface ChatResponse {

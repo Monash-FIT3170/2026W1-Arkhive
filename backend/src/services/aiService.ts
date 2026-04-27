@@ -1,7 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import type { Message } from "../../../../models/Message";
+import type { Message } from "../models/message";
+import dotenv from "dotenv";
+dotenv.config();
 
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY!);
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function sendMessageToGemini(
 	messages: Message[]

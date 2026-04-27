@@ -3,8 +3,7 @@ import type { ChatMessage } from "../../../../models/Message";
 import MessageItem from "./MessageItem";
 import { useEffect, useRef, useState } from "react";
 import { sendMessageToGemini } from "./aiService";
-
-
+import { sendMessage } from "../../../../services/llmService";
 
 function ChatPanel({
 	isOpen,
@@ -38,12 +37,12 @@ function ChatPanel({
 		onAddMessage(userMsg);
 		setInput("");
 
-		const allMessages = [...messages, userMsg].map(m => ({
-			role: m.role === "user" ? "user" as const : "model" as const,
+		const allMessages = [...messages, userMsg].map((m) => ({
+			role: m.role === "user" ? ("user" as const) : ("model" as const),
 			content: m.content
 		}));
 
-		const reply = await sendMessageToGemini(allMessages);
+		const reply = await sendMessage(allMessages);
 
 		onAddMessage({
 			id: crypto.randomUUID(),
@@ -77,7 +76,9 @@ function ChatPanel({
 					<div className="flex items-center justify-between p-4 border-b border-gray-200 bg-base-200/50 rounded-t-xl">
 						<div className="flex items-center gap-2">
 							<Bot className="w-7 h-7 text-primary" />
-							<h2 className="font-semibold text-lg">AI Assistant</h2>
+							<h2 className="font-semibold text-lg">
+								AI Assistant
+							</h2>
 						</div>
 						<button
 							onClick={onToggle}
@@ -88,7 +89,6 @@ function ChatPanel({
 						</button>
 					</div>
 
-
 					{/* messages area */}
 					<div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
 						<div className="chat chat-start">
@@ -97,9 +97,15 @@ function ChatPanel({
 									<Bot className="w-7 h-7 text-primary" />
 								</div>
 							</div>
-							<div className="chat-header text-xs opacity-50 mb-1">AI Assistant</div>
-							<div className="chat-bubble chat-bubble-primary text-primary-content" style={{ boxShadow: "var(--color-secondary)" }}>
-								Hi there, I'm Arkhive's Virtual Assistant. What would you like to do today?
+							<div className="chat-header text-xs opacity-50 mb-1">
+								AI Assistant
+							</div>
+							<div
+								className="chat-bubble chat-bubble-primary text-primary-content"
+								style={{ boxShadow: "var(--color-secondary)" }}
+							>
+								Hi there, I'm Arkhive's Virtual Assistant. What
+								would you like to do today?
 							</div>
 						</div>
 						{messages.map((msg) => (
@@ -121,7 +127,6 @@ function ChatPanel({
 							focus:outline-none
 							
 						"
-
 								placeholder="Type your message here"
 								value={input}
 								onChange={(e) => setInput(e.target.value)}
