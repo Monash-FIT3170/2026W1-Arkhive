@@ -47,7 +47,7 @@ function ChatPanel({
 		onAddMessage({
 			id: crypto.randomUUID(),
 			role: "model",
-			content: reply,
+			content: reply.response,
 			timestamp: new Date().toISOString()
 		});
 	};

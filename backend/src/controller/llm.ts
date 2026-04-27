@@ -14,10 +14,14 @@ export default {
 			}
 
 			const reply = await aiService.sendMessageToGemini(messages);
+			console.log(reply);
 			res.json({ reply });
 		} catch (error) {
-			console.error("Gemini error:", error);
-			res.status(500).json({ error: "Failed to get AI response" });
+			console.error("Error communicating with Gemini:", error);
+			res.status(500).json({
+				response: "Sorry, I encountered an error on the server.",
+				intent: null
+			});
 		}
 	}
 };

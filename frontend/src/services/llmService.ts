@@ -4,7 +4,7 @@ import type { ExtractedData } from "../models/TableData";
 export async function sendMessage(
 	messages: Message[],
 	documentContext?: ExtractedData
-): Promise<string> {
+): Promise<ChatResponse> {
 	const response = await fetch("/api/llm/chat", {
 		method: "POST",
 		headers: {
@@ -19,6 +19,7 @@ export async function sendMessage(
 		throw new Error("Failed to send message");
 	}
 
-	const data: ChatResponse = await response.json();
-	return data.response;
+	const data = await response.json();
+	console.log(data);
+	return data.reply;
 }
