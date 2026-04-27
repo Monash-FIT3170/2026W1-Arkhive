@@ -1,8 +1,9 @@
-import { ChevronsLeft, ChevronsRight, ChevronsUp, ChevronsDown, Bot, Send } from "lucide-react";
+import { ChevronsLeft, ChevronsDown, Bot, Send, X } from "lucide-react";
 import type { ChatMessage } from "../../../../models/Message";
 import MessageItem from "./MessageItem";
 import { useEffect, useRef, useState } from "react";
 import { sendMessageToGemini } from "./aiService";
+
 
 
 function ChatPanel({
@@ -58,79 +59,60 @@ function ChatPanel({
 		}
 	};
 
-	// Styling of the chat when the window is collapsed
-	if (!isOpen) {
-		return (
-			<div className="h-full w-full bg-base-200 border border-gray-200 rounded-lg flex flex-row lg:flex-col items-center justify-between lg:justify-start px-4 lg:px-0 py-0 lg:py-4 transition-all">
-				{/* horizontal AI assistant label (mobile only) */}
-				<div className="flex items-center justify-center lg:hidden">
-					<span className="text-base-content/50 uppercase tracking-widest font-semibold">
-						AI Assistant
-					</span>
-				</div>
-
-				{/* Expand Button */}
-				<button
-					onClick={onToggle}
-					className="btn btn-ghost btn-circle"
-					title="Expand Chat"
-				>
-					<ChevronsLeft className="w-6 h-6 hidden lg:block" />
-					<ChevronsDown className="w-6 h-6 lg:hidden" />
-				</button>
-
-				{/* Vertical AI Assistant label (Desktop only) */}
-				<div className="hidden lg:flex flex-1 items-center justify-center lg:mt-4">
-					<span className="[writing-mode:vertical-rl] text-base-content/50 uppercase tracking-widest font-semibold">
-						AI Assistant
-					</span>
-				</div>
-			</div>
-		);
-	}
-	// Styling of the chat when the window is expanded
 	return (
-		<div className="flex flex-col h-full w-full bg-base-200 border border-gray-200 rounded-lg">
-			{/* window header area */}
-			<div className="flex items-center justify-between p-4 border-b border-gray-200 bg-base-200/50">
-				<div className="flex items-center gap-2">
-					<Bot className="w-7 h-7 text-primary" />
-					<h2 className="font-semibold text-lg">AI Assistant</h2>
-				</div>
-				<button
-					onClick={onToggle}
-					className="btn btn-ghost btn-sm btn-circle"
-					title="Collapse Chat"
-				>
-					<ChevronsRight className="w-7 h-7 hidden lg:block" />
-					<ChevronsUp className="w-7 h-7 lg:hidden" />
-				</button>
-			</div>
+		<>
+			{/* AI Button to open and close modal */}
+			<button
+				onClick={onToggle}
+				className="btn btn-primary btn-circle btn-lg fixed bottom-6 right-6"
+				title={isOpen ? "Close AI Assistant" : "Open AI Assistant"}
+			>
+				<Bot className="w-9 h-9" />
+			</button>
 
-			{/* messages area */}
-			<div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-				<div className="chat chat-start">
-					<div className="chat-image avatar">
-						<div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
+			{/* Floating Chat Modal */}
+			{isOpen && (
+				<div className="fixed bottom-20 right-6 w-[50vw] md:w-96 h-[530px] max-h-[80vh] z-50 flex flex-col bg-base-200 border border-gray-200 rounded-xl">
+					{/* window header area */}
+					<div className="flex items-center justify-between p-4 border-b border-gray-200 bg-base-200/50 rounded-t-xl">
+						<div className="flex items-center gap-2">
 							<Bot className="w-7 h-7 text-primary" />
+							<h2 className="font-semibold text-lg">AI Assistant</h2>
 						</div>
+						<button
+							onClick={onToggle}
+							className="btn btn-ghost btn-sm btn-circle"
+							title="Close Chat"
+						>
+							<X className="w-6 h-6" />
+						</button>
 					</div>
-					<div className="chat-header text-xs opacity-50 mb-1">AI Assistant</div>
-					<div className="chat-bubble chat-bubble-primary text-primary-content" style={{ boxShadow: "var(--color-secondary)" }}>
-						Hi there, I'm Arkhive's Virtual Assistant. What would you like to do today?
-					</div>
-				</div>
-				{messages.map((msg) => (
-					<MessageItem key={msg.id} msg={msg} />
-				))}
-				<div ref={messagesEndRef} />
-			</div>
 
-			{/* text input area */}
-			<div className="p-4 border-t border-gray-300 bg-base-300/30">
-				<div className="flex gap-2 items-center">
-					<textarea
-						className="
+
+					{/* messages area */}
+					<div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+						<div className="chat chat-start">
+							<div className="chat-image avatar">
+								<div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
+									<Bot className="w-7 h-7 text-primary" />
+								</div>
+							</div>
+							<div className="chat-header text-xs opacity-50 mb-1">AI Assistant</div>
+							<div className="chat-bubble chat-bubble-primary text-primary-content" style={{ boxShadow: "var(--color-secondary)" }}>
+								Hi there, I'm Arkhive's Virtual Assistant. What would you like to do today?
+							</div>
+						</div>
+						{messages.map((msg) => (
+							<MessageItem key={msg.id} msg={msg} />
+						))}
+						<div ref={messagesEndRef} />
+					</div>
+
+					{/* text input area */}
+					<div className="p-4 border-t border-gray-300 bg-base-300/30">
+						<div className="flex gap-2 items-center">
+							<textarea
+								className="
 							textarea textarea-bordered w-full resize-none h-12 min-h-[1rem]
 							rounded-xl bg-base-100
 							border border-base-300
@@ -140,21 +122,23 @@ function ChatPanel({
 							
 						"
 
-						placeholder="Type your message here"
-						value={input}
-						onChange={(e) => setInput(e.target.value)}
-						onKeyDown={(e) => handleKeyDown(e)}
-					></textarea>
-					<button
-						className="btn btn-primary btn-square"
-						title="Send message"
-						onClick={handleSend}
-					>
-						<Send className="w-5 h-5" />
-					</button>
+								placeholder="Type your message here"
+								value={input}
+								onChange={(e) => setInput(e.target.value)}
+								onKeyDown={(e) => handleKeyDown(e)}
+							></textarea>
+							<button
+								className="btn btn-primary btn-square"
+								title="Send message"
+								onClick={handleSend}
+							>
+								<Send className="w-5 h-5" />
+							</button>
+						</div>
+					</div>
 				</div>
-			</div>
-		</div >
+			)}
+		</>
 	);
 }
 

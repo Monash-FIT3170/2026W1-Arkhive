@@ -21,20 +21,15 @@ function ValidationPage() {
 				<div className="w-full h-[50vh] lg:h-full lg:flex-1">
 					<ExtractedDataPanel />
 				</div>
-				<div
-					className={`transition-all duration-300 ease-in-out w-full lg:h-full ${isChatOpen
-						? "h-[50vh] lg:h-auto lg:flex-[0.8]"
-						: "h-20 lg:h-auto lg:flex-[0.05]"
-						}`}
-				>
-					<ChatPanel
-						isOpen={isChatOpen}
-						onToggle={() => setIsChatOpen(!isChatOpen)}
-						messages={messages}
-						onAddMessage={addMessage}
-					/>
-				</div>
 			</div>
+
+			{/* Floating Chat Modal */}
+			<ChatPanel
+				isOpen={isChatOpen}
+				onToggle={() => setIsChatOpen(!isChatOpen)}
+				messages={messages}
+				onAddMessage={addMessage}
+			/>
 		</>
 	);
 }
