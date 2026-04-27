@@ -2,7 +2,7 @@ import { Bot } from "lucide-react";
 import type { ChatMessage } from "../../../../models/Message";
 
 function MessageItem({ msg }: { msg: ChatMessage }) {
-	const isUser = msg.role === "user";  // ✅
+	const isUser = msg.role === "user";
 
 	return (
 		<div className={`chat ${isUser ? "chat-end" : "chat-start"}`}>
