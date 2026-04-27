@@ -1,9 +1,9 @@
 import { ChatRequest, Message } from "../models/message";
 import { Router, Request, Response } from "express";
 
-const aiService = require("../services/aiService");
+import aiService from "../services/aiService";
 
-module.exports = {
+export default {
 	chatWithModel: async (req: Request<{}, {}, ChatRequest>, res: Response) => {
 		try {
 			const { messages, documentContext } = req.body;

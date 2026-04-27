@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import chatRoute from "./routes/chatRoutes";
+import chatRoute from "./routes/llmRoutes";
 
 dotenv.config();
 
@@ -15,5 +15,5 @@ app.use(express.json());
 app.use("/api/chat", chatRoute);
 
 app.listen(PORT, () => {
-    console.log(`Backend running on http://localhost:${PORT}`);
+	console.log(`Backend running on http://localhost:${PORT}`);
 });

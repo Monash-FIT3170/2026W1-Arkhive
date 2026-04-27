@@ -1,7 +1,7 @@
-const llmController = require("../controller/llm");
-const express = require("express");
-const router = express.Router();
+import llmController from "../controller/llm";
+import { Router } from "express";
+const router = Router();
 
 router.post("/chat", llmController.chatWithModel);
 
-module.exports = router;
+export default router;

@@ -15,7 +15,6 @@ export async function sendMessage(
 			documentContext
 		} as ChatRequest)
 	});
-
 	if (!response.ok) {
 		throw new Error("Failed to send message");
 	}
