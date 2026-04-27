@@ -31,10 +31,15 @@ const chatResponseSchema: Schema = {
 						"unclear"
 					]
 				},
-				field: {
+				column: {
 					type: SchemaType.STRING,
 					description:
-						"The specific column, header, or field being discussed (e.g., 'apples')."
+						"The specific column header from the provided document context (e.g., 'Price', 'Quantity')."
+				},
+				rowId: {
+					type: SchemaType.STRING,
+					description:
+						"The unique '_id' of the exact row the user wants to modify (extracted from the provided document context)."
 				},
 				oldValue: {
 					type: SchemaType.STRING,

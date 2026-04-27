@@ -26,8 +26,9 @@ export interface ChatResponse {
 
 export interface Intent {
 	type: "correction" | "context" | "approval" | "rejection" | "unclear";
-	field?: string; // what field/header they're talking about
-	oldValue?: string; // what it currently says
-	newValue?: string; // what it should say
-	note?: string; // any extra context the user provided
+	rowId?: string; // The unique ID of the row
+	column?: string; // <-- Changed from 'field' to 'column'
+	oldValue?: string;
+	newValue?: string;
+	note?: string;
 }

@@ -1,4 +1,9 @@
 export interface ExtractedData {
 	columns: string[];
-	rows: Record<string, any>[];
+	rows: ExtractedRow[];
+}
+
+export interface ExtractedRow {
+	_id: string | number;
+	[key: string]: any;
 }
