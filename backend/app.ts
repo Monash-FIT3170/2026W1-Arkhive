@@ -1,5 +1,4 @@
 import express, { Request, RequestHandler, Response } from 'express';
-import { extractTextFromSampleImage } from './src/services/ocr/ocr'
 import apiRouter from "./src/routes/api"
 import session from 'express-session';
 
@@ -27,5 +26,6 @@ app.get('/', (_req: Request, res: Response) => {
 app.use('/api/', apiRouter);
 
 app.listen(PORT, () => {
-  console.log(`[server]: Server is running locally at :${PORT}`);
+  console.log(`Server is running locally at ${PORT}`);
+  console.log('Test OCR at http://localhost:3000/ocr/test');
 });

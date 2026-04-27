@@ -7,6 +7,7 @@ import { pdf } from 'pdf-to-img';
 
 
 
+
 const client = new vision.ImageAnnotatorClient({
   keyFilename: path.resolve(process.cwd(), '../../credentials/google-vision-key.json'),
   features: [
@@ -24,14 +25,25 @@ const chunk = <T>(arr: T[], size: number): T[][] =>
     arr.slice(i * size, i * size + size)
   );
 
-export async function extractTextFromSampleImage(): Promise<string> {
-  const imagePath = path.resolve(process.cwd(), 'assets/sample-page-1.png');
+export async function textExtraction(imagePath: string): Promise<string> {
+  const absoluteImagePath = path.resolve(imagePath);
 
-  const [result] = await client.documentTextDetection(imagePath);
+  const [result] = await client.documentTextDetection(absoluteImagePath);
 
   const extractedText = result.fullTextAnnotation?.text ?? '';
 
   return extractedText;
+}
+
+
+// test ocr on 1 png page
+export async function testOCR() {
+  const text = await textExtraction("assets/sample-page-1.png");
+
+  return {
+    success: true,
+    text,
+  };
 }
 
 
