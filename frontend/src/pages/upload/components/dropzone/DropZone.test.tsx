@@ -57,4 +57,14 @@ describe('DropZone File Validation Logic', function () {
     expect(ALLOWED_MIME_TYPES).toContain('image/jpeg');
   });
 
+  test('should ignore files with unsupported extensions even if MIME type is empty', function () {
+  const mockFiles = [
+    new File(['data'], 'unknown.xyz', { type: '' })
+  ] as unknown as FileList;
+
+  const result = filterValidFiles(mockFiles);
+
+  expect(result.length).toBe(0);
+  });
+  
 });
