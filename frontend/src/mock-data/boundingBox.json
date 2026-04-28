@@ -1,0 +1,476 @@
+[
+  {
+    "id": "comp_0",
+    "type": "HEADER",
+    "indentation": 664,
+    "y": 102,
+    "layer": 0,
+    "text": "TOTO",
+    "confidence": 0.9905128479003906
+  },
+  {
+    "id": "comp_1",
+    "type": "BODY_TEXT",
+    "indentation": 145,
+    "y": 147,
+    "layer": 0,
+    "text": "ONE PIECE TOILET",
+    "confidence": 0.9905422329902649
+  },
+  {
+    "id": "comp_2",
+    "type": "TABLE_ROW",
+    "indentation": 157,
+    "y": 175,
+    "layer": 0,
+    "text": "NO . ITEM DESCRIPTION PRICE LIST ( Rp . ) WHITE PHOTO",
+    "confidence": 0.978762412071228,
+    "cells": [
+      "NO .",
+      "ITEM",
+      "DESCRIPTION",
+      "PRICE LIST ( Rp . ) WHITE",
+      "PHOTO"
+    ]
+  },
+  {
+    "id": "comp_3",
+    "type": "LIST_ITEM",
+    "indentation": 163,
+    "y": 230,
+    "layer": 0,
+    "text": "1 CW823REJ 38,230,000",
+    "confidence": 0.9788917700449625,
+    "cells": [
+      "1",
+      "CW823REJ",
+      "38,230,000"
+    ]
+  },
+  {
+    "id": "comp_4",
+    "type": "TABLE_ROW",
+    "indentation": 180,
+    "y": 273,
+    "layer": 1,
+    "text": "A. CW823REJW / F - V2 : 10,430,000",
+    "confidence": 0.9805013239383698,
+    "cells": [
+      "A. CW823REJW / F - V2 :",
+      "10,430,000"
+    ],
+    "parentId": "comp_3"
+  },
+  {
+    "id": "comp_5",
+    "type": "TABLE_ROW",
+    "indentation": 211,
+    "y": 292.5,
+    "layer": 2,
+    "text": "CW823IREJ \" Avante \" Rimless w / CCT One Piece Toilet Bowl Only ( S - Trap ) 6,018,000",
+    "confidence": 0.9605854153633118,
+    "cells": [
+      "CW823IREJ",
+      "\" Avante \" Rimless w / CCT One Piece Toilet Bowl Only ( S - Trap )",
+      "6,018,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_6",
+    "type": "TABLE_ROW",
+    "indentation": 211,
+    "y": 314.5,
+    "layer": 2,
+    "text": "CW823CREJP \" Avante \" Tank Cover for CW823REJ 1,788,000",
+    "confidence": 0.9751424193382263,
+    "cells": [
+      "CW823CREJP",
+      "\" Avante \" Tank Cover for CW823REJ",
+      "1,788,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_7",
+    "type": "TABLE_ROW",
+    "indentation": 210,
+    "y": 334,
+    "layer": 2,
+    "text": "TX902CV25 : Installation Fitting Set for CW823REJ , CW823RJ 533,000",
+    "confidence": 0.9786259531974792,
+    "cells": [
+      "TX902CV25 :",
+      "Installation Fitting Set for CW823REJ , CW823RJ",
+      "533,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_8",
+    "type": "LIST_ITEM",
+    "indentation": 219,
+    "y": 356,
+    "layer": 2,
+    "text": "-TX277S Stop Valve w / Flexible Hose 230,000",
+    "confidence": 0.9706924756368002,
+    "cells": [
+      "-TX277S",
+      "Stop Valve w / Flexible Hose",
+      "230,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_9",
+    "type": "LIST_ITEM",
+    "indentation": 219,
+    "y": 378,
+    "layer": 3,
+    "text": "-TX276CV2 Fixing Bracket 180,000",
+    "confidence": 0.9813950260480245,
+    "cells": [
+      "-TX276CV2",
+      "Fixing Bracket",
+      "180,000"
+    ],
+    "parentId": "comp_8"
+  },
+  {
+    "id": "comp_10",
+    "type": "LIST_ITEM",
+    "indentation": 219,
+    "y": 399,
+    "layer": 4,
+    "text": "-T53P100V5S Floor Flange w / Seal Gasket 123,000",
+    "confidence": 0.9425021409988403,
+    "cells": [
+      "-T53P100V5S",
+      "Floor Flange w / Seal Gasket",
+      "123,000"
+    ],
+    "parentId": "comp_9"
+  },
+  {
+    "id": "comp_11",
+    "type": "LIST_ITEM",
+    "indentation": 202,
+    "y": 418.5,
+    "layer": 2,
+    "text": "- TX823C8WS 1,710,000",
+    "confidence": 0.9546137750148773,
+    "cells": [
+      "- TX823C8WS",
+      "1,710,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_12",
+    "type": "TABLE_ROW",
+    "indentation": 210,
+    "y": 439,
+    "layer": 3,
+    "text": "CKH6657U Dual Flush Tank Trim w / o Stop Valve for CW823REJ ( 4,5 / 3 Liters ) Outlet Connector 381,000",
+    "confidence": 0.9783534407615662,
+    "cells": [
+      "CKH6657U",
+      "Dual Flush Tank Trim w / o Stop Valve for CW823REJ ( 4,5 / 3 Liters ) Outlet Connector",
+      "381,000"
+    ],
+    "parentId": "comp_11"
+  },
+  {
+    "id": "comp_13",
+    "type": "TABLE_ROW",
+    "indentation": 181,
+    "y": 482,
+    "layer": 2,
+    "text": "B. TCF4911EZ Apricot Washlet , Elongated , for CCT Installation 27,800,000",
+    "confidence": 0.9794498880704244,
+    "cells": [
+      "B. TCF4911EZ",
+      "Apricot Washlet , Elongated , for CCT Installation",
+      "27,800,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_14",
+    "type": "LIST_ITEM",
+    "indentation": 162,
+    "y": 523.5,
+    "layer": 1,
+    "text": "2 CW823RJ 11,940,000 6,018,000",
+    "confidence": 0.9760276873906454,
+    "cells": [
+      "2",
+      "CW823RJ",
+      "11,940,000 6,018,000"
+    ],
+    "parentId": "comp_3"
+  },
+  {
+    "id": "comp_15",
+    "type": "TABLE_ROW",
+    "indentation": 212,
+    "y": 544.5,
+    "layer": 2,
+    "text": "CW8231RJ \" Avante \" Rimless One Piece Toilet Bowl Only ( S - Trap )",
+    "confidence": 0.9454824328422546,
+    "cells": [
+      "CW8231RJ",
+      "\" Avante \" Rimless One Piece Toilet Bowl Only ( S - Trap )"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_16",
+    "type": "TABLE_ROW",
+    "indentation": 211,
+    "y": 565,
+    "layer": 2,
+    "text": "CW823CREJP \" Avante \" Tank Cover for CW823RJ 1,788,000",
+    "confidence": 0.9730991125106812,
+    "cells": [
+      "CW823CREJP",
+      "\" Avante \" Tank Cover for CW823RJ",
+      "1,788,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_17",
+    "type": "TABLE_ROW",
+    "indentation": 212,
+    "y": 586.5,
+    "layer": 2,
+    "text": "TX902CV25 : Installation Fitting Set for CW823REJ , CW823RJ 533,000",
+    "confidence": 0.9802534182866415,
+    "cells": [
+      "TX902CV25 :",
+      "Installation Fitting Set for CW823REJ , CW823RJ",
+      "533,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_18",
+    "type": "LIST_ITEM",
+    "indentation": 219,
+    "y": 607.5,
+    "layer": 2,
+    "text": "-TX277S Stop Valve w / Flexible Hose 230,000",
+    "confidence": 0.9702023069063822,
+    "cells": [
+      "-TX277S",
+      "Stop Valve w / Flexible Hose",
+      "230,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_19",
+    "type": "LIST_ITEM",
+    "indentation": 219,
+    "y": 628,
+    "layer": 3,
+    "text": "-TX276CV2 Fixing Bracket 180,000",
+    "confidence": 0.9828011989593506,
+    "cells": [
+      "-TX276CV2",
+      "Fixing Bracket",
+      "180,000"
+    ],
+    "parentId": "comp_18"
+  },
+  {
+    "id": "comp_20",
+    "type": "LIST_ITEM",
+    "indentation": 219,
+    "y": 648.5,
+    "layer": 4,
+    "text": "-T53P100V5 Floor Flange w / Seal Gasket 123,000",
+    "confidence": 0.967300275961558,
+    "cells": [
+      "-T53P100V5",
+      "Floor Flange w / Seal Gasket",
+      "123,000"
+    ],
+    "parentId": "comp_19"
+  },
+  {
+    "id": "comp_21",
+    "type": "LIST_ITEM",
+    "indentation": 202,
+    "y": 669.5,
+    "layer": 2,
+    "text": "- TX823C8WS Dual Flush Tank Trim w / o Stop Valve for CW823RJ ( 4,5 / 3 Liters ) Outlet Connector 1,710,000",
+    "confidence": 0.9616596500078837,
+    "cells": [
+      "- TX823C8WS",
+      "Dual Flush Tank Trim w / o Stop Valve for CW823RJ ( 4,5 / 3 Liters ) Outlet Connector",
+      "1,710,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_22",
+    "type": "LIST_ITEM",
+    "indentation": 202,
+    "y": 690.5,
+    "layer": 3,
+    "text": "- CKH6657U 381,000",
+    "confidence": 0.9731115400791168,
+    "cells": [
+      "- CKH6657U",
+      "381,000"
+    ],
+    "parentId": "comp_21"
+  },
+  {
+    "id": "comp_23",
+    "type": "LIST_ITEM",
+    "indentation": 202,
+    "y": 712.5,
+    "layer": 4,
+    "text": "- TC281SJ Duroplast Seat & Cover w / Metal Hinges , Soft Closing ( Elongated ) 1,510,000",
+    "confidence": 0.9803129831949869,
+    "cells": [
+      "- TC281SJ",
+      "Duroplast Seat & Cover w / Metal Hinges , Soft Closing ( Elongated )",
+      "1,510,000"
+    ],
+    "parentId": "comp_22"
+  },
+  {
+    "id": "comp_24",
+    "type": "LIST_ITEM",
+    "indentation": 164,
+    "y": 752.5,
+    "layer": 2,
+    "text": "3 CW823PJ 11,030,000",
+    "confidence": 0.977408766746521,
+    "cells": [
+      "3",
+      "CW823PJ",
+      "11,030,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_25",
+    "type": "LIST_ITEM",
+    "indentation": 206,
+    "y": 773,
+    "layer": 3,
+    "text": "- CW8231PJ -CW823CRJP \" Avante \" One Piece Toilet Bowl Only ( P - Trap ) 5,549,000",
+    "confidence": 0.9659237265586853,
+    "cells": [
+      "- CW8231PJ -CW823CRJP",
+      "\" Avante \" One Piece Toilet Bowl Only ( P - Trap )",
+      "5,549,000"
+    ],
+    "parentId": "comp_24"
+  },
+  {
+    "id": "comp_26",
+    "type": "TABLE_ROW",
+    "indentation": 402,
+    "y": 796,
+    "layer": 4,
+    "text": "\" Avante \" Tank Cover for CW823NJN , CW823PJ Installation Fitting Set for CW823PJ 1,788,000",
+    "confidence": 0.9760690927505493,
+    "cells": [
+      "\" Avante \" Tank Cover for CW823NJN , CW823PJ Installation Fitting Set for CW823PJ",
+      "1,788,000"
+    ],
+    "parentId": "comp_25"
+  },
+  {
+    "id": "comp_27",
+    "type": "LIST_ITEM",
+    "indentation": 206,
+    "y": 816,
+    "layer": 4,
+    "text": "-TX902CZ : 473,000",
+    "confidence": 0.9752125442028046,
+    "cells": [
+      "-TX902CZ :",
+      "473,000"
+    ],
+    "parentId": "comp_25"
+  },
+  {
+    "id": "comp_28",
+    "type": "LIST_ITEM",
+    "indentation": 219,
+    "y": 836.5,
+    "layer": 5,
+    "text": "-TX277S Stop Valve w / Flexible Hose 230,000",
+    "confidence": 0.9747008085250854,
+    "cells": [
+      "-TX277S",
+      "Stop Valve w / Flexible Hose",
+      "230,000"
+    ],
+    "parentId": "comp_27"
+  },
+  {
+    "id": "comp_29",
+    "type": "LIST_ITEM",
+    "indentation": 219,
+    "y": 858,
+    "layer": 6,
+    "text": "-TX215C Slip - in Connector 110,000",
+    "confidence": 0.9742314219474792,
+    "cells": [
+      "-TX215C",
+      "Slip - in Connector",
+      "110,000"
+    ],
+    "parentId": "comp_28"
+  },
+  {
+    "id": "comp_30",
+    "type": "TABLE_ROW",
+    "indentation": 206,
+    "y": 890,
+    "layer": 5,
+    "text": "TX276C -TX823C1WSF1 Fixing Bracket Tank Trim w / o Stop Valve for CW823PJ ( 6 Liters ) 1,710,000 133,000",
+    "confidence": 0.9785687923431396,
+    "cells": [
+      "TX276C -TX823C1WSF1",
+      "Fixing Bracket",
+      "Tank Trim w / o Stop Valve for CW823PJ ( 6 Liters )",
+      "1,710,000",
+      "133,000"
+    ],
+    "parentId": "comp_27"
+  },
+  {
+    "id": "comp_31",
+    "type": "LIST_ITEM",
+    "indentation": 206,
+    "y": 920.5,
+    "layer": 5,
+    "text": "- TC281SJ Duroplast Seat & Cover w / Metal Hinges , Soft Closing ( Elongated ) 1,510,000",
+    "confidence": 0.9684316714604696,
+    "cells": [
+      "- TC281SJ",
+      "Duroplast Seat & Cover w / Metal Hinges , Soft Closing ( Elongated )",
+      "1,510,000"
+    ],
+    "parentId": "comp_27"
+  },
+  {
+    "id": "comp_32",
+    "type": "BODY_TEXT",
+    "indentation": 402,
+    "y": 963,
+    "layer": 6,
+    "text": "NOTE : FOR P - TRAP INSTALLATION",
+    "confidence": 0.9765546917915344,
+    "parentId": "comp_31"
+  }
+]
