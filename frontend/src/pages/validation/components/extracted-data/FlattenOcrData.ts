@@ -5,6 +5,11 @@ import type { OCRComponent } from "./OCRComponent";
  function isMainItem(component: any) { 
     return component.cells && /^\d+$/.test(component.cells[0]); 
 }
+
+// helper for layering
+function effectiveLayer(component: OCRComponent): number { 
+    return isMainItem(component) ? 0 : component.layer + 1; 
+}
     
 
  // text formatter (remove dashes, colons)
@@ -25,11 +30,6 @@ function cleanPrice(value: string, useFirstPrice = false) {
 
 }
 
-//submodel formatter 
-function isSubModel(value: string) { 
-    return /^[A-Z]\.\s*[A-Z0-9]/.test(value.trim());
-}
-
 //description formatter
 function getDescription(cells: string[]) {
     if (cells.length <= 2) return "";
@@ -44,54 +44,76 @@ function looksLikeItemCode(value: string) {
 
 // Flatten ocr data 
 export function flattenOcrData(data: OCRComponent[]): ExtractedData {
-    const columns = [
-        "ITEM_Level_1",
-        "ITEM_Level_2",
-        "ITEM_Level_3",
-        "ITEM",
-        "DESCRIPTION",
-        "PRICE",
-    ];
 
-    const rows: ExtractedRow[] = [];
-    const componentById = new Map<string, OCRComponent>();
+    //find table header row
+    const tableColsComponent = data.find( (c) => c.type === "TABLE_COLS" );
 
-    data.forEach((component) => { 
-        componentById.set(component.id, component); // map components by id
+    //fallback
+    const fallbackCols = tableColsComponent?.cells || [ "ITEM", "DESCRIPTION", "PRICE", ];
+
+    //header clean
+    const cleanedCols = fallbackCols.map((col) => col .replace(/\(.*?\)/g, "") 
+    .replace(/\./g, "") 
+    .replace(/\s+/g, "_") 
+    .trim() 
+    .toUpperCase() 
+    );
+
+    //go through each component
+    let maxLayer = 0; data.forEach((component) => { 
+        if (component.cells && component.layer > maxLayer) { 
+            maxLayer = component.layer; 
+        } 
     });
 
+    // +1 to account for the effective layer shift
+    const adjustedMaxLayer = maxLayer + 1;
+
+    //create level cols for hierarchy
+    const levelColumns: string[] = []; 
+    
+    for (let i = 1; i <= adjustedMaxLayer; i++) { 
+        levelColumns.push(`ITEM_Level_${i}`); 
+    }
+
+    //build cols
+    const columns: string[] = [];
+    levelColumns.forEach((col) => columns.push(col)); 
+    cleanedCols.forEach((col) => columns.push(col));
+
+    //rows
+    const rows: ExtractedRow[] = [];
+
+
+    //dynamic layering array
+    const currentLevels: string[] = [];
+
     data.forEach((component) => {
-
-        // state for items indentation
-        let currentLevel1 = ""; 
-        let currentLevel2 = ""; 
-        let currentLevel3 = "";
-
 
         //components that dont contain data
         if (!component.cells) return; 
         if (component.type === "HEADER" || component.type === "BODY_TEXT") return;
-        if (component.text?.includes("NO . ITEM DESCRIPTION")) return;
+        if (component.type === "TABLE_COLS") return;
 
+        //for layers
+        const layer = effectiveLayer(component);
         const firstCell = component.cells[0] || "";
 
-        // Main item
-        if (isMainItem(component)) {
-            currentLevel1 = component.cells[1] || ""; 
-            currentLevel2 = ""; 
-            currentLevel3 = ""; 
+        //array must be long enough
+        while (currentLevels.length <= layer) { 
+            currentLevels.push(""); 
         }
 
-        // Submodel
-        else if (isSubModel(firstCell)) { 
-            currentLevel2 = firstCell.trim(); 
-            currentLevel3 = ""; 
+        //update current level
+        if (isMainItem(component)) { 
+            currentLevels[layer] = component.cells[1] || "";
+        } else { 
+            currentLevels[layer] = cleanItem(firstCell); 
         }
-
-        // Parts
-        else { 
-            currentLevel3 = cleanItem(firstCell);
-         }
+        
+        for (let i = layer + 1; i < currentLevels.length; i++) { 
+            currentLevels[i] = ""; 
+        }
          
         // create rows
         const row: ExtractedRow = { 
@@ -99,28 +121,32 @@ export function flattenOcrData(data: OCRComponent[]): ExtractedData {
         };
 
         // assign levels to row
-        row["ITEM_Level_1"] = currentLevel1; 
-        row["ITEM_Level_2"] = currentLevel2; 
-        row["ITEM_Level_3"] = currentLevel3;
+        for (let i = 0; i < levelColumns.length; i++) { 
+            row[levelColumns[i]] = currentLevels[i] || ""; 
+        }
 
         //ITEM fix
         const rawItem = component.cells[0] || "";
+        const itemCol = cleanedCols.find((col) => col.includes("ITEM")) ?? "ITEM"; 
+
         
         if (isMainItem(component)) { 
-            row["ITEM"] = component.cells[1] || "";  //if main use cell 1
+            row[itemCol] = component.cells[1] || "";  
         } else if (looksLikeItemCode(rawItem)) {  
-            row["ITEM"] = cleanItem(rawItem);  // item code use cell 2
+            row[itemCol] = cleanItem(rawItem)  // item code use first cell
         } else { 
-            row["ITEM"] = "";  // blank
+            row[itemCol] = "";  // blank
         }
 
-        //DESCRIPTION
-        row["DESCRIPTION"] = getDescription(component.cells);
+        //DESCRIPTION fix
+        const descCol = cleanedCols.find((col) => col.includes("DESC")) ?? "DESCRIPTION"; 
+        row[descCol] = getDescription(component.cells);
 
 
-        //PRICE fix - if main item, use first price, else use last price 
+        //PRICE fix - find anything that includes "price"
         const rawPriceText = component.cells.join(" ");
-        row["PRICE"] = cleanPrice(rawPriceText, isMainItem(component));
+        const priceCol = columns.find((col) => col.includes("PRICE")) || "PRICE";
+        row[priceCol] = cleanPrice(rawPriceText, isMainItem(component));
 
         rows.push(row);
     });

@@ -49,7 +49,7 @@ function ExtractedDataPanel() {
                       column === "ITEM" ? "break-all" : "break-words"
                     }`}
                   >
-                    {column === "PRICE" && row[column]
+                    {column.includes("PRICE") && row[column]
                       ? formatCurrency(
                           Number(String(row[column]).replace(/,/g, "")),
                         )
