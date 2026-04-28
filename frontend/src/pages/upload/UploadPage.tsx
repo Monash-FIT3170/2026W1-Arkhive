@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import DropZone from './components/dropzone/DropZone';
 import ProcessButton from './components/actions/ProcessButton';
+import {useNavigate} from "react-router-dom";
 
 /**
  * Logic helper to manage the "Store" user story.
@@ -31,6 +32,7 @@ function UploadPage() {
   // USER STORY: "Store the uploaded file for the next step"
   // We initialize the store as an empty array of File objects.
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const navigate = useNavigate();
 
   /**
    * USER STORY: "Capture the selected file from the user"
@@ -52,10 +54,10 @@ function UploadPage() {
   function handleProceedToPreview() {
     // Logging for debug purposes during development handoff.
     console.log("Proceeding to preview step with the following store:", uploadedFiles);
-    
-    // TODO: Next developer to add navigation logic here:
-    // const navigate = useNavigate();
+    // navigation logic here:
     // navigate('/validation');
+    // navigate to preview and pass files:
+    navigate("/preview", {state: {files: uploadedFiles}});
   }
 
   return (
