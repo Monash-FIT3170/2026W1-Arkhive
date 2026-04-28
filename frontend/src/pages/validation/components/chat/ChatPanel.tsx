@@ -1,8 +1,7 @@
-import { ChevronsLeft, ChevronsDown, Bot, Send, X } from "lucide-react";
+import { Bot, Send, X } from "lucide-react";
 import type { ChatMessage } from "../../../../models/Message";
 import MessageItem from "./MessageItem";
 import { useEffect, useRef, useState } from "react";
-import { sendMessageToGemini } from "./aiService";
 import { sendMessage } from "../../../../services/llmService";
 
 function ChatPanel({
