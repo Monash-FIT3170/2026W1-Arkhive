@@ -66,5 +66,17 @@ describe('DropZone File Validation Logic', function () {
 
   expect(result.length).toBe(0);
   });
-  
+
+  test('should filter out invalid files and keep only valid ones in mixed input', function () {
+  const mockFiles = [
+    new File(['data'], 'valid.pdf', { type: 'application/pdf' }),
+    new File(['data'], 'invalid.exe', { type: 'application/x-msdownload' })
+  ] as unknown as FileList;
+
+  const result = filterValidFiles(mockFiles);
+
+  expect(result.length).toBe(1);
+  expect(result[0].name).toBe('valid.pdf');
+});
+
 });
