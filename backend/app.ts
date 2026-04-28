@@ -1,6 +1,10 @@
 import express, { Request, RequestHandler, Response } from 'express';
 import apiRouter from "./src/routes/api"
 import session from 'express-session';
+import multer from 'multer'
+import uploadRouter from './src/routes/upload'
+
+const uploads = multer({ dest: 'uploads/' })
 
 const app = express();
 app.use(express.json());
@@ -21,6 +25,8 @@ const PORT = process.env.PORT || 3000;
 app.get('/', (_req: Request, res: Response) => {
   res.send('Hello World');
 });
+
+app.post('/uploads')
 
 // testing api endpoint
 app.use('/api/', apiRouter);
