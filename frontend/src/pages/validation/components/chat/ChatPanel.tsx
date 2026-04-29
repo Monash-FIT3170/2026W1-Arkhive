@@ -3,17 +3,20 @@ import type { ChatMessage } from "../../../../models/Message";
 import MessageItem from "./MessageItem";
 import { useEffect, useRef, useState } from "react";
 import { sendMessage } from "../../../../services/llmService";
+import type { ExtractedData } from "../extracted-data/ExtractedData";
 
 function ChatPanel({
 	isOpen,
 	onToggle,
 	messages,
-	onAddMessage
+	onAddMessage,
+	documentContext
 }: {
 	isOpen: boolean;
 	onToggle: () => void;
 	messages: ChatMessage[];
 	onAddMessage: (msg: ChatMessage) => void;
+	documentContext: ExtractedData;
 }) {
 	const [input, setInput] = useState("");
 	const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -41,7 +44,7 @@ function ChatPanel({
 			content: m.content
 		}));
 
-		const reply = await sendMessage(allMessages);
+		const reply = await sendMessage(allMessages, documentContext);
 
 		onAddMessage({
 			id: crypto.randomUUID(),
