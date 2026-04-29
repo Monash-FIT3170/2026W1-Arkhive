@@ -1,10 +1,10 @@
-import mockOcrData from "../../../../mock-data/boundingBox.json";
-import { flattenOcrData } from "./FlattenOcrData";
-import type { OCRComponent } from "../../../../models/OCRComponent";
+import type { ExtractedData } from "./ExtractedData";
 
-function ExtractedDataPanel() {
-	const extractedData = flattenOcrData(mockOcrData as OCRComponent[]);
-
+function ExtractedDataPanel({
+	extractedData
+}: {
+	extractedData: ExtractedData;
+}) {
 	// Currency formatting function
 	const formatCurrency = (amount: number) => {
 		return new Intl.NumberFormat("id-ID", {

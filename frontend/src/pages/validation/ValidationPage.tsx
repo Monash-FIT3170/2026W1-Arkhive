@@ -3,11 +3,13 @@ import DocumentPanel from "./components/document/DocumentPanel";
 import ExtractedDataPanel from "./components/extracted-data/ExtractedDataPanel";
 import ChatPanel from "./components/chat/ChatPanel";
 import type { ChatMessage } from "../../models/Message";
-
+import type { OCRComponent } from "../../models/OCRComponent";
+import mockOcrData from "../../mock-data/boundingBox.json";
+import { flattenOcrData } from "./components/extracted-data/FlattenOcrData";
 function ValidationPage() {
 	const [isChatOpen, setIsChatOpen] = useState(true);
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
-
+	const documentContext = flattenOcrData(mockOcrData as OCRComponent[]);
 	const addMessage = (message: ChatMessage) => {
 		setMessages((prev) => [...prev, message]);
 	};
@@ -19,7 +21,7 @@ function ValidationPage() {
 					<DocumentPanel />
 				</div>
 				<div className="w-full h-[50vh] lg:h-full lg:flex-1">
-					<ExtractedDataPanel />
+					<ExtractedDataPanel extractedData={documentContext} />
 				</div>
 			</div>
 
@@ -29,6 +31,7 @@ function ValidationPage() {
 				onToggle={() => setIsChatOpen(!isChatOpen)}
 				messages={messages}
 				onAddMessage={addMessage}
+				documentContext={documentContext}
 			/>
 		</>
 	);

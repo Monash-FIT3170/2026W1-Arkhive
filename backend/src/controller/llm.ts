@@ -13,7 +13,10 @@ export default {
 				return;
 			}
 
-			const reply = await aiService.sendMessageToGemini(messages);
+			const reply = await aiService.sendMessageToGemini(
+				messages,
+				documentContext
+			);
 			console.log(reply);
 			res.json({ reply });
 		} catch (error) {

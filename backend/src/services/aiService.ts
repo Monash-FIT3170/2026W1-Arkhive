@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI, SchemaType, Schema } from "@google/generative-ai";
 import type { Message } from "../models/message";
 import dotenv from "dotenv";
+import { ExtractedData } from "../models/TableData";
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -63,19 +64,33 @@ const chatResponseSchema: Schema = {
 };
 
 export default {
-	sendMessageToGemini: async (messages: Message[]): Promise<string> => {
+	sendMessageToGemini: async (
+		messages: Message[],
+		documentContext: ExtractedData | undefined
+	): Promise<string> => {
+		//turn into string
+		const formattedContext = JSON.stringify(documentContext, null, 2);
+
+		//set up model
 		const model = genAI.getGenerativeModel({
 			model: "gemini-2.5-flash",
 			systemInstruction: `You are an AI assistant helping a user validate and correct a digitized document/table. 
             Analyze the user's message. If they want to change data (e.g., 'change apples to bananas'), extract the intent as a 'correction'. 
             If they approve or reject the document, extract that intent. 
-            Always be polite and confirm what you are doing in the 'response' field.`,
+            Always be polite and confirm what you are doing in the 'response' field.
+            
+            CURRENT TABLE CONTEXT:
+            The following JSON represents the current state of the extracted table, including its column headers and row data. 
+            Use this data to understand exactly what the user is referring to when they ask for corrections:
+            
+            ${formattedContext}
+            `,
 			generationConfig: {
 				responseMimeType: "application/json",
 				responseSchema: chatResponseSchema
 			}
 		});
-
+		console.log(formattedContext);
 		// Gemini uses a history array + a final user message separately
 		const history = messages.slice(0, -1).map((m) => ({
 			role: m.role,
