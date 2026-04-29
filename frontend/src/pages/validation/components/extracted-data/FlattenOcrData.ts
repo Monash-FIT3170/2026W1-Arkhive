@@ -127,7 +127,7 @@ export function flattenOcrData(data: OCRComponent[]): ExtractedData {
 
         //ITEM fix
         const rawItem = component.cells[0] || "";
-        const itemCol = cleanedCols.find((col) => col.includes("ITEM")) ?? "ITEM"; 
+        const itemCol = cleanedCols[0] ?? "ITEM";
 
         
         if (isMainItem(component)) { 
@@ -139,13 +139,13 @@ export function flattenOcrData(data: OCRComponent[]): ExtractedData {
         }
 
         //DESCRIPTION fix
-        const descCol = cleanedCols.find((col) => col.includes("DESC")) ?? "DESCRIPTION"; 
+        const descCol = cleanedCols[1] ?? "DESCRIPTION";
         row[descCol] = getDescription(component.cells);
 
 
         //PRICE fix - find anything that includes "price"
         const rawPriceText = component.cells.join(" ");
-        const priceCol = columns.find((col) => col.includes("PRICE")) || "PRICE";
+        const priceCol = cleanedCols[cleanedCols.length - 1] ?? "PRICE";
         row[priceCol] = cleanPrice(rawPriceText, isMainItem(component));
 
         rows.push(row);
