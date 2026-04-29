@@ -1,6 +1,7 @@
 import { useState } from "react";
 import mockImage from "../../../../mock-data/test.png";
 import mockOcrData from "../../../../mock-data/boundingBox.json";
+import type { OCRComponent } from "../../../../models/OCRComponent";
 
 function DocumentPanel() {
 	const [viewBox, setViewBox] = useState("0 0 1000 1000"); // default
@@ -8,7 +9,7 @@ function DocumentPanel() {
 	const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
 		const { naturalWidth, naturalHeight } = e.currentTarget;
 		if (naturalWidth && naturalHeight) {
-			// original image is 2200x1700 (200 DPI). 
+			// original image is 2200x1700 (200 DPI).
 			// OCR coordinates are generated at ~1.5x smaller scale (~133 DPI).
 			// scale factor of ocr -> image (200 dpi /133 dpi) = 1.5037593985
 			const scaleFactor = 1.5037593985;
@@ -44,25 +45,27 @@ function DocumentPanel() {
 							preserveAspectRatio="xMidYMid meet"
 						>
 							{/* map all the bounding boxes */}
-							{(mockOcrData as any[]).map((comp) => {
+							{(mockOcrData as OCRComponent[]).map((comp) => {
 								if (!comp.boundingBoxes) return null;
-								
-								return Object.entries(comp.boundingBoxes).map(([cellKey, box]: [string, any]) => {
-									// convert vertices to points string for <polygon> points attribute
-									const pointsStr = box.vertices
-										.map((v: any) => `${v.x},${v.y}`)
-										.join(" ");
 
-									return (
-										// Styling for individual overlays
-										// TODO: Can be updated later with opacity-0 or dynamic hover classes from the table panel.
-										<polygon
-											key={`${comp.id}-${cellKey}`}
-											points={pointsStr}
-											className="fill-primary/10 stroke-primary/50 stroke-2 transition-all duration-200"
-										/>
-									);
-								});
+								return Object.entries(comp.boundingBoxes).map(
+									([cellKey, box]: [string, any]) => {
+										// convert vertices to points string for <polygon> points attribute
+										const pointsStr = box.vertices
+											.map((v: any) => `${v.x},${v.y}`)
+											.join(" ");
+
+										return (
+											// Styling for individual overlays
+											// TODO: Can be updated later with opacity-0 or dynamic hover classes from the table panel.
+											<polygon
+												key={`${comp.id}-${cellKey}`}
+												points={pointsStr}
+												className="fill-primary/10 stroke-primary/50 stroke-2 transition-all duration-200"
+											/>
+										);
+									}
+								);
 							})}
 						</svg>
 					</div>
