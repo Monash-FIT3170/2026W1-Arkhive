@@ -1,0 +1,2542 @@
+[
+  {
+    "id": "comp_0",
+    "type": "HEADER",
+    "indentation": 664,
+    "y": 102,
+    "layer": 0,
+    "text": "TOTO",
+    "confidence": 0.9905128479003906,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "TOTO",
+        "vertices": [
+          {
+            "x": 664,
+            "y": 87
+          },
+          {
+            "x": 797,
+            "y": 89
+          },
+          {
+            "x": 797,
+            "y": 119
+          },
+          {
+            "x": 664,
+            "y": 117
+          }
+        ],
+        "confidence": 0.9905128479003906
+      }
+    }
+  },
+  {
+    "id": "comp_1",
+    "type": "BODY_TEXT",
+    "indentation": 145,
+    "y": 147,
+    "layer": 0,
+    "text": "ONE PIECE TOILET",
+    "confidence": 0.9905422329902649,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "ONE PIECE TOILET",
+        "vertices": [
+          {
+            "x": 145,
+            "y": 141
+          },
+          {
+            "x": 306,
+            "y": 141
+          },
+          {
+            "x": 306,
+            "y": 153
+          },
+          {
+            "x": 145,
+            "y": 153
+          }
+        ],
+        "confidence": 0.9905422329902649
+      }
+    }
+  },
+  {
+    "id": "comp_2",
+    "type": "TABLE_COLS",
+    "indentation": 157,
+    "y": 175,
+    "layer": 0,
+    "text": "NO . ITEM DESCRIPTION PRICE LIST ( Rp . ) WHITE PHOTO",
+    "confidence": 0.978762400150299,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "NO .",
+        "vertices": [
+          {
+            "x": 157,
+            "y": 169
+          },
+          {
+            "x": 185,
+            "y": 171
+          },
+          {
+            "x": 184,
+            "y": 183
+          },
+          {
+            "x": 156,
+            "y": 181
+          }
+        ],
+        "confidence": 0.9388492107391357
+      },
+      "cell_1": {
+        "text": "ITEM",
+        "vertices": [
+          {
+            "x": 279,
+            "y": 171
+          },
+          {
+            "x": 314,
+            "y": 171
+          },
+          {
+            "x": 314,
+            "y": 183
+          },
+          {
+            "x": 279,
+            "y": 183
+          }
+        ],
+        "confidence": 0.9874136447906494
+      },
+      "cell_2": {
+        "text": "DESCRIPTION",
+        "vertices": [
+          {
+            "x": 634,
+            "y": 172
+          },
+          {
+            "x": 742,
+            "y": 172
+          },
+          {
+            "x": 742,
+            "y": 183
+          },
+          {
+            "x": 634,
+            "y": 183
+          }
+        ],
+        "confidence": 0.9925411939620972
+      },
+      "cell_3": {
+        "text": "PRICE LIST ( Rp . ) WHITE",
+        "vertices": [
+          {
+            "x": 992,
+            "y": 161
+          },
+          {
+            "x": 1121,
+            "y": 162
+          },
+          {
+            "x": 1121,
+            "y": 194
+          },
+          {
+            "x": 992,
+            "y": 193
+          }
+        ],
+        "confidence": 0.9848694801330566
+      },
+      "cell_4": {
+        "text": "PHOTO",
+        "vertices": [
+          {
+            "x": 1200,
+            "y": 169
+          },
+          {
+            "x": 1255,
+            "y": 170
+          },
+          {
+            "x": 1255,
+            "y": 182
+          },
+          {
+            "x": 1200,
+            "y": 181
+          }
+        ],
+        "confidence": 0.9901384711265564
+      }
+    },
+    "cells": [
+      "NO .",
+      "ITEM",
+      "DESCRIPTION",
+      "PRICE LIST ( Rp . ) WHITE",
+      "PHOTO"
+    ]
+  },
+  {
+    "id": "comp_3",
+    "type": "TABLE_ROW",
+    "indentation": 163,
+    "y": 230,
+    "layer": 0,
+    "text": "1 CW823REJ 38,230,000",
+    "confidence": 0.9788917700449625,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "1",
+        "vertices": [
+          {
+            "x": 163,
+            "y": 225
+          },
+          {
+            "x": 171,
+            "y": 225
+          },
+          {
+            "x": 171,
+            "y": 235
+          },
+          {
+            "x": 163,
+            "y": 235
+          }
+        ],
+        "confidence": 0.9728155136108398
+      },
+      "cell_1": {
+        "text": "CW823REJ",
+        "vertices": [
+          {
+            "x": 202,
+            "y": 225
+          },
+          {
+            "x": 292,
+            "y": 226
+          },
+          {
+            "x": 292,
+            "y": 239
+          },
+          {
+            "x": 202,
+            "y": 238
+          }
+        ],
+        "confidence": 0.9800647497177124
+      },
+      "cell_2": {
+        "text": "38,230,000",
+        "vertices": [
+          {
+            "x": 1034,
+            "y": 225
+          },
+          {
+            "x": 1120,
+            "y": 224
+          },
+          {
+            "x": 1120,
+            "y": 238
+          },
+          {
+            "x": 1034,
+            "y": 239
+          }
+        ],
+        "confidence": 0.9837950468063354
+      }
+    },
+    "cells": [
+      "1",
+      "CW823REJ",
+      "38,230,000"
+    ]
+  },
+  {
+    "id": "comp_4",
+    "type": "TABLE_ROW",
+    "indentation": 180,
+    "y": 273,
+    "layer": 0,
+    "text": "A. CW823REJW / F - V2 : 10,430,000",
+    "confidence": 0.9805013239383698,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "A. CW823REJW / F - V2 :",
+        "vertices": [
+          {
+            "x": 180,
+            "y": 267
+          },
+          {
+            "x": 350,
+            "y": 267
+          },
+          {
+            "x": 350,
+            "y": 279
+          },
+          {
+            "x": 180,
+            "y": 279
+          }
+        ],
+        "confidence": 0.9726548790931702
+      },
+      "cell_1": {
+        "text": "10,430,000",
+        "vertices": [
+          {
+            "x": 1041,
+            "y": 267
+          },
+          {
+            "x": 1119,
+            "y": 267
+          },
+          {
+            "x": 1119,
+            "y": 280
+          },
+          {
+            "x": 1041,
+            "y": 280
+          }
+        ],
+        "confidence": 0.9883477687835693
+      }
+    },
+    "cells": [
+      "A. CW823REJW / F - V2 :",
+      "10,430,000"
+    ]
+  },
+  {
+    "id": "comp_5",
+    "type": "TABLE_ROW",
+    "indentation": 211,
+    "y": 292.5,
+    "layer": 1,
+    "text": "CW823IREJ \" Avante \" Rimless w / CCT One Piece Toilet Bowl Only ( S - Trap ) 6,018,000",
+    "confidence": 0.9605853954950968,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "CW823IREJ",
+        "vertices": [
+          {
+            "x": 211,
+            "y": 287
+          },
+          {
+            "x": 289,
+            "y": 288
+          },
+          {
+            "x": 289,
+            "y": 299
+          },
+          {
+            "x": 211,
+            "y": 298
+          }
+        ],
+        "confidence": 0.9271605014801025
+      },
+      "cell_1": {
+        "text": "\" Avante \" Rimless w / CCT One Piece Toilet Bowl Only ( S - Trap )",
+        "vertices": [
+          {
+            "x": 402,
+            "y": 286
+          },
+          {
+            "x": 800,
+            "y": 288
+          },
+          {
+            "x": 800,
+            "y": 302
+          },
+          {
+            "x": 402,
+            "y": 300
+          }
+        ],
+        "confidence": 0.9781414866447449
+      },
+      "cell_2": {
+        "text": "6,018,000",
+        "vertices": [
+          {
+            "x": 1057,
+            "y": 288
+          },
+          {
+            "x": 1121,
+            "y": 288
+          },
+          {
+            "x": 1121,
+            "y": 299
+          },
+          {
+            "x": 1057,
+            "y": 299
+          }
+        ],
+        "confidence": 0.9764541983604431
+      }
+    },
+    "cells": [
+      "CW823IREJ",
+      "\" Avante \" Rimless w / CCT One Piece Toilet Bowl Only ( S - Trap )",
+      "6,018,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_6",
+    "type": "TABLE_ROW",
+    "indentation": 211,
+    "y": 314.5,
+    "layer": 1,
+    "text": "CW823CREJP \" Avante \" Tank Cover for CW823REJ 1,788,000",
+    "confidence": 0.9751424193382263,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "CW823CREJP",
+        "vertices": [
+          {
+            "x": 211,
+            "y": 309
+          },
+          {
+            "x": 306,
+            "y": 309
+          },
+          {
+            "x": 306,
+            "y": 320
+          },
+          {
+            "x": 211,
+            "y": 320
+          }
+        ],
+        "confidence": 0.9792733192443848
+      },
+      "cell_1": {
+        "text": "\" Avante \" Tank Cover for CW823REJ",
+        "vertices": [
+          {
+            "x": 402,
+            "y": 309
+          },
+          {
+            "x": 635,
+            "y": 309
+          },
+          {
+            "x": 635,
+            "y": 320
+          },
+          {
+            "x": 402,
+            "y": 320
+          }
+        ],
+        "confidence": 0.979349672794342
+      },
+      "cell_2": {
+        "text": "1,788,000",
+        "vertices": [
+          {
+            "x": 1058,
+            "y": 309
+          },
+          {
+            "x": 1120,
+            "y": 308
+          },
+          {
+            "x": 1120,
+            "y": 320
+          },
+          {
+            "x": 1058,
+            "y": 321
+          }
+        ],
+        "confidence": 0.9668042659759521
+      }
+    },
+    "cells": [
+      "CW823CREJP",
+      "\" Avante \" Tank Cover for CW823REJ",
+      "1,788,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_7",
+    "type": "TABLE_ROW",
+    "indentation": 210,
+    "y": 334,
+    "layer": 1,
+    "text": "TX902CV25 : Installation Fitting Set for CW823REJ , CW823RJ 533,000",
+    "confidence": 0.9786259531974792,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "TX902CV25 :",
+        "vertices": [
+          {
+            "x": 210,
+            "y": 328
+          },
+          {
+            "x": 297,
+            "y": 329
+          },
+          {
+            "x": 297,
+            "y": 341
+          },
+          {
+            "x": 210,
+            "y": 340
+          }
+        ],
+        "confidence": 0.9806347489356995
+      },
+      "cell_1": {
+        "text": "Installation Fitting Set for CW823REJ , CW823RJ",
+        "vertices": [
+          {
+            "x": 402,
+            "y": 330
+          },
+          {
+            "x": 714,
+            "y": 330
+          },
+          {
+            "x": 714,
+            "y": 343
+          },
+          {
+            "x": 402,
+            "y": 343
+          }
+        ],
+        "confidence": 0.9716660976409912
+      },
+      "cell_2": {
+        "text": "533,000",
+        "vertices": [
+          {
+            "x": 1070,
+            "y": 330
+          },
+          {
+            "x": 1122,
+            "y": 330
+          },
+          {
+            "x": 1122,
+            "y": 341
+          },
+          {
+            "x": 1070,
+            "y": 341
+          }
+        ],
+        "confidence": 0.9835770130157471
+      }
+    },
+    "cells": [
+      "TX902CV25 :",
+      "Installation Fitting Set for CW823REJ , CW823RJ",
+      "533,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_8",
+    "type": "TABLE_ROW",
+    "indentation": 219,
+    "y": 356,
+    "layer": 1,
+    "text": "-TX277S Stop Valve w / Flexible Hose 230,000",
+    "confidence": 0.9706924756368002,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "-TX277S",
+        "vertices": [
+          {
+            "x": 219,
+            "y": 350
+          },
+          {
+            "x": 274,
+            "y": 349
+          },
+          {
+            "x": 274,
+            "y": 361
+          },
+          {
+            "x": 219,
+            "y": 362
+          }
+        ],
+        "confidence": 0.9456964731216431
+      },
+      "cell_1": {
+        "text": "Stop Valve w / Flexible Hose",
+        "vertices": [
+          {
+            "x": 401,
+            "y": 349
+          },
+          {
+            "x": 564,
+            "y": 347
+          },
+          {
+            "x": 564,
+            "y": 362
+          },
+          {
+            "x": 401,
+            "y": 364
+          }
+        ],
+        "confidence": 0.9827051162719727
+      },
+      "cell_2": {
+        "text": "230,000",
+        "vertices": [
+          {
+            "x": 1074,
+            "y": 351
+          },
+          {
+            "x": 1122,
+            "y": 351
+          },
+          {
+            "x": 1122,
+            "y": 361
+          },
+          {
+            "x": 1074,
+            "y": 361
+          }
+        ],
+        "confidence": 0.9836758375167847
+      }
+    },
+    "cells": [
+      "-TX277S",
+      "Stop Valve w / Flexible Hose",
+      "230,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_9",
+    "type": "TABLE_ROW",
+    "indentation": 219,
+    "y": 378,
+    "layer": 1,
+    "text": "-TX276CV2 Fixing Bracket 180,000",
+    "confidence": 0.9813950260480245,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "-TX276CV2",
+        "vertices": [
+          {
+            "x": 219,
+            "y": 370
+          },
+          {
+            "x": 290,
+            "y": 369
+          },
+          {
+            "x": 290,
+            "y": 382
+          },
+          {
+            "x": 219,
+            "y": 383
+          }
+        ],
+        "confidence": 0.966285228729248
+      },
+      "cell_1": {
+        "text": "Fixing Bracket",
+        "vertices": [
+          {
+            "x": 400,
+            "y": 371
+          },
+          {
+            "x": 489,
+            "y": 368
+          },
+          {
+            "x": 489,
+            "y": 382
+          },
+          {
+            "x": 400,
+            "y": 385
+          }
+        ],
+        "confidence": 0.9862655401229858
+      },
+      "cell_2": {
+        "text": "180,000",
+        "vertices": [
+          {
+            "x": 1075,
+            "y": 372
+          },
+          {
+            "x": 1122,
+            "y": 372
+          },
+          {
+            "x": 1122,
+            "y": 382
+          },
+          {
+            "x": 1075,
+            "y": 382
+          }
+        ],
+        "confidence": 0.9916343092918396
+      }
+    },
+    "cells": [
+      "-TX276CV2",
+      "Fixing Bracket",
+      "180,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_10",
+    "type": "TABLE_ROW",
+    "indentation": 219,
+    "y": 399,
+    "layer": 1,
+    "text": "-T53P100V5S Floor Flange w / Seal Gasket 123,000",
+    "confidence": 0.9425021409988403,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "-T53P100V5S",
+        "vertices": [
+          {
+            "x": 219,
+            "y": 393
+          },
+          {
+            "x": 296,
+            "y": 393
+          },
+          {
+            "x": 296,
+            "y": 404
+          },
+          {
+            "x": 219,
+            "y": 404
+          }
+        ],
+        "confidence": 0.8600999116897583
+      },
+      "cell_1": {
+        "text": "Floor Flange w / Seal Gasket",
+        "vertices": [
+          {
+            "x": 401,
+            "y": 392
+          },
+          {
+            "x": 569,
+            "y": 390
+          },
+          {
+            "x": 569,
+            "y": 404
+          },
+          {
+            "x": 401,
+            "y": 406
+          }
+        ],
+        "confidence": 0.9805381298065186
+      },
+      "cell_2": {
+        "text": "123,000",
+        "vertices": [
+          {
+            "x": 1075,
+            "y": 394
+          },
+          {
+            "x": 1122,
+            "y": 394
+          },
+          {
+            "x": 1122,
+            "y": 403
+          },
+          {
+            "x": 1075,
+            "y": 403
+          }
+        ],
+        "confidence": 0.9868683815002441
+      }
+    },
+    "cells": [
+      "-T53P100V5S",
+      "Floor Flange w / Seal Gasket",
+      "123,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_11",
+    "type": "TABLE_ROW",
+    "indentation": 202,
+    "y": 418.5,
+    "layer": 1,
+    "text": "- TX823C8WS 1,710,000",
+    "confidence": 0.9546137750148773,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "- TX823C8WS",
+        "vertices": [
+          {
+            "x": 202,
+            "y": 413
+          },
+          {
+            "x": 292,
+            "y": 413
+          },
+          {
+            "x": 292,
+            "y": 424
+          },
+          {
+            "x": 202,
+            "y": 424
+          }
+        ],
+        "confidence": 0.9314597845077515
+      },
+      "cell_1": {
+        "text": "1,710,000",
+        "vertices": [
+          {
+            "x": 1059,
+            "y": 414
+          },
+          {
+            "x": 1121,
+            "y": 414
+          },
+          {
+            "x": 1121,
+            "y": 425
+          },
+          {
+            "x": 1059,
+            "y": 425
+          }
+        ],
+        "confidence": 0.9777677655220032
+      }
+    },
+    "cells": [
+      "- TX823C8WS",
+      "1,710,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_12",
+    "type": "TABLE_ROW",
+    "indentation": 210,
+    "y": 439,
+    "layer": 1,
+    "text": "CKH6657U Dual Flush Tank Trim w / o Stop Valve for CW823REJ ( 4,5 / 3 Liters ) Outlet Connector 381,000",
+    "confidence": 0.9783534407615662,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "CKH6657U",
+        "vertices": [
+          {
+            "x": 210,
+            "y": 434
+          },
+          {
+            "x": 281,
+            "y": 434
+          },
+          {
+            "x": 281,
+            "y": 444
+          },
+          {
+            "x": 210,
+            "y": 444
+          }
+        ],
+        "confidence": 0.984379768371582
+      },
+      "cell_1": {
+        "text": "Dual Flush Tank Trim w / o Stop Valve for CW823REJ ( 4,5 / 3 Liters ) Outlet Connector",
+        "vertices": [
+          {
+            "x": 402,
+            "y": 412
+          },
+          {
+            "x": 832,
+            "y": 413
+          },
+          {
+            "x": 832,
+            "y": 446
+          },
+          {
+            "x": 402,
+            "y": 445
+          }
+        ],
+        "confidence": 0.9703412055969238
+      },
+      "cell_2": {
+        "text": "381,000",
+        "vertices": [
+          {
+            "x": 1070,
+            "y": 435
+          },
+          {
+            "x": 1122,
+            "y": 435
+          },
+          {
+            "x": 1122,
+            "y": 446
+          },
+          {
+            "x": 1070,
+            "y": 446
+          }
+        ],
+        "confidence": 0.9803393483161926
+      }
+    },
+    "cells": [
+      "CKH6657U",
+      "Dual Flush Tank Trim w / o Stop Valve for CW823REJ ( 4,5 / 3 Liters ) Outlet Connector",
+      "381,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_13",
+    "type": "TABLE_ROW",
+    "indentation": 181,
+    "y": 482,
+    "layer": 1,
+    "text": "B. TCF4911EZ Apricot Washlet , Elongated , for CCT Installation 27,800,000",
+    "confidence": 0.9794498880704244,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "B. TCF4911EZ",
+        "vertices": [
+          {
+            "x": 181,
+            "y": 476
+          },
+          {
+            "x": 290,
+            "y": 476
+          },
+          {
+            "x": 290,
+            "y": 488
+          },
+          {
+            "x": 181,
+            "y": 488
+          }
+        ],
+        "confidence": 0.9819977283477783
+      },
+      "cell_1": {
+        "text": "Apricot Washlet , Elongated , for CCT Installation",
+        "vertices": [
+          {
+            "x": 401,
+            "y": 475
+          },
+          {
+            "x": 705,
+            "y": 473
+          },
+          {
+            "x": 705,
+            "y": 488
+          },
+          {
+            "x": 401,
+            "y": 490
+          }
+        ],
+        "confidence": 0.9859368205070496
+      },
+      "cell_2": {
+        "text": "27,800,000",
+        "vertices": [
+          {
+            "x": 1040,
+            "y": 476
+          },
+          {
+            "x": 1120,
+            "y": 475
+          },
+          {
+            "x": 1120,
+            "y": 488
+          },
+          {
+            "x": 1040,
+            "y": 489
+          }
+        ],
+        "confidence": 0.9704151153564453
+      }
+    },
+    "cells": [
+      "B. TCF4911EZ",
+      "Apricot Washlet , Elongated , for CCT Installation",
+      "27,800,000"
+    ],
+    "parentId": "comp_4"
+  },
+  {
+    "id": "comp_14",
+    "type": "TABLE_ROW",
+    "indentation": 162,
+    "y": 523.5,
+    "layer": 0,
+    "text": "2 CW823RJ 11,940,000 6,018,000",
+    "confidence": 0.9760276873906454,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "2",
+        "vertices": [
+          {
+            "x": 162,
+            "y": 518
+          },
+          {
+            "x": 173,
+            "y": 518
+          },
+          {
+            "x": 173,
+            "y": 529
+          },
+          {
+            "x": 162,
+            "y": 529
+          }
+        ],
+        "confidence": 0.9648485779762268
+      },
+      "cell_1": {
+        "text": "CW823RJ",
+        "vertices": [
+          {
+            "x": 202,
+            "y": 517
+          },
+          {
+            "x": 279,
+            "y": 516
+          },
+          {
+            "x": 279,
+            "y": 529
+          },
+          {
+            "x": 202,
+            "y": 530
+          }
+        ],
+        "confidence": 0.9792578220367432
+      },
+      "cell_2": {
+        "text": "11,940,000 6,018,000",
+        "vertices": [
+          {
+            "x": 1035,
+            "y": 518
+          },
+          {
+            "x": 1120,
+            "y": 518
+          },
+          {
+            "x": 1120,
+            "y": 552
+          },
+          {
+            "x": 1035,
+            "y": 552
+          }
+        ],
+        "confidence": 0.9839766621589661
+      }
+    },
+    "cells": [
+      "2",
+      "CW823RJ",
+      "11,940,000 6,018,000"
+    ]
+  },
+  {
+    "id": "comp_15",
+    "type": "TABLE_ROW",
+    "indentation": 212,
+    "y": 544.5,
+    "layer": 1,
+    "text": "CW8231RJ \" Avante \" Rimless One Piece Toilet Bowl Only ( S - Trap )",
+    "confidence": 0.945482462644577,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "CW8231RJ",
+        "vertices": [
+          {
+            "x": 212,
+            "y": 539
+          },
+          {
+            "x": 288,
+            "y": 539
+          },
+          {
+            "x": 288,
+            "y": 550
+          },
+          {
+            "x": 212,
+            "y": 550
+          }
+        ],
+        "confidence": 0.9165251851081848
+      },
+      "cell_1": {
+        "text": "\" Avante \" Rimless One Piece Toilet Bowl Only ( S - Trap )",
+        "vertices": [
+          {
+            "x": 401,
+            "y": 539
+          },
+          {
+            "x": 748,
+            "y": 539
+          },
+          {
+            "x": 748,
+            "y": 552
+          },
+          {
+            "x": 401,
+            "y": 552
+          }
+        ],
+        "confidence": 0.9744397401809692
+      }
+    },
+    "cells": [
+      "CW8231RJ",
+      "\" Avante \" Rimless One Piece Toilet Bowl Only ( S - Trap )"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_16",
+    "type": "TABLE_ROW",
+    "indentation": 211,
+    "y": 565,
+    "layer": 1,
+    "text": "CW823CREJP \" Avante \" Tank Cover for CW823RJ 1,788,000",
+    "confidence": 0.9730991125106812,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "CW823CREJP",
+        "vertices": [
+          {
+            "x": 211,
+            "y": 559
+          },
+          {
+            "x": 318,
+            "y": 559
+          },
+          {
+            "x": 318,
+            "y": 571
+          },
+          {
+            "x": 211,
+            "y": 571
+          }
+        ],
+        "confidence": 0.980808675289154
+      },
+      "cell_1": {
+        "text": "\" Avante \" Tank Cover for CW823RJ",
+        "vertices": [
+          {
+            "x": 401,
+            "y": 560
+          },
+          {
+            "x": 626,
+            "y": 560
+          },
+          {
+            "x": 626,
+            "y": 570
+          },
+          {
+            "x": 401,
+            "y": 570
+          }
+        ],
+        "confidence": 0.9776395559310913
+      },
+      "cell_2": {
+        "text": "1,788,000",
+        "vertices": [
+          {
+            "x": 1051,
+            "y": 560
+          },
+          {
+            "x": 1120,
+            "y": 560
+          },
+          {
+            "x": 1120,
+            "y": 571
+          },
+          {
+            "x": 1051,
+            "y": 571
+          }
+        ],
+        "confidence": 0.9608491063117981
+      }
+    },
+    "cells": [
+      "CW823CREJP",
+      "\" Avante \" Tank Cover for CW823RJ",
+      "1,788,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_17",
+    "type": "TABLE_ROW",
+    "indentation": 212,
+    "y": 586.5,
+    "layer": 1,
+    "text": "TX902CV25 : Installation Fitting Set for CW823REJ , CW823RJ 533,000",
+    "confidence": 0.9802534182866415,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "TX902CV25 :",
+        "vertices": [
+          {
+            "x": 212,
+            "y": 581
+          },
+          {
+            "x": 308,
+            "y": 581
+          },
+          {
+            "x": 308,
+            "y": 592
+          },
+          {
+            "x": 212,
+            "y": 592
+          }
+        ],
+        "confidence": 0.9813382029533386
+      },
+      "cell_1": {
+        "text": "Installation Fitting Set for CW823REJ , CW823RJ",
+        "vertices": [
+          {
+            "x": 402,
+            "y": 580
+          },
+          {
+            "x": 714,
+            "y": 580
+          },
+          {
+            "x": 714,
+            "y": 593
+          },
+          {
+            "x": 402,
+            "y": 593
+          }
+        ],
+        "confidence": 0.9736320972442627
+      },
+      "cell_2": {
+        "text": "533,000",
+        "vertices": [
+          {
+            "x": 1063,
+            "y": 580
+          },
+          {
+            "x": 1119,
+            "y": 580
+          },
+          {
+            "x": 1119,
+            "y": 593
+          },
+          {
+            "x": 1063,
+            "y": 593
+          }
+        ],
+        "confidence": 0.985789954662323
+      }
+    },
+    "cells": [
+      "TX902CV25 :",
+      "Installation Fitting Set for CW823REJ , CW823RJ",
+      "533,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_18",
+    "type": "TABLE_ROW",
+    "indentation": 219,
+    "y": 607.5,
+    "layer": 1,
+    "text": "-TX277S Stop Valve w / Flexible Hose 230,000",
+    "confidence": 0.9702023069063822,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "-TX277S",
+        "vertices": [
+          {
+            "x": 219,
+            "y": 602
+          },
+          {
+            "x": 273,
+            "y": 602
+          },
+          {
+            "x": 273,
+            "y": 613
+          },
+          {
+            "x": 219,
+            "y": 613
+          }
+        ],
+        "confidence": 0.9430856108665466
+      },
+      "cell_1": {
+        "text": "Stop Valve w / Flexible Hose",
+        "vertices": [
+          {
+            "x": 401,
+            "y": 601
+          },
+          {
+            "x": 565,
+            "y": 600
+          },
+          {
+            "x": 565,
+            "y": 614
+          },
+          {
+            "x": 401,
+            "y": 615
+          }
+        ],
+        "confidence": 0.979385495185852
+      },
+      "cell_2": {
+        "text": "230,000",
+        "vertices": [
+          {
+            "x": 1069,
+            "y": 601
+          },
+          {
+            "x": 1121,
+            "y": 602
+          },
+          {
+            "x": 1121,
+            "y": 614
+          },
+          {
+            "x": 1069,
+            "y": 613
+          }
+        ],
+        "confidence": 0.988135814666748
+      }
+    },
+    "cells": [
+      "-TX277S",
+      "Stop Valve w / Flexible Hose",
+      "230,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_19",
+    "type": "TABLE_ROW",
+    "indentation": 219,
+    "y": 628,
+    "layer": 1,
+    "text": "-TX276CV2 Fixing Bracket 180,000",
+    "confidence": 0.9828012188275655,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "-TX276CV2",
+        "vertices": [
+          {
+            "x": 219,
+            "y": 622
+          },
+          {
+            "x": 291,
+            "y": 622
+          },
+          {
+            "x": 291,
+            "y": 634
+          },
+          {
+            "x": 219,
+            "y": 634
+          }
+        ],
+        "confidence": 0.9756513833999634
+      },
+      "cell_1": {
+        "text": "Fixing Bracket",
+        "vertices": [
+          {
+            "x": 401,
+            "y": 623
+          },
+          {
+            "x": 488,
+            "y": 621
+          },
+          {
+            "x": 488,
+            "y": 634
+          },
+          {
+            "x": 401,
+            "y": 636
+          }
+        ],
+        "confidence": 0.9878518581390381
+      },
+      "cell_2": {
+        "text": "180,000",
+        "vertices": [
+          {
+            "x": 1070,
+            "y": 621
+          },
+          {
+            "x": 1121,
+            "y": 622
+          },
+          {
+            "x": 1121,
+            "y": 635
+          },
+          {
+            "x": 1070,
+            "y": 634
+          }
+        ],
+        "confidence": 0.9849004149436951
+      }
+    },
+    "cells": [
+      "-TX276CV2",
+      "Fixing Bracket",
+      "180,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_20",
+    "type": "TABLE_ROW",
+    "indentation": 219,
+    "y": 648.5,
+    "layer": 1,
+    "text": "-T53P100V5 Floor Flange w / Seal Gasket 123,000",
+    "confidence": 0.967300275961558,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "-T53P100V5",
+        "vertices": [
+          {
+            "x": 219,
+            "y": 643
+          },
+          {
+            "x": 296,
+            "y": 643
+          },
+          {
+            "x": 296,
+            "y": 654
+          },
+          {
+            "x": 219,
+            "y": 654
+          }
+        ],
+        "confidence": 0.9349454641342163
+      },
+      "cell_1": {
+        "text": "Floor Flange w / Seal Gasket",
+        "vertices": [
+          {
+            "x": 401,
+            "y": 643
+          },
+          {
+            "x": 570,
+            "y": 643
+          },
+          {
+            "x": 570,
+            "y": 656
+          },
+          {
+            "x": 401,
+            "y": 656
+          }
+        ],
+        "confidence": 0.9764962792396545
+      },
+      "cell_2": {
+        "text": "123,000",
+        "vertices": [
+          {
+            "x": 1070,
+            "y": 644
+          },
+          {
+            "x": 1121,
+            "y": 644
+          },
+          {
+            "x": 1121,
+            "y": 654
+          },
+          {
+            "x": 1070,
+            "y": 654
+          }
+        ],
+        "confidence": 0.9904590845108032
+      }
+    },
+    "cells": [
+      "-T53P100V5",
+      "Floor Flange w / Seal Gasket",
+      "123,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_21",
+    "type": "TABLE_ROW",
+    "indentation": 202,
+    "y": 669.5,
+    "layer": 1,
+    "text": "- TX823C8WS Dual Flush Tank Trim w / o Stop Valve for CW823RJ ( 4,5 / 3 Liters ) Outlet Connector 1,710,000",
+    "confidence": 0.9616596301396688,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "- TX823C8WS",
+        "vertices": [
+          {
+            "x": 202,
+            "y": 664
+          },
+          {
+            "x": 304,
+            "y": 664
+          },
+          {
+            "x": 304,
+            "y": 675
+          },
+          {
+            "x": 202,
+            "y": 675
+          }
+        ],
+        "confidence": 0.9341667294502258
+      },
+      "cell_1": {
+        "text": "Dual Flush Tank Trim w / o Stop Valve for CW823RJ ( 4,5 / 3 Liters ) Outlet Connector",
+        "vertices": [
+          {
+            "x": 402,
+            "y": 665
+          },
+          {
+            "x": 823,
+            "y": 663
+          },
+          {
+            "x": 823,
+            "y": 694
+          },
+          {
+            "x": 402,
+            "y": 696
+          }
+        ],
+        "confidence": 0.9675384163856506
+      },
+      "cell_2": {
+        "text": "1,710,000",
+        "vertices": [
+          {
+            "x": 1050,
+            "y": 664
+          },
+          {
+            "x": 1120,
+            "y": 664
+          },
+          {
+            "x": 1120,
+            "y": 676
+          },
+          {
+            "x": 1050,
+            "y": 676
+          }
+        ],
+        "confidence": 0.9832737445831299
+      }
+    },
+    "cells": [
+      "- TX823C8WS",
+      "Dual Flush Tank Trim w / o Stop Valve for CW823RJ ( 4,5 / 3 Liters ) Outlet Connector",
+      "1,710,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_22",
+    "type": "TABLE_ROW",
+    "indentation": 202,
+    "y": 690.5,
+    "layer": 1,
+    "text": "- CKH6657U 381,000",
+    "confidence": 0.9731115400791168,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "- CKH6657U",
+        "vertices": [
+          {
+            "x": 202,
+            "y": 684
+          },
+          {
+            "x": 291,
+            "y": 683
+          },
+          {
+            "x": 291,
+            "y": 696
+          },
+          {
+            "x": 202,
+            "y": 697
+          }
+        ],
+        "confidence": 0.9658346176147461
+      },
+      "cell_1": {
+        "text": "381,000",
+        "vertices": [
+          {
+            "x": 1063,
+            "y": 685
+          },
+          {
+            "x": 1119,
+            "y": 685
+          },
+          {
+            "x": 1119,
+            "y": 698
+          },
+          {
+            "x": 1063,
+            "y": 698
+          }
+        ],
+        "confidence": 0.9803884625434875
+      }
+    },
+    "cells": [
+      "- CKH6657U",
+      "381,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_23",
+    "type": "TABLE_ROW",
+    "indentation": 202,
+    "y": 712.5,
+    "layer": 1,
+    "text": "- TC281SJ Duroplast Seat & Cover w / Metal Hinges , Soft Closing ( Elongated ) 1,510,000",
+    "confidence": 0.9803129831949869,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "- TC281SJ",
+        "vertices": [
+          {
+            "x": 202,
+            "y": 706
+          },
+          {
+            "x": 278,
+            "y": 706
+          },
+          {
+            "x": 278,
+            "y": 718
+          },
+          {
+            "x": 202,
+            "y": 718
+          }
+        ],
+        "confidence": 0.97617107629776
+      },
+      "cell_1": {
+        "text": "Duroplast Seat & Cover w / Metal Hinges , Soft Closing ( Elongated )",
+        "vertices": [
+          {
+            "x": 402,
+            "y": 706
+          },
+          {
+            "x": 823,
+            "y": 706
+          },
+          {
+            "x": 823,
+            "y": 719
+          },
+          {
+            "x": 402,
+            "y": 719
+          }
+        ],
+        "confidence": 0.9734801650047302
+      },
+      "cell_2": {
+        "text": "1,510,000",
+        "vertices": [
+          {
+            "x": 1050,
+            "y": 706
+          },
+          {
+            "x": 1119,
+            "y": 706
+          },
+          {
+            "x": 1119,
+            "y": 719
+          },
+          {
+            "x": 1050,
+            "y": 719
+          }
+        ],
+        "confidence": 0.9912877082824707
+      }
+    },
+    "cells": [
+      "- TC281SJ",
+      "Duroplast Seat & Cover w / Metal Hinges , Soft Closing ( Elongated )",
+      "1,510,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_24",
+    "type": "TABLE_ROW",
+    "indentation": 164,
+    "y": 752.5,
+    "layer": 1,
+    "text": "3 CW823PJ 11,030,000",
+    "confidence": 0.977408766746521,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "3",
+        "vertices": [
+          {
+            "x": 164,
+            "y": 747
+          },
+          {
+            "x": 173,
+            "y": 747
+          },
+          {
+            "x": 173,
+            "y": 758
+          },
+          {
+            "x": 164,
+            "y": 758
+          }
+        ],
+        "confidence": 0.9740753769874573
+      },
+      "cell_1": {
+        "text": "CW823PJ",
+        "vertices": [
+          {
+            "x": 202,
+            "y": 747
+          },
+          {
+            "x": 278,
+            "y": 747
+          },
+          {
+            "x": 278,
+            "y": 759
+          },
+          {
+            "x": 202,
+            "y": 759
+          }
+        ],
+        "confidence": 0.9784259796142578
+      },
+      "cell_2": {
+        "text": "11,030,000",
+        "vertices": [
+          {
+            "x": 1034,
+            "y": 747
+          },
+          {
+            "x": 1119,
+            "y": 747
+          },
+          {
+            "x": 1119,
+            "y": 760
+          },
+          {
+            "x": 1034,
+            "y": 760
+          }
+        ],
+        "confidence": 0.9797249436378479
+      }
+    },
+    "cells": [
+      "3",
+      "CW823PJ",
+      "11,030,000"
+    ],
+    "parentId": "comp_14"
+  },
+  {
+    "id": "comp_25",
+    "type": "TABLE_ROW",
+    "indentation": 206,
+    "y": 773,
+    "layer": 2,
+    "text": "- CW8231PJ -CW823CRJP \" Avante \" One Piece Toilet Bowl Only ( P - Trap ) 5,549,000",
+    "confidence": 0.9659237265586853,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "- CW8231PJ -CW823CRJP",
+        "vertices": [
+          {
+            "x": 206,
+            "y": 768
+          },
+          {
+            "x": 309,
+            "y": 767
+          },
+          {
+            "x": 309,
+            "y": 801
+          },
+          {
+            "x": 206,
+            "y": 802
+          }
+        ],
+        "confidence": 0.9427498579025269
+      },
+      "cell_1": {
+        "text": "\" Avante \" One Piece Toilet Bowl Only ( P - Trap )",
+        "vertices": [
+          {
+            "x": 401,
+            "y": 766
+          },
+          {
+            "x": 693,
+            "y": 768
+          },
+          {
+            "x": 693,
+            "y": 782
+          },
+          {
+            "x": 401,
+            "y": 780
+          }
+        ],
+        "confidence": 0.9795175790786743
+      },
+      "cell_2": {
+        "text": "5,549,000",
+        "vertices": [
+          {
+            "x": 1050,
+            "y": 769
+          },
+          {
+            "x": 1120,
+            "y": 769
+          },
+          {
+            "x": 1120,
+            "y": 781
+          },
+          {
+            "x": 1050,
+            "y": 781
+          }
+        ],
+        "confidence": 0.9755037426948547
+      }
+    },
+    "cells": [
+      "- CW8231PJ -CW823CRJP",
+      "\" Avante \" One Piece Toilet Bowl Only ( P - Trap )",
+      "5,549,000"
+    ],
+    "parentId": "comp_24"
+  },
+  {
+    "id": "comp_26",
+    "type": "TABLE_ROW",
+    "indentation": 402,
+    "y": 796,
+    "layer": 3,
+    "text": "\" Avante \" Tank Cover for CW823NJN , CW823PJ Installation Fitting Set for CW823PJ 1,788,000",
+    "confidence": 0.9760690927505493,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "\" Avante \" Tank Cover for CW823NJN , CW823PJ Installation Fitting Set for CW823PJ",
+        "vertices": [
+          {
+            "x": 402,
+            "y": 789
+          },
+          {
+            "x": 710,
+            "y": 789
+          },
+          {
+            "x": 710,
+            "y": 823
+          },
+          {
+            "x": 402,
+            "y": 823
+          }
+        ],
+        "confidence": 0.9787445664405823
+      },
+      "cell_1": {
+        "text": "1,788,000",
+        "vertices": [
+          {
+            "x": 1050,
+            "y": 789
+          },
+          {
+            "x": 1119,
+            "y": 787
+          },
+          {
+            "x": 1119,
+            "y": 801
+          },
+          {
+            "x": 1050,
+            "y": 803
+          }
+        ],
+        "confidence": 0.9733936190605164
+      }
+    },
+    "cells": [
+      "\" Avante \" Tank Cover for CW823NJN , CW823PJ Installation Fitting Set for CW823PJ",
+      "1,788,000"
+    ],
+    "parentId": "comp_25"
+  },
+  {
+    "id": "comp_27",
+    "type": "TABLE_ROW",
+    "indentation": 206,
+    "y": 816,
+    "layer": 3,
+    "text": "-TX902CZ : 473,000",
+    "confidence": 0.9752125442028046,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "-TX902CZ :",
+        "vertices": [
+          {
+            "x": 206,
+            "y": 810
+          },
+          {
+            "x": 295,
+            "y": 810
+          },
+          {
+            "x": 295,
+            "y": 822
+          },
+          {
+            "x": 206,
+            "y": 822
+          }
+        ],
+        "confidence": 0.9593660235404968
+      },
+      "cell_1": {
+        "text": "473,000",
+        "vertices": [
+          {
+            "x": 1062,
+            "y": 810
+          },
+          {
+            "x": 1119,
+            "y": 810
+          },
+          {
+            "x": 1119,
+            "y": 823
+          },
+          {
+            "x": 1062,
+            "y": 823
+          }
+        ],
+        "confidence": 0.9910590648651123
+      }
+    },
+    "cells": [
+      "-TX902CZ :",
+      "473,000"
+    ],
+    "parentId": "comp_25"
+  },
+  {
+    "id": "comp_28",
+    "type": "TABLE_ROW",
+    "indentation": 219,
+    "y": 836.5,
+    "layer": 3,
+    "text": "-TX277S Stop Valve w / Flexible Hose 230,000",
+    "confidence": 0.9747007886568705,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "-TX277S",
+        "vertices": [
+          {
+            "x": 219,
+            "y": 831
+          },
+          {
+            "x": 273,
+            "y": 831
+          },
+          {
+            "x": 273,
+            "y": 842
+          },
+          {
+            "x": 219,
+            "y": 842
+          }
+        ],
+        "confidence": 0.9514378905296326
+      },
+      "cell_1": {
+        "text": "Stop Valve w / Flexible Hose",
+        "vertices": [
+          {
+            "x": 401,
+            "y": 831
+          },
+          {
+            "x": 564,
+            "y": 829
+          },
+          {
+            "x": 564,
+            "y": 843
+          },
+          {
+            "x": 401,
+            "y": 845
+          }
+        ],
+        "confidence": 0.9855995774269104
+      },
+      "cell_2": {
+        "text": "230,000",
+        "vertices": [
+          {
+            "x": 1074,
+            "y": 833
+          },
+          {
+            "x": 1123,
+            "y": 833
+          },
+          {
+            "x": 1123,
+            "y": 842
+          },
+          {
+            "x": 1074,
+            "y": 842
+          }
+        ],
+        "confidence": 0.9870648980140686
+      }
+    },
+    "cells": [
+      "-TX277S",
+      "Stop Valve w / Flexible Hose",
+      "230,000"
+    ],
+    "parentId": "comp_25"
+  },
+  {
+    "id": "comp_29",
+    "type": "TABLE_ROW",
+    "indentation": 219,
+    "y": 858,
+    "layer": 3,
+    "text": "-TX215C Slip - in Connector 110,000",
+    "confidence": 0.9742314219474792,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "-TX215C",
+        "vertices": [
+          {
+            "x": 219,
+            "y": 853
+          },
+          {
+            "x": 277,
+            "y": 853
+          },
+          {
+            "x": 277,
+            "y": 863
+          },
+          {
+            "x": 219,
+            "y": 863
+          }
+        ],
+        "confidence": 0.9702960848808289
+      },
+      "cell_1": {
+        "text": "Slip - in Connector",
+        "vertices": [
+          {
+            "x": 401,
+            "y": 852
+          },
+          {
+            "x": 505,
+            "y": 850
+          },
+          {
+            "x": 505,
+            "y": 864
+          },
+          {
+            "x": 401,
+            "y": 866
+          }
+        ],
+        "confidence": 0.9754694700241089
+      },
+      "cell_2": {
+        "text": "110,000",
+        "vertices": [
+          {
+            "x": 1075,
+            "y": 853
+          },
+          {
+            "x": 1123,
+            "y": 853
+          },
+          {
+            "x": 1123,
+            "y": 864
+          },
+          {
+            "x": 1075,
+            "y": 864
+          }
+        ],
+        "confidence": 0.9769287109375
+      }
+    },
+    "cells": [
+      "-TX215C",
+      "Slip - in Connector",
+      "110,000"
+    ],
+    "parentId": "comp_25"
+  },
+  {
+    "id": "comp_30",
+    "type": "TABLE_ROW",
+    "indentation": 206,
+    "y": 890,
+    "layer": 3,
+    "text": "TX276C -TX823C1WSF1 Fixing Bracket Tank Trim w / o Stop Valve for CW823PJ ( 6 Liters ) 1,710,000 133,000",
+    "confidence": 0.9785687923431396,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "TX276C -TX823C1WSF1",
+        "vertices": [
+          {
+            "x": 206,
+            "y": 874
+          },
+          {
+            "x": 324,
+            "y": 874
+          },
+          {
+            "x": 324,
+            "y": 906
+          },
+          {
+            "x": 206,
+            "y": 906
+          }
+        ],
+        "confidence": 0.9706529974937439
+      },
+      "cell_1": {
+        "text": "Fixing Bracket",
+        "vertices": [
+          {
+            "x": 401,
+            "y": 874
+          },
+          {
+            "x": 487,
+            "y": 873
+          },
+          {
+            "x": 487,
+            "y": 886
+          },
+          {
+            "x": 401,
+            "y": 887
+          }
+        ],
+        "confidence": 0.986812949180603
+      },
+      "cell_2": {
+        "text": "Tank Trim w / o Stop Valve for CW823PJ ( 6 Liters )",
+        "vertices": [
+          {
+            "x": 402,
+            "y": 892
+          },
+          {
+            "x": 717,
+            "y": 893
+          },
+          {
+            "x": 717,
+            "y": 907
+          },
+          {
+            "x": 402,
+            "y": 906
+          }
+        ],
+        "confidence": 0.9718353152275085
+      },
+      "cell_3": {
+        "text": "1,710,000",
+        "vertices": [
+          {
+            "x": 1050,
+            "y": 894
+          },
+          {
+            "x": 1119,
+            "y": 893
+          },
+          {
+            "x": 1119,
+            "y": 906
+          },
+          {
+            "x": 1050,
+            "y": 907
+          }
+        ],
+        "confidence": 0.9802314043045044
+      },
+      "cell_4": {
+        "text": "133,000",
+        "vertices": [
+          {
+            "x": 1075,
+            "y": 875
+          },
+          {
+            "x": 1122,
+            "y": 875
+          },
+          {
+            "x": 1122,
+            "y": 885
+          },
+          {
+            "x": 1075,
+            "y": 885
+          }
+        ],
+        "confidence": 0.9833112955093384
+      }
+    },
+    "cells": [
+      "TX276C -TX823C1WSF1",
+      "Fixing Bracket",
+      "Tank Trim w / o Stop Valve for CW823PJ ( 6 Liters )",
+      "1,710,000",
+      "133,000"
+    ],
+    "parentId": "comp_25"
+  },
+  {
+    "id": "comp_31",
+    "type": "TABLE_ROW",
+    "indentation": 206,
+    "y": 920.5,
+    "layer": 3,
+    "text": "- TC281SJ Duroplast Seat & Cover w / Metal Hinges , Soft Closing ( Elongated ) 1,510,000",
+    "confidence": 0.9684316714604696,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "- TC281SJ",
+        "vertices": [
+          {
+            "x": 206,
+            "y": 914
+          },
+          {
+            "x": 281,
+            "y": 913
+          },
+          {
+            "x": 281,
+            "y": 926
+          },
+          {
+            "x": 206,
+            "y": 927
+          }
+        ],
+        "confidence": 0.9518656730651855
+      },
+      "cell_1": {
+        "text": "Duroplast Seat & Cover w / Metal Hinges , Soft Closing ( Elongated )",
+        "vertices": [
+          {
+            "x": 402,
+            "y": 915
+          },
+          {
+            "x": 824,
+            "y": 915
+          },
+          {
+            "x": 824,
+            "y": 929
+          },
+          {
+            "x": 402,
+            "y": 929
+          }
+        ],
+        "confidence": 0.9705380201339722
+      },
+      "cell_2": {
+        "text": "1,510,000",
+        "vertices": [
+          {
+            "x": 1050,
+            "y": 915
+          },
+          {
+            "x": 1119,
+            "y": 914
+          },
+          {
+            "x": 1119,
+            "y": 927
+          },
+          {
+            "x": 1050,
+            "y": 928
+          }
+        ],
+        "confidence": 0.982891321182251
+      }
+    },
+    "cells": [
+      "- TC281SJ",
+      "Duroplast Seat & Cover w / Metal Hinges , Soft Closing ( Elongated )",
+      "1,510,000"
+    ],
+    "parentId": "comp_25"
+  },
+  {
+    "id": "comp_32",
+    "type": "BODY_TEXT",
+    "indentation": 402,
+    "y": 963,
+    "layer": 4,
+    "text": "NOTE : FOR P - TRAP INSTALLATION",
+    "confidence": 0.9765546917915344,
+    "boundingBoxes": {
+      "cell_0": {
+        "text": "NOTE : FOR P - TRAP INSTALLATION",
+        "vertices": [
+          {
+            "x": 402,
+            "y": 958
+          },
+          {
+            "x": 657,
+            "y": 958
+          },
+          {
+            "x": 657,
+            "y": 968
+          },
+          {
+            "x": 402,
+            "y": 968
+          }
+        ],
+        "confidence": 0.9765546917915344
+      }
+    },
+    "parentId": "comp_31"
+  }
+]
