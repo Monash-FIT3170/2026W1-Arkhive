@@ -4,11 +4,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
 import './index.css'
 import UploadPage from './pages/upload/UploadPage'
-
-// TEMP for previewpage
-function PreviewPage() {
-  return <div>Preview Page (WIP)</div>
-}
+import PreviewPage from './pages/preview/PreviewPage'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
