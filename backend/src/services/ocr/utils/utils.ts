@@ -1,5 +1,5 @@
 import { google } from "@google-cloud/vision/build/protos/protos.js";
-import { OCRBoundingBoxes } from "../types/boundingBoxTypes.js";
+import { OCRBoundingBoxes, OCRComponent } from "../types/boundingBoxTypes.js";
 
 export const flattenPagesToWordMap = (pages: google.cloud.vision.v1.IPage[]): OCRBoundingBoxes  => {
   return pages
@@ -68,6 +68,26 @@ export const flattenPagesToParaMap = (pages: google.cloud.vision.v1.IPage[]): OC
     }, {});
 };
 
+export const flattenParagraphsToCellMap = (pages: google.cloud.vision.v1.IParagraph[]): OCRBoundingBoxes  => {
+  return pages
+    .reduce((acc: OCRBoundingBoxes , paragraph, index) => {
+      const key = `cell_${index}`;
+      
+      acc[key] = {
+        // In fullTextAnnotation, words are arrays of symbols
+        text: paragraph.words?.flatMap(word => word.symbols?.map(s => s.text).join('') ?? "").join(" ") ?? '',
+        vertices: (paragraph.boundingBox?.vertices ?? []).map(v => ({
+          x: v.x ?? 0,
+          y: v.y ?? 0
+        })),
+        confidence: paragraph.confidence ?? 0
+      };
+
+      return acc;
+    }, {});
+};
+
+
 
 export const findAverageAccuracyForAllBlock = (pages: google.cloud.vision.v1.IPage[]): number => {
   const recordResult = pages
@@ -105,16 +125,19 @@ export const findAverageAccuracyForAllWords = (pages: google.cloud.vision.v1.IPa
     return recordResult.reduce((acc: number, word, index) => {acc += word; return acc;}, 0) / recordResult.length;
 };
 
-export interface OCRComponent {
-  id: string;
-  type: 'TITLE' | 'HEADER' | 'TABLE_ROW' | 'LIST_ITEM' | 'BODY_TEXT';
-  indentation: number;
-  y: number;
-  layer?: number;
-  text: string;
-  cells?: string[]; // Used specifically for TABLE_ROW
-  confidence: number;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 export const extractStructuredComponents = (pages: google.cloud.vision.v1.IPage[]): OCRComponent[] => {
   const Y_THRESHOLD = 15; // Vertical proximity for same-line items
@@ -170,9 +193,7 @@ export const extractStructuredComponents = (pages: google.cloud.vision.v1.IPage[
       // Determine Component Type
       let type: OCRComponent['type'] = 'BODY_TEXT';
 
-      if (BULLET_REGEX.test(fullText)) {
-        type = 'LIST_ITEM';
-      } else if (sortedParts.length > 1) {
+      if (sortedParts.length > 1) {
         type = 'TABLE_ROW';
       } else if (height > 35 && index === 0) {
         type = 'TITLE';
@@ -187,10 +208,11 @@ export const extractStructuredComponents = (pages: google.cloud.vision.v1.IPage[
         y,
         layer: 0,
         text: fullText,
-        confidence
+        confidence,
+        boundingBoxes: flattenParagraphsToCellMap(sortedParts)
       };
 
-      if (type === 'TABLE_ROW' || type === "LIST_ITEM") {
+      if (type === 'TABLE_ROW') {
         result.cells = partTexts;
       }
 
@@ -202,75 +224,54 @@ export const extractStructuredComponents = (pages: google.cloud.vision.v1.IPage[
 
 /**
  * Adjusts component types based on relative indentation (the '-' handler)
+ * 
+ * Author: Harsha Sharma 
+ * 
  */
 function postProcessIndentation(components: OCRComponent[]): OCRComponent[] {
-  return components.map(comp => {
-    // If it's standard text but indented significantly, mark as nested
-    if (comp.type === 'BODY_TEXT' && comp.indentation > 60) {
-      // Logic to treat heavily indented text as part of a previous list item
-      return { ...comp, type: 'BODY_TEXT' as const }; 
+  const INDENT_STEP = 30; // Pixels that constitute a new nesting level
+  const stack: OCRComponent[] = [];
+
+  //Heuristic: very first table row is always a list of table columns
+  const firstIndex = components.findIndex(c => c.type === "TABLE_ROW")
+
+  components.map((comp, ind) => {
+    if (ind == firstIndex){
+      comp.type = "TABLE_COLS";
     }
+  })
+
+  return components.map((comp, index) => {
+    // 1. Pop from stack if current component is further left than the top of stack
+    // This means we've "closed" a nested section
+    while (stack.length > 0 && comp.indentation <= stack[stack.length - 1].indentation - 5) {
+      stack.pop();
+    }
+
+    // 2. Determine Parent
+    const parent = stack[stack.length - 1];
+    if (parent) {
+      comp.parentId = parent.id;
+      comp.layer = stack.length;
+    } else {
+      comp.layer = 0;
+    }
+
+    // 3. Heuristic: Should this component be a parent for the NEXT ones?
+    // Usually List Items or Headers "own" the indented text below them
+    const isPotentialParent = comp.type === 'HEADER';
+    
+    // Also, if the NEXT item is indented significantly more than this one, 
+    // this item is effectively the parent.
+    const nextComp = components[index + 1];
+    const nextIsIndented = nextComp && nextComp.indentation > comp.indentation + INDENT_STEP;
+
+    if (isPotentialParent || nextIsIndented) {
+      stack.push(comp);
+    }
+
     return comp;
   });
 }
 
 
-export const extractHierarchicalTables = (pages: google.cloud.vision.v1.IPage[]): OCRComponent[] => {
-  const Y_THRESHOLD = 15;
-  const INDENT_STEP = 20; // Min pixels to consider a new "Layer"
-  
-  // 1. Initial Row Mapping (Same as before)
-  const allParagraphs = pages.flatMap(page => (page.blocks ?? []).flatMap(b => b.paragraphs ?? []));
-  const rowMap: Record<string, google.cloud.vision.v1.IParagraph[]> = {};
-
-  allParagraphs.forEach(para => {
-    const v = para.boundingBox?.vertices;
-    if (!v) return;
-    const yCenter = ((v[0].y ?? 0) + (v[3].y ?? 0)) / 2;
-    const existingKey = Object.keys(rowMap).find(k => Math.abs(Number(k) - yCenter) < Y_THRESHOLD);
-    const key = existingKey ?? yCenter.toString();
-    if (!rowMap[key]) rowMap[key] = [];
-    rowMap[key].push(para);
-  });
-
-  // 2. Sort and Process Rows
-  const rawRows = Object.keys(rowMap)
-    .map(Number)
-    .sort((a, b) => a - b)
-    .map((y, index) => {
-      const paragraphs = rowMap[y.toString()].sort((a, b) => 
-        (a.boundingBox?.vertices?.[0]?.x ?? 0) - (b.boundingBox?.vertices?.[0]?.x ?? 0)
-      );
-
-      const partTexts = paragraphs.map(p => 
-        p.words?.map(w => w.symbols?.map(s => s.text).join('')).join(' ') ?? ""
-      );
-
-      return {
-        id: `row_${index}`,
-        y,
-        indentation: paragraphs[0]?.boundingBox?.vertices?.[0]?.x ?? 0,
-        text: partTexts.join(' '),
-        cells: paragraphs.length > 1 ? partTexts : undefined,
-        type: (paragraphs.length > 1 ? 'TABLE_ROW' : 'BODY_TEXT') as OCRComponent['type']
-      };
-    });
-
-  // 3. Hierarchical Layering Logic
-  const currentBaseIndentation = rawRows[0]?.indentation ?? 0;
-  
-  return rawRows.map((row, idx) => {
-    // Calculate layer based on how many "steps" it is from the base margin
-    const diff = row.indentation - currentBaseIndentation;
-    
-    // Determine layer: if diff is 60px and step is 30px, it's Layer 3
-    const layer = diff > (INDENT_STEP / 2) ? Math.floor(diff / INDENT_STEP) + 1 : 1;
-
-    // Heuristic: If it's a TABLE_ROW and layer > 1, it's subordinate
-    return {
-      ...row,
-      layer,
-      confidence: 0 // Placeholder
-    } as OCRComponent;
-  });
-};

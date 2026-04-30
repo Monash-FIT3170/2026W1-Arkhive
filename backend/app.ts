@@ -26,11 +26,7 @@ app.get('/', (_req: Request, res: Response) => {
   res.send('Hello World');
 });
 
-<<<<<<< HEAD
 app.use('/uploads', uploads.single('table_input'), uploadRouter)
-=======
-app.post('/uploads')
->>>>>>> 9aeba9d0c73de9fd7299075eef10d69968507fd2
 
 // testing api endpoint
 app.use('/api/', apiRouter);

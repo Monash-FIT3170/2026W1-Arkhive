@@ -1,7 +1,7 @@
 import path from 'path';
 import vision from '@google-cloud/vision';
 import fs from 'fs'
-import { extractHierarchicalTables, extractStructuredComponents, findAverageAccuracyForAllWords, flattenPagesToBlockMap, flattenPagesToParaMap, flattenPagesToWordMap } from './utils/utils.js';
+import { extractStructuredComponents, findAverageAccuracyForAllWords, flattenPagesToBlockMap, flattenPagesToParaMap, flattenPagesToWordMap } from './utils/utils.js';
 import { OCRBoundingBoxes }from './types/boundingBoxTypes.js';
 import { pdf } from 'pdf-to-img';
 
@@ -62,18 +62,6 @@ async function getBoundingBoxesWords(imageBuffer: Buffer) {
   const fullTextAnnotation = response.fullTextAnnotation;
   return extractStructuredComponents(fullTextAnnotation!.pages!)
 }
-
-/* function for getting overall averaged confidence score for all words
-*/
-async function getAverageConfidenceScore(imageBuffer: Buffer) {
-
-  const [response] = await client.documentTextDetection(imageBuffer);
-  const fullTextAnnotation = response.fullTextAnnotation;
-  return extractStructuredComponents(fullTextAnnotation?.pages!);
-}
-
-
-function drawBoundingBoxes(imageBuffer: Buffer, OCRBoundingBoxes: OCRBoundingBoxes){};
 
 // function for getting overall averaged confidence score
 
