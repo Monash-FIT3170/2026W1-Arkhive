@@ -2,8 +2,9 @@ import { useState } from "react";
 import mockImage from "../../../../mock-data/test.png";
 import mockOcrData from "../../../../mock-data/boundingBox.json";
 
-function DocumentPanel() {
+function DocumentPanel({ hoveredOverlayId, }: { hoveredOverlayId: string | null; }) {
 	const [viewBox, setViewBox] = useState("0 0 1000 1000"); // default
+
 
 	const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
 		const { naturalWidth, naturalHeight } = e.currentTarget;
@@ -40,26 +41,41 @@ function DocumentPanel() {
 							// set the internal canvas coordinates using viewBox
 							viewBox={viewBox}
 							// set invisible SVG canvas on top of the image
-							className="absolute inset-0 w-full h-full pointer-events-none"
+							className="absolute inset-0 w-full h-full"
 							preserveAspectRatio="xMidYMid meet"
 						>
+							<defs>
+								<filter id="highlightGlow" x="-50%" y="-50%" width="200%" height="300%">
+									<feGaussianBlur stdDeviation="4" result="glow" />
+									<feMerge>
+										<feMergeNode in="glow" />
+										<feMergeNode in="SourceGraphic" />
+									</feMerge>
+								</filter>
+							</defs>
 							{/* map all the bounding boxes */}
 							{(mockOcrData as any[]).map((comp) => {
 								if (!comp.boundingBoxes) return null;
-								
+
 								return Object.entries(comp.boundingBoxes).map(([cellKey, box]: [string, any]) => {
-									// convert vertices to points string for <polygon> points attribute
+
+									const id = `${comp.id}:${cellKey}`;
+
 									const pointsStr = box.vertices
 										.map((v: any) => `${v.x},${v.y}`)
 										.join(" ");
 
+									const isActive = hoveredOverlayId === id || hoveredOverlayId === comp.id;
+
 									return (
-										// Styling for individual overlays
-										// TODO: Can be updated later with opacity-0 or dynamic hover classes from the table panel.
 										<polygon
-											key={`${comp.id}-${cellKey}`}
+											key={id}
 											points={pointsStr}
-											className="fill-primary/10 stroke-primary/50 stroke-2 transition-all duration-200"
+											fill={isActive ? "rgba(245, 158, 11, 0.35)" : "transparent"}
+											stroke={isActive ? "#f59e0b" : "transparent"}
+											strokeWidth={isActive ? 3 : 1}
+											opacity={isActive ? 1 : 0.75}
+											filter={isActive ? "url(#highlightGlow)" : undefined}
 										/>
 									);
 								});

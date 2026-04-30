@@ -1,11 +1,19 @@
-export interface OCRComponent { 
-    id: string; 
+export interface OCRComponent {
+    id: string;
     type: | "TITLE" | "HEADER" | "TABLE_COLS" | "TABLE_ROW" | "LIST_ITEM" | "BODY_TEXT";
-    indentation: number; 
-    y: number; 
-    layer: number; 
-    parentId?: string; 
-    text: string; 
-    cells?: string[]; 
-    confidence: number; 
+    indentation: number;
+    y: number;
+    layer: number;
+    parentId?: string;
+    text: string;
+    cells?: string[];
+    confidence: number;
+    boundingBoxes?: Record<
+        string,
+        {
+            text: string;
+            vertices: Array<{ x: number; y: number }>;
+            confidence: number;
+        }
+    >;
 }
