@@ -4,10 +4,11 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
 import './index.css'
 import UploadPage from './pages/upload/UploadPage'
+import ValidationPage from './pages/validation/ValidationPage'
 
 // TEMP for previewpage
 function PreviewPage() {
-  return <div>Preview Page (WIP)</div>
+  return <ValidationPage />
 }
 
 createRoot(document.getElementById('root')!).render(
