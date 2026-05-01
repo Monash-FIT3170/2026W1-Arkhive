@@ -117,7 +117,8 @@ export function flattenOcrData(data: OCRComponent[]): ExtractedData {
          
         // create rows
         const row: ExtractedRow = { 
-            _id: component.id, 
+            _id: component.id,
+            confidence: component.confidence ?? 1, // carry confidence from OCR component test
         };
 
         // assign levels to row

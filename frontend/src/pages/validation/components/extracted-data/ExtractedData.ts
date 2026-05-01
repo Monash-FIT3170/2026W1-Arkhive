@@ -4,6 +4,7 @@ export interface ExtractedData {
 }
 
 export interface ExtractedRow { 
-    _id: string | number; 
+    _id: string | number;
+    confidence: number; // OCR confidence score from Google Cloud Vision (0 to 1)
     [key: string]: any; 
 }
