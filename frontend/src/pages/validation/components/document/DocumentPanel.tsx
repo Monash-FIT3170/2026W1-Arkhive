@@ -3,8 +3,25 @@ import mockImage from "../../../../mock-data/test.png";
 import mockOcrData from "../../../../mock-data/boundingBox.json";
 import type { OCRComponent } from "../../../../models/OCRComponent";
 
+// NEW update: Calculating real average confidence from OCR data
+function calculateAverageConfidence(data: OCRComponent[]): number {
+    const componentsWithConfidence = data.filter(
+        (comp) => typeof comp.confidence === "number"
+    );
+    if (componentsWithConfidence.length === 0) return 0;
+    const total = componentsWithConfidence.reduce(
+        (sum, comp) => sum + comp.confidence,
+        0
+    );
+    return total / componentsWithConfidence.length;
+}
+
 function DocumentPanel() {
 	const [viewBox, setViewBox] = useState("0 0 1000 1000"); // default
+
+	// NEW update: Real average confidence from mock data
+		const averageConfidence = calculateAverageConfidence(mockOcrData as OCRComponent[]);
+		const confidencePercent = Math.round(averageConfidence * 100);
 
 	const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
 		const { naturalWidth, naturalHeight } = e.currentTarget;
@@ -71,9 +88,16 @@ function DocumentPanel() {
 					</div>
 				</div>
 
-				{/* Row 3: Confidence Score */}
+				{/* Row 3: Confidence Score, updated to show real score instead of hardcoded value, made the colours a little brighter for the document panel */}
 				<div className="border-t pt-3 text-sm text-base-content/70">
-					Confidence Score: <span className="font-medium">92%</span>
+					Confidence Score:{" "}
+					<span className={`font-medium ${
+						confidencePercent >= 85 ? "text-green-400" :
+						confidencePercent >= 70 ? "text-yellow-400" :
+						"text-red-400"
+					}`}>
+						{confidencePercent}%
+					</span> 
 				</div>
 			</div>
 		</>
