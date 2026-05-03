@@ -1,5 +1,6 @@
 type PreviewCardProps = {
-  file: File | null;
+  label: string;
+  hasFile: boolean;
   index: number;
   isSelected: boolean;
   previewSrc?: string;
@@ -8,7 +9,8 @@ type PreviewCardProps = {
 };
 
 function PreviewCard({
-  file,
+  label,
+  hasFile,
   index,
   isSelected,
   previewSrc,
@@ -21,10 +23,10 @@ function PreviewCard({
         isSelected
           ? "border-green-500 bg-[#1f2028] shadow-[0_0_0_1px_rgba(34,197,94,0.35)]"
           : "border-[#2e303a] bg-[#1a1c24]"
-      } ${file ? "cursor-pointer" : "cursor-default"}`}
-      onClick={() => file && onToggle(index)}
+      } ${hasFile ? "cursor-pointer" : "cursor-default"}`}
+      onClick={() => hasFile && onToggle(index)}
     >
-      {file && (
+      {hasFile && (
         <span
           className={`absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${
             isSelected
@@ -37,9 +39,9 @@ function PreviewCard({
       )}
 
       <div className="mx-auto mb-[10px] mt-4 h-[150px] w-[108px] overflow-hidden rounded-[2px] border border-[#3f4350] bg-[#f8fafc] shadow-[inset_0_0_0_1px_#e5e7eb]">
-        {file && isImage ? (
-          <img src={previewSrc} alt={file.name} className="h-full w-full object-cover" />
-        ) : file ? (
+        {hasFile && isImage ? (
+          <img src={previewSrc} alt={label} className="h-full w-full object-cover" />
+        ) : hasFile ? (
           <div className="flex h-full w-full items-center justify-center text-center text-xs font-semibold text-gray-500">
             Preview unavailable
           </div>
@@ -47,9 +49,7 @@ function PreviewCard({
       </div>
 
       <div>
-        <p className="truncate text-center text-xs text-gray-300">
-          {file ? file.name : `Page ${index + 1}`}
-        </p>
+        <p className="truncate text-center text-xs text-gray-300">{label}</p>
         <p className="mt-1.5 text-center text-xs text-gray-400">{index + 1}</p>
       </div>
     </article>
