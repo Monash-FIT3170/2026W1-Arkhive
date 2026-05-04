@@ -1,6 +1,7 @@
 import { useState } from "react";
 import mockImage from "../../../../mock-data/test.png";
 import mockOcrData from "../../../../mock-data/boundingBox.json";
+import type { OCRComponent } from "../../../../models/OCRComponent";
 
 function DocumentPanel({ hoveredOverlayId, }: { hoveredOverlayId: string | null; }) {
 	const [viewBox, setViewBox] = useState("0 0 1000 1000"); // default
@@ -9,7 +10,7 @@ function DocumentPanel({ hoveredOverlayId, }: { hoveredOverlayId: string | null;
 	const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
 		const { naturalWidth, naturalHeight } = e.currentTarget;
 		if (naturalWidth && naturalHeight) {
-			// original image is 2200x1700 (200 DPI). 
+			// original image is 2200x1700 (200 DPI).
 			// OCR coordinates are generated at ~1.5x smaller scale (~133 DPI).
 			// scale factor of ocr -> image (200 dpi /133 dpi) = 1.5037593985
 			const scaleFactor = 1.5037593985;
@@ -54,7 +55,7 @@ function DocumentPanel({ hoveredOverlayId, }: { hoveredOverlayId: string | null;
 								</filter>
 							</defs>
 							{/* map all the bounding boxes */}
-							{(mockOcrData as any[]).map((comp) => {
+							{(mockOcrData as OCRComponent[]).map((comp) => {
 								if (!comp.boundingBoxes) return null;
 
 								return Object.entries(comp.boundingBoxes).map(([cellKey, box]: [string, any]) => {

@@ -155,7 +155,7 @@ export function flattenOcrData(data: OCRComponent[]): ExtractedData {
 
         //PRICE fix - find anything that includes "price"
         const rawPriceText = component.cells.join(" ");
-        const priceCol = columns.find((col) => col.includes("PRICE")) || "PRICE";
+        const priceCol = cleanedCols[cleanedCols.length - 1] ?? "PRICE";
         row[priceCol] = cleanPrice(rawPriceText, isMainItem(component));
 
         rows.push(row);
