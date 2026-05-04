@@ -10,6 +10,7 @@ function ValidationPage() {
 	const [isChatOpen, setIsChatOpen] = useState(true);
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const documentContext = flattenOcrData(mockOcrData as OCRComponent[]);
+	//test
 	//bounding box hover state 
 	const [hoveredOverlayId, setHoveredOverlayId] = useState<string | null>(null);
 
