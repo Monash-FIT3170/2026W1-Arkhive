@@ -19,7 +19,7 @@ function PreviewCard({
 }: PreviewCardProps) {
   return (
     <article
-      className={`relative min-h-[220px] rounded-[10px] border p-3 transition ${
+      className={`relative min-h-[300px] rounded-[10px] border p-3 transition ${
         isSelected
           ? "border-green-500 bg-[#1f2028] shadow-[0_0_0_1px_rgba(34,197,94,0.35)]"
           : "border-[#2e303a] bg-[#1a1c24]"
@@ -38,9 +38,9 @@ function PreviewCard({
         </span>
       )}
 
-      <div className="mx-auto mb-[10px] mt-4 h-[150px] w-[108px] overflow-hidden rounded-[2px] border border-[#3f4350] bg-[#f8fafc] shadow-[inset_0_0_0_1px_#e5e7eb]">
+      <div className="mx-auto mb-[10px] mt-4 h-[220px] w-[160px] overflow-hidden rounded-[2px] border border-[#3f4350] bg-[#f8fafc] shadow-[inset_0_0_0_1px_#e5e7eb]">
         {hasFile && isImage ? (
-          <img src={previewSrc} alt={label} className="h-full w-full object-cover" />
+          <img src={previewSrc} alt={label} className="h-full w-full object-contain" />
         ) : hasFile ? (
           <div className="flex h-full w-full items-center justify-center text-center text-xs font-semibold text-gray-500">
             Preview unavailable
