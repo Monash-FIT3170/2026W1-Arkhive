@@ -1,5 +1,5 @@
 import { google } from "@google-cloud/vision/build/protos/protos.js";
-import { OCRBoundingBoxes, OCRComponent } from "../types/boundingBoxTypes.js";
+import { OCRBoundingBox, OCRBoundingBoxes, OCRComponent } from "../types/boundingBoxTypes.js";
 
 export const flattenPagesToWordMap = (pages: google.cloud.vision.v1.IPage[]): OCRBoundingBoxes  => {
   return pages
@@ -223,7 +223,7 @@ export const extractStructuredComponents = (pages: google.cloud.vision.v1.IPage[
 };
 
 /**
- * Adjusts component types based on relative indentation (the '-' handler)
+ * Adjusts component types based on relative indentation (the level handler)
  * 
  * Author: Harsha Sharma 
  * 
@@ -233,7 +233,7 @@ function postProcessIndentation(components: OCRComponent[]): OCRComponent[] {
   const stack: OCRComponent[] = [];
 
   //Heuristic: very first table row is always a list of table columns
-  const firstIndex = components.findIndex(c => c.type === "TABLE_ROW")
+  const firstIndex = components.findIndex(c => c.type === "TABLE_ROW");
 
   components.map((comp, ind) => {
     if (ind == firstIndex){
@@ -241,7 +241,27 @@ function postProcessIndentation(components: OCRComponent[]): OCRComponent[] {
     }
   })
 
+  const table_cols = components[components.findIndex(c => c.type === "TABLE_COLS")];
+
   return components.map((comp, index) => {
+    comp.type == "TABLE_ROW" ? Object.keys(comp.boundingBoxes!).map(
+      (num1, _) => 
+      Object.keys(table_cols.boundingBoxes!).map((num,  _) => {
+        const column = table_cols.boundingBoxes![num.toString()];
+        const cell = comp.boundingBoxes![num1.toString()];
+        const leftMarginOfCol = column.vertices[0].x
+        const widthOfCol = column.vertices[1].x - leftMarginOfCol
+
+        const leftMarginOfCell = cell.vertices[0].x
+        const widthOfCell = cell.vertices[1].x - leftMarginOfCell
+
+        if (leftMarginOfCol <= leftMarginOfCell + widthOfCell &&
+          leftMarginOfCell <= leftMarginOfCol + widthOfCol 
+        ){
+          cell.column = column.text;
+        }
+      })
+    ) : ""
     // 1. Pop from stack if current component is further left than the top of stack
     // This means we've "closed" a nested section
     while (stack.length > 0 && comp.indentation <= stack[stack.length - 1].indentation - 5) {
@@ -273,5 +293,3 @@ function postProcessIndentation(components: OCRComponent[]): OCRComponent[] {
     return comp;
   });
 }
-
-
