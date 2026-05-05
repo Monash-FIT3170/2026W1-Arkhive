@@ -5,5 +5,6 @@ export interface ExtractedData {
 
 export interface ExtractedRow {
 	_id: string | number;
+	_cellKeyMap?: Record<string, string>;
 	[key: string]: any;
 }

@@ -15,7 +15,13 @@ export interface OCRBoundingBoxes {
 
 export interface OCRComponent {
 	id: string;
-	type: "TITLE" | "HEADER" | "TABLE_ROW" | "BODY_TEXT" | "TABLE_COLS";
+	type:
+		| "TITLE"
+		| "HEADER"
+		| "TABLE_COLS"
+		| "TABLE_ROW"
+		| "LIST_ITEM"
+		| "BODY_TEXT";
 	indentation: number;
 	y: number;
 	layer: number;

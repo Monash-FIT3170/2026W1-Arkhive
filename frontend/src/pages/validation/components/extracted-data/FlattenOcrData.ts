@@ -1,5 +1,5 @@
-import type { ExtractedData, ExtractedRow } from "./ExtractedData";
-import type { OCRComponent } from "./OCRComponent";
+import type { ExtractedData, ExtractedRow } from "../../../../models/TableData";
+import type { OCRComponent } from "../../../../models/OCRComponent";
 
 // --- Helpers ---
 

@@ -1,11 +1,14 @@
-import type { ExtractedData } from "./ExtractedData";
+import mockOcrData from "../../../../mock-data/boundingBox.json";
+import type { ExtractedData } from "../../../../models/TableData";
+import { flattenOcrData } from "./FlattenOcrData";
 
 function ExtractedDataPanel({
-	extractedData
+	onHover
 }: {
-	extractedData: ExtractedData;
+	onHover: (id: string | null) => void;
 }) {
-	// Currency formatting function
+	const extractedData: ExtractedData = flattenOcrData(mockOcrData as any[]);
+
 	const formatCurrency = (amount: number) => {
 		return new Intl.NumberFormat("id-ID", {
 			style: "currency",
@@ -19,10 +22,8 @@ function ExtractedDataPanel({
 				EXTRACTED DATA
 			</h2>
 
-			{/* Table */}
 			<div className="flex-1 overflow-auto min-h-0 max-w-full">
 				<table className="table table-fixed w-full border border-base-300 text-[10px]">
-					{/* Table Header */}
 					<thead>
 						<tr className="text-base-content/70">
 							{extractedData.columns.map((column) => (
@@ -36,33 +37,44 @@ function ExtractedDataPanel({
 						</tr>
 					</thead>
 
-					{/* Table Body */}
 					<tbody>
 						{extractedData.rows.map((row) => (
 							<tr
 								key={row._id}
 								className="border-b border-base-300 hover:bg-base-300/40"
 							>
-								{extractedData.columns.map((column) => (
-									<td
-										key={column}
-										className={`p-2 text-base-content ${
-											column === "ITEM"
-												? "break-all"
-												: "break-words"
-										}`}
-									>
-										{column.includes("PRICE") && row[column]
-											? formatCurrency(
-													Number(
-														String(
-															row[column]
-														).replace(/,/g, "")
-													)
+								{extractedData.columns.map((column) => {
+									const cellKey = row._cellKeyMap?.[column];
+									return (
+										<td
+											key={column}
+											className={`p-2 hover:bg-warning/10 cursor-pointer text-base-content ${
+												column === "ITEM"
+													? "break-all"
+													: "break-words"
+											}`}
+											onMouseEnter={() =>
+												onHover(
+													cellKey
+														? `${row._id}:${cellKey}`
+														: String(row._id)
 												)
-											: row[column] || ""}
-									</td>
-								))}
+											}
+											onMouseLeave={() => onHover(null)}
+										>
+											{column.includes("PRICE") &&
+											row[column]
+												? formatCurrency(
+														Number(
+															String(
+																row[column]
+															).replace(/,/g, "")
+														)
+													)
+												: row[column] || ""}
+										</td>
+									);
+								})}
 							</tr>
 						))}
 					</tbody>

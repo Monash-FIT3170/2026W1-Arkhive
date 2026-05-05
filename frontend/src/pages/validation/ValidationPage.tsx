@@ -10,6 +10,11 @@ function ValidationPage() {
 	const [isChatOpen, setIsChatOpen] = useState(true);
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const documentContext = flattenOcrData(mockOcrData as OCRComponent[]);
+	//test
+	//bounding box hover state 
+	const [hoveredOverlayId, setHoveredOverlayId] = useState<string | null>(null);
+
+
 	const addMessage = (message: ChatMessage) => {
 		setMessages((prev) => [...prev, message]);
 	};
@@ -18,10 +23,12 @@ function ValidationPage() {
 		<>
 			<div className="flex flex-col lg:flex-row w-full p-3 gap-3 h-auto lg:h-screen lg:overflow-hidden">
 				<div className="w-full h-[50vh] lg:h-full lg:flex-1">
-					<DocumentPanel />
+
+					<DocumentPanel hoveredOverlayId={hoveredOverlayId} />
+
 				</div>
 				<div className="w-full h-[50vh] lg:h-full lg:flex-1">
-					<ExtractedDataPanel extractedData={documentContext} />
+					<ExtractedDataPanel onHover={setHoveredOverlayId} extractedData={documentContext} />
 				</div>
 			</div>
 
