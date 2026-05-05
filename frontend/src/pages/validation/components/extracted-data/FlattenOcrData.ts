@@ -1,8 +1,6 @@
 import type { ExtractedData, ExtractedRow } from "../../../../models/TableData";
 import type { OCRComponent } from "../../../../models/OCRComponent";
 
-// --- Helpers ---
-
 export function normalizeColKey(col: string): string {
 	return col
 		.replace(/\(.*?\)/g, "")
@@ -12,19 +10,40 @@ export function normalizeColKey(col: string): string {
 		.toUpperCase();
 }
 
+/** Finds the horizontal center (X coordinate) of a specific cell in a component */
 export function cellMidX(component: OCRComponent, key: string): number | null {
 	const verts = component.boundingBoxes?.[key]?.vertices;
 	if (!verts?.length) return null;
+
 	const xs = verts.map((v) => Number(v.x));
 	return (Math.min(...xs) + Math.max(...xs)) / 2;
 }
 
+/** Helper to find the index of the closest number in an array to a target value */
+function findClosestIndex(
+	target: number,
+	values: number[],
+	startIndex = 0
+): number {
+	let bestIdx = startIndex;
+	let minScore = Infinity;
+
+	for (let j = startIndex; j < values.length; j++) {
+		const score = Math.abs(target - values[j]);
+		if (score < minScore) {
+			minScore = score;
+			bestIdx = j;
+		}
+	}
+	return bestIdx;
+}
+
+/** Extracts the column headers and their X-axis positions from the table */
 export function extractColumns(data: OCRComponent[]) {
 	const colComp = data.find((c) => c.type === "TABLE_COLS");
 	const rawCols = colComp?.cells ?? [];
 
 	const keys = rawCols.map(normalizeColKey);
-
 	const positions = rawCols.map(
 		(_, i) => (colComp ? cellMidX(colComp, `cell_${i}`) : null) ?? i * 100
 	);
@@ -32,104 +51,91 @@ export function extractColumns(data: OCRComponent[]) {
 	return { keys, positions };
 }
 
+/** Determines which column is the main "Item" column based on where most row items start */
 export function detectItemColumn(
 	components: OCRComponent[],
 	colXs: number[]
 ): number {
-	// This function returns the main column based on its frequency of items in that column, left based
 	const freq = new Map<number, number>();
-	components.forEach((c) => {
-		// Get the horizontal center (x position) of the first item in this row
-		const x = cellMidX(c, "cell_0");
-		if (x === null) return;
 
-		// Find the closest column to this component
-		let bestIdx = 0;
-		let minScore = Infinity;
-		for (let j = 0; j < colXs.length; j++) {
-			// Distance between component and column center
-			const score = Math.abs(x - colXs[j]);
-			// Keep track of the closest column
-			if (score < minScore) {
-				minScore = score;
-				bestIdx = j;
-			}
-		}
-		// Increment count for the column this component belongs to
-		freq.set(bestIdx, (freq.get(bestIdx) ?? 0) + 1);
+	components.forEach((c) => {
+		const startX = cellMidX(c, "cell_0");
+		if (startX === null) return;
+
+		const closestColIdx = findClosestIndex(startX, colXs);
+		freq.set(closestColIdx, (freq.get(closestColIdx) ?? 0) + 1);
 	});
 
 	if (freq.size === 0) return 0;
-	// Find the column with the highest number of assigned components
+
+	// Return the column index with the highest frequency of items
 	return [...freq.entries()].reduce((a, b) => (b[1] > a[1] ? b : a))[0];
 }
 
+/** Determines the nested depth (indentation level) of each row using a Stack */
 export function resolveLevels(components: OCRComponent[]) {
-	const idToDepth = new Map<string, number>(); // map os component id -> depth level
-	const stack: { id: string; indent: number; depth: number }[] = []; // top of stack is the current parent
+	const idToDepth = new Map<string, number>();
+	const stack: { id: string; indent: number; depth: number }[] = [];
 	const INDENT_THRESHOLD = 8;
 
-	components.forEach((c) => {
+	for (const c of components) {
 		const verts = c.boundingBoxes?.["cell_0"]?.vertices;
-
-		// get indent based on left mst x in bounding box/component indentation
 		const currentIndent = verts?.length
 			? Math.min(...verts.map((v) => Number(v.x)))
 			: (c.indentation ?? 0);
+		let currentDepth = 0;
 
-		// first item
-		if (stack.length === 0) {
-			stack.push({ id: c.id, indent: currentIndent, depth: 0 });
-			idToDepth.set(c.id, 0);
-		} else {
-			while (stack.length > 0) {
-				// compare with previous item, difference of indentaiton
-				const top = stack[stack.length - 1];
-				const diff = currentIndent - top.indent;
+		// Pop items off the stack until we find the parent or sibling of the current item
+		while (stack.length > 0) {
+			const top = stack[stack.length - 1];
+			const diff = currentIndent - top.indent;
 
-				// if the difference is greater then the threshold
-				if (diff > INDENT_THRESHOLD) {
-					// give this component a greater depth
-					const newDepth = top.depth + 1;
-					stack.push({
-						id: c.id,
-						indent: currentIndent,
-						depth: newDepth
-					});
-					// set this item new depth
-					idToDepth.set(c.id, newDepth);
-					break;
-
-					// is the difference is less the the threshold, it means it is the same depth
-				} else if (Math.abs(diff) <= INDENT_THRESHOLD) {
-					// places this component at top of stack
-					stack[stack.length - 1] = {
-						id: c.id,
-						indent: currentIndent,
-						depth: top.depth
-					};
-					// set as same depth
-					idToDepth.set(c.id, top.depth);
-					break;
-
-					// this means the component has a lower depth level
-				} else {
-					stack.pop(); // keep poping until we find a matching parent
-				}
-			}
-			// when everything is popped, set back to root level
-			if (stack.length === 0) {
-				stack.push({ id: c.id, indent: currentIndent, depth: 0 });
-				idToDepth.set(c.id, 0);
+			if (diff > INDENT_THRESHOLD) {
+				// Current item is indented further than top (it's a Child)
+				currentDepth = top.depth + 1;
+				break;
+			} else if (Math.abs(diff) <= INDENT_THRESHOLD) {
+				// Current item has same indentation as top (it's a Sibling)
+				currentDepth = top.depth;
+				stack.pop(); // Remove old sibling so current becomes the new top
+				break;
+			} else {
+				// Current item is outdented (it belongs to a previous level)
+				stack.pop();
 			}
 		}
-	});
 
-	// return the component mapping to depth level
+		stack.push({ id: c.id, indent: currentIndent, depth: currentDepth });
+		idToDepth.set(c.id, currentDepth);
+	}
+
 	return idToDepth;
 }
 
-// --- Level resolution ---
+/** Maps a specific cell to its matching column index */
+function resolveCellColIdx(
+	component: OCRComponent,
+	cellIndex: number,
+	colKeys: string[],
+	colXs: number[],
+	lastColIdx: number
+): number {
+	const bbKey = `cell_${cellIndex}`;
+	const rawColumnName = component.boundingBoxes?.[bbKey]?.column;
+
+	// The OCR already knows exactly which column this cell belongs to
+	if (rawColumnName) {
+		const idx = colKeys.indexOf(normalizeColKey(rawColumnName));
+		if (idx !== -1) return idx;
+	}
+
+	// If doesn't exist, then find the closest column spatially (forward-only matching)
+	const mX = cellMidX(component, bbKey) ?? 0;
+	const safeStartIndex = Math.min(lastColIdx + 1, colXs.length - 1);
+
+	return findClosestIndex(mX, colXs, safeStartIndex);
+}
+
 type BuildRowsParams = {
 	components: OCRComponent[];
 	colKeys: string[];
@@ -145,125 +151,95 @@ export function buildRows({
 	itemCol,
 	idToDepth
 }: BuildRowsParams): { rows: ExtractedRow[]; levelCols: string[] } {
-	// create the column headers for the nested main columns based on the maximum depth
 	const maxDepth = Math.max(...idToDepth.values(), 0);
-	const levelCols = Array.from(
+	const subItemCols = Array.from(
 		{ length: maxDepth },
-		(_, i) => `SUB_ITEM_${i + 1}`
+		(_, i) => `SUB_${colKeys[itemCol]}_${i + 1}`
 	);
 
 	const rows: ExtractedRow[] = [];
-	const levelCtx: string[] = [];
 
-	// Setup context to remember columns to the left of ITEM (like NO.)
-	const leftColsCtx: Record<string, string[]> = {};
+	// Context trackers used to cascade parent values down to child rows
+	const cascadingLeftValues: Record<string, string[]> = {};
+	const hierarchyValues: string[] = [];
+
+	// Initialize tracking for columns to the left of the main item (e.g., "NO.")
 	for (let i = 0; i < itemCol; i++) {
-		leftColsCtx[colKeys[i]] = [];
+		cascadingLeftValues[colKeys[i]] = [];
 	}
 
 	components.forEach((c) => {
-		// get depth for the component
 		const depth = idToDepth.get(c.id) ?? 0;
-		// map each cell to a column
-		const mappedCells: { val: string; colIdx: number }[] = [];
 		let lastColIdx = -1;
 
-		(c.cells ?? []).forEach((val, i) => {
-			// for each cell map it to the best column based on bounding boxes
-			const mX = cellMidX(c, `cell_${i}`) ?? 0;
-
-			// search for the next column only
-			let bestIdx = lastColIdx + 1;
-			if (bestIdx >= colXs.length) bestIdx = colXs.length - 1; //make sure id doesn't exceed max
-
-			let minScore = Infinity;
-			// only check cloest column forward from the last since cell in the same component can't go backwards from the previous
-			for (let j = lastColIdx + 1; j < colXs.length; j++) {
-				const score = Math.abs(mX - colXs[j]);
-				if (score < minScore) {
-					minScore = score;
-					bestIdx = j;
-				}
-			}
-			// push the cell with its column index into the map
-			mappedCells.push({ val, colIdx: bestIdx });
-			// use the
-			lastColIdx = bestIdx;
+		// Map cells to their respective columns
+		const mappedCells = (c.cells ?? []).map((val, i) => {
+			const colIdx = resolveCellColIdx(c, i, colKeys, colXs, lastColIdx);
+			lastColIdx = colIdx;
+			return { val, colIdx };
 		});
 
-		// 1. Cascade logic for left-side columns
+		// Update Cascading Left-Side Logic (e.g., inheriting parent row numbers)
 		for (let i = 0; i < itemCol; i++) {
-			// get the column header
 			const colKey = colKeys[i];
-			// get the cells that have a column index equal to the current o
-			const cell = mappedCells.find((mc) => mc.colIdx === i);
+			const cellValue = mappedCells.find((mc) => mc.colIdx === i)?.val;
 
-			if (cell) {
-				leftColsCtx[colKey][depth] = cell.val; // Store new NO.
+			if (cellValue) {
+				cascadingLeftValues[colKey][depth] = cellValue;
 			} else if (depth > 0) {
-				leftColsCtx[colKey][depth] =
-					leftColsCtx[colKey][depth - 1] ?? ""; // Inherit parent NO.
+				cascadingLeftValues[colKey][depth] =
+					cascadingLeftValues[colKey][depth - 1] ?? "";
 			} else {
-				leftColsCtx[colKey][depth] = ""; // Clear if empty top-level
+				cascadingLeftValues[colKey][depth] = "";
 			}
-			leftColsCtx[colKey].length = depth + 1; // Wipe deeper history
+			cascadingLeftValues[colKey].length = depth + 1; // Clear deeper history
 		}
 
-		// 2. Cascade logic for the "ITEM" column
-		let itemValue = "";
-		mappedCells.forEach((cell) => {
-			if (cell.colIdx === itemCol && !itemValue) itemValue = cell.val;
-		});
+		// Update Hierarchy/Nesting Logic for the main item
+		const itemValue =
+			mappedCells.find((mc) => mc.colIdx === itemCol)?.val ?? "";
+		hierarchyValues[depth] = itemValue;
+		hierarchyValues.length = depth + 1;
 
-		levelCtx[depth] = itemValue;
-		levelCtx.length = depth + 1;
-
-		// 3. Construct the row
+		// Assemble the final Extracted Row
 		const row: ExtractedRow = { _id: c.id };
-		[...colKeys, ...levelCols].forEach((col) => (row[col] = ""));
+		[...colKeys, ...subItemCols].forEach((col) => (row[col] = ""));
 
-		// Fill normal data (Description, Price)
+		// Fill normal data (Description, Price, etc.)
 		mappedCells.forEach(({ val, colIdx }) => {
-			if (colIdx !== itemCol && colIdx >= itemCol && colKeys[colIdx]) {
+			if (colIdx >= itemCol && colIdx !== itemCol && colKeys[colIdx]) {
 				row[colKeys[colIdx]] = val;
 			}
 		});
 
-		// Fill Cascading Left Columns (NO.)
+		// Fill Cascading Left Columns
 		for (let i = 0; i < itemCol; i++) {
-			const colKey = colKeys[i];
-			if (colKey) row[colKey] = leftColsCtx[colKey][depth] ?? "";
+			if (colKeys[i])
+				row[colKeys[i]] = cascadingLeftValues[colKeys[i]][depth] ?? "";
 		}
 
 		// Fill ITEM and SUB_ITEMs
-		const itemColKey = colKeys[itemCol];
-		if (itemColKey) row[itemColKey] = levelCtx[0] ?? "";
-
-		levelCols.forEach((col, i) => {
-			row[col] = levelCtx[i + 1] ?? "";
+		if (colKeys[itemCol]) row[colKeys[itemCol]] = hierarchyValues[0] ?? "";
+		subItemCols.forEach((col, i) => {
+			row[col] = hierarchyValues[i + 1] ?? "";
 		});
 
 		rows.push(row);
 	});
 
-	return { rows, levelCols };
+	return { rows, levelCols: subItemCols };
 }
 
-// --- Main ---
 export function flattenOcrData(data: OCRComponent[]): ExtractedData {
 	const components = data.filter(
 		(c) =>
 			c.cells && !["HEADER", "BODY_TEXT", "TABLE_COLS"].includes(c.type)
 	);
 
-	// get the mid positions and names of the columns in the table
 	const { keys, positions } = extractColumns(data);
-	// get the column that is considered the main column based on frequency of entries
 	const itemCol = detectItemColumn(components, positions);
-	// get component's depth/indentation level based on bounding boxes
 	const idToDepth = resolveLevels(components);
 
-	// build the rows and columns
 	const { rows, levelCols } = buildRows({
 		components,
 		colKeys: keys,
@@ -272,6 +248,7 @@ export function flattenOcrData(data: OCRComponent[]): ExtractedData {
 		idToDepth
 	});
 
+	// Build the final array of column names, injecting sub-items after the main item column
 	const finalCols: string[] = [];
 	keys.forEach((k, i) => {
 		finalCols.push(k);

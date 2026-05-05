@@ -1,5 +1,6 @@
 export interface OCRBoundingBox {
 	text: string;
+	column?: string;
 	vertices: Vertex[];
 	confidence: number;
 }
