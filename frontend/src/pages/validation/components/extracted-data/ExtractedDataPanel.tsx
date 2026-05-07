@@ -1,10 +1,15 @@
 <<<<<<< HEAD
 import mockOcrData from "../../../../mock-data/boundingBox.json";
+<<<<<<< HEAD
 =======
 import { AlertTriangle } from "lucide-react"; // NEW: imported for low confidence warning icon
 >>>>>>> 35a60c904bc91d8edb2b3eb12faf23f0c816b4d5
 import type { ExtractedData } from "./ExtractedData";
+=======
+import type { ExtractedData } from "../../../../models/TableData";
+>>>>>>> 5f3f3ed6747d72fe46de5213aac7676e04e0a576
 import { flattenOcrData } from "./FlattenOcrData";
+import { TableProperties } from "lucide-react";
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
@@ -36,10 +41,11 @@ function getConfidenceTier(confidence: number): {
 }
 
 function ExtractedDataPanel({
-  onHover,
+	onHover
 }: {
-  onHover: (id: string | null) => void;
+	onHover: (id: string | null) => void;
 }) {
+<<<<<<< HEAD
 <<<<<<< HEAD
   const extractedData: ExtractedData = flattenOcrData(mockOcrData as any[]);
 =======
@@ -51,36 +57,48 @@ function ExtractedDataPanel({
 		}).format(amount);
 	};
 >>>>>>> 35a60c904bc91d8edb2b3eb12faf23f0c816b4d5
+=======
+	const extractedData: ExtractedData = flattenOcrData(mockOcrData as any[]);
+>>>>>>> 5f3f3ed6747d72fe46de5213aac7676e04e0a576
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-    }).format(amount);
-  };
+	const formatCurrency = (amount: number) => {
+		return new Intl.NumberFormat("id-ID", {
+			style: "currency",
+			currency: "IDR"
+		}).format(amount);
+	};
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   return (
     <div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
       <h2 className="mb-4 text-xl font-semibold text-base-content">
         EXTRACTED DATA
       </h2>
+=======
+	return (
+		<div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
+			<h2 className="mb-4 text-xl font-heading font-semibold text-base-content flex items-center gap-2">
+				<div className="bg-neutral text-neutral-content p-1 rounded-xl">
+					<TableProperties size={18} strokeWidth={2.5} />
+				</div>
+				EXTRACTED DATA
+			</h2>
+>>>>>>> 5f3f3ed6747d72fe46de5213aac7676e04e0a576
 
-      <div className="flex-1 overflow-auto min-h-0 max-w-full">
-        <table className="table table-fixed w-full border border-base-300 text-[10px]">
-          <thead>
-            <tr className="text-base-content/70">
-              {extractedData.columns.map((column) => (
-                <th
-                  key={column}
-                  className="p-3 text-left text-[12px] font-bold border-b border-base-300 break-words whitespace-normal"
-                >
-                  {column.replace(/_/g, " ")}
-                </th>
-              ))}
-            </tr>
-          </thead>
+			<div className="flex-1 overflow-auto min-h-0 max-w-full rounded-lg border border-base-300">
+				<table className="table table-zebra table-pin-rows w-full text-xs font-sans">
+					<thead>
+						<tr className="bg-base-300/50 text-base-content/80 uppercase tracking-wider text-[11px]">
+							{extractedData.columns.map((column) => (
+								<th key={column} className="p-3 text-left font-semibold">
+									{column.replace(/_/g, " ")}
+								</th>
+							))}
+						</tr>
+					</thead>
 
+<<<<<<< HEAD
           <tbody>
             {extractedData.rows.map((row) => (
               <tr
@@ -160,19 +178,53 @@ function ExtractedDataPanel({
 										<td
 											key={column}
 											className={`p-2 text-base-content ${
+=======
+					<tbody>
+						{extractedData.rows.map((row) => (
+							<tr
+								key={row._id}
+								className="hover:bg-primary/10 transition-colors duration-150"
+							>
+								{extractedData.columns.map((column) => {
+									const cellKey = row._cellKeyMap?.[column];
+									return (
+										<td
+											key={column}
+											className={`p-3 cursor-pointer text-base-content ${
+>>>>>>> 5f3f3ed6747d72fe46de5213aac7676e04e0a576
 												column === "ITEM"
 													? "break-all"
 													: "break-words"
 											}`}
+<<<<<<< HEAD
 										>
 											{column.includes("PRICE") && row[column]
 												? formatCurrency(
 														Number(
 															String(row[column]).replace(/,/g, "")
+=======
+											onMouseEnter={() =>
+												onHover(
+													cellKey
+														? `${row._id}:${cellKey}`
+														: String(row._id)
+												)
+											}
+											onMouseLeave={() => onHover(null)}
+										>
+											{column.includes("PRICE") &&
+											row[column]
+												? formatCurrency(
+														Number(
+															String(
+																row[column]
+															).replace(/,/g, "")
+>>>>>>> 5f3f3ed6747d72fe46de5213aac7676e04e0a576
 														)
 													)
 												: row[column] || ""}
 										</td>
+<<<<<<< HEAD
 									))}
 
 									{/* NEW: Confidence score cell added at the end of each row
@@ -190,12 +242,21 @@ function ExtractedDataPanel({
 								</tr>
 							);
 						})}
+=======
+									);
+								})}
+							</tr>
+						))}
+>>>>>>> 5f3f3ed6747d72fe46de5213aac7676e04e0a576
 					</tbody>
 				</table>
 			</div>
 		</div>
 	);
+<<<<<<< HEAD
 >>>>>>> 35a60c904bc91d8edb2b3eb12faf23f0c816b4d5
+=======
+>>>>>>> 5f3f3ed6747d72fe46de5213aac7676e04e0a576
 }
 
 export default ExtractedDataPanel;
