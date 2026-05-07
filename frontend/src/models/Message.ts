@@ -25,10 +25,13 @@ export interface ChatResponse {
 }
 
 export interface Intent {
-	type: "correction" | "context" | "approval" | "rejection" | "unclear";
+	type: "correction" | "context" | "approval" | "rejection" | "unclear" | "column_confirm" | "column_correction" | "column_delete";
 	rowId?: string; // The unique ID of the row
 	column?: string; // <-- Changed from 'field' to 'column'
 	oldValue?: string;
 	newValue?: string;
 	note?: string;
+	approved?: boolean;
+	updates?: Array<{ from: string; to: string }>;
+	deletedColumns?: string[];
 }

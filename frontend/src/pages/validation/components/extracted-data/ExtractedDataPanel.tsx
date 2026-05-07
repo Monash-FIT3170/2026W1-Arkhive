@@ -1,7 +1,8 @@
 import mockOcrData from "../../../../mock-data/boundingBox.json";
 import { AlertTriangle } from "lucide-react"; // NEW: imported for low confidence warning icon
-import type { ExtractedData } from "./ExtractedData";
+import type { ExtractedData } from "../../../../models/TableData";
 import { flattenOcrData } from "./FlattenOcrData";
+import { TableProperties } from "lucide-react";
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
@@ -131,7 +132,7 @@ function ExtractedDataPanel({
 					</tbody>
 				</table>
 			</div>
-		</div>
+		</div >
 	);
 }
 

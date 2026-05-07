@@ -3,7 +3,7 @@ import type { ChatMessage } from "../../../../models/Message";
 import MessageItem from "./MessageItem";
 import { useEffect, useRef, useState } from "react";
 import { sendMessage } from "../../../../services/llmService";
-import type { ExtractedData } from "../extracted-data/ExtractedData";
+import type { ExtractedData } from "../../../../models/TableData";
 
 function ChatPanel({
 	isOpen,
@@ -19,6 +19,7 @@ function ChatPanel({
 	documentContext: ExtractedData;
 }) {
 	const [input, setInput] = useState("");
+	const [isLoading, setLoading] = useState(false);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -38,20 +39,31 @@ function ChatPanel({
 
 		onAddMessage(userMsg);
 		setInput("");
-
+		setLoading(true);
 		const allMessages = [...messages, userMsg].map((m) => ({
 			role: m.role === "user" ? ("user" as const) : ("model" as const),
 			content: m.content
 		}));
 
-		const reply = await sendMessage(allMessages, documentContext);
-
-		onAddMessage({
-			id: crypto.randomUUID(),
-			role: "model",
-			content: reply.response,
-			timestamp: new Date().toISOString()
-		});
+		try {
+			const reply = await sendMessage(allMessages, documentContext);
+			onAddMessage({
+				id: crypto.randomUUID(),
+				role: "model",
+				content: reply.response,
+				timestamp: new Date().toISOString()
+			});
+		} catch (error) {
+			onAddMessage({
+				id: crypto.randomUUID(),
+				role: "model",
+				content:
+					"Sorry, something went wrong while analysing the columns.",
+				timestamp: new Date().toISOString()
+			});
+		} finally {
+			setLoading(false);
+		}
 	};
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === "Enter" && !e.shiftKey) {
@@ -113,6 +125,28 @@ function ChatPanel({
 						{messages.map((msg) => (
 							<MessageItem key={msg.id} msg={msg} />
 						))}
+						{isLoading && (
+							<div className="chat chat-start">
+								<div className="chat-image avatar">
+									<div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
+										<Bot className="w-7 h-7 text-primary" />
+									</div>
+								</div>
+								<div className="chat-header text-xs opacity-50 mb-1">
+									AI Assistant
+								</div>
+								<div
+									className="chat-bubble chat-bubble-primary text-primary-content"
+									style={{
+										boxShadow: "var(--color-secondary)"
+									}}
+								>
+									<span>Just a moment</span>
+									<span className="loading loading-dots loading-sm ml-1.5"></span>
+								</div>
+							</div>
+						)}
+
 						<div ref={messagesEndRef} />
 					</div>
 
@@ -133,11 +167,13 @@ function ChatPanel({
 								value={input}
 								onChange={(e) => setInput(e.target.value)}
 								onKeyDown={(e) => handleKeyDown(e)}
+								disabled={isLoading}
 							></textarea>
 							<button
 								className="btn btn-primary btn-square"
 								title="Send message"
 								onClick={handleSend}
+								disabled={isLoading}
 							>
 								<Send className="w-5 h-5" />
 							</button>
