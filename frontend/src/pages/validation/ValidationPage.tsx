@@ -3,7 +3,7 @@ import DocumentPanel from "./components/document/DocumentPanel";
 import ExtractedDataPanel from "./components/extracted-data/ExtractedDataPanel";
 import ChatPanel from "./components/chat/ChatPanel";
 import type { ChatMessage } from "../../models/Message";
-import type { OCRComponent } from "../../models/OCRComponent";
+import type { OCRComponent } from "./components/extracted-data/OCRComponent";
 import mockOcrData from "../../mock-data/boundingBox.json";
 import { flattenOcrData } from "./components/extracted-data/FlattenOcrData";
 function ValidationPage() {
@@ -14,6 +14,7 @@ function ValidationPage() {
 	//bounding box hover state 
 	const [hoveredOverlayId, setHoveredOverlayId] = useState<string | null>(null);
 
+	const ExtractedDataPanelComponent = ExtractedDataPanel as any;
 
 	const addMessage = (message: ChatMessage) => {
 		setMessages((prev) => [...prev, message]);
@@ -28,7 +29,7 @@ function ValidationPage() {
 
 				</div>
 				<div className="w-full h-[50vh] lg:h-full lg:flex-1">
-					<ExtractedDataPanel onHover={setHoveredOverlayId} extractedData={documentContext} />
+					<ExtractedDataPanelComponent onHover={setHoveredOverlayId} extractedData={documentContext} />
 				</div>
 			</div>
 
