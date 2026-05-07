@@ -29,7 +29,9 @@ const chatResponseSchema: Schema = {
 						"context",
 						"approval",
 						"rejection",
-						"unclear"
+						"unclear",
+						"column_confirm",
+						"column_correction"
 					]
 				},
 				column: {
@@ -55,6 +57,29 @@ const chatResponseSchema: Schema = {
 					type: SchemaType.STRING,
 					description:
 						"Any extra context or reasoning the user provided."
+				},
+				approved: {
+					type: SchemaType.BOOLEAN,
+					description:
+						"True if the user confirmed the columns are correct (for column_confirm)."
+				},
+				updates: {
+					type: SchemaType.ARRAY,
+					description: "A list of column name updates (for column_correction).",
+					items: {
+						type: SchemaType.OBJECT,
+						properties: {
+							from: {
+								type: SchemaType.STRING,
+								description: "The current column name."
+							},
+							to: {
+								type: SchemaType.STRING,
+								description: "The new column name."
+							}
+						},
+						required: ["from", "to"]
+					}
 				}
 			},
 			required: ["type"]
@@ -75,8 +100,10 @@ export default {
 		const model = genAI.getGenerativeModel({
 			model: "gemini-2.5-flash",
 			systemInstruction: `You are an AI assistant helping a user validate and correct a digitized document/table. 
-            Analyze the user's message. If they want to change data (e.g., 'change apples to bananas'), extract the intent as a 'correction'. 
-            If they approve or reject the document, extract that intent. 
+            Analyse the user's message. If they want to change data in a specific cell (e.g., 'change apples to bananas in row X'), extract the intent as a 'correction'.
+            If they confirm the columns look correct, use the 'column_confirm' intent and set 'approved' to true.
+            If they want to rename one or more column headers (e.g., 'change Supplier to Vendor Name'), use the 'column_correction' intent and populate the 'updates' array.
+            If they approve or reject the document generally, use the 'approval' or 'rejection' intent.
             Always be polite and confirm what you are doing in the 'response' field.
             
             CURRENT TABLE CONTEXT:
