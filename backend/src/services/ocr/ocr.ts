@@ -2,9 +2,6 @@ import path from 'path';
 import vision from '@google-cloud/vision';
 import fs from 'fs'
 import { extractStructuredComponents, findAverageAccuracyForAllWords, flattenPagesToBlockMap, flattenPagesToParaMap, flattenPagesToWordMap } from './utils/utils.js';
-import { OCRBoundingBoxes }from './types/boundingBoxTypes.js';
-import { pdf } from 'pdf-to-img';
-
 
 
 
@@ -20,19 +17,19 @@ const client = new vision.ImageAnnotatorClient({
     }
 });
 
-const chunk = <T>(arr: T[], size: number): T[][] =>
-  Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
-    arr.slice(i * size, i * size + size)
-  );
-
 export async function textExtraction(imagePath: string): Promise<string> {
-  const absoluteImagePath = path.resolve(imagePath);
+  try {
+    const absoluteImagePath = path.resolve(imagePath);
 
-  const [result] = await client.documentTextDetection(absoluteImagePath);
+    const [result] = await client.documentTextDetection(absoluteImagePath);
 
-  const extractedText = result.fullTextAnnotation?.text ?? '';
+    const extractedText = result.fullTextAnnotation?.text ?? '';
 
-  return extractedText;
+    return extractedText;
+  } catch (e: any){
+    console.log("Request failed. Error " + e + " occured")
+    return "";
+  }
 }
 
 
@@ -53,14 +50,14 @@ export async function testOCR() {
 function for getting bounding boxes for all words detected
 */  
 async function getBoundingBoxesWords(imageBuffer: Buffer) {
-  
-  //const pages = mimeType == "application/pdf" ? pdf(imageBuffer) : imageBuffer
-
-
-
-  const [response] = await client.documentTextDetection(imageBuffer);
-  const fullTextAnnotation = response.fullTextAnnotation;
-  return extractStructuredComponents(fullTextAnnotation!.pages!)
+  try {
+    const [response] = await client.documentTextDetection(imageBuffer);
+    const fullTextAnnotation = response.fullTextAnnotation;
+    return extractStructuredComponents(fullTextAnnotation!.pages!)
+  } catch (e: any){
+    console.log("Request failed. Error " + e + " occured")
+    return "";
+  }
 }
 
 // function for getting overall averaged confidence score
