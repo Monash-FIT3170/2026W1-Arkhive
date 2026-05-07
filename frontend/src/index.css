@@ -4,6 +4,21 @@
 	themes: nord;
 }
 
+@theme {
+	--font-sans: "Inter", "system-ui", "sans-serif";
+	--font-heading: "Manrope", "sans-serif";
+}
+
+/* Base resets to apply our fonts globally */
+@layer base {
+	html {
+		font-family: var(--font-sans);
+	}
+	h1, h2, h3, h4, h5, h6 {
+		font-family: var(--font-heading);
+	}
+}
+
 :root {
 	--text: #6b6375;
 	--text-h: #08060d;
