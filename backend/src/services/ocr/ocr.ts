@@ -1,7 +1,7 @@
 import path from 'path';
 import vision from '@google-cloud/vision';
-import fs from 'fs'
-import { extractStructuredComponents, findAverageAccuracyForAllWords, flattenPagesToBlockMap, flattenPagesToParaMap, flattenPagesToWordMap } from './utils/utils.js';
+import fs from 'fs';
+import { extractStructuredComponents } from './utils/utils_table_extraction.js';
 
 
 
@@ -49,7 +49,7 @@ export async function testOCR() {
 
 function for getting bounding boxes for all words detected
 */  
-async function getBoundingBoxesWords(imageBuffer: Buffer) {
+async function parseTable(imageBuffer: Buffer) {
   try {
     const [response] = await client.documentTextDetection(imageBuffer);
     const fullTextAnnotation = response.fullTextAnnotation;
@@ -62,6 +62,6 @@ async function getBoundingBoxesWords(imageBuffer: Buffer) {
 
 // function for getting overall averaged confidence score
 
-const jsonOut = JSON.stringify(await getBoundingBoxesWords(fs.readFileSync("Screenshot 2026-04-25 195541.png")), null, 2)
+const jsonOut = JSON.stringify(await parseTable(fs.readFileSync("Screenshot 2026-04-25 195541.png")), null, 2)
 
 fs.writeFileSync("boundingBox.json", jsonOut, 'utf-8')
