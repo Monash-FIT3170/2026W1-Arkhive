@@ -31,7 +31,8 @@ const chatResponseSchema: Schema = {
 						"rejection",
 						"unclear",
 						"column_confirm",
-						"column_correction"
+						"column_correction",
+						"column_delete"
 					]
 				},
 				column: {
@@ -80,6 +81,13 @@ const chatResponseSchema: Schema = {
 						},
 						required: ["from", "to"]
 					}
+				},
+				deletedColumns: {
+					type: SchemaType.ARRAY,
+					description: "A list of column names to delete (for column_delete).",
+					items: {
+						type: SchemaType.STRING
+					}
 				}
 			},
 			required: ["type"]
@@ -103,6 +111,7 @@ export default {
             Analyse the user's message. If they want to change data in a specific cell (e.g., 'change apples to bananas in row X'), extract the intent as a 'correction'.
             If they confirm the columns look correct, use the 'column_confirm' intent and set 'approved' to true.
             If they want to rename one or more column headers (e.g., 'change Supplier to Vendor Name'), use the 'column_correction' intent and populate the 'updates' array.
+            If they want to remove or delete one or more columns (e.g., 'delete the tax column'), use the 'column_delete' intent and populate the 'deletedColumns' array.
             If they approve or reject the document generally, use the 'approval' or 'rejection' intent.
             Always be polite and confirm what you are doing in the 'response' field.
             
