@@ -116,8 +116,14 @@ export function flattenOcrData(data: OCRComponent[]): ExtractedData {
         }
 
         // create rows
+<<<<<<< HEAD
         const row: ExtractedRow = {
             _id: component.id,
+=======
+        const row: ExtractedRow = { 
+            _id: component.id,
+            confidence: component.confidence ?? 1, // carry confidence from OCR component test
+>>>>>>> 35a60c904bc91d8edb2b3eb12faf23f0c816b4d5
         };
 
         if (component.boundingBoxes) {

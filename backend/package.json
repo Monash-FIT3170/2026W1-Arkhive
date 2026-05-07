@@ -1,21 +1,23 @@
 {
-	"scripts": {
-		"dev": "tsx watch app.ts"
-	},
-	"dependencies": {
-		"@google/genai": "^1.50.1",
-		"@google/generative-ai": "^0.24.1",
-		"cors": "^2.8.6",
-		"dotenv": "^17.4.2",
-		"express": "^5.2.1",
-		"tsc": "^2.0.4"
-	},
-	"devDependencies": {
-		"@types/cors": "^2.8.19",
-		"@types/express": "^5.0.6",
-		"@types/node": "^25.6.0",
-		"nodemon": "^3.1.14",
-		"ts-node": "^10.9.2",
-		"tsx": "^4.21.0"
-	}
+  "scripts": {
+    "dev": "tsx watch app.ts"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.6.0",
+    "tsx": "^4.21.0"
+  },
+  "dependencies": {
+    "@google-cloud/vision": "^5.3.5",
+    "@google/generative-ai": "^0.24.1",
+    "@types/express-session": "^1.19.0",
+    "@types/multer": "^2.1.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "multer": "^2.1.1",
+    "pdf-to-img": "^6.0.0",
+    "pdf2img": "^0.5.0",
+    "tsc": "^2.0.4"
+  }
 }
