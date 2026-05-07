@@ -1,6 +1,7 @@
 import mockOcrData from "../../../../mock-data/boundingBox.json";
 import type { ExtractedData } from "../../../../models/TableData";
 import { flattenOcrData } from "./FlattenOcrData";
+import { TableProperties } from "lucide-react";
 
 function ExtractedDataPanel({
 	onHover
@@ -18,19 +19,19 @@ function ExtractedDataPanel({
 
 	return (
 		<div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
-			<h2 className="mb-4 text-xl font-semibold text-base-content">
+			<h2 className="mb-4 text-xl font-heading font-semibold text-base-content flex items-center gap-2">
+				<div className="bg-neutral text-neutral-content p-1 rounded-xl">
+					<TableProperties size={18} strokeWidth={2.5} />
+				</div>
 				EXTRACTED DATA
 			</h2>
 
-			<div className="flex-1 overflow-auto min-h-0 max-w-full">
-				<table className="table table-fixed w-full border border-base-300 text-[10px]">
+			<div className="flex-1 overflow-auto min-h-0 max-w-full rounded-lg border border-base-300">
+				<table className="table table-zebra table-pin-rows w-full text-xs font-sans">
 					<thead>
-						<tr className="text-base-content/70">
+						<tr className="bg-base-300/50 text-base-content/80 uppercase tracking-wider text-[11px]">
 							{extractedData.columns.map((column) => (
-								<th
-									key={column}
-									className="p-3 text-left text-[12px] font-bold border-b border-base-300 break-words whitespace-normal"
-								>
+								<th key={column} className="p-3 text-left font-semibold">
 									{column.replace(/_/g, " ")}
 								</th>
 							))}
@@ -41,14 +42,14 @@ function ExtractedDataPanel({
 						{extractedData.rows.map((row) => (
 							<tr
 								key={row._id}
-								className="border-b border-base-300 hover:bg-base-300/40"
+								className="hover:bg-primary/10 transition-colors duration-150"
 							>
 								{extractedData.columns.map((column) => {
 									const cellKey = row._cellKeyMap?.[column];
 									return (
 										<td
 											key={column}
-											className={`p-2 hover:bg-warning/10 cursor-pointer text-base-content ${
+											className={`p-3 cursor-pointer text-base-content ${
 												column === "ITEM"
 													? "break-all"
 													: "break-words"
