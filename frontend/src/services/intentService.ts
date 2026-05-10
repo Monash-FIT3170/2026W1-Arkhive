@@ -9,20 +9,20 @@ export function applyIntent(data: ExtractedData, intent: Intent): ExtractedData 
                 console.error("Missing required fields for correction intent");
                 return data;
             }
-            return updatecell(data, intent.rowId, intent.column, intent.newValue);
+            return updatecell(data, intent);
 
         case "column_correction":
             if (intent.oldValue === undefined || intent.newValue === undefined) {
                 console.error("Missing required fields for column correction intent");
                 return data;
             }
-            return updateColumn(data, intent.oldValue, intent.newValue);
+            return updateColumn(data, intent);
         case "column_delete":
             if (intent.column === undefined) {
                 console.error("Missing required field for column delete intent");
                 return data;
             }
-            return deletecolumn(data, intent.column);
+            return deletecolumn(data, intent);
         case "column_confirm":
             if (intent.approved === undefined) {
                 console.error("Missing required field for column confirmation intent");
@@ -37,7 +37,10 @@ export function applyIntent(data: ExtractedData, intent: Intent): ExtractedData 
 
 //Helper functions for each intent type
 // For cell updates, we need to find the specific row and column and update the value
-function updatecell(data: ExtractedData, rowID: string, column: string, newValue: string): ExtractedData {
+function updatecell(data: ExtractedData, intent: Intent): ExtractedData {
+    const rowID = intent.rowId;
+    const column = intent.column as string;
+    const newValue = intent.newValue;
     return {
         ...data,
         rows: data.rows.map((row) => {
@@ -53,7 +56,9 @@ function updatecell(data: ExtractedData, rowID: string, column: string, newValue
 }
 
 // For column updates, we need to update both the columns array and the rows to reflect the new column name
-function updateColumn(data: ExtractedData, oldColumn: string, newColumn: string): ExtractedData {
+function updateColumn(data: ExtractedData, intent: Intent): ExtractedData {
+    const oldColumn = intent.oldValue as string;
+    const newColumn = intent.newValue as string;
     return {
         columns: data.columns.map((col) => col === oldColumn ? newColumn : col),
         rows: data.rows.map((row) => {
@@ -68,7 +73,8 @@ function updateColumn(data: ExtractedData, oldColumn: string, newColumn: string)
 }
 
 // For column deletion, we need to remove the column from the columns array and also remove it from each row
-function deletecolumn(data: ExtractedData, column: string): ExtractedData {
+function deletecolumn(data: ExtractedData, intent: Intent): ExtractedData {
+    const column = intent.column as string;
     return {
         columns: data.columns.filter((col) => col !== column),
         rows: data.rows.map((row) => {
@@ -83,5 +89,10 @@ function deletecolumn(data: ExtractedData, column: string): ExtractedData {
 
 // For column confirmation, we can simply return the data as is, since this intent is just for user confirmation and doesn't change the data structure
 function confirmcolumns(data: ExtractedData, approved: boolean): ExtractedData {
+    if (approved) {
+        console.log("User confirmed the columns are correct");
+    } else {
+        console.log("User indicated the columns are incorrect");
+    }
     return data;
 }
