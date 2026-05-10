@@ -5,12 +5,29 @@ import type { Intent } from "../models/Message";
 export function applyIntent(data: ExtractedData, intent: Intent): ExtractedData {
     switch (intent.type) {
         case "correction":
+            if (intent.rowId === undefined || intent.column === undefined || intent.newValue === undefined) {
+                console.error("Missing required fields for correction intent");
+                return data;
+            }
             return updatecell(data, intent.rowId, intent.column, intent.newValue);
+
         case "column_correction":
+            if (intent.oldValue === undefined || intent.newValue === undefined) {
+                console.error("Missing required fields for column correction intent");
+                return data;
+            }
             return updateColumn(data, intent.oldValue, intent.newValue);
         case "column_delete":
+            if (intent.column === undefined) {
+                console.error("Missing required field for column delete intent");
+                return data;
+            }
             return deletecolumn(data, intent.column);
         case "column_confirm":
+            if (intent.approved === undefined) {
+                console.error("Missing required field for column confirmation intent");
+                return data;
+            }
             return confirmcolumns(data, intent.approved);
         default:
             return data;
