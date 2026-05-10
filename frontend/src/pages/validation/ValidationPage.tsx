@@ -62,6 +62,7 @@ function ValidationPage() {
 				messages={messages}
 				onAddMessage={addMessage}
 				documentContext={documentContext}
+				onIntentApplied={(updatedData) => setDocumentContext(updatedData)}
 			/>
 		</>
 	);
