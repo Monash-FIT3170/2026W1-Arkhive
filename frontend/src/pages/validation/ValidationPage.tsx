@@ -3,7 +3,7 @@ import DocumentPanel from "./components/document/DocumentPanel";
 import ExtractedDataPanel from "./components/extracted-data/ExtractedDataPanel";
 import ChatPanel from "./components/chat/ChatPanel";
 import type { ChatMessage } from "../../models/Message";
-import type { OCRComponent } from "./components/extracted-data/OCRComponent";
+import type { OCRComponent } from "../../models/OCRComponent";
 import mockOcrData from "../../mock-data/boundingBox.json";
 import { flattenOcrData } from "./components/extracted-data/FlattenOcrData";
 import { getExtractionSession, saveExtractionSession } from "../../services/extractionService";
