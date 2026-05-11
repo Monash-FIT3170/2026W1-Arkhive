@@ -1,6 +1,6 @@
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import type { PreviewItem } from "../../../upload/types";
+import type { PreviewItem } from "../../types";
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
 

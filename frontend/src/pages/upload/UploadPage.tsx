@@ -10,10 +10,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import type { PreviewItem } from './types';
-import { buildPreviewItemsForFiles, revokeObjectUrlsFromPreviewItems } from '../preview/components/grid/previewHelpers';
+import { buildPreviewItemsForFiles, revokeObjectUrlsFromPreviewItems } from './components/preview/previewHelpers';
 import EmptyUploadView from './components/EmptyUploadView';
 import UploadSidebar   from './components/UploadSidebar';
-import PreviewCard     from '../preview/components/grid/PreviewCard';
+import PreviewCard     from './components/preview/PreviewCard';
 
 function UploadPage() {
   const navigate = useNavigate();

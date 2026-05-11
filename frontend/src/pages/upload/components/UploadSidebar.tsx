@@ -3,8 +3,8 @@
 //   SelectionActions, UploadMoreButton, ProcessDocumentsButton
 // To reorder, add, or remove sidebar sections, this is the only file to touch.
 
-import SelectionActions       from '../../preview/components/actions/SelectionActions';
-import ProcessDocumentsButton from '../../preview/components/actions/ProcessDocumentsButton';
+import SelectionActions       from './actions/SelectionActions';
+import ProcessDocumentsButton from './actions/ProcessDocumentsButton';
 import DropZone               from './dropzone/DropZone'; 
 
 type Props = {
