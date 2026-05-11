@@ -34,11 +34,12 @@ function getConfidenceTier(confidence: number): {
 }
 
 function ExtractedDataPanel({
-	onHover
+	onHover,
+	extractedData
 }: {
 	onHover: (id: string | null) => void;
+	extractedData: ExtractedData;
 }) {
-	const extractedData: ExtractedData = flattenOcrData(mockOcrData as any[]);
 	// Currency formatting function (unchanged)
 	const formatCurrency = (amount: number) => {
 		return new Intl.NumberFormat("id-ID", {
