@@ -35,11 +35,6 @@ export function filterValidFiles(fileList: FileList | null): File[] {
 
 /**
  * DropZone Component
- * * @author Muhammad Mubashir Shah (33878897)
- * * HANDOFF TODO:
- * 1. Implement 'handleInputChange' using 'filterValidFiles'.
- * 2. Implement 'handleFileDrop' and 'handleDragOver'.
- * 3. Add the UI 
  */
 function DropZone({ onFilesCaptured }: { onFilesCaptured: (files: File[]) => void }) {
   
