@@ -5,7 +5,7 @@ import type { Intent } from "../models/Message";
 export function applyIntent(data: ExtractedData, intent: Intent): ExtractedData {
     switch (intent.type) {
         case "correction":
-            console.log("correction intent fields:", intent.rowId, intent.column, intent.newValue);
+            //console.log("correction intent fields:", intent.rowId, intent.column, intent.newValue);
             if (intent.rowId === undefined || intent.column === undefined || intent.newValue === undefined) {
                 console.error("Missing required fields for correction intent");
                 return data;

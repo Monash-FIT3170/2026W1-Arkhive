@@ -44,7 +44,7 @@ function ValidationPage() {
 
 	return (
 		<>
-			<div className="flex flex-col lg:flex-row w-full p-3 gap-3 h-auto lg:h-screen lg:overflow-hidden">
+			<div className=" flex flex-col lg:flex-row w-full p-3 gap-3 h-auto lg:h-screen lg:overflow-hidden !border-0 !border-none">
 				<div className="w-full h-[50vh] lg:h-full lg:flex-1">
 
 					<DocumentPanel hoveredOverlayId={hoveredOverlayId} />
