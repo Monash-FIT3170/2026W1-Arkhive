@@ -32,7 +32,8 @@ const chatResponseSchema: Schema = {
 						"unclear",
 						"column_confirm",
 						"column_correction",
-						"column_delete"
+						"column_delete",
+						"column_header_add"
 					]
 				},
 				column: {
@@ -66,7 +67,8 @@ const chatResponseSchema: Schema = {
 				},
 				updates: {
 					type: SchemaType.ARRAY,
-					description: "A list of column name updates (for column_correction).",
+					description:
+						"A list of column name updates (for column_correction).",
 					items: {
 						type: SchemaType.OBJECT,
 						properties: {
@@ -84,7 +86,8 @@ const chatResponseSchema: Schema = {
 				},
 				deletedColumns: {
 					type: SchemaType.ARRAY,
-					description: "A list of column names to delete (for column_delete).",
+					description:
+						"A list of column names to delete (for column_delete).",
 					items: {
 						type: SchemaType.STRING
 					}

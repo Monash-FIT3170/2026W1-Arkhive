@@ -14,7 +14,7 @@ function getConfidenceTier(confidence: number): {
 } {
 	if (confidence >= 0.85) {
 		return {
-			badgeClass: "badge-success",
+			badgeClass: "badge-success p-2",
 			label: `${Math.round(confidence * 100)}%`,
 			isLow: false
 		};
@@ -34,7 +34,7 @@ function getConfidenceTier(confidence: number): {
 }
 
 function ExtractedDataPanel({
-	onHover,
+	onHover
 }: {
 	onHover: (id: string | null) => void;
 }) {
@@ -47,32 +47,28 @@ function ExtractedDataPanel({
 		}).format(amount);
 	};
 
-
-
 	return (
-
 		<div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
 			<h2 className="mb-4 text-xl font-semibold text-base-content">
 				EXTRACTED DATA
 			</h2>
 
 			<div className="flex-1 overflow-auto min-h-0 max-w-full">
-				<table className="table table-fixed w-full border border-base-300 text-[10px]">
-
+				<table className="table table-fixed w-full border border-base-300 bg-white text-[10px]">
 					{/* Header */}
 					<thead>
 						<tr className="text-base-content/70">
 							{extractedData.columns.map((column) => (
 								<th
 									key={column}
-									className="p-3 text-left text-[12px] font-bold border-b border-base-300 break-words whitespace-normal"
+									className="p-3 text-left text-[16px] font-bold border-b border-base-300 break-words whitespace-normal"
 								>
 									{column.replace(/_/g, " ")}
 								</th>
 							))}
 
 							{/* NEW: Confidence column */}
-							<th className="p-3 text-left text-[12px] font-bold border-b border-base-300">
+							<th className="p-3 text-left text-[16px] font-bold border-b border-base-300">
 								CONF
 							</th>
 						</tr>
@@ -86,17 +82,22 @@ function ExtractedDataPanel({
 							return (
 								<tr
 									key={row._id}
-									className={`border-b border-base-300 hover:bg-base-300/40 ${tier.isLow ? "bg-error/10" : ""
-										}`}
+									className={`border-b border-base-300 hover:bg-base-300/40 ${
+										tier.isLow ? "bg-error/10" : ""
+									}`}
 								>
 									{extractedData.columns.map((column) => {
-										const cellKey = row._cellKeyMap?.[column];
+										const cellKey =
+											row._cellKeyMap?.[column];
 
 										return (
 											<td
 												key={column}
-												className={`p-2 hover:bg-warning/10 cursor-pointer text-base-content ${column === "ITEM" ? "break-all" : "break-words"
-													}`}
+												className={`p-2 hover:bg-warning/10 cursor-pointer text-base-content ${
+													column === "ITEM"
+														? "break-all"
+														: "break-words"
+												}`}
 												onMouseEnter={() =>
 													onHover(
 														cellKey
@@ -104,12 +105,22 @@ function ExtractedDataPanel({
 															: String(row._id)
 													)
 												}
-												onMouseLeave={() => onHover(null)}
+												onMouseLeave={() =>
+													onHover(null)
+												}
 											>
-												{column.includes("PRICE") && row[column]
+												{column.includes("PRICE") &&
+												row[column]
 													? formatCurrency(
-														Number(String(row[column]).replace(/,/g, ""))
-													)
+															Number(
+																String(
+																	row[column]
+																).replace(
+																	/,/g,
+																	""
+																)
+															)
+														)
 													: row[column] || ""}
 											</td>
 										);
@@ -132,7 +143,7 @@ function ExtractedDataPanel({
 					</tbody>
 				</table>
 			</div>
-		</div >
+		</div>
 	);
 }
 

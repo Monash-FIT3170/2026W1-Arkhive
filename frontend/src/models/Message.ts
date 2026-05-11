@@ -25,7 +25,16 @@ export interface ChatResponse {
 }
 
 export interface Intent {
-	type: "correction" | "context" | "approval" | "rejection" | "unclear" | "column_confirm" | "column_correction" | "column_delete";
+	type:
+		| "correction"
+		| "context"
+		| "approval"
+		| "rejection"
+		| "unclear"
+		| "column_confirm"
+		| "column_correction"
+		| "column_delete"
+		| "column_header_add";
 	rowId?: string; // The unique ID of the row
 	column?: string; // <-- Changed from 'field' to 'column'
 	oldValue?: string;
