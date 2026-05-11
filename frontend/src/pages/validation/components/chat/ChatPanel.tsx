@@ -4,19 +4,22 @@ import MessageItem from "./MessageItem";
 import { useEffect, useRef, useState } from "react";
 import { sendMessage } from "../../../../services/llmService";
 import type { ExtractedData } from "../../../../models/TableData";
+import { applyIntent } from "../../../../services/intentService";
 
 function ChatPanel({
 	isOpen,
 	onToggle,
 	messages,
 	onAddMessage,
-	documentContext
+	documentContext,
+	onIntentApplied
 }: {
 	isOpen: boolean;
 	onToggle: () => void;
 	messages: ChatMessage[];
 	onAddMessage: (msg: ChatMessage) => void;
 	documentContext: ExtractedData;
+	onIntentApplied?: (updatedData: ExtractedData) => void;
 }) {
 	const [input, setInput] = useState("");
 	const [isLoading, setLoading] = useState(false);
@@ -53,6 +56,11 @@ function ChatPanel({
 				content: reply.response,
 				timestamp: new Date().toISOString()
 			});
+
+			if (reply.intent) {
+				const updatedData = applyIntent(documentContext, reply.intent);
+				onIntentApplied(updatedData);
+			}
 		} catch (error) {
 			onAddMessage({
 				id: crypto.randomUUID(),
