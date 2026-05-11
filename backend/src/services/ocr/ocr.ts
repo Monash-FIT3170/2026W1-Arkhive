@@ -2,6 +2,8 @@ import path from 'path';
 import vision from '@google-cloud/vision';
 import fs from 'fs';
 import { extractStructuredComponents } from './utils/utils_table_extraction.js';
+import { setTimeout } from 'timers/promises';
+import { withRetry } from './utils/utils.js';
 
 
 
@@ -50,18 +52,17 @@ export async function testOCR() {
 function for getting bounding boxes for all words detected
 */  
 async function parseTable(imageBuffer: Buffer) {
-  try {
-    const [response] = await client.documentTextDetection(imageBuffer);
-    const fullTextAnnotation = response.fullTextAnnotation;
-    return extractStructuredComponents(fullTextAnnotation!.pages!)
-  } catch (e: any){
-    console.log("Request failed. Error " + e + " occured")
-    return "";
-  }
+  const [response] = await client.documentTextDetection(imageBuffer);
+  const fullTextAnnotation = response.fullTextAnnotation;
+  return extractStructuredComponents(fullTextAnnotation!.pages!)
 }
 
-// function for getting overall averaged confidence score
+async function parseTableWithRetries(imageBuffer: Buffer){
+  return await withRetry(() => parseTable(imageBuffer))
+}
 
-const jsonOut = JSON.stringify(await parseTable(fs.readFileSync("Screenshot 2026-04-25 195541.png")), null, 2)
+// // function for getting overall averaged confidence score
 
-fs.writeFileSync("boundingBox.json", jsonOut, 'utf-8')
+// const jsonOut = JSON.stringify(await parseTableWithRetries(fs.readFileSync("Screenshot 2026-04-25 195541.png")), null, 2)
+
+// fs.writeFileSync("boundingBox.json", jsonOut, 'utf-8')

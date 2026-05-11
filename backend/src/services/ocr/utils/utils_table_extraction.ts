@@ -6,7 +6,6 @@ const flattenParagraphsToCellMap = (pages: google.cloud.vision.v1.IParagraph[]):
   return pages
     .reduce((acc: OCRBoundingBoxes , paragraph, index) => {
       const key = `cell_${index}`;
-      
       acc[key] = {
         // In fullTextAnnotation, words are arrays of symbols
         text: paragraph.words?.flatMap(word => word.symbols?.map(s => s.text).join('') ?? "").join(" ") ?? '',
