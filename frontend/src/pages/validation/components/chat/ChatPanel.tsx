@@ -59,7 +59,7 @@ function ChatPanel({
 
 			if (reply.intent) {
 				const updatedData = applyIntent(documentContext, reply.intent);
-				onIntentApplied(updatedData);
+				onIntentApplied?.(updatedData);
 			}
 		} catch (error) {
 			onAddMessage({

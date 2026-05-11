@@ -83,9 +83,8 @@ function ExtractedDataPanel({
 							return (
 								<tr
 									key={row._id}
-									className={`border-b border-base-300 hover:bg-base-300/40 ${
-										tier.isLow ? "bg-error/10" : ""
-									}`}
+									className={`border-b border-base-300 hover:bg-base-300/40 ${tier.isLow ? "bg-error/10" : ""
+										}`}
 								>
 									{extractedData.columns.map((column) => {
 										const cellKey =
@@ -94,11 +93,10 @@ function ExtractedDataPanel({
 										return (
 											<td
 												key={column}
-												className={`p-2 hover:bg-warning/10 cursor-pointer text-base-content ${
-													column === "ITEM"
-														? "break-all"
-														: "break-words"
-												}`}
+												className={`p-2 hover:bg-warning/10 cursor-pointer text-base-content ${column === "ITEM"
+													? "break-all"
+													: "break-words"
+													}`}
 												onMouseEnter={() =>
 													onHover(
 														cellKey
@@ -110,18 +108,8 @@ function ExtractedDataPanel({
 													onHover(null)
 												}
 											>
-												{column.includes("PRICE") &&
-												row[column]
-													? formatCurrency(
-															Number(
-																String(
-																	row[column]
-																).replace(
-																	/,/g,
-																	""
-																)
-															)
-														)
+												{column.includes("PRICE") && row[column]
+													? formatCurrency(Number(String(row[column]).replace(/[^0-9.]/g, "")))
 													: row[column] || ""}
 											</td>
 										);
