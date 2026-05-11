@@ -1,5 +1,7 @@
-import { AlertTriangle } from "lucide-react"; // NEW: imported for low confidence warning icon
+import { AlertTriangle, Download, Check } from "lucide-react"; // NEW: Importing icons for confidence badges and export button
+import { useState } from "react";
 import type { ExtractedData } from "./ExtractedData";
+import { exportExtractedDataAsCSV } from "../../../../services/csvDownloadService";
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
@@ -43,11 +45,40 @@ function ExtractedDataPanel({
 		}).format(amount);
 	};
 
+	// used to check if file exported
+	const [exported, setExported] = useState(false);
+
+	// function to import csvService export and trigger CSV download
+	function handleExportCSV() {
+		exportExtractedDataAsCSV(extractedData);
+		setExported(true);
+		setTimeout(() => setExported(false), 2500);
+	}
+
+
 	return (
 		<div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
-			<h2 className="mb-4 text-xl font-semibold text-base-content">
-				EXTRACTED DATA
-			</h2>
+			
+			{/* Download Button */}
+			<div className="mb-4 flex items-center justify-between">
+			<h2 className="text-xl font-semibold text-base-content">EXTRACTED DATA</h2>
+			<button
+				onClick={handleExportCSV}
+				disabled={exported}
+				className={`btn btn-sm gap-2 text-xs transition-all ${
+					exported
+						? "btn-success"
+						: "btn-outline"
+				}`}
+				title="Export to CSV"
+			>
+				{exported ? (
+					<><Check className="w-3.5 h-3.5" />Exported!</>
+				) : (
+					<><Download className="w-3.5 h-3.5" />Export CSV</>
+				)}
+			</button>
+			</div>
 
 			{/* Table */}
 			<div className="flex-1 overflow-auto min-h-0 max-w-full">
