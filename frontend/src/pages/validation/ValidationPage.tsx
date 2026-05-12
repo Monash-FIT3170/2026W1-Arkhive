@@ -89,6 +89,14 @@ function ValidationPage() {
     setDocumentContext(updatedData);
   };
 
+  const resolveLastMessage = () => {
+    setMessages((prev) =>
+      prev.map((msg, i) =>
+        i === prev.length - 1 ? { ...msg, resolved: true } : msg,
+      ),
+    );
+  };
+
   //handle accept
   const handleAccept = async () => {
     if (!documentContext) {
@@ -100,7 +108,7 @@ function ValidationPage() {
       console.error("Failed to save session after accept", error);
     }
     setOldContext(null); // old to null
-
+    resolveLastMessage(); // hide buttons
     //ai confirmation message
     addMessage({
       id: crypto.randomUUID(),
@@ -117,7 +125,7 @@ function ValidationPage() {
     }
     setDocumentContext(oldContext); // back to old
     setOldContext(null); // old to null
-
+    resolveLastMessage(); // hide buttons
     addMessage({
       id: crypto.randomUUID(),
       role: "model",

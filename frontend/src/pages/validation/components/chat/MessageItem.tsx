@@ -15,6 +15,7 @@ function MessageItem({
 
   const showActions =
     !isUser &&
+    !msg.resolved &&
     msg.intent &&
     (msg.intent.type === "column_confirm" ||
       msg.intent.type === "column_correction" ||

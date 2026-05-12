@@ -11,6 +11,7 @@ export type ChatMessage = {
 	content: string; 
 	timestamp: string; 
 	intent?: Intent; // so MessageItem knows when to show Accept/Reject 
+	resolved?: boolean; // true after user accepts or rejects
 };
 
 export interface ChatRequest {
