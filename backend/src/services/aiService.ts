@@ -6,6 +6,64 @@ dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
+// applies the users intent to the current document context and returns updated context
+function applyIntentToContext(context: ExtractedData, intent: any): ExtractedData {
+	const updated = {
+		columns: [...context.columns],
+		rows: context.rows.map((row) => ({ ...row }))
+	};
+
+	if (intent.type === "column_correction" && intent.updates) {
+		
+		//rename columns
+		updated.columns = updated.columns.map((col: string) => {
+			const match = intent.updates.find((u: any) => u.from === col);
+			return match ? match.to : col;
+		});
+
+		//rename keys
+		updated.rows = updated.rows.map((row) => {
+			const newRow = { ...row };
+			intent.updates.forEach(({ from, to }: { from: string; to: string }) => {
+				if (from in newRow) {
+					newRow[to] = newRow[from];
+					delete newRow[from];
+				}
+			});
+			return newRow;
+		});
+	}
+
+	//remove deleted columns from column list
+	if (intent.type === "column_delete" && intent.deletedColumns) {
+		updated.columns = updated.columns.filter(
+			(col: string) => !intent.deletedColumns.includes(col)
+		);
+
+		//remove deleted column keys
+		updated.rows = updated.rows.map((row) => {
+			const newRow = { ...row };
+			intent.deletedColumns.forEach((col: string) => {
+				delete newRow[col];
+			});
+			return newRow;
+		});
+	}
+
+	//update cell value
+	if (intent.type === "correction" && intent.rowId && intent.column && intent.newValue) {
+		updated.rows = updated.rows.map((row) => {
+			if (row._id === intent.rowId) {
+				return { ...row, [intent.column]: intent.newValue };
+			}
+			return row;
+		});
+	}
+	return updated;
+
+}
+
+
 const chatResponseSchema: Schema = {
 	type: SchemaType.OBJECT,
 	properties: {
@@ -103,7 +161,7 @@ export default {
 	sendMessageToGemini: async (
 		messages: Message[],
 		documentContext: ExtractedData | undefined
-	): Promise<string> => {
+	): Promise<any> => {
 		//turn into string
 		const formattedContext = JSON.stringify(documentContext, null, 2);
 
@@ -152,6 +210,21 @@ export default {
 
 		const chat = model.startChat({ history });
 		const result = await chat.sendMessage(lastMessage);
-		return JSON.parse(result.response.text());
+
+		const parsed = JSON.parse(result.response.text());
+
+		const updatedContext =
+		parsed.intent &&
+		documentContext &&
+		["correction", "column_correction", "column_delete"].includes(parsed.intent.type)
+		? applyIntentToContext(documentContext, parsed.intent)
+		: undefined;
+
+		return {
+			...parsed,
+			updatedContext
+		};
+
+		// return JSON.parse(result.response.text());
 	}
 };
