@@ -23,6 +23,8 @@ function UploadPage() {
   const [previewItems,  setPreviewItems]  = useState<PreviewItem[]>([]);
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
   const [isProcessing,  setIsProcessing]  = useState(false);
+  const [uploadError,   setUploadError]   = useState<string | null>(null); // US-1.4
+  const [uploadSuccess, setUploadSuccess] = useState(false);               // US-1.5
 
   // Refs let the async preview-sync effect read current values without
   // needing them as dependencies (which would cause infinite loops).
@@ -125,6 +127,8 @@ function UploadPage() {
   async function handleProcess() {
     if (selectedPages.size === 0 || isProcessing) return;
     setIsProcessing(true);
+    setUploadError(null);    // US-1.4: clear any previous error before retrying
+    setUploadSuccess(false); // US-1.5: clear any previous success before retrying
 
     try {
       const selectedItems = [...selectedPages]
@@ -145,12 +149,29 @@ function UploadPage() {
         body: formData,
       });
 
-      if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
+      // US-1.4: detect upload failure and extract reason from response
+      if (!response.ok) {
+        let reason = `Upload failed (${response.status} ${response.statusText})`;
+        try {
+          const body = await response.json();
+          if (body?.message) reason = body.message;
+        } catch {
+          // response wasn't JSON — use the status-based reason above
+        }
+        throw new Error(reason);
+      }
 
-      navigate('/validation');
+      // US-1.5: detect successful upload and show success notification
+      setUploadSuccess(true);
+      setTimeout(() => {
+        navigate('/validation');
+      }, 1500);
+
     } catch (err) {
+      // US-1.4: store error message in state to display near upload area
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred during upload.';
+      setUploadError(message);
       console.error('Processing failed:', err);
-      alert('Processing failed. Check the console for details.');
     } finally {
       setIsProcessing(false);
     }
@@ -170,6 +191,39 @@ function UploadPage() {
       <header className="border-base-300 bg-base-100 text-base-content flex h-16 shrink-0 items-center border-b px-5 text-2xl font-bold">
         Preview
       </header>
+
+      {/* US-1.4: Error notification banner placed above the upload/preview area */}
+      {uploadError && (
+        <div className="bg-error/10 border-error text-error flex items-start gap-3 border-l-4 px-5 py-3 text-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          <div className="flex-1">
+            <p className="font-semibold">Upload failed</p>
+            <p className="opacity-90">{uploadError}</p>
+          </div>
+          <button
+            className="opacity-60 hover:opacity-100"
+            onClick={() => setUploadError(null)}
+            aria-label="Dismiss error"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* US-1.5: Success notification banner */}
+      {uploadSuccess && (
+        <div className="bg-success/10 border-success text-success flex items-center gap-3 border-l-4 px-5 py-3 text-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          <div>
+            <p className="font-semibold">Upload successful</p>
+            <p className="opacity-90">Redirecting to validation...</p>
+          </div>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1">
 
