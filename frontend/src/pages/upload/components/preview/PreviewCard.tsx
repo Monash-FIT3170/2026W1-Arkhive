@@ -84,14 +84,14 @@ function PreviewCard({
               <button
                 type="button"
                 className="inline-flex w-full max-w-[11rem] items-center justify-center gap-1 rounded-md border border-[#4b5563] bg-[#1f2028] px-2 py-1.5 text-center text-xs font-normal text-gray-300 transition hover:border-[#6b7280] hover:bg-[#252830] hover:text-gray-200"
-                aria-label={`Replace ${label}`}
+                aria-label={`Replace file ${label}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   replaceInputRef.current?.click();
                 }}
               >
                 <Upload className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
-                Replace Image
+                Replace File
               </button>
             </>
           )}
@@ -99,14 +99,14 @@ function PreviewCard({
             <button
               type="button"
               className="inline-flex w-full max-w-[11rem] items-center justify-center gap-1 rounded-md border border-[#4b5563] bg-[#1f2028] px-2 py-1.5 text-center text-xs font-normal text-gray-300 transition hover:border-[#6b7280] hover:bg-[#252830] hover:text-gray-200"
-              aria-label={`Remove ${label}`}
+              aria-label={`Remove file ${label}`}
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove(index);
               }}
             >
               <Trash2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
-              Remove Image
+              Remove File
             </button>
           )}
         </div>

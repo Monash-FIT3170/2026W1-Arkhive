@@ -128,7 +128,7 @@ function UploadPage() {
     setSelectedPages(new Set());
   }
 
-  // ── Remove preview ──────────────────────────────────────────────────────────
+  // ── Remove file from queue ───────────────────────────────────────────────────
   // For pdfs with multiple pages, they share a file index, so removing one page removes the whole PDF.
   function handleRemovePreview(previewIndex: number) {
     const item = previewItemsRef.current[previewIndex];
@@ -163,7 +163,7 @@ function UploadPage() {
     const item = previewItemsRef.current[previewIndex];
     if (!item?.hasFile || item.fileIndex === undefined) return;
     const fi = item.fileIndex;
-    if (!window.confirm(`Replace "${item.label}" with "${newFile.name}"?`)) return;
+    if (!window.confirm(`Replace file "${item.label}" with "${newFile.name}"?`)) return;
 
     setFiles((prev) => {
       if (fi < 0 || fi >= prev.length) return prev;
