@@ -7,8 +7,8 @@ import {
   resolveLevels,
   buildRows,
   flattenOcrData
-} from "../pages/validation/components/extracted-data/FlattenOcrData";
-import type { OCRComponent } from "../models/OCRComponent";
+} from "./FlattenOcrData";
+import type { OCRComponent } from "../../../../models/OCRComponent";
 
 // ---------------------------------------------------------------------------
 // Helpers
