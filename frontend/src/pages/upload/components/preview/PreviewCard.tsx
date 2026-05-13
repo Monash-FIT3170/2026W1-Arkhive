@@ -1,3 +1,5 @@
+import { Trash2 } from "lucide-react";
+
 type PreviewCardProps = {
   label: string;
   hasFile: boolean;
@@ -6,6 +8,7 @@ type PreviewCardProps = {
   previewSrc?: string;
   isImage?: boolean;
   onToggle: (index: number) => void;
+  onRemove?: (index: number) => void;
 };
 
 function PreviewCard({
@@ -16,6 +19,7 @@ function PreviewCard({
   previewSrc,
   isImage,
   onToggle,
+  onRemove,
 }: PreviewCardProps) {
   return (
     <article
@@ -52,6 +56,23 @@ function PreviewCard({
         <p className="truncate text-center text-xs text-gray-300">{label}</p>
         <p className="mt-1.5 text-center text-xs text-gray-400">{index + 1}</p>
       </div>
+
+      {hasFile && onRemove && (
+        <div className="mt-3 flex justify-center">
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-1 rounded-md border border-[#4b5563] bg-[#1f2028] px-2 py-1.5 text-center text-xs font-normal text-gray-300 transition hover:border-[#6b7280] hover:bg-[#252830] hover:text-gray-200"
+            aria-label={`Remove ${label}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove(index);
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+            Remove Image
+          </button>
+        </div>
+      )}
     </article>
   );
 }

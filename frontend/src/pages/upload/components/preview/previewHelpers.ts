@@ -25,7 +25,8 @@ export async function buildPreviewItemsForFiles(
 ): Promise<PreviewItem[]> {
   const nextItems: PreviewItem[] = [];
 
-  for (const file of filesToProcess) {
+  for (let fileIndex = 0; fileIndex < filesToProcess.length; fileIndex += 1) {
+    const file = filesToProcess[fileIndex];
     if (isPdfFile(file)) {
       try {
         const data = new Uint8Array(await file.arrayBuffer());
@@ -42,6 +43,7 @@ export async function buildPreviewItemsForFiles(
               label: `${file.name} (Page ${pageNumber})`,
               isImage: false,
               hasFile: true,
+              fileIndex,
             });
             continue;
           }
@@ -55,6 +57,7 @@ export async function buildPreviewItemsForFiles(
             previewSrc: canvas.toDataURL("image/png"),
             isImage: true,
             hasFile: true,
+            fileIndex,
           });
         }
       } catch {
@@ -62,6 +65,7 @@ export async function buildPreviewItemsForFiles(
           label: file.name,
           isImage: false,
           hasFile: true,
+          fileIndex,
         });
       }
       continue;
@@ -75,6 +79,7 @@ export async function buildPreviewItemsForFiles(
         previewSrc: objectUrl,
         isImage: true,
         hasFile: true,
+        fileIndex,
       });
       continue;
     }
@@ -83,6 +88,7 @@ export async function buildPreviewItemsForFiles(
       label: file.name,
       isImage: false,
       hasFile: true,
+      fileIndex,
     });
   }
 

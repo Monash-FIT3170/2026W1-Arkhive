@@ -3,8 +3,8 @@
 //
 // To change the empty-state look  →  edit EmptyUploadView.tsx
 // To change the sidebar           →  edit UploadSidebar.tsx
-// To change PDF/canvas logic      →  edit components/grid/previewHelpers.ts
-// To change the preview cards     →  edit components/grid/PreviewCard.tsx
+// To change PDF/canvas logic      →  edit components/preview/previewHelpers.ts
+// To change the preview cards     →  edit components/preview/PreviewCard.tsx
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -121,6 +121,18 @@ function UploadPage() {
     setSelectedPages(new Set());
   }
 
+  // ── Remove preview ──────────────────────────────────────────────────────────
+  // For pdfs with multiple pages, they share a file index, so removing one page removes the whole PDF.
+  function handleRemovePreview(previewIndex: number) {
+    const item = previewItemsRef.current[previewIndex];
+    if (!item?.hasFile || item.fileIndex === undefined) return;
+    const { fileIndex } = item;
+    setFiles((prev) => {
+      if (fileIndex < 0 || fileIndex >= prev.length) return prev;
+      return prev.filter((_, i) => i !== fileIndex);
+    });
+  }
+
   // ── Process: send selected pages to OCR backend, then navigate ─────────────
   async function handleProcess() {
     if (selectedPages.size === 0 || isProcessing) return;
@@ -186,6 +198,7 @@ function UploadPage() {
                 previewSrc={item.previewSrc}
                 isImage={item.isImage}
                 onToggle={togglePageSelection}
+                onRemove={handleRemovePreview}
               />
             ))}
           </div>
