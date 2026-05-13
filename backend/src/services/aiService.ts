@@ -93,7 +93,7 @@ const chatResponseSchema: Schema = {
 					}
 				}
 			},
-			required: ["type"]
+			required: ["type", "column", "newValue", "rowId"]
 		}
 	},
 	required: ["response"]
@@ -111,7 +111,17 @@ export default {
 		const model = genAI.getGenerativeModel({
 			model: "gemini-2.5-flash",
 			systemInstruction: `You are an AI assistant helping a user validate and correct a digitized document/table. 
-            Analyse the user's message. If they want to change data in a specific cell (e.g., 'change apples to bananas in row X'), extract the intent as a 'correction'.
+            Analyse the user's message. 
+						
+						If they want to change data in a specific cell (e.g., 'change apples to bananas in row X'), extract the intent as a 'correction'.
+						When the user wants to correct a cell value, you MUST:
+						1. Set type to 'correction'
+						2. Set rowId to the exact '_id' value of the row (e.g. 'comp_3')
+						3. Set column to the exact column header key from the table context (e.g. 'ITEM', 'QTY', 'PRICE')
+						4. Set newValue to the replacement value the user specified
+						Never leave these fields empty for a correction intent.
+						
+
             If they confirm the columns look correct, use the 'column_confirm' intent and set 'approved' to true.
             If they want to rename one or more column headers (e.g., 'change Supplier to Vendor Name'), use the 'column_correction' intent and populate the 'updates' array.
             If they want to remove or delete one or more columns (e.g., 'delete the tax column'), use the 'column_delete' intent and populate the 'deletedColumns' array.
