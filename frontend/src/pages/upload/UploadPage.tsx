@@ -14,6 +14,11 @@ import { buildPreviewItemsForFiles, revokeObjectUrlsFromPreviewItems } from './c
 import EmptyUploadView from './components/EmptyUploadView';
 import UploadSidebar   from './components/UploadSidebar';
 import PreviewCard     from './components/preview/PreviewCard';
+import {
+  filterValidFiles,
+  partitionBySize,
+  MAX_FILE_SIZE_MB,
+} from './components/dropzone/DropZone';
 
 function UploadPage() {
   const navigate = useNavigate();
@@ -135,6 +140,39 @@ function UploadPage() {
     });
   }
 
+  // ── Replace with file ───────────────────────────────────────────────────────
+  // Swap a file for another after type/size checks and user confirmation.
+  function handleReplaceWithFile(previewIndex: number, picked: File) {
+    const transfer = new DataTransfer();
+    transfer.items.add(picked);
+    const valid = filterValidFiles(transfer.files);
+    if (valid.length === 0) {
+      window.alert(
+        'This file type is not supported. Use JPG, PNG, PDF, HEIC, HEIF, or TIFF.',
+      );
+      return;
+    }
+    const checked = valid[0];
+    const { accepted, rejected } = partitionBySize([checked]);
+    if (rejected.length > 0) {
+      window.alert(`File is too large. Maximum size is ${MAX_FILE_SIZE_MB} MB.`);
+      return;
+    }
+    const newFile = accepted[0];
+
+    const item = previewItemsRef.current[previewIndex];
+    if (!item?.hasFile || item.fileIndex === undefined) return;
+    const fi = item.fileIndex;
+    if (!window.confirm(`Replace "${item.label}" with "${newFile.name}"?`)) return;
+
+    setFiles((prev) => {
+      if (fi < 0 || fi >= prev.length) return prev;
+      const next = [...prev];
+      next[fi] = newFile;
+      return next;
+    });
+  }
+
   // ── Process: send selected pages to OCR backend, then navigate ─────────────
   async function handleProcess() {
     if (selectedPages.size === 0 || isProcessing) return;
@@ -253,6 +291,7 @@ function UploadPage() {
                 isImage={item.isImage}
                 onToggle={togglePageSelection}
                 onRemove={handleRemovePreview}
+                onReplaceWithFile={handleReplaceWithFile}
               />
             ))}
           </div>
