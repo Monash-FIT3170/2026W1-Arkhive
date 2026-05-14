@@ -113,13 +113,23 @@ function ExtractedDataPanel({
 										Shows a DaisyUI badge with the score percentage
 										Green ≥85%, Amber 70-84%, Red <70%
 										Low confidence rows also show a warning icon from lucide-react */}
+									{/* UPDATED: Capsule shape with solid background colours for high visibility */}
+                                    {/* Alert icon on left only for low confidence rows with hover tooltip */}
 									<td className="p-2">
-										<span className={`badge ${tier.badgeClass} gap-1 text-[10px]`}>
-											{tier.isLow && (
-												<AlertTriangle className="w-3 h-3" />
-											)}
-											{tier.label}
-										</span>
+                                        <div className="flex items-center gap-1">
+                                            {tier.isLow && (
+                                                <span title="please check this output">
+                                                    <AlertTriangle className="w-3 h-3 text-red-500 cursor-pointer flex-shrink-0" />
+                                                </span>
+                                            )}
+                                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${
+                                                tier.badgeClass === "badge-success" ? "bg-green-500" :
+                                                tier.badgeClass === "badge-warning" ? "bg-yellow-500" :
+                                                "bg-red-500"
+                                            }`}>
+                                                {tier.label}
+                                            </span>
+                                        </div>
 									</td>
 								</tr>
 							);
