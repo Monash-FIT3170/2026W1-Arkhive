@@ -51,27 +51,29 @@ function ExtractedDataPanel({
 
 			{/* Table */}
 			<div className="flex-1 overflow-auto min-h-0 max-w-full">
-				<table className="table table-fixed w-full border border-base-300 text-[10px]">
+                {/* UPDATED: Removed table-fixed to allow columns to size based on content */}
+                <table className="table w-full border border-base-300 text-[10px]">
 
 					{/* Table Header */}
 					<thead>
-						<tr className="text-base-content/70">
-							{/* Existing columns (unchanged) */}
-							{extractedData.columns.map((column) => (
-								<th
-									key={column}
-									className="p-3 text-left text-[12px] font-bold border-b border-base-300 break-words whitespace-normal"
-								>
-									{column.replace(/_/g, " ")}
-								</th>
-							))}
+                        <tr className="text-base-content/70">
+                            {/* Existing columns (unchanged) */}
+                            {extractedData.columns.map((column) => (
+                            //  UPDATED: whitespace-nowrap prevents headers from breaking mid-word.
+                                <th
+                                key={column}
+                                className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-nowrap"
+                                >
+                                {column.replace(/_/g, " ")}
+                                </th>
+                            ))}
 
-							{/* NEW: Confidence column header added at the end of the table */}
-							<th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal">
-								CONF
-							</th>
-						</tr>
-					</thead>
+                            {/* NEW: Confidence column header added at the end of the table */}
+                            <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal">
+                                CONFIDENCE SCORE
+                            </th>
+                        </tr>
+                    </thead>
 
 					{/* Table Body */}
 					<tbody>

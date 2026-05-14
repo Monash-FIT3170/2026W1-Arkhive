@@ -42,7 +42,9 @@ function ValidationPage() {
 				<div className="w-full h-[50vh] lg:h-full lg:flex-1">
 					<DocumentPanel />
 				</div>
-				<div className="w-full h-[50vh] lg:h-full lg:flex-1">
+				{/* UPDATED: overflow-x-auto allows horizontal scrolling on the right panel */}
+                {/* so all columns are accessible without squishing the left panel */}
+				<div className="w-full h-[50vh] lg:h-full lg:flex-1 overflow-x-auto">
 					<ExtractedDataPanel extractedData={documentContext} />
 				</div>
 			</div>
