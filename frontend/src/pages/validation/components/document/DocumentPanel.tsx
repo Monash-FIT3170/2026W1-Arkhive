@@ -89,15 +89,16 @@ function DocumentPanel() {
 				</div>
 
 				{/* Row 3: Confidence Score, updated to show real score instead of hardcoded value, made the colours a little brighter for the document panel */}
-				<div className="border-t pt-3 text-sm text-base-content/70">
-					Confidence Score:{" "}
-					<span className={`font-medium ${
-						confidencePercent >= 85 ? "text-green-400" :
-						confidencePercent >= 70 ? "text-yellow-400" :
-						"text-red-400"
+				{/* UPDATED: Replaced plain coloured text with capsule matching the right panel style */}
+				<div className="border-t pt-3 text-sm text-base-content/70 flex items-center gap-2">
+					Confidence Score:
+					<span className={`px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${
+						confidencePercent >= 85 ? "bg-green-500" :
+						confidencePercent >= 70 ? "bg-yellow-500" :
+						"bg-red-500"
 					}`}>
 						{confidencePercent}%
-					</span> 
+					</span>
 				</div>
 			</div>
 		</>
