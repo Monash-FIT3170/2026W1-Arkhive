@@ -82,27 +82,29 @@ function ExtractedDataPanel({
 
 			{/* Table */}
 			<div className="flex-1 overflow-auto min-h-0 max-w-full">
-				<table className="table table-fixed w-full border border-base-300 text-[10px]">
+                {/* UPDATED: Removed table-fixed to allow columns to size based on content */}
+                <table className="table w-full border border-base-300 text-[10px]">
 
 					{/* Table Header */}
 					<thead>
-						<tr className="text-base-content/70">
-							{/* Existing columns (unchanged) */}
-							{extractedData.columns.map((column) => (
-								<th
-									key={column}
-									className="p-3 text-left text-[12px] font-bold border-b border-base-300 break-words whitespace-normal"
-								>
-									{column.replace(/_/g, " ")}
-								</th>
-							))}
+                        <tr className="text-base-content/70">
+                            {/* Existing columns (unchanged) */}
+                            {extractedData.columns.map((column) => (
+                            //  UPDATED: whitespace-nowrap prevents headers from breaking mid-word.
+                                <th
+                                key={column}
+                                className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-nowrap"
+                                >
+                                {column.replace(/_/g, " ")}
+                                </th>
+                            ))}
 
-							{/* NEW: Confidence column header added at the end of the table */}
-							<th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal">
-								CONF
-							</th>
-						</tr>
-					</thead>
+                            {/* NEW: Confidence column header added at the end of the table */}
+                            <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal">
+                                CONFIDENCE SCORE
+                            </th>
+                        </tr>
+                    </thead>
 
 					{/* Table Body */}
 					<tbody>
@@ -144,13 +146,23 @@ function ExtractedDataPanel({
 										Shows a DaisyUI badge with the score percentage
 										Green ≥85%, Amber 70-84%, Red <70%
 										Low confidence rows also show a warning icon from lucide-react */}
+									{/* UPDATED: Capsule shape with solid background colours for high visibility */}
+                                    {/* Alert icon on left only for low confidence rows with hover tooltip */}
 									<td className="p-2">
-										<span className={`badge ${tier.badgeClass} gap-1 text-[10px]`}>
-											{tier.isLow && (
-												<AlertTriangle className="w-3 h-3" />
-											)}
-											{tier.label}
-										</span>
+                                        <div className="flex items-center gap-1">
+                                            {tier.isLow && (
+                                                <span title="please check this output">
+                                                    <AlertTriangle className="w-3 h-3 text-red-500 cursor-pointer flex-shrink-0" />
+                                                </span>
+                                            )}
+                                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${
+                                                tier.badgeClass === "badge-success" ? "bg-green-500" :
+                                                tier.badgeClass === "badge-warning" ? "bg-yellow-500" :
+                                                "bg-red-500"
+                                            }`}>
+                                                {tier.label}
+                                            </span>
+                                        </div>
 									</td>
 								</tr>
 							);
