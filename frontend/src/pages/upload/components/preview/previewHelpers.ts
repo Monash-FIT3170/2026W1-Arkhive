@@ -1,5 +1,11 @@
-import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
-import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+// Use pdf.js legacy build because the normal one was crashing on render with
+// "getOrInsertComputed is not a function" (caused by new Map APIs + Vite's bundling).
+// Legacy bundles polyfills so that API exists and render works.
+
+// import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+// import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs";
+import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import type { PreviewItem } from "../../types";
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
