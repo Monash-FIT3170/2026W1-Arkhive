@@ -178,6 +178,12 @@ function UploadPage() {
   // ── Process: send selected pages to OCR backend, then navigate ─────────────
   async function handleProcess() {
     if (selectedPages.size === 0 || isProcessing) return;
+    if (selectedPages.size > 1) {
+      window.alert(
+        'Only one page can be processed at a time for the current milestone. Deselect the extra files so exactly one is selected, then try again.',
+      );
+      return;
+    }
     setIsProcessing(true);
     setUploadError(null);    // US-1.4: clear any previous error before retrying
     setUploadSuccess(false); // US-1.5: clear any previous success before retrying
