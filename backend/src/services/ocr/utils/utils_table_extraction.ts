@@ -21,6 +21,12 @@ const flattenParagraphsToCellMap = (pages: google.cloud.vision.v1.IParagraph[]):
 };
 
 
+/**
+ * given a record or hashmap of rows of google ocr paragraphs, get the components based on rows and columns
+ * @param rowMap 
+ * 
+ * @returns 
+ */
 function getComponents(rowMap: Record<string, google.cloud.vision.v1.IParagraph[]>){
   return Object.keys(rowMap)
       .map(Number)
@@ -31,7 +37,7 @@ function getComponents(rowMap: Record<string, google.cloud.vision.v1.IParagraph[
         // Sort paragraphs horizontally (Left to Right)
         const sortedParts = paragraphs.sort((a, b) => 
           (a.boundingBox?.vertices?.[0]?.x ?? 0) - (b.boundingBox?.vertices?.[0]?.x ?? 0)
-        );
+        )
 
         // Extract text content
         const partTexts = sortedParts.map(p => 
@@ -61,7 +67,7 @@ function getComponents(rowMap: Record<string, google.cloud.vision.v1.IParagraph[
           indentation: leftMargin,
           y,
           layer: 0,
-          text: fullText,
+          text: fullText.replace(/^-/, ""),
           confidence,
           boundingBoxes: flattenParagraphsToCellMap(sortedParts)
         };
@@ -95,6 +101,9 @@ function addParentAndAddColumns(components: OCRComponent[]) {
         leftMarginOfCell <= leftMarginOfCol + widthOfCol 
       ){
         cell.column = column.text;
+      }
+      else{
+        comp.type ="BODY_TEXT"
       }
     })
   ) : ""
@@ -171,6 +180,8 @@ export const extractStructuredComponents = (pages: google.cloud.vision.v1.IPage[
  * 
  * Author: Harsha Sharma 
  * 
+ * @example
+ * 
  */
 function postProcessIndentation(components: OCRComponent[]): OCRComponent[] {
   //Heuristic: very first table row is always a list of table columns
@@ -183,3 +194,5 @@ function postProcessIndentation(components: OCRComponent[]): OCRComponent[] {
   })
   return addParentAndAddColumns(components)
 }
+
+
