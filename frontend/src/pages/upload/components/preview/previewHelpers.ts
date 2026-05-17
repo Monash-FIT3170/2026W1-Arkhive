@@ -28,11 +28,23 @@ export async function buildPreviewItemsForFiles(
   for (let fileIndex = 0; fileIndex < filesToProcess.length; fileIndex += 1) {
     const file = filesToProcess[fileIndex];
     if (isPdfFile(file)) {
+      let pdf: Awaited<ReturnType<typeof getDocument>["promise"]>;
       try {
         const data = new Uint8Array(await file.arrayBuffer());
-        const pdf = await getDocument({ data }).promise;
+        pdf = await getDocument({ data }).promise;
+      } catch (err) {
+        console.error("[preview] PDF load failed:", file.name, err);
+        nextItems.push({
+          label: file.name,
+          isImage: false,
+          hasFile: true,
+          fileIndex,
+        });
+        continue;
+      }
 
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        try {
           const page = await pdf.getPage(pageNumber);
           const viewport = page.getViewport({ scale: PDF_PREVIEW_SCALE });
           const canvas = document.createElement("canvas");
@@ -59,14 +71,15 @@ export async function buildPreviewItemsForFiles(
             hasFile: true,
             fileIndex,
           });
+        } catch (err) {
+          console.error(`[preview] PDF page render failed: ${file.name} p.${pageNumber}`, err);
+          nextItems.push({
+            label: `${file.name} (Page ${pageNumber})`,
+            isImage: false,
+            hasFile: true,
+            fileIndex,
+          });
         }
-      } catch {
-        nextItems.push({
-          label: file.name,
-          isImage: false,
-          hasFile: true,
-          fileIndex,
-        });
       }
       continue;
     }
