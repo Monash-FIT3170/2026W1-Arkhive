@@ -58,7 +58,8 @@ export async function buildPreviewItemsForFiles(
 
           if (!context) {
             nextItems.push({
-              label: `${file.name} (Page ${pageNumber})`,
+              label: file.name,
+              subtitle: `Page ${pageNumber}`,
               isImage: false,
               hasFile: true,
               fileIndex,
@@ -71,7 +72,8 @@ export async function buildPreviewItemsForFiles(
           await page.render({ canvas, canvasContext: context, viewport }).promise;
 
           nextItems.push({
-            label: `${file.name} (Page ${pageNumber})`,
+            label: file.name,
+            subtitle: `Page ${pageNumber}`,
             previewSrc: canvas.toDataURL("image/png"),
             isImage: true,
             hasFile: true,
@@ -80,7 +82,8 @@ export async function buildPreviewItemsForFiles(
         } catch (err) {
           console.error(`[preview] PDF page render failed: ${file.name} p.${pageNumber}`, err);
           nextItems.push({
-            label: `${file.name} (Page ${pageNumber})`,
+            label: file.name,
+            subtitle: `Page ${pageNumber}`,
             isImage: false,
             hasFile: true,
             fileIndex,

@@ -5,6 +5,7 @@ const REPLACE_INPUT_ACCEPT = ".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif";
 
 type PreviewCardProps = {
   label: string;
+  subtitle?: string;
   hasFile: boolean;
   index: number;
   isSelected: boolean;
@@ -17,6 +18,7 @@ type PreviewCardProps = {
 
 function PreviewCard({
   label,
+  subtitle,
   hasFile,
   index,
   isSelected,
@@ -27,6 +29,7 @@ function PreviewCard({
   onReplaceWithFile,
 }: PreviewCardProps) {
   const replaceInputRef = useRef<HTMLInputElement>(null);
+  const displayName = subtitle ? `${label} — ${subtitle}` : label;
 
   return (
     <article
@@ -51,7 +54,7 @@ function PreviewCard({
 
       <div className="mx-auto mb-[10px] mt-4 h-[220px] w-[160px] overflow-hidden rounded-[2px] border border-[#3f4350] bg-[#f8fafc] shadow-[inset_0_0_0_1px_#e5e7eb]">
         {hasFile && isImage ? (
-          <img src={previewSrc} alt={label} className="h-full w-full object-contain" />
+          <img src={previewSrc} alt={displayName} className="h-full w-full object-contain" />
         ) : hasFile ? (
           <div className="flex h-full w-full items-center justify-center text-center text-xs font-semibold text-gray-500">
             Preview unavailable
@@ -61,7 +64,11 @@ function PreviewCard({
 
       <div>
         <p className="truncate text-center text-xs text-gray-300">{label}</p>
-        <p className="mt-1.5 text-center text-xs text-gray-400">{index + 1}</p>
+        {subtitle ? (
+          <p className="mt-1 truncate text-center text-xs text-gray-400">{subtitle}</p>
+        ) : (
+          <p className="mt-1.5 text-center text-xs text-gray-500">{index + 1}</p>
+        )}
       </div>
 
       {hasFile && (onRemove || onReplaceWithFile) && (
@@ -84,7 +91,7 @@ function PreviewCard({
               <button
                 type="button"
                 className="inline-flex w-full max-w-[11rem] items-center justify-center gap-1 rounded-md border border-[#4b5563] bg-[#1f2028] px-2 py-1.5 text-center text-xs font-normal text-gray-300 transition hover:border-[#6b7280] hover:bg-[#252830] hover:text-gray-200"
-                aria-label={`Replace file ${label}`}
+                aria-label={`Replace file ${displayName}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   replaceInputRef.current?.click();
@@ -99,7 +106,7 @@ function PreviewCard({
             <button
               type="button"
               className="inline-flex w-full max-w-[11rem] items-center justify-center gap-1 rounded-md border border-[#4b5563] bg-[#1f2028] px-2 py-1.5 text-center text-xs font-normal text-gray-300 transition hover:border-[#6b7280] hover:bg-[#252830] hover:text-gray-200"
-              aria-label={`Remove file ${label}`}
+              aria-label={`Remove file ${displayName}`}
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove(index);

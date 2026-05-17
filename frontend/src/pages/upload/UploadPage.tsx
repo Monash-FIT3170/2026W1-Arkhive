@@ -163,7 +163,9 @@ function UploadPage() {
     const item = previewItemsRef.current[previewIndex];
     if (!item?.hasFile || item.fileIndex === undefined) return;
     const fi = item.fileIndex;
-    if (!window.confirm(`Replace file "${item.label}" with "${newFile.name}"?`)) return;
+    if (!window.confirm(
+      `Replace file "${item.subtitle ? `${item.label} (${item.subtitle})` : item.label}" with "${newFile.name}"?`,
+    )) return;
 
     setFiles((prev) => {
       if (fi < 0 || fi >= prev.length) return prev;
@@ -282,8 +284,9 @@ function UploadPage() {
           <div className="grid auto-rows-auto grid-cols-[repeat(auto-fill,minmax(200px,1fr))] content-start gap-[18px]">
             {previewItems.map((item, index) => (
               <PreviewCard
-                key={`${item.label}-${index}`}
+                key={`${item.label}-${item.subtitle ?? ""}-${index}`}
                 label={item.label}
+                subtitle={item.subtitle}
                 hasFile={item.hasFile}
                 index={index}
                 isSelected={selectedPages.has(index)}
