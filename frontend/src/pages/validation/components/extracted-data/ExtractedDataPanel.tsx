@@ -10,6 +10,7 @@ function getConfidenceTier(confidence: number): {
 	colour: string;
 	label: string;
 	isLow: boolean;
+	badgeClass?: string;
 } {
 	if (confidence >= 0.85) {
 		return {
