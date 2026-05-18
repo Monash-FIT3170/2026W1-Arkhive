@@ -35,15 +35,14 @@ function PreviewCard({
   onReplaceWithFile,
 }: PreviewCardProps) {
   const replaceInputRef = useRef<HTMLInputElement>(null);
-  const displayName = subtitle ? `${label} ${subtitle}` : label;
-
-const warningMessage = shouldWarn
-  ? isBlurry && isDark
-    ? "Image may be blurry and too dark"
-    : isBlurry
-      ? "Image may be blurry"
-      : "Image may be too dark"
-  : null;
+  const displayName = subtitle ? `${label} - ${subtitle}` : label;
+  const warningMessage = shouldWarn
+    ? isBlurry && isDark
+      ? "Image may be blurry and too dark"
+      : isBlurry
+        ? "Image may be blurry"
+        : "Image may be too dark"
+    : null;
 
   return (
     <article
