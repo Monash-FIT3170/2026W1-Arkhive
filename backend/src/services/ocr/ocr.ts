@@ -1,10 +1,9 @@
 import path from 'path';
 import vision from '@google-cloud/vision';
-import fs from 'fs'
-import { extractStructuredComponents, findAverageAccuracyForAllWords, flattenPagesToBlockMap, flattenPagesToParaMap, flattenPagesToWordMap } from './utils/utils.js';
-import { OCRBoundingBoxes }from './types/boundingBoxTypes.js';
-import { pdf } from 'pdf-to-img';
-
+import fs from 'fs';
+import { extractStructuredComponents } from './utils/utils_table_extraction.js';
+import { setTimeout } from 'timers/promises';
+import { withRetry } from './utils/utils.js';
 
 
 
@@ -20,19 +19,19 @@ const client = new vision.ImageAnnotatorClient({
     }
 });
 
-const chunk = <T>(arr: T[], size: number): T[][] =>
-  Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
-    arr.slice(i * size, i * size + size)
-  );
-
 export async function textExtraction(imagePath: string): Promise<string> {
-  const absoluteImagePath = path.resolve(imagePath);
+  try {
+    const absoluteImagePath = path.resolve(imagePath);
 
-  const [result] = await client.documentTextDetection(absoluteImagePath);
+    const [result] = await client.documentTextDetection(absoluteImagePath);
 
-  const extractedText = result.fullTextAnnotation?.text ?? '';
+    const extractedText = result.fullTextAnnotation?.text ?? '';
 
-  return extractedText;
+    return extractedText;
+  } catch (e: any){
+    console.log("Request failed. Error " + e + " occured")
+    return "";
+  }
 }
 
 
@@ -52,19 +51,18 @@ export async function testOCR() {
 
 function for getting bounding boxes for all words detected
 */  
-async function getBoundingBoxesWords(imageBuffer: Buffer) {
-  
-  //const pages = mimeType == "application/pdf" ? pdf(imageBuffer) : imageBuffer
-
-
-
+async function parseTable(imageBuffer: Buffer) {
   const [response] = await client.documentTextDetection(imageBuffer);
   const fullTextAnnotation = response.fullTextAnnotation;
   return extractStructuredComponents(fullTextAnnotation!.pages!)
 }
 
+async function parseTableWithRetries(imageBuffer: Buffer){
+  return await withRetry(() => parseTable(imageBuffer))
+}
+
 // function for getting overall averaged confidence score
 
-const jsonOut = JSON.stringify(await getBoundingBoxesWords(fs.readFileSync("Screenshot 2026-04-25 195541.png")), null, 2)
+// const jsonOut = JSON.stringify(await parseTableWithRetries(fs.readFileSync("sample-file-1_page-0001.jpg")), null, 2)
 
-fs.writeFileSync("boundingBox.json", jsonOut, 'utf-8')
+// fs.writeFileSync("boundingBox.json", jsonOut, 'utf-8')
