@@ -298,6 +298,9 @@ function UploadPage() {
                 isSelected={selectedPages.has(index)}
                 previewSrc={item.previewSrc}
                 isImage={item.isImage}
+                isBlurry={item.isBlurry}
+                isDark={item.isDark}
+                shouldWarn={item.shouldWarn}
                 onToggle={togglePageSelection}
                 onRemove={handleRemovePreview}
                 onReplaceWithFile={handleReplaceWithFile}

@@ -11,6 +11,9 @@ type PreviewCardProps = {
   isSelected: boolean;
   previewSrc?: string;
   isImage?: boolean;
+  isBlurry?: boolean;
+  isDark?: boolean;
+  shouldWarn?: boolean;
   onToggle: (index: number) => void;
   onRemove?: (index: number) => void;
   onReplaceWithFile?: (index: number, file: File) => void;
@@ -24,12 +27,23 @@ function PreviewCard({
   isSelected,
   previewSrc,
   isImage,
+  isBlurry,
+  isDark,
+  shouldWarn,
   onToggle,
   onRemove,
   onReplaceWithFile,
 }: PreviewCardProps) {
   const replaceInputRef = useRef<HTMLInputElement>(null);
-  const displayName = subtitle ? `${label} — ${subtitle}` : label;
+  const displayName = subtitle ? `${label} ${subtitle}` : label;
+
+const warningMessage = shouldWarn
+  ? isBlurry && isDark
+    ? "Image may be blurry and too dark"
+    : isBlurry
+      ? "Image may be blurry"
+      : "Image may be too dark"
+  : null;
 
   return (
     <article
@@ -52,7 +66,7 @@ function PreviewCard({
         </span>
       )}
 
-      <div className="mx-auto mb-[10px] mt-4 h-[220px] w-[160px] overflow-hidden rounded-[2px] border border-[#3f4350] bg-[#f8fafc] shadow-[inset_0_0_0_1px_#e5e7eb]">
+            <div className="mx-auto mb-[10px] mt-4 h-[220px] w-[160px] overflow-hidden rounded-[2px] border border-[#3f4350] bg-[#f8fafc] shadow-[inset_0_0_0_1px_#e5e7eb]">
         {hasFile && isImage ? (
           <img src={previewSrc} alt={displayName} className="h-full w-full object-contain" />
         ) : hasFile ? (
@@ -61,6 +75,12 @@ function PreviewCard({
           </div>
         ) : null}
       </div>
+
+      {shouldWarn && warningMessage && (
+        <div className="mb-2 rounded-md border border-yellow-500/40 bg-yellow-500/10 px-2 py-1 text-center text-[11px] text-yellow-200">
+          {warningMessage}
+        </div>
+      )}
 
       <div>
         <p className="truncate text-center text-xs text-gray-300">{label}</p>
