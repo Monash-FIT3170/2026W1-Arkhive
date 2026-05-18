@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { textExtraction } from '../services/ocr/ocr.js';
+import { Multer } from 'multer';
 
 declare module 'express-session' {
   interface SessionData {
@@ -23,7 +24,11 @@ export default {
     try {
       // Run OCR on each page in parallel
       const ocrResults = await Promise.all(
-        files.map((file) => textExtraction(file.buffer.toString('base64')))
+        files.map((file) => {
+          console.log(file)
+          textExtraction(file.originalname)
+    }
+    )
       );
 
       // Flatten all pages' OCR components into one array

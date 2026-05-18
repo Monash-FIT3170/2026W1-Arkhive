@@ -9,7 +9,7 @@ import { pdf } from 'pdf-to-img';
 
 
 const client = new vision.ImageAnnotatorClient({
-  keyFilename: path.resolve(process.cwd(), '../../credentials/google-vision-key.json'),
+  keyFilename: path.resolve(process.cwd(), '../backend/src/credentials/google-vision-key.json'),
   features: [
       {
         type: 'DOCUMENT_TEXT_DETECTION',
@@ -26,8 +26,8 @@ const chunk = <T>(arr: T[], size: number): T[][] =>
   );
 
 export async function textExtraction(imagePath: string): Promise<string> {
-  const absoluteImagePath = path.resolve(imagePath);
-
+  const absoluteImagePath = imagePath;
+  console.log(absoluteImagePath)
   const [result] = await client.documentTextDetection(absoluteImagePath);
 
   const extractedText = result.fullTextAnnotation?.text ?? '';
@@ -65,6 +65,6 @@ async function getBoundingBoxesWords(imageBuffer: Buffer) {
 
 // function for getting overall averaged confidence score
 
-const jsonOut = JSON.stringify(await getBoundingBoxesWords(fs.readFileSync("Screenshot 2026-04-25 195541.png")), null, 2)
+const jsonOut = JSON.stringify(await getBoundingBoxesWords(fs.readFileSync("assets/sample-page-1.png")), null, 2)
 
 fs.writeFileSync("boundingBox.json", jsonOut, 'utf-8')
