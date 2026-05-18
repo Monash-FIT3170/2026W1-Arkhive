@@ -1,17 +1,28 @@
 import { Request, Response } from "express";
+import { Session } from "express-session";
 
-type RequestWithSession = Request & { session?: any };
+interface ExtractionSessionData {
+	extraction?: {
+		ocrData: any;
+		createdAt: number;
+		updatedAt: number;
+	};
+}
+
+type SessionRequest = Request & {
+	session: Session & ExtractionSessionData;
+};
 
 export default {
-	getExtraction: (req: RequestWithSession, res: Response) => {
-		if (req.session?.extraction) {
+	getExtraction: (req: SessionRequest, res: Response) => {
+		if (req.session.extraction) {
 			res.json(req.session.extraction);
 		} else {
 			res.json(null);
 		}
 	},
 
-	saveExtraction: (req: RequestWithSession, res: Response) => {
+	saveExtraction: (req: SessionRequest, res: Response) => {
 		const { ocrData } = req.body;
 
 		if (!ocrData) {
@@ -19,16 +30,14 @@ export default {
 			return;
 		}
 
-		if (req.session?.extraction) {
+		if (req.session.extraction) {
 			req.session.extraction.ocrData = ocrData;
 			req.session.extraction.updatedAt = Date.now();
 		} else {
-			req.session = {
-				extraction: {
-					ocrData,
-					createdAt: Date.now(),
-					updatedAt: Date.now()
-				}
+			req.session.extraction = {
+				ocrData,
+				createdAt: Date.now(),
+				updatedAt: Date.now()
 			};
 		}
 
