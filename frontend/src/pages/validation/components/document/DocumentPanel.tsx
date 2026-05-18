@@ -16,11 +16,17 @@ function calculateAverageConfidence(data: OCRComponent[]): number {
 	return total / componentsWithConfidence.length;
 }
 
-function DocumentPanel({ hoveredOverlayId, }: { hoveredOverlayId: string | null; }) {
+function DocumentPanel({
+	hoveredOverlayId
+}: {
+	hoveredOverlayId: string | null;
+}) {
+	const [zoom, setZoom] = useState(1);
 	const [viewBox, setViewBox] = useState("0 0 1000 1000"); // default
-
 	// NEW update: Real average confidence from mock data
-	const averageConfidence = calculateAverageConfidence(mockOcrData as OCRComponent[]);
+	const averageConfidence = calculateAverageConfidence(
+		mockOcrData as OCRComponent[]
+	);
 	const confidencePercent = Math.round(averageConfidence * 100);
 
 	const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -43,10 +49,36 @@ function DocumentPanel({ hoveredOverlayId, }: { hoveredOverlayId: string | null;
 				<h2 className="mb-4 text-xl font-semibold text-base-content">
 					DOCUMENT PANEL
 				</h2>
+				{/* Row 2: Zoom buttoms*/}
+				<div className="mb-2 flex gap-2">
+					<button
+						className="btn btn-sm"
+						onClick={() => setZoom((z) => Math.max(1, z - 0.25))}
+					>
+						−
+					</button>
 
-				{/* Row 2: Image & Overlay Container */}
-				<div className="flex-1 min-h-[250px] relative overflow-hidden border border-base-300">
-					<div className="absolute inset-0 w-full h-full">
+					<button
+						className="btn btn-sm"
+						onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
+					>
+						+
+					</button>
+
+					<button className="btn btn-sm" onClick={() => setZoom(1)}>
+						Reset
+					</button>
+				</div>
+				{/* Row 3: Image & Overlay Container */}
+				<div className="flex-1 min-h-[250px] relative overflow-auto border border-base-300">
+					<div
+						className="absolute inset-0 w-full h-full origin-center"
+						style={{
+							transform: `scale(${zoom})`,
+							transformOrigin: "top left",
+							transition: "transform 0.2s ease"
+						}}
+					>
 						<img
 							src={mockImage}
 							alt="Document"
@@ -62,7 +94,13 @@ function DocumentPanel({ hoveredOverlayId, }: { hoveredOverlayId: string | null;
 							preserveAspectRatio="xMidYMid meet"
 						>
 							<defs>
-								<filter id="highlightGlow" x="-50%" y="-50%" width="200%" height="300%">
+								<filter
+									id="highlightGlow"
+									x="-50%"
+									y="-50%"
+									width="200%"
+									height="300%"
+								>
 									<feGaussianBlur stdDeviation="4" result="glow" />
 									<feMerge>
 										<feMergeNode in="glow" />
@@ -74,28 +112,32 @@ function DocumentPanel({ hoveredOverlayId, }: { hoveredOverlayId: string | null;
 							{(mockOcrData as OCRComponent[]).map((comp) => {
 								if (!comp.boundingBoxes) return null;
 
-								return Object.entries(comp.boundingBoxes).map(([cellKey, box]: [string, any]) => {
+								return Object.entries(comp.boundingBoxes).map(
+									([cellKey, box]: [string, any]) => {
+										const id = `${comp.id}:${cellKey}`;
 
-									const id = `${comp.id}:${cellKey}`;
+										const pointsStr = box.vertices
+											.map((v: any) => `${v.x},${v.y}`)
+											.join(" ");
 
-									const pointsStr = box.vertices
-										.map((v: any) => `${v.x},${v.y}`)
-										.join(" ");
+										const isActive =
+											hoveredOverlayId === id || hoveredOverlayId === comp.id;
 
-									const isActive = hoveredOverlayId === id || hoveredOverlayId === comp.id;
-
-									return (
-										<polygon
-											key={id}
-											points={pointsStr}
-											fill={isActive ? "rgba(245, 158, 11, 0.35)" : "transparent"}
-											stroke={isActive ? "#f59e0b" : "transparent"}
-											strokeWidth={isActive ? 3 : 1}
-											opacity={isActive ? 1 : 0.75}
-											filter={isActive ? "url(#highlightGlow)" : undefined}
-										/>
-									);
-								});
+										return (
+											<polygon
+												key={id}
+												points={pointsStr}
+												fill={
+													isActive ? "rgba(245, 158, 11, 0.35)" : "transparent"
+												}
+												stroke={isActive ? "#f59e0b" : "transparent"}
+												strokeWidth={isActive ? 3 : 1}
+												opacity={isActive ? 1 : 0.75}
+												filter={isActive ? "url(#highlightGlow)" : undefined}
+											/>
+										);
+									}
+								);
 							})}
 						</svg>
 					</div>
@@ -104,10 +146,15 @@ function DocumentPanel({ hoveredOverlayId, }: { hoveredOverlayId: string | null;
 				{/* Row 3: Confidence Score, updated to show real score instead of hardcoded value, made the colours a little brighter for the document panel */}
 				<div className="border-t pt-3 text-sm text-base-content/70">
 					Confidence Score:{" "}
-					<span className={`font-medium ${confidencePercent >= 85 ? "text-green-400" :
-							confidencePercent >= 70 ? "text-yellow-400" :
-								"text-red-400"
-						}`}>
+					<span
+						className={`font-medium ${
+							confidencePercent >= 85
+								? "text-green-400"
+								: confidencePercent >= 70
+									? "text-yellow-400"
+									: "text-red-400"
+						}`}
+					>
 						{confidencePercent}%
 					</span>
 				</div>
