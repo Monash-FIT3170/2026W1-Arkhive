@@ -61,8 +61,8 @@ async function parseTableWithRetries(imageBuffer: Buffer){
   return await withRetry(() => parseTable(imageBuffer))
 }
 
-// // function for getting overall averaged confidence score
+// function for getting overall averaged confidence score
 
-// const jsonOut = JSON.stringify(await parseTableWithRetries(fs.readFileSync("Screenshot 2026-04-25 195541.png")), null, 2)
+// const jsonOut = JSON.stringify(await parseTableWithRetries(fs.readFileSync("sample-file-1_page-0001.jpg")), null, 2)
 
 // fs.writeFileSync("boundingBox.json", jsonOut, 'utf-8')
