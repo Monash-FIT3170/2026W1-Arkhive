@@ -25,4 +25,8 @@ const uploadRouter = Router();
 
 uploadRouter.post('/', upload.array('pages'), uploadController.processUpload);
 
+uploadRouter.get('/', (req, res) =>{
+  return res.status(204).send(req.session.extraction ?? "")
+});
+
 export default uploadRouter;
