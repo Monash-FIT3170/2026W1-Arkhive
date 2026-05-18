@@ -1,3 +1,6 @@
+import type { ExtractedData } from "../models/TableData";
+import type { OCRComponent } from "../models/OCRComponent";
+
 export async function getExtractionSession() {
 	const response = await fetch("/api/extraction", {
 		method: "GET",
@@ -11,7 +14,7 @@ export async function getExtractionSession() {
 	return await response.json();
 }
 
-export async function saveExtractionSession(ocrData: any) {
+export async function saveExtractionSession(ocrData: ExtractedData | OCRComponent[]) {
 	const response = await fetch("/api/extraction", {
 		method: "POST",
 		headers: {

@@ -10,7 +10,7 @@ function escapeCell(value: unknown): string {
 
 	// NEW: Prevent Excel from interpreting strings as formulas (CSV Injection)
 	// If it starts with =, +, -, or @, prepend a single quote
-	if (/^[=\+\-@\t\r]/.test(raw)) {
+	if (/^[=\-@\t\r]/.test(raw)) {
 		raw = ` ${raw}`;
 	}
 

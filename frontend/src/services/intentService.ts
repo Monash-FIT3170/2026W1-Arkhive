@@ -80,7 +80,7 @@ function deletecolumn(data: ExtractedData, intent: Intent): ExtractedData {
         columns: data.columns.filter((col) => col !== column),
         rows: data.rows.map((row) => {
             if (column in row) {
-                const { [column]: string, ...rest } = row;
+                const { [column]: _, ...rest } = row;
                 return rest as ExtractedRow;
             }
             return row;

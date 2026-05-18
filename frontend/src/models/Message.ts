@@ -32,6 +32,7 @@ export interface Intent {
 	column?: string; // <-- Changed from 'field' to 'column'
 	oldValue?: string;
 	newValue?: string;
+	approved?: boolean; // for column_confirm intent
 	note?: string;
 	updates?: Array<{ from: string; to: string }>; // for column renames
 	deletedColumns?: string[]; // for column deletes

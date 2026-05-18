@@ -15,7 +15,7 @@ import {
 function ValidationPage() {
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [documentContext, setDocumentContext] = useState<any>(null);
+  const [documentContext, setDocumentContext] = useState<ExtractedData | null>(null);
   const [splitPercent, setSplitPercent] = useState(50);
   const [oldContext, setOldContext] = useState<ExtractedData | null>(null); //for AI suggesiton
 
@@ -26,7 +26,7 @@ function ValidationPage() {
       try {
         let sessionData = await getExtractionSession();
         if (!sessionData?.ocrData) {
-          sessionData = await saveExtractionSession(mockOcrData);
+          sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
         }
         setDocumentContext(
           flattenOcrData(sessionData.ocrData as OCRComponent[]),
@@ -77,14 +77,12 @@ function ValidationPage() {
   //bounding box hover state
   const [hoveredOverlayId, setHoveredOverlayId] = useState<string | null>(null);
 
-  const ExtractedDataPanelComponent = ExtractedDataPanel as any;
-
   const addMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
   };
 
   // called when AI returns updatedContext after accepting suggestion
-  const handleContextUpdate = (updatedData: any) => {
+  const handleContextUpdate = (updatedData: ExtractedData) => {
     setOldContext(documentContext); // save snapshot before overwriting
     setDocumentContext(updatedData);
   };
@@ -167,7 +165,7 @@ function ValidationPage() {
           className="w-full h-[50vh] lg:h-full"
           style={{ width: `${100 - splitPercent}%` }}
         >
-          <ExtractedDataPanelComponent
+          <ExtractedDataPanel
             onHover={setHoveredOverlayId}
             extractedData={documentContext}
           />

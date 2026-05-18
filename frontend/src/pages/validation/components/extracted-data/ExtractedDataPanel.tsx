@@ -1,6 +1,6 @@
 import { AlertTriangle, Download, Check } from "lucide-react"; // NEW: Importing icons for confidence badges and export button
 import { useState } from "react";
-import type { ExtractedData } from "./ExtractedData";
+import type { ExtractedData } from "../../../../models/TableData";
 import { exportExtractedDataAsCSV } from "../../../../services/csvDownloadService";
 
 // NEW update: Helper function helps to determine the confidence tier of a row
