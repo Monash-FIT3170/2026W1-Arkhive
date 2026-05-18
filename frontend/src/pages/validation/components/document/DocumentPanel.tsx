@@ -147,13 +147,12 @@ function DocumentPanel({
 				<div className="border-t pt-3 text-sm text-base-content/70">
 					Confidence Score:{" "}
 					<span
-						className={`font-medium ${
-							confidencePercent >= 85
+						className={`font-medium ${confidencePercent >= 85
 								? "text-green-400"
 								: confidencePercent >= 70
 									? "text-yellow-400"
 									: "text-red-400"
-						}`}
+							}`}
 					>
 						{confidencePercent}%
 					</span>

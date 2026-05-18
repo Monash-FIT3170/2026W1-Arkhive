@@ -1,5 +1,7 @@
-import { AlertTriangle } from "lucide-react"; // NEW: imported for low confidence warning icon
-import type { ExtractedData } from "../../../../models/TableData";
+import { AlertTriangle, Download, Check } from "lucide-react"; // NEW: Importing icons for confidence badges and export button
+import { useState } from "react";
+import type { ExtractedData } from "./ExtractedData";
+import { exportExtractedDataAsCSV } from "../../../../services/csvDownloadService";
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
@@ -45,29 +47,62 @@ function ExtractedDataPanel({
 		}).format(amount);
 	};
 
+	// used to check if file exported
+	const [exported, setExported] = useState(false);
+
+	// function to import csvService export and trigger CSV download
+	function handleExportCSV() {
+		exportExtractedDataAsCSV(extractedData);
+		setExported(true);
+		setTimeout(() => setExported(false), 2500);
+	}
+
+
 	return (
 		<div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
-			<h2 className="mb-4 text-xl font-semibold text-base-content">
-				EXTRACTED DATA
-			</h2>
 
+			{/* Download Button */}
+			<div className="mb-4 flex items-center justify-between">
+				<h2 className="text-xl font-semibold text-base-content">EXTRACTED DATA</h2>
+				<button
+					onClick={handleExportCSV}
+					disabled={exported}
+					className={`btn btn-sm gap-2 text-xs transition-all ${exported
+						? "btn-success"
+						: "btn-outline"
+						}`}
+					title="Export to CSV"
+				>
+					{exported ? (
+						<><Check className="w-3.5 h-3.5" />Exported!</>
+					) : (
+						<><Download className="w-3.5 h-3.5" />Export CSV</>
+					)}
+				</button>
+			</div>
+
+			{/* Table */}
 			<div className="flex-1 overflow-auto min-h-0 max-w-full">
-				<table className="table w-full border border-base-300 bg-white text-[10px]">
-					{/* Header */}
+				{/* UPDATED: Removed table-fixed to allow columns to size based on content */}
+				<table className="table w-full border border-base-300 text-[10px]">
+
+					{/* Table Header */}
 					<thead>
 						<tr className="text-base-content/70">
+							{/* Existing columns (unchanged) */}
 							{extractedData.columns.map((column) => (
+								//  UPDATED: whitespace-nowrap prevents headers from breaking mid-word.
 								<th
 									key={column}
-									className="p-3 text-left text-[11px] font-bold border-b border-base-300 break-words whitespace-normal"
+									className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-nowrap"
 								>
 									{column.replace(/_/g, " ")}
 								</th>
 							))}
 
-							{/* NEW: Confidence column */}
-							<th className="p-3 text-left text-[11px] font-bold border-b border-base-300 min-w-[100[x]">
-								CONFIDENCE
+							{/* NEW: Confidence column header added at the end of the table */}
+							<th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal">
+								CONFIDENCE SCORE
 							</th>
 						</tr>
 					</thead>
@@ -80,9 +115,8 @@ function ExtractedDataPanel({
 							return (
 								<tr
 									key={row._id}
-									className={`border-b border-base-300 hover:bg-base-300/40 ${
-										tier.isLow ? "bg-error/10" : ""
-									}`}
+									className={`border-b border-base-300 hover:bg-base-300/40 ${tier.isLow ? "bg-error/10" : ""
+										}`}
 								>
 									{extractedData.columns.map((column) => {
 										const cellKey = row._cellKeyMap?.[column];
@@ -103,22 +137,23 @@ function ExtractedDataPanel({
 										);
 									})}
 
-									{/* NEW: Confidence cell */}
+									{/* NEW: Confidence score cell added at the end of each row
+										Shows a DaisyUI badge with the score percentage
+										Green ≥85%, Amber 70-84%, Red <70%
+										Low confidence rows also show a warning icon from lucide-react */}
+									{/* UPDATED: Capsule shape with solid background colours for high visibility */}
+									{/* Alert icon on left only for low confidence rows with hover tooltip */}
 									<td className="p-2">
-										<div className="flex flex-col gap-1 min-w-[80px]">
-											<div className="h-2 rounded-full bg-base-300">
-												<div
-													className="h-2 rounded-full"
-													style={{
-														width: tier.label,
-														backgroundColor: tier.colour
-													}}
-												/>
-											</div>
-											<span
-												className="text-[12px] tabular-nums"
-												style={{ color: tier.colour }}
-											>
+										<div className="flex items-center gap-1">
+											{tier.isLow && (
+												<span title="please check this output">
+													<AlertTriangle className="w-3 h-3 text-red-500 cursor-pointer flex-shrink-0" />
+												</span>
+											)}
+											<span className={`px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${tier.badgeClass === "badge-success" ? "bg-green-500" :
+												tier.badgeClass === "badge-warning" ? "bg-yellow-500" :
+													"bg-red-500"
+												}`}>
 												{tier.label}
 											</span>
 										</div>
