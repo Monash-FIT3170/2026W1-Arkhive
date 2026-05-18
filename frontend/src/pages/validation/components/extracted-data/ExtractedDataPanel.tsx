@@ -124,10 +124,13 @@ function ExtractedDataPanel({
 													<AlertTriangle className="w-3 h-3 text-red-500 cursor-pointer flex-shrink-0" />
 												</span>
 											)}
-											<span className={`px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${
-												tier.badgeClass === "badge-success" ? "bg-green-500" :
-												tier.badgeClass === "badge-warning" ? "bg-yellow-500" :
-												"bg-red-500"
+											{/* UPDATED: Switched from solid fill to outlined badge style */}
+											{/* High confidence uses brand blue, medium amber, low red */}
+											{/* White background keeps it subtle so it doesn't compete with more important UI elements */}
+											<span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+												tier.badgeClass === "badge-success" ? "border-blue-500 text-blue-500 bg-white" :
+												tier.badgeClass === "badge-warning" ? "border-amber-500 text-amber-500 bg-white" :
+												"border-red-500 text-red-500 bg-white"
 											}`}>
 												{tier.label}
 											</span>
