@@ -9,13 +9,15 @@ import { flattenOcrData } from "./components/extracted-data/FlattenOcrData";
 import type { ExtractedData } from "../../models/TableData";
 import {
   getExtractionSession,
-  saveExtractionSession,
+  saveExtractionSession
 } from "../../services/extractionService";
 
 function ValidationPage() {
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [documentContext, setDocumentContext] = useState<ExtractedData | null>(null);
+  const [documentContext, setDocumentContext] = useState<ExtractedData | null>(
+    null
+  );
   const [splitPercent, setSplitPercent] = useState(50);
   const [oldContext, setOldContext] = useState<ExtractedData | null>(null); //for AI suggesiton
 
@@ -24,13 +26,13 @@ function ValidationPage() {
   useEffect(() => {
     async function loadSession() {
       try {
-        let sessionData = await getExtractionSession();
-        if (!sessionData?.ocrData) {
-          sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
-        }
-        setDocumentContext(
-          flattenOcrData(sessionData.ocrData as OCRComponent[]),
-        );
+        let ocrData = await getExtractionSession();
+        // console.log("SESSION DATA:", sessionData);
+        // console.log("OCR DATA:", sessionData?.ocrData);
+        // if (!sessionData?.ocrData) {
+        //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
+        // }
+        setDocumentContext(flattenOcrData(ocrData as OCRComponent[]));
       } catch (error) {
         console.error("Failed to load extraction session", error);
       }
@@ -90,8 +92,8 @@ function ValidationPage() {
   const resolveLastMessage = () => {
     setMessages((prev) =>
       prev.map((msg, i) =>
-        i === prev.length - 1 ? { ...msg, resolved: true } : msg,
-      ),
+        i === prev.length - 1 ? { ...msg, resolved: true } : msg
+      )
     );
   };
 
@@ -112,7 +114,7 @@ function ValidationPage() {
       id: crypto.randomUUID(),
       role: "model",
       content: "Got it! The changes have been applied and saved.",
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     });
   };
 
@@ -128,7 +130,7 @@ function ValidationPage() {
       id: crypto.randomUUID(),
       role: "model",
       content: "No problem, the changes have been reverted.",
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     });
   };
 
