@@ -1,8 +1,25 @@
+
+/**a waiting function that sets timeout before running
+ * 
+ * @param time 
+ * @returns 
+ * 
+ * @author Harsha Sharma (33879303)
+ */
 const wait = (time: number) => {
   return new Promise((resolve) => setTimeout(() => resolve("waiting"), time));
 }
 
-
+/**an async function that handles retries
+ * 
+ * @param fn 
+ * 
+ * @param maxRetries 
+ * @param delayMs 
+ * @returns 
+ * 
+ * @author Harsha Sharma (33879303)
+ */
 export async function withRetry<T>(
   fn: () => Promise<T>,
   maxRetries: number = 3,

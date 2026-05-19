@@ -45,10 +45,11 @@ export async function testOCR() {
 }
 
 
-/* 
+/**
 
 
 function for getting bounding boxes for all words detected
+ @author Harsha Sharma (33879303)
 */  
 async function parseTable(imageBuffer: Buffer) {
   const [response] = await client.documentTextDetection(imageBuffer);

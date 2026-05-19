@@ -8,6 +8,8 @@ import { OCRBoundingBoxes, OCRComponent } from "../types/boundingBoxTypes";
  * @param pages: an OCR IPage from google vision
  * 
  * @returns OCRComponent[] or a list of OCRComponents that was detected in the pages
+ * 
+ * @author Harsha Sharma (33879303)
  */
 export const extractStructuredComponents = (pages: google.cloud.vision.v1.IPage[]): OCRComponent[] => {
   const rowMap: Record<string, google.cloud.vision.v1.IParagraph[]> = {};
@@ -30,6 +32,8 @@ export const extractStructuredComponents = (pages: google.cloud.vision.v1.IPage[
  * 
  * @param pages 
  * @returns OCRBoundingBoxes 
+ * 
+ * @author Harsha Sharma (33879303)
  */
 const flattenParagraphsToCellMap = (pages: google.cloud.vision.v1.IParagraph[]): OCRBoundingBoxes  => {
   return pages
@@ -60,6 +64,8 @@ const flattenParagraphsToCellMap = (pages: google.cloud.vision.v1.IParagraph[]):
  * 
  * @param components 
  * @returns 
+ * 
+ * @author Harsha Sharma (33879303)
  */
 function postProcessIndentation(components: OCRComponent[]): OCRComponent[] {
   const INDENT_STEP = 30; // Pixels that constitute a new nesting level
@@ -121,6 +127,8 @@ function postProcessIndentation(components: OCRComponent[]): OCRComponent[] {
  * @param pages 
  * @param rowMap 
  * @returns void
+ * 
+ * @author Harsha Sharma (33879303)
  */
 const processParagraphsAndFillRowMap = (pages: google.cloud.vision.v1.IPage[], rowMap: Record<string, google.cloud.vision.v1.IParagraph[]>) => {
   const Y_THRESHOLD = 15;
@@ -160,6 +168,9 @@ const processParagraphsAndFillRowMap = (pages: google.cloud.vision.v1.IPage[], r
  * @param index 
  * @param rowMap 
  * @returns void
+ * 
+ * 
+ * @author Harsha Sharma (33879303)
  */
 const identifyTypeAndCreateComponents  = (y: number, index: number, rowMap: Record<string, google.cloud.vision.v1.IParagraph[]>) => {
       const paragraphs = rowMap[y.toString()];
@@ -220,6 +231,9 @@ const identifyTypeAndCreateComponents  = (y: number, index: number, rowMap: Reco
  * @param comp 
  * @param components 
  * @returns void
+ * 
+ * 
+ * @author Harsha Sharma (33879303)
  */
 const AddColumnsToRows = (comp: OCRComponent, components: OCRComponent[]) => {
   const table_cols = components[components.findIndex(c => c.type === "TABLE_COLS")];
