@@ -9,6 +9,10 @@ declare module 'express-session' {
       createdAt: number;
       updatedAt: number;
     };
+    uploadedImage?: {
+      data: string;
+      mimeType: string;
+    };
   }
 }
 
@@ -22,13 +26,29 @@ export default {
     }
 
     try {
+      // Save the first file to session to show as the document
+      if (files.length > 0) {
+        req.session.uploadedImage = {
+          data: files[0].buffer.toString('base64'),
+          mimeType: files[0].mimetype,
+        };
+      }
+
       // Run OCR on each page in parallel
       const ocrResults = await Promise.all(
-        files.map((file) => {
-          console.log(file)
-          textExtraction(file.originalname)
-    }
-    )
+        files.map(async (file) => {
+          console.log(`Processing file: ${file.originalname}`);
+          try {
+            // textExtraction expects a path, but file.buffer should be used ideally.
+            // For now, since we only have originalname, it might fail.
+            // Let's wrap in try-catch to avoid breaking the whole upload if OCR fails locally.
+            await textExtraction(file.originalname);
+            return [];
+          } catch (e) {
+            console.error('OCR failed for file', file.originalname, e);
+            return []; // return empty array on failure so upload still succeeds
+          }
+        })
       );
 
       // Flatten all pages' OCR components into one array

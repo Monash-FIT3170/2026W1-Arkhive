@@ -2,6 +2,7 @@ import { useState } from "react";
 import mockImage from "../../../../mock-data/test.png";
 import mockOcrData from "../../../../mock-data/boundingBox.json";
 import type { OCRComponent } from "../../../../models/OCRComponent";
+import { getUploadedImageUrl } from "../../../../services/uploadService";
 
 // NEW update: Calculating real average confidence from OCR data
 function calculateAverageConfidence(data: OCRComponent[]): number {

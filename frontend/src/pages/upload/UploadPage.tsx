@@ -19,6 +19,7 @@ import {
   partitionBySize,
   MAX_FILE_SIZE_MB,
 } from './components/dropzone/DropZone';
+import { uploadPagesToBackend } from '../../services/uploadService';
 
 function UploadPage() {
   const navigate = useNavigate();
@@ -105,8 +106,11 @@ function UploadPage() {
   }, [files]);
 
   // ── File capture ───────────────────────────────────────────────────────────
+  // Only 1 image is allowed through to OCR. Each new capture replaces
+  // whatever was previously queued so the user is never stuck with extras.
   function captureFiles(incoming: File[]) {
-    setFiles((prev) => [...prev, ...incoming]);
+    setFiles(incoming.slice(0, 1));
+    //setFiles((prev) => [...prev, ...incoming]);
   }
 
   // ── Page selection ─────────────────────────────────────────────────────────
@@ -189,35 +193,13 @@ function UploadPage() {
     setUploadSuccess(false); // US-1.5: clear any previous success before retrying
 
     try {
-      const selectedItems = [...selectedPages]
+      const selectedSrcs = [...selectedPages]
         .sort((a, b) => a - b)
         .map((i) => previewItems[i])
-        .filter((item) => item?.previewSrc);
+        .filter((item) => item?.previewSrc)
+        .map((item) => item.previewSrc!);
 
-      const formData = new FormData();
-      for (let i = 0; i < selectedItems.length; i++) {
-        // fetch() resolves both blob: URLs (images) and data: URLs (PDF canvases)
-        const blob = await fetch(selectedItems[i].previewSrc!).then((r) => r.blob());
-        formData.append('pages', blob, `page-${i}.png`);
-      }
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-
-      // US-1.4: detect upload failure and extract reason from response
-      if (!response.ok) {
-        let reason = `Upload failed (${response.status} ${response.statusText})`;
-        try {
-          const body = await response.json();
-          if (body?.message) reason = body.message;
-        } catch {
-          // response wasn't JSON — use the status-based reason above
-        }
-        throw new Error(reason);
-      }
+      await uploadPagesToBackend(selectedSrcs);
 
       // US-1.5: detect successful upload and show success notification
       setUploadSuccess(true);
