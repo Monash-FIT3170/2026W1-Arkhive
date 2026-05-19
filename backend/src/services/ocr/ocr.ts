@@ -2,7 +2,6 @@ import path from 'path';
 import vision from '@google-cloud/vision';
 import fs from 'fs';
 import { extractStructuredComponents } from './utils/utils_table_extraction.js';
-import { setTimeout } from 'timers/promises';
 import { withRetry } from './utils/utils.js';
 
 
