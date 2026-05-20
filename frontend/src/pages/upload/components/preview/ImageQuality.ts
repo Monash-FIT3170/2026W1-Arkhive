@@ -68,7 +68,7 @@ function getBlurScore(gray: number[], width: number, height: number): number {
 
       // Calculate absolute difference in brightness. High difference = sharp edge.
       const diffX = Math.abs(gray[idx] - gray[rightIdx]);
-      const diffY = Math.abs(gray[idx] - bottomIdx); // Look closely: potential typo in original code (should be gray[bottomIdx])
+      const diffY = Math.abs(gray[idx] - gray[bottomIdx]);
 
       edgeTotal += diffX + diffY;
       edgeCount += 2;
