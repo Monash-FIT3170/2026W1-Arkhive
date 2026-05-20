@@ -15,6 +15,7 @@ type Props = {
   onDeselectAll:   () => void;
   onProcess:       () => void;
   onFilesCaptured: (files: File[]) => void;
+  onError?: (msg: string | null) => void;
 };
 
 function UploadSidebar({
@@ -25,9 +26,10 @@ function UploadSidebar({
   onDeselectAll,
   onProcess,
   onFilesCaptured,
+  onError,
 }: Props) {
   return (
-    <aside className="border-base-300 bg-base-100 flex w-[300px] flex-col gap-4 border-l px-4 py-6">
+    <aside className="border-base-300 bg-base-100 flex w-80 shrink-0 flex-col gap-4 border-l px-4 py-6 overflow-y-auto">
 
       <h2 className="text-base-content m-0 text-center text-2xl font-semibold">
         Document Processing
@@ -49,7 +51,7 @@ function UploadSidebar({
         <p className="text-base-content/50 mb-2 text-xs font-medium uppercase tracking-wider">
           Add more files
         </p>
-        <DropZone onFilesCaptured={onFilesCaptured} />
+        <DropZone onFilesCaptured={onFilesCaptured} onError={onError} />
       </div>
 
       {/* Process button — pinned to the bottom */}

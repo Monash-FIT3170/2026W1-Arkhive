@@ -7,9 +7,10 @@ import DropZone, { filterValidFiles } from './dropzone/DropZone';
 
 type Props = {
   onFilesCaptured: (files: File[]) => void;
+  onError?: (msg: string | null) => void;
 };
 
-function EmptyUploadView({ onFilesCaptured }: Props) {
+function EmptyUploadView({ onFilesCaptured, onError }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -23,15 +24,15 @@ function EmptyUploadView({ onFilesCaptured }: Props) {
 
       {/* Branding */}
       <div className="mb-10 text-center">
-        <h1 className="text-base-content mb-2 text-4xl font-bold">Arkhive</h1>
+        <h1 className="text-base-content mb-2 text-4xl font-bold">ARKHIVE</h1>
         <p className="text-base-content/60 text-lg">
-          Upload documents to begin OCR extraction
+          Upload pages to begin OCR extraction
         </p>
       </div>
 
       {/*dropzone — drag & drop or click to add more files */}
       <div>
-        <DropZone onFilesCaptured={onFilesCaptured} />
+        <DropZone onFilesCaptured={onFilesCaptured} onError={onError} />
       </div>
       
       <input
