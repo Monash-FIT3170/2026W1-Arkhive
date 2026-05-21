@@ -87,13 +87,20 @@ function ChatPanel({
   return (
     <>
       {/* AI Button to open and close modal */}
-      <button
-        onClick={onToggle}
-        className="btn btn-primary btn-circle btn-lg fixed bottom-6 right-6"
-        title={isOpen ? "Close AI Assistant" : "Open AI Assistant"}
-      >
-        <Bot className="w-9 h-9" />
-      </button>
+      <div className="fixed bottom-6 right-6 z-50">
+        <div className="indicator">
+          {!isOpen && (
+            <span className="indicator-item badge badge-error badge-sm w-3.5 h-3.5 p-0 border-2 border-base-100 rounded-full shadow-sm mt-1 mr-1"></span>
+          )}
+          <button
+            onClick={onToggle}
+            className="btn btn-primary btn-circle btn-lg shadow-md"
+            title={isOpen ? "Close AI Assistant" : "Open AI Assistant"}
+          >
+            <Bot className="w-9 h-9" />
+          </button>
+        </div>
+      </div>
 
       {/* Floating Chat Modal */}
       {isOpen && (
