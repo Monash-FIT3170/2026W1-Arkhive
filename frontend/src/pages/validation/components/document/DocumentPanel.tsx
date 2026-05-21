@@ -41,10 +41,9 @@ function DocumentPanel({
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = e.currentTarget;
     if (naturalWidth && naturalHeight) {
-      // original image is 2200x1700 (200 DPI).
-      // OCR coordinates are generated at ~1.5x smaller scale (~133 DPI).
-      // scale factor of ocr -> image (200 dpi /133 dpi) = 1.5037593985
-      const scaleFactor = 1.5037593985;
+      // If the OCR data coordinates exactly match the original image pixels, 
+      // the scale factor should be 1.
+      const scaleFactor = 1;
       const ocrWidth = naturalWidth / scaleFactor;
       const ocrHeight = naturalHeight / scaleFactor;
       setViewBox(`0 0 ${ocrWidth} ${ocrHeight}`);
@@ -187,13 +186,12 @@ function DocumentPanel({
         <div className="border-t pt-3 text-sm text-base-content/70">
           Confidence Score:{" "}
           <span
-            className={`font-medium ${
-              confidencePercent >= 85
+            className={`font-medium ${confidencePercent >= 85
                 ? "text-green-400"
                 : confidencePercent >= 70
                   ? "text-yellow-400"
                   : "text-red-400"
-            }`}
+              }`}
           >
             {confidencePercent}%
           </span>
