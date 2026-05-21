@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import mockImage from "../../../../mock-data/test.png";
 import mockOcrData from "../../../../mock-data/boundingBox.json";
 import type { OCRComponent } from "../../../../models/OCRComponent";
@@ -30,6 +30,14 @@ function DocumentPanel({
 	);
 	const confidencePercent = Math.round(averageConfidence * 100);
 
+	// Panning state
+	const containerRef = useRef<HTMLDivElement>(null);
+	const [isDragging, setIsDragging] = useState(false);
+	const [startX, setStartX] = useState(0);
+	const [startY, setStartY] = useState(0);
+	const [scrollLeft, setScrollLeft] = useState(0);
+	const [scrollTop, setScrollTop] = useState(0);
+
 	const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
 		const { naturalWidth, naturalHeight } = e.currentTarget;
 		if (naturalWidth && naturalHeight) {
@@ -41,6 +49,30 @@ function DocumentPanel({
 			const ocrHeight = naturalHeight / scaleFactor;
 			setViewBox(`0 0 ${ocrWidth} ${ocrHeight}`);
 		}
+	};
+	// The dragging and scrolling functions below were done with the help of Goolge Gemini 
+	const handleMouseDown = (e: React.MouseEvent) => {
+		if (!containerRef.current) return;
+		setIsDragging(true);
+		setStartX(e.pageX - containerRef.current.offsetLeft);
+		setStartY(e.pageY - containerRef.current.offsetTop);
+		setScrollLeft(containerRef.current.scrollLeft);
+		setScrollTop(containerRef.current.scrollTop);
+	};
+
+	const handleMouseMove = (e: React.MouseEvent) => {
+		if (!isDragging || !containerRef.current) return;
+		e.preventDefault();
+		const x = e.pageX - containerRef.current.offsetLeft;
+		const y = e.pageY - containerRef.current.offsetTop;
+		const walkX = x - startX;
+		const walkY = y - startY;
+		containerRef.current.scrollLeft = scrollLeft - walkX;
+		containerRef.current.scrollTop = scrollTop - walkY;
+	};
+
+	const handleMouseUpOrLeave = () => {
+		setIsDragging(false);
 	};
 
 	return (
@@ -71,7 +103,14 @@ function DocumentPanel({
 					</button>
 				</div>
 				{/* Row 3: Image & Overlay Container */}
-				<div className="flex-1 min-h-[250px] relative overflow-auto border border-base-300">
+				<div
+					ref={containerRef}
+					onMouseDown={handleMouseDown}
+					onMouseMove={handleMouseMove}
+					onMouseUp={handleMouseUpOrLeave}
+					onMouseLeave={handleMouseUpOrLeave}
+					className={`flex-1 min-h-[250px] relative overflow-auto border border-base-300 ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+				>
 					<div
 						className="absolute inset-0 w-full h-full origin-center"
 						style={{
@@ -149,10 +188,10 @@ function DocumentPanel({
 					Confidence Score:{" "}
 					<span
 						className={`font-medium ${confidencePercent >= 85
-								? "text-green-400"
-								: confidencePercent >= 70
-									? "text-yellow-400"
-									: "text-red-400"
+							? "text-green-400"
+							: confidencePercent >= 70
+								? "text-yellow-400"
+								: "text-red-400"
 							}`}
 					>
 						{confidencePercent}%
