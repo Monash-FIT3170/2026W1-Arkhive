@@ -191,7 +191,7 @@ export function buildRows({
     hierarchyValues[depth] = itemValue;
     hierarchyValues.length = depth + 1;
 
-    const row: ExtractedRow = { _id: c.id };
+    const row: ExtractedRow = { _id: c.id, _confidence: c.confidence };
     [...colKeys, ...subItemCols].forEach((col) => (row[col] = ""));
 
     mappedCells.forEach(({ val, colIdx }) => {

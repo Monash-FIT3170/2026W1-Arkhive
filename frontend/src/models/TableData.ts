@@ -1,10 +1,11 @@
 export interface ExtractedData {
-	columns: string[];
-	rows: ExtractedRow[];
+  columns: string[];
+  rows: ExtractedRow[];
 }
 
 export interface ExtractedRow {
-	_id: string | number;
-	_cellKeyMap?: Record<string, string>;
-	[key: string]: any;
+  _id: string | number;
+  _cellKeyMap?: Record<string, string>;
+  _confidence?: number;
+  [key: string]: any;
 }
