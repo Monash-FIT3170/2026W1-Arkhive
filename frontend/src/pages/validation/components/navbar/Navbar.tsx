@@ -1,5 +1,4 @@
-import { Sun, Upload, LayoutGrid, Columns2 } from 'lucide-react';
-
+import { Sun, Moon, Upload, LayoutGrid, Columns2 } from 'lucide-react';
 
 export const Navbar = () => {
   return (
@@ -9,7 +8,7 @@ export const Navbar = () => {
           <a className="text-xl font-bold">Arkhive</a>
         </div>
         <div className="flex-1">
-          <ul className="menu menu-horizontal px-1">
+          <ul className="menu menu-horizontal px-1 items-center">
             <li>
               <a className="flex items-center gap-2">Upload <Upload className="w-5 h-5" /></a>
             </li>
@@ -20,7 +19,12 @@ export const Navbar = () => {
               <a className="flex items-center gap-2">Validation <Columns2 className="w-5 h-5" /></a>
             </li>
             <li>
-              <a><Sun className="w-5 h-5" /></a>
+              <label className="swap swap-rotate cursor-pointer mx-2">
+                {/* hidden checkbox that toggles night/day theme */}
+                <input type="checkbox" value="night" className="theme-controller" />
+                <Sun className="swap-off w-5 h-5" />
+                <Moon className="swap-on w-5 h-5" />
+              </label>
             </li>
           </ul>
         </div>

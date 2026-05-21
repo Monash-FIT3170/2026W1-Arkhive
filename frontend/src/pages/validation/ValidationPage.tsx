@@ -146,7 +146,7 @@ function ValidationPage() {
     <>
       <div
         ref={containerRef}
-        className="flex flex-col lg:flex-row w-full p-3 gap-3 h-auto lg:h-screen lg:overflow-hidden"
+        className="flex flex-col lg:flex-row w-full p-3 gap-3 h-auto lg:h-[calc(100vh-72px)] lg:overflow-hidden"
       >
         <div
           className="w-full h-[50vh] lg:h-full"
