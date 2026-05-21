@@ -4,13 +4,13 @@ import ExtractedDataPanel from "./components/extracted-data/ExtractedDataPanel";
 import ChatPanel from "./components/chat/ChatPanel";
 import type { ChatMessage } from "../../models/Message";
 import type { OCRComponent } from "../../models/OCRComponent";
-import mockOcrData from "../../mock-data/boundingBox.json";
 import { flattenOcrData } from "./components/extracted-data/FlattenOcrData";
 import type { ExtractedData } from "../../models/TableData";
 import {
   getExtractionSession,
   saveExtractionSession
 } from "../../services/extractionService";
+import { getUploadedImageUrl } from "../../services/uploadService";
 
 function ValidationPage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -20,6 +20,8 @@ function ValidationPage() {
   );
   const [splitPercent, setSplitPercent] = useState(50);
   const [oldContext, setOldContext] = useState<ExtractedData | null>(null); //for AI suggesiton
+  const [documentImageURL, setDocumentImageURL] = useState<string>();
+  const [ocrData, setOCRData] = useState<OCRComponent[]>([]);
 
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -27,11 +29,13 @@ function ValidationPage() {
     async function loadSession() {
       try {
         let ocrData = await getExtractionSession();
+        setOCRData(ocrData);
         // console.log("SESSION DATA:", sessionData);
         // console.log("OCR DATA:", sessionData?.ocrData);
         // if (!sessionData?.ocrData) {
         //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
         // }
+        setDocumentImageURL(await getUploadedImageUrl());
         setDocumentContext(flattenOcrData(ocrData as OCRComponent[]));
       } catch (error) {
         console.error("Failed to load extraction session", error);
@@ -152,7 +156,11 @@ function ValidationPage() {
           className="w-full h-[50vh] lg:h-full"
           style={{ width: `${splitPercent}%` }}
         >
-          <DocumentPanel hoveredOverlayId={hoveredOverlayId} />
+          <DocumentPanel
+            hoveredOverlayId={hoveredOverlayId}
+            documentImageUrl={documentImageURL}
+            ocrData={ocrData}
+          />
         </div>
 
         <div
