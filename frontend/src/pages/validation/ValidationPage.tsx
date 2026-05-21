@@ -13,7 +13,7 @@ import {
 } from "../../services/extractionService";
 
 function ValidationPage() {
-  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [documentContext, setDocumentContext] = useState<ExtractedData | null>(
     null
