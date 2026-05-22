@@ -261,7 +261,7 @@ function UploadPage() {
 
   // Files loaded → split layout: preview grid left, sidebar right
   return (
-    <div className="bg-base-100 w-full h-full flex flex-col">
+    <div className="bg-base-100 fixed inset-0 z-10 flex flex-col">
 
       <header className="bg-base-100 text-base-content flex h-16 shrink-0 items-center px-6 text-2xl font-extrabold shadow-sm z-20">
         Preview
