@@ -9,7 +9,7 @@ export const Navbar = () => {
 
   function getCurrentStep(): number {
     if (location.pathname === '/validation') return 2;
-    if (location.pathname === '/export') return 3;
+    // if (location.pathname === '/export') return 3;
     if (location.pathname === '/' && step === 'preview') return 1;
     return 0;
   }
@@ -39,10 +39,6 @@ export const Navbar = () => {
             <li className={`step ${currentStep >= 2 ? "step-primary" : "animate-pulse"} z-30`} onClick={() => navigate("/validation")}>
               <span className="step-icon"><Columns2 className="w-4 h-4 hover:scale-130 transition  cursor-pointer" /></span>
               Validation
-            </li>
-            <li className={`step ${currentStep >= 3 ? "step-primary" : "animate-pulse"} z-10`} onClick={() => navigate("/export")}>
-              <span className="step-icon"><Share2Icon className="w-4 h-4 hover:scale-130 transition  cursor-pointer" /></span>
-              Export
             </li>
             <label className="swap swap-rotate cursor-pointer mx-2">
               {/* hidden checkbox that toggles night/day theme */}
