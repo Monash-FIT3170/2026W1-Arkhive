@@ -12,8 +12,8 @@ import { useNavigate } from 'react-router-dom';
 import type { PreviewItem } from './types';
 import { buildPreviewItemsForFiles } from './components/preview/previewHelpers';
 import EmptyUploadView from './components/EmptyUploadView';
-import UploadSidebar   from './components/UploadSidebar';
-import PreviewCard     from './components/preview/PreviewCard';
+import UploadSidebar from './components/UploadSidebar';
+import PreviewCard from './components/preview/PreviewCard';
 import {
   filterValidFiles,
   partitionBySize,
@@ -25,10 +25,10 @@ function UploadPage() {
   const navigate = useNavigate();
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [previewItems,  setPreviewItems]  = useState<PreviewItem[]>([]);
+  const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
-  const [isProcessing,  setIsProcessing]  = useState(false);
-  const [uploadError,   setUploadError]   = useState<string | null>(null); // US-1.4
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null); // US-1.4
   const [uploadSuccess, setUploadSuccess] = useState(false);               // US-1.5
   const [replaceConfirm, setReplaceConfirm] = useState<{
     previewIndex: number;
@@ -37,8 +37,8 @@ function UploadPage() {
   } | null>(null);
 
   // Refs
-  const previewItemsRef   = useRef<PreviewItem[]>([]);
-  const createdUrlsRef    = useRef<string[]>([]);
+  const previewItemsRef = useRef<PreviewItem[]>([]);
+  const createdUrlsRef = useRef<string[]>([]);
 
   useEffect(() => { previewItemsRef.current = previewItems; }, [previewItems]);
 
@@ -58,7 +58,7 @@ function UploadPage() {
         setPreviewItems(prev => {
           const startIndex = prev.length;
           const next = [...prev, ...newItems];
-          
+
           setSelectedPages(prevSel => {
             const nextSel = new Set(prevSel);
             newItems.forEach((item, i) => {
@@ -99,7 +99,7 @@ function UploadPage() {
     setPreviewItems((prev) => {
       const next = [...prev];
       next.splice(previewIndex, 1);
-      
+
       setSelectedPages(prevSel => {
         const nextSel = new Set<number>();
         for (const idx of prevSel) {
@@ -134,7 +134,7 @@ function UploadPage() {
 
     const item = previewItemsRef.current[previewIndex];
     if (!item?.hasFile) return;
-    
+
     const itemTitle = item.subtitle ? `${item.label} (${item.subtitle})` : item.label;
     setReplaceConfirm({ previewIndex, newFile, itemTitle });
   }
@@ -150,11 +150,11 @@ function UploadPage() {
         setPreviewItems(prev => {
           const next = [...prev];
           next.splice(previewIndex, 1, ...newItems);
-          
+
           setSelectedPages(prevSel => {
             const nextSel = new Set<number>();
             const shift = newItems.length - 1;
-            
+
             for (const idx of prevSel) {
               if (idx < previewIndex) {
                 nextSel.add(idx);
@@ -162,13 +162,13 @@ function UploadPage() {
                 nextSel.add(idx + shift);
               }
             }
-            
+
             newItems.forEach((item, i) => {
               if (item.hasFile) nextSel.add(previewIndex + i);
             });
             return nextSel;
           });
-          
+
           return next;
         });
       })
