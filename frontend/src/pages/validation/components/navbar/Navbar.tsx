@@ -1,8 +1,18 @@
 import { Sun, Moon, Upload, LayoutGrid, Columns2, Share2Icon } from 'lucide-react';
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export const Navbar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const stepMap: Record<string, number> = {
+    "/upload": 0,
+    "/preview": 1,
+    "/validation": 2,
+    "/export": 3,
+  };
+  const currentStep = stepMap[location.pathname] ?? 0;
+
+
 
   const handleStepClick = (route: string) => {
     navigate(route);
@@ -17,20 +27,20 @@ export const Navbar = () => {
         </div>
         <div className="ml-auto flex items-center gap-6">
           <ul className="steps">
-            <li className="step step-primary cursor-pointer " onClick={() => handleStepClick("/")}>
-              <span className="step-icon"><Upload className="w-4 h-4 hover:scale-130 transition" /></span>
+            <li className="step step-primary z-50" onClick={() => handleStepClick("/")}>
+              <span className="step-icon"><Upload className="w-4 h-4 hover:scale-130 transitio cursor-pointer" /></span>
               Upload
             </li>
-            <li className="step step-primary cursor-pointer" onClick={() => handleStepClick("/preview")}>
-              <span className="step-icon"><LayoutGrid className="w-4 h-4 hover:scale-130 transition" /></span>
+            <li className={`step ${currentStep >= 1 ? "step-primary" : "animate-pulse"} z-40`} onClick={() => handleStepClick("/preview")}>
+              <span className="step-icon"><LayoutGrid className="w-4 h-4 hover:scale-130 transition  cursor-pointer" /></span>
               Document Preview
             </li>
-            <li className="step step-primary cursor-pointer" onClick={() => handleStepClick("/validation")}>
-              <span className="step-icon"><Columns2 className="w-4 h-4 hover:scale-130 transition" /></span>
+            <li className={`step ${currentStep >= 2 ? "step-primary" : "animate-pulse"} z-30`} onClick={() => handleStepClick("/validation")}>
+              <span className="step-icon"><Columns2 className="w-4 h-4 hover:scale-130 transition  cursor-pointer" /></span>
               Validation
             </li>
-            <li className="step animate-pulse cursor-pointer" onClick={() => handleStepClick("/export")}>
-              <span className="step-icon"><Share2Icon className="w-4 h-4 hover:scale-130 transition" /></span>
+            <li className={`step ${currentStep >= 3 ? "step-primary" : "animate-pulse"} z-10`} onClick={() => handleStepClick("/export")}>
+              <span className="step-icon"><Share2Icon className="w-4 h-4 hover:scale-130 transition  cursor-pointer" /></span>
               Export
             </li>
             <label className="swap swap-rotate cursor-pointer mx-2">
