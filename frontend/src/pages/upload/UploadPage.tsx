@@ -58,6 +58,9 @@ function UploadPage() {
         setPreviewItems(prev => {
           const startIndex = prev.length;
           const next = [...prev, ...newItems];
+          if (prev.length === 0 && next.length > 0) {
+            navigate('/?step=preview', { replace: true });
+          }
 
           setSelectedPages(prevSel => {
             const nextSel = new Set(prevSel);
@@ -100,6 +103,7 @@ function UploadPage() {
       const next = [...prev];
       next.splice(previewIndex, 1);
 
+      if (next.length === 0) navigate('/', { replace: true });
       setSelectedPages(prevSel => {
         const nextSel = new Set<number>();
         for (const idx of prevSel) {

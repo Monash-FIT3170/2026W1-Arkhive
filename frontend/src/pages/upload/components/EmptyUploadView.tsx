@@ -20,7 +20,7 @@ function EmptyUploadView({ onFilesCaptured, onError }: Props) {
   }
 
   return (
-    <div className="bg-base-100 w-full h-full flex flex-col items-center justify-center">
+    <div className="bg-base-100 fixed inset-0 flex flex-col items-center justify-center">
 
       {/* Branding */}
       <div className="mb-10 text-center">
