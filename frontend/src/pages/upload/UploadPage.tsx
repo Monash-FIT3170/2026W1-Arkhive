@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { unlockStep } from '../../services/stepGuard.ts';
 
 import type { PreviewItem } from './types';
 import { buildPreviewItemsForFiles } from './components/preview/previewHelpers';
@@ -60,6 +61,7 @@ function UploadPage() {
           const next = [...prev, ...newItems];
           if (prev.length === 0 && next.length > 0) {
             navigate('/?step=preview', { replace: true });
+            unlockStep(1); //unlock step 1 (preview) after successful file capture
           }
 
           setSelectedPages(prevSel => {
@@ -72,6 +74,7 @@ function UploadPage() {
 
           return next;
         });
+
       })
       .finally(() => {
         setIsProcessing(false);
@@ -204,6 +207,7 @@ function UploadPage() {
       await uploadPagesToBackend(selectedSrcs);
 
       // US-1.5: detect successful upload and show success notification
+      unlockStep(2);
       setUploadSuccess(true);
       setTimeout(() => {
         navigate('/validation');
