@@ -14,7 +14,7 @@ function applyIntentToContext(context: ExtractedData, intent: any): ExtractedDat
 	};
 
 	if (intent.type === "column_correction" && intent.updates) {
-		
+
 		//rename columns
 		updated.columns = updated.columns.map((col: string) => {
 			const match = intent.updates.find((u: any) => u.from === col);
@@ -181,7 +181,7 @@ export default {
 						
 
             If they confirm the columns look correct, use the 'column_confirm' intent and set 'approved' to true.
-            If they want to rename one or more column headers (e.g., 'change Supplier to Vendor Name'), use the 'column_correction' intent and populate the 'updates' array.
+            If they want to rename one or more column headers (e.g., 'change column header Supplier to Vendor Name'), use the 'column_correction' intent and populate the 'updates' array.
             If they want to remove or delete one or more columns (e.g., 'delete the tax column'), use the 'column_delete' intent and populate the 'deletedColumns' array.
             If they approve or reject the document generally, use the 'approval' or 'rejection' intent.
             Always be polite and confirm what you are doing in the 'response' field.
@@ -214,11 +214,11 @@ export default {
 		const parsed = JSON.parse(result.response.text());
 
 		const updatedContext =
-		parsed.intent &&
-		documentContext &&
-		["correction", "column_correction", "column_delete"].includes(parsed.intent.type)
-		? applyIntentToContext(documentContext, parsed.intent)
-		: undefined;
+			parsed.intent &&
+				documentContext &&
+				["correction", "column_correction", "column_delete"].includes(parsed.intent.type)
+				? applyIntentToContext(documentContext, parsed.intent)
+				: undefined;
 
 		return {
 			...parsed,
