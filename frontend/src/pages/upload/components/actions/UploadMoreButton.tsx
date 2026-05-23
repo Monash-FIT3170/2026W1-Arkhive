@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import type { ChangeEvent } from "react";
-import { filterValidFiles } from "../../../upload/components/dropzone/DropZone";
+import { filterValidFiles } from "../dropzone/DropZone";
 
 type UploadMoreButtonProps = {
   onFilesSelected: (files: File[]) => void;
@@ -33,7 +33,7 @@ function UploadMoreButton({ onFilesSelected }: UploadMoreButtonProps) {
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="h-[42px] cursor-pointer rounded-lg border border-[#3b3f4d] bg-[#1f2028] text-[15px] font-semibold text-gray-100 transition hover:bg-[#292b36]"
+        className="btn btn-outline w-full rounded-xl"
       >
         Upload More
       </button>

@@ -1,53 +1,57 @@
-import { AlertTriangle } from "lucide-react"; // NEW: imported for low confidence warning icon
-import type { ExtractedData } from "./ExtractedData";
+import { AlertTriangle, Download, Check } from "lucide-react"; // NEW: Importing icons for confidence badges and export button
+import { useState } from "react";
+import type { ExtractedData } from "../../../../models/TableData";
+import { exportExtractedDataAsCSV } from "../../../../services/csvDownloadService";
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
 // Thresholds: ≥0.85 = high (green), 0.70-0.84 = medium (amber), <0.70 = low (red)
 function getConfidenceTier(confidence: number): {
-	badgeClass: string;
-	label: string;
-	isLow: boolean;
+  colour: string;
+  label: string;
+  isLow: boolean;
+  badgeClass?: string;
 } {
-	if (confidence >= 0.85) {
-		return {
-			badgeClass: "badge-success",
-			label: `${Math.round(confidence * 100)}%`,
-			isLow: false
-		};
-	} else if (confidence >= 0.7) {
-		return {
-			badgeClass: "badge-warning",
-			label: `${Math.round(confidence * 100)}%`,
-			isLow: false
-		};
-	} else {
-		return {
-			badgeClass: "badge-error",
-			label: `${Math.round(confidence * 100)}%`,
-			isLow: true // triggers row highlight and warning icon
-		};
-	}
+  const percent = Math.round(confidence * 100);
+  console.log(confidence);
+  if (confidence >= 0.85) {
+    return {
+      colour: "#22c55e",
+      label: `${percent}% - High`,
+      isLow: false
+    };
+  } else if (confidence >= 0.7) {
+    return {
+      colour: "#f59e0b",
+      label: `${percent}% - Medium`,
+      isLow: false
+    };
+  } else {
+    return {
+      colour: "#f59e0b",
+      label: `${percent}% - Low`,
+      isLow: true // triggers row highlight and warning icon
+    };
+  }
 }
 
 function ExtractedDataPanel({
-	extractedData
+  onHover,
+  extractedData
 }: {
-	extractedData: ExtractedData;
+  onHover: (id: string | null) => void;
+  extractedData: ExtractedData;
 }) {
-	// Currency formatting function (unchanged)
-	const formatCurrency = (amount: number) => {
-		return new Intl.NumberFormat("id-ID", {
-			style: "currency",
-			currency: "IDR"
-		}).format(amount);
-	};
+  // Currency formatting function (unchanged)
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR"
+    }).format(amount);
+  };
 
-	return (
-		<div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
-			<h2 className="mb-4 text-xl font-semibold text-base-content">
-				EXTRACTED DATA
-			</h2>
+  // used to check if file exported
+  const [exported, setExported] = useState(false);
 
 			{/* Table */}
 			<div className="flex-1 overflow-auto min-h-0 max-w-full">
@@ -75,43 +79,45 @@ function ExtractedDataPanel({
 						</tr>
 					</thead>
 
-					{/* Table Body */}
-					<tbody>
-						{extractedData.rows.map((row) => {
-							// NEW: Calculate confidence tier for this row
-							// Used for badge colour and row background highlight
-							const tier = getConfidenceTier(row.confidence ?? 1);
+              {/* NEW: Confidence column header added at the end of the table */}
+              <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal">
+                CONFIDENCE SCORE
+              </th>
+            </tr>
+          </thead>
 
-							return (
-								<tr
-									key={row._id}
-									className={`border-b border-base-300 hover:bg-base-300/40
-										${tier.isLow ? "bg-error/10" : ""}`}
-									// NEW: Low confidence rows get a subtle red background
-									// so they are visually distinguishable at a glance
-									// satisfying acceptance criteria: "low confidence fields are visually distinguishable"
-								>
-									{/* Existing data cells (unchanged) */}
-									{extractedData.columns.map((column) => (
-										<td
-											key={column}
-											className={`p-2 text-base-content ${
-												column === "ITEM"
-													? "break-all"
-													: "break-words"
-											}`}
-										>
-											{column.includes("PRICE") && row[column]
-												? formatCurrency(
-														Number(
-															String(row[column]).replace(/,/g, "")
-														)
-													)
-												: row[column] || ""}
-										</td>
-									))}
+          {/* Body */}
+          <tbody>
+            {extractedData.rows.map((row) => {
+              const tier = getConfidenceTier(row._confidence ?? 1);
 
-									{/* NEW: Confidence score cell added at the end of each row
+              return (
+                <tr
+                  key={row._id}
+                  className={`border-b border-base-300 hover:bg-base-300/40 ${
+                    tier.isLow ? "bg-error/10" : ""
+                  }`}
+                >
+                  {extractedData.columns.map((column) => {
+                    const cellKey = row._cellKeyMap?.[column];
+
+                    return (
+                      <td
+                        key={column}
+                        className={`p-2 hover:bg-warning/10 cursor-pointer text-base-content text-[13px]`}
+                        onMouseEnter={() =>
+                          onHover(
+                            cellKey ? `${row._id}:${cellKey}` : String(row._id)
+                          )
+                        }
+                        onMouseLeave={() => onHover(null)}
+                      >
+                        {row[column] || ""}
+                      </td>
+                    );
+                  })}
+
+                  {/* NEW: Confidence score cell added at the end of each row
 										Shows a DaisyUI badge with the score percentage
 										Green ≥85%, Amber 70-84%, Red <70%
 										Low confidence rows also show a warning icon from lucide-react */}
