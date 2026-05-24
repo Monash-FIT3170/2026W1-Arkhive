@@ -182,23 +182,22 @@ function DocumentPanel({
           </div>
         </div>
 
-        {/* Row 3: Confidence Score, updated to show real score instead of hardcoded value, made the colours a little brighter for the document panel */}
-        <div className="border-t pt-3 text-sm text-base-content/70">
-          Confidence Score:{" "}
-          <span
-            className={`font-medium ${confidencePercent >= 85
-                ? "text-green-400"
-                : confidencePercent >= 70
-                  ? "text-yellow-400"
-                  : "text-red-400"
-              }`}
-          >
-            {confidencePercent}%
-          </span>
-        </div>
-      </div>
-    </>
-  );
+				{/* Row 3: Confidence Score, updated to show real score instead of hardcoded value, made the colours a little brighter for the document panel */}
+				{/* UPDATED: Replaced plain coloured text with capsule matching the right panel style */}
+				<div className="border-t pt-3 text-sm text-base-content/70 flex items-center gap-2">
+					Confidence Score:
+					{/* UPDATED: Matching outlined badge style to keep confidence score as secondary info */}
+					<span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+						confidencePercent >= 85 ? "border-blue-500 text-blue-500 bg-white" :
+						confidencePercent >= 70 ? "border-amber-500 text-amber-500 bg-white" :
+						"border-red-500 text-red-500 bg-white"
+					}`}>
+						{confidencePercent}%
+					</span>
+				</div>
+			</div>
+		</>
+	);
 }
 
 export default DocumentPanel;
