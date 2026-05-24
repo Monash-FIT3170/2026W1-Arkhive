@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
-import { textExtraction, getBoundingBoxesWords } from "../services/ocr/ocr.ts";
+import { textExtraction, parseTableWithRetries } from "../services/ocr/ocr.ts";
 import { Multer } from "multer";
 import { SessionData } from "express-session";
+import { parse } from "node:path";
 
 declare module "express-session" {
   interface SessionData {
@@ -46,7 +47,7 @@ export default {
             // textExtraction expects a path, but file.buffer should be used ideally.
             // For now, since we only have originalname, it might fail.
             // Let's wrap in try-catch to avoid breaking the whole upload if OCR fails locally.
-            const text = await getBoundingBoxesWords(file.buffer);
+            const text = await parseTableWithRetries(file.buffer);
             return text;
           } catch (e) {
             console.error("OCR failed for file", file.originalname, e);
