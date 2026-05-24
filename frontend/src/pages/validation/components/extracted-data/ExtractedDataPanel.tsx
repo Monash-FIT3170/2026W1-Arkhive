@@ -57,8 +57,8 @@ function ExtractedDataPanel({
     {/* Table */}
     <div className="flex-1 overflow-auto min-h-0 max-w-full">
       {/* UPDATED: Removed table-fixed to allow columns to size based on content */}
-      <table className="table w-full border border-base-300 text-[10px]">
-
+      {/* UPDATED: Reinstated fixed table to make whole table visible BUT Text wraps instead of forcing scroll*/}
+      <table className="table table-fixed w-full border border-base-300 text-[10px]">
         {/* Table Header */}
         <thead>
           <tr className="text-base-content/70">
@@ -67,25 +67,17 @@ function ExtractedDataPanel({
               // 	UPDATED: whitespace-nowrap prevents headers from breaking mid-word.
               <th
                 key={column}
-                className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-nowrap"
-              >
+                className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal break-words">
                 {column.replace(/_/g, " ")}
               </th>
             ))}
 
             {/* NEW: Confidence column header added at the end of the table */}
-            <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal">
+            <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal break-words">
               CONFIDENCE SCORE
             </th>
           </tr>
-        </thead>
-        <thead>
-          <tr>
-            {/* NEW: Confidence column header added at the end of the table */}
-            <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal">
-              CONFIDENCE SCORE
-            </th>
-          </tr>
+
         </thead>
 
         {/* Body */}
@@ -124,7 +116,7 @@ function ExtractedDataPanel({
 										Low confidence rows also show a warning icon from lucide-react */}
                 {/* UPDATED: Capsule shape with solid background colours for high visibility */}
                 {/* Alert icon on left only for low confidence rows with hover tooltip */}
-                <td className="p-2">
+                <td className="p-2 text-[13px] break-words whitespace-normal">
                   <div className="flex items-center gap-1">
                     {tier.isLow && (
                       <span title="please check this output">
