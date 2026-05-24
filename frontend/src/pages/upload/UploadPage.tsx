@@ -6,7 +6,7 @@
 // To change PDF/canvas logic      →  edit components/preview/previewHelpers.ts
 // To change the preview cards     →  edit components/preview/PreviewCard.tsx
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { unlockStep } from '../../services/stepGuard.ts';
 
@@ -43,6 +43,13 @@ function UploadPage() {
 
   useEffect(() => { previewItemsRef.current = previewItems; }, [previewItems]);
 
+  useEffect(() => {
+    if (previewItems.length > 0) {
+      navigate('/?step=preview', { replace: true });
+    }
+  }, [previewItems, navigate]);
+
+
   // Clean up object URLs when leaving the page
   useEffect(() => {
     return () => {
@@ -60,7 +67,6 @@ function UploadPage() {
           const startIndex = prev.length;
           const next = [...prev, ...newItems];
           if (prev.length === 0 && next.length > 0) {
-            navigate('/?step=preview', { replace: true });
             unlockStep(1); //unlock step 1 (preview) after successful file capture
           }
 
