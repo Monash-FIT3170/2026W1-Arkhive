@@ -53,7 +53,7 @@ function ExtractedDataPanel({
   // used to check if file exported
   const [exported, setExported] = useState(false);
 
-  <div>
+  return <div>
     {/* Table */}
     <div className="flex-1 overflow-auto min-h-0 max-w-full">
       {/* UPDATED: Removed table-fixed to allow columns to size based on content */}
