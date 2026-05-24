@@ -12,6 +12,21 @@ import {
 } from "../../services/extractionService";
 import { getUploadedImageUrl } from "../../services/uploadService";
 
+function useIsLargeScreen() {
+  const [isLarge, setIsLarge] = useState(
+    window.innerWidth >= 1024
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsLarge(window.innerWidth >= 1024);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return isLarge;
+
+}
+
 function ValidationPage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -22,7 +37,7 @@ function ValidationPage() {
   const [oldContext, setOldContext] = useState<ExtractedData | null>(null); //for AI suggesiton
   const [documentImageURL, setDocumentImageURL] = useState<string>();
   const [ocrData, setOCRData] = useState<OCRComponent[]>([]);
-
+  const isLarge = useIsLargeScreen();
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -154,7 +169,9 @@ function ValidationPage() {
       >
         <div
           className="w-full h-[50vh] lg:h-full"
-          style={{ width: `${splitPercent}%` }}
+
+          style={isLarge ? { width: `${splitPercent}%` } : { width: "100%" }}
+
         >
           <DocumentPanel
             hoveredOverlayId={hoveredOverlayId}
@@ -173,7 +190,10 @@ function ValidationPage() {
 
         <div
           className="w-full h-[50vh] lg:h-full"
-          style={{ width: `${100 - splitPercent}%` }}
+
+          style={isLarge ? {
+            width: `${100 - splitPercent}%`
+          } : { width: "100%" }}
         >
           <ExtractedDataPanel
             onHover={setHoveredOverlayId}

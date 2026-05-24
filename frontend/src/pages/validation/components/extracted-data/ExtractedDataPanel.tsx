@@ -86,95 +86,95 @@ function ExtractedDataPanel({
 
       {/* Table */}
 
-      <div className="w-full overflow-auto">
-        <div className="scale-[0.9] origin-top-left">
+      {/* Table */}
+      <div className="flex-1 overflow-auto min-h-0 max-w-full">
+        {/* UPDATED: Removed table-fixed to allow columns to size based on content */}
 
-          {/* UPDATED: Removed table-fixed to allow columns to size based on content */}
-          <table className="table w-full border border-base-300 text-[10px]">
+        {/* UPDATED: Removed table-fixed to allow columns to size based on content */}
+        <table className="table table-fixed w-full border border-base-300 text-[10px]">
 
-            {/* Table Header */}
-            <thead>
-              <tr className="text-base-content/70">
-                {/* Existing columns (unchanged) */}
-                {extractedData.columns.map((column) => (
-                  // 	UPDATED: whitespace-nowrap prevents headers from breaking mid-word.
-                  <th
-                    key={column}
-                    className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-nowrap"
-                  >
-                    {column.replace(/_/g, " ")}
-                  </th>
-                ))}
+          {/* Table Header */}
+          <thead>
+            <tr className="text-base-content/70">
+              {/* Existing columns (unchanged) */}
+              {extractedData.columns.map((column) => (
+                // 	UPDATED: whitespace-nowrap prevents headers from breaking mid-word.
+                <th
+                  key={column}
+                  className="p-3 whitespace-normal break-words text-left text-[12px] font-bold border-b border-base-300"
 
-                {/* NEW: Confidence column header added at the end of the table */}
-                <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal">
-                  CONFIDENCE SCORE
+                >
+                  {column.replace(/_/g, " ")}
                 </th>
-              </tr>
-            </thead>
+              ))}
 
-            {/* Body */}
-            <tbody>
-              {extractedData.rows.map((row) => {
-                const tier = getConfidenceTier(row._confidence ?? 1);
+              {/* NEW: Confidence column header added at the end of the table */}
+              <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal break-words">
+                CONFIDENCE SCORE
+              </th>
+            </tr>
+          </thead>
 
-                return (
-                  <tr
-                    key={row._id}
-                    className={`border-b border-base-300 hover:bg-base-300/40 ${tier.isLow ? "bg-error/10" : ""
-                      }`}
-                  >
-                    {extractedData.columns.map((column) => {
-                      const cellKey = row._cellKeyMap?.[column];
+          {/* Body */}
+          <tbody>
+            {extractedData.rows.map((row) => {
+              const tier = getConfidenceTier(row._confidence ?? 1);
 
-                      return (
-                        <td
-                          key={column}
-                          className={`p-2 hover:bg-warning/10 cursor-pointer text-base-content text-[13px]`}
-                          onMouseEnter={() =>
-                            onHover(
-                              cellKey ? `${row._id}:${cellKey}` : String(row._id)
-                            )
-                          }
-                          onMouseLeave={() => onHover(null)}
-                        >
-                          {row[column] || ""}
-                        </td>
-                      );
-                    })}
+              return (
+                <tr
+                  key={row._id}
+                  className={`border-b border-base-300 hover:bg-base-300/40 ${tier.isLow ? "bg-error/10" : ""
+                    }`}
+                >
+                  {extractedData.columns.map((column) => {
+                    const cellKey = row._cellKeyMap?.[column];
 
-                    {/* NEW: Confidence score cell added at the end of each row
+                    return (
+                      <td
+                        key={column}
+                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 cursor-pointer text-base-content text-[13px]`}
+                        onMouseEnter={() =>
+                          onHover(
+                            cellKey ? `${row._id}:${cellKey}` : String(row._id)
+                          )
+                        }
+                        onMouseLeave={() => onHover(null)}
+                      >
+                        {row[column] || ""}
+                      </td>
+                    );
+                  })}
+
+                  {/* NEW: Confidence score cell added at the end of each row
 										Shows a DaisyUI badge with the score percentage
 										Green ≥85%, Amber 70-84%, Red <70%
 										Low confidence rows also show a warning icon from lucide-react */}
-                    {/* UPDATED: Capsule shape with solid background colours for high visibility */}
-                    {/* Alert icon on left only for low confidence rows with hover tooltip */}
-                    <td className="p-2">
-                      <div className="flex items-center gap-1">
-                        {tier.isLow && (
-                          <span title="please check this output">
-                            <AlertTriangle className="w-3 h-3 text-red-500 cursor-pointer flex-shrink-0" />
-                          </span>
-                        )}
-                        {/* UPDATED: Switched from solid fill to outlined badge style */}
-                        {/* High confidence uses brand blue, medium amber, low red */}
-                        {/* White background keeps it subtle so it doesn't compete with more important UI elements */}
-                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === "badge-success" ? "border-blue-500 text-blue-500 bg-white" :
-                          tier.badgeClass === "badge-warning" ? "border-amber-500 text-amber-500 bg-white" :
-                            "border-red-500 text-red-500 bg-white"
-                          }`}>
-                          {tier.label}
+                  {/* UPDATED: Capsule shape with solid background colours for high visibility */}
+                  {/* Alert icon on left only for low confidence rows with hover tooltip */}
+                  <td className="p-2">
+                    <div className="flex items-center gap-1">
+                      {tier.isLow && (
+                        <span title="please check this output">
+                          <AlertTriangle className="w-3 h-3 text-red-500 cursor-pointer flex-shrink-0" />
                         </span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      )}
+                      {/* UPDATED: Switched from solid fill to outlined badge style */}
+                      {/* High confidence uses brand blue, medium amber, low red */}
+                      {/* White background keeps it subtle so it doesn't compete with more important UI elements */}
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === "badge-success" ? "border-blue-500 text-blue-500 bg-white" :
+                        tier.badgeClass === "badge-warning" ? "border-amber-500 text-amber-500 bg-white" :
+                          "border-red-500 text-red-500 bg-white"
+                        }`}>
+                        {tier.label}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
-
     </div>
 
   );
