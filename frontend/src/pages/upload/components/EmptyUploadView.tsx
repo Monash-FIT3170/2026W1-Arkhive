@@ -20,7 +20,7 @@ function EmptyUploadView({ onFilesCaptured, onError }: Props) {
   }
 
   return (
-    <div className="bg-base-100 fixed inset-0 flex flex-col items-center justify-center">
+    <div className="bg-base-100 w-full flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 4rem)' }}>
 
       {/* Branding */}
       <div className="mb-10 text-center">
@@ -34,7 +34,7 @@ function EmptyUploadView({ onFilesCaptured, onError }: Props) {
       <div>
         <DropZone onFilesCaptured={onFilesCaptured} onError={onError} />
       </div>
-      
+
       <input
         ref={inputRef}
         type="file"

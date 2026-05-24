@@ -6,14 +6,15 @@
 // To change PDF/canvas logic      →  edit components/preview/previewHelpers.ts
 // To change the preview cards     →  edit components/preview/PreviewCard.tsx
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { unlockStep } from '../../services/stepGuard.ts';
 
 import type { PreviewItem } from './types';
 import { buildPreviewItemsForFiles } from './components/preview/previewHelpers';
 import EmptyUploadView from './components/EmptyUploadView';
-import UploadSidebar   from './components/UploadSidebar';
-import PreviewCard     from './components/preview/PreviewCard';
+import UploadSidebar from './components/UploadSidebar';
+import PreviewCard from './components/preview/PreviewCard';
 import {
   filterValidFiles,
   partitionBySize,
@@ -25,10 +26,10 @@ function UploadPage() {
   const navigate = useNavigate();
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [previewItems,  setPreviewItems]  = useState<PreviewItem[]>([]);
+  const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
-  const [isProcessing,  setIsProcessing]  = useState(false);
-  const [uploadError,   setUploadError]   = useState<string | null>(null); // US-1.4
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null); // US-1.4
   const [uploadSuccess, setUploadSuccess] = useState(false);               // US-1.5
   const [replaceConfirm, setReplaceConfirm] = useState<{
     previewIndex: number;
@@ -37,10 +38,17 @@ function UploadPage() {
   } | null>(null);
 
   // Refs
-  const previewItemsRef   = useRef<PreviewItem[]>([]);
-  const createdUrlsRef    = useRef<string[]>([]);
+  const previewItemsRef = useRef<PreviewItem[]>([]);
+  const createdUrlsRef = useRef<string[]>([]);
 
   useEffect(() => { previewItemsRef.current = previewItems; }, [previewItems]);
+
+  useEffect(() => {
+    if (previewItems.length > 0) {
+      navigate('/?step=preview', { replace: true });
+    }
+  }, [previewItems, navigate]);
+
 
   // Clean up object URLs when leaving the page
   useEffect(() => {
@@ -58,7 +66,10 @@ function UploadPage() {
         setPreviewItems(prev => {
           const startIndex = prev.length;
           const next = [...prev, ...newItems];
-          
+          if (prev.length === 0 && next.length > 0) {
+            unlockStep(1); //unlock step 1 (preview) after successful file capture
+          }
+
           setSelectedPages(prevSel => {
             const nextSel = new Set(prevSel);
             newItems.forEach((item, i) => {
@@ -69,6 +80,7 @@ function UploadPage() {
 
           return next;
         });
+
       })
       .finally(() => {
         setIsProcessing(false);
@@ -99,7 +111,8 @@ function UploadPage() {
     setPreviewItems((prev) => {
       const next = [...prev];
       next.splice(previewIndex, 1);
-      
+
+      if (next.length === 0) navigate('/', { replace: true });
       setSelectedPages(prevSel => {
         const nextSel = new Set<number>();
         for (const idx of prevSel) {
@@ -134,7 +147,7 @@ function UploadPage() {
 
     const item = previewItemsRef.current[previewIndex];
     if (!item?.hasFile) return;
-    
+
     const itemTitle = item.subtitle ? `${item.label} (${item.subtitle})` : item.label;
     setReplaceConfirm({ previewIndex, newFile, itemTitle });
   }
@@ -150,11 +163,11 @@ function UploadPage() {
         setPreviewItems(prev => {
           const next = [...prev];
           next.splice(previewIndex, 1, ...newItems);
-          
+
           setSelectedPages(prevSel => {
             const nextSel = new Set<number>();
             const shift = newItems.length - 1;
-            
+
             for (const idx of prevSel) {
               if (idx < previewIndex) {
                 nextSel.add(idx);
@@ -162,13 +175,13 @@ function UploadPage() {
                 nextSel.add(idx + shift);
               }
             }
-            
+
             newItems.forEach((item, i) => {
               if (item.hasFile) nextSel.add(previewIndex + i);
             });
             return nextSel;
           });
-          
+
           return next;
         });
       })
@@ -200,6 +213,7 @@ function UploadPage() {
       await uploadPagesToBackend(selectedSrcs);
 
       // US-1.5: detect successful upload and show success notification
+      unlockStep(2);
       setUploadSuccess(true);
       setTimeout(() => {
         navigate('/validation');
@@ -261,9 +275,10 @@ function UploadPage() {
 
   // Files loaded → split layout: preview grid left, sidebar right
   return (
-    <div className="bg-base-100 fixed inset-0 z-10 flex flex-col">
+    <div className="bg-base-100 fixed top-[92px] inset-x-0 bottom-0 z-0 flex flex-col">
 
-      <header className="bg-base-100 text-base-content flex h-16 shrink-0 items-center px-6 text-2xl font-extrabold shadow-sm z-20">
+
+      <header className="bg-base-100 text-base-content flex h-12 shrink-0 items-center px-6 text-xl font-extrabold border-b border-base-300">
         Preview
       </header>
 

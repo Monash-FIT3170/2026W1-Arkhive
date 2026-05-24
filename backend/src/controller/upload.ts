@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
-import { textExtraction, getBoundingBoxesWords } from "../services/ocr/ocr.js";
+import { textExtraction, getBoundingBoxesWords } from "../services/ocr/ocr.ts";
 import { Multer } from "multer";
+import { SessionData } from "express-session";
 
 declare module "express-session" {
   interface SessionData {
