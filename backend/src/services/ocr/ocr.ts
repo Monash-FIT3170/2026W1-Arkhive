@@ -1,15 +1,10 @@
-import path from "path";
-import vision from "@google-cloud/vision";
-import fs from "fs";
-import {
-  extractStructuredComponents,
-  findAverageAccuracyForAllWords,
-  flattenPagesToBlockMap,
-  flattenPagesToParaMap,
-  flattenPagesToWordMap
-} from "./utils/utils.js";
-import { OCRBoundingBoxes, OCRComponent } from "./types/boundingBoxTypes.js";
-import { pdf } from "pdf-to-img";
+import path from 'path';
+import vision from '@google-cloud/vision';
+import fs from 'fs';
+import { extractStructuredComponents } from './utils/utils_table_extraction.js';
+import { withRetry } from './utils/utils.js';
+
+
 
 const client = new vision.ImageAnnotatorClient({
   keyFilename: path.resolve(
@@ -49,25 +44,26 @@ export async function textExtraction(buffer: Buffer): Promise<string> {
 //   };
 // }
 
-/* 
+/**
 
 
 function for getting bounding boxes for all words detected
-*/
-export async function getBoundingBoxesWords(
-  imageBuffer: Buffer
-): Promise<OCRComponent[]> {
-  //const pages = mimeType == "application/pdf" ? pdf(imageBuffer) : imageBuffer
-
+ @author Harsha Sharma (33879303)
+*/  
+async function parseTable(imageBuffer: Buffer) {
   const [response] = await client.documentTextDetection(imageBuffer);
   const fullTextAnnotation = response.fullTextAnnotation;
   return extractStructuredComponents(fullTextAnnotation!.pages!);
 }
 
+export async function parseTableWithRetries(imageBuffer: Buffer){
+  return await withRetry(() => parseTable(imageBuffer))
+}
+
 // function for getting overall averaged confidence score
 
 const jsonOut = JSON.stringify(
-  await getBoundingBoxesWords(fs.readFileSync("assets/sample-page-1.png")),
+  await parseTable(fs.readFileSync("assets/sample-page-1.png")),
   null,
   2
 );
