@@ -1,19 +1,22 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "./assets/vite.svg";
-import heroImg from "./assets/hero.png";
 import "./App.css";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Navbar from "./pages/validation/components/navbar/Navbar";
+import UploadPage from "./pages/upload/UploadPage";
 import ValidationPage from "./pages/validation/ValidationPage";
 
 function App() {
-	const [count, setCount] = useState(0);
-
 	return (
-		<>
-			<div className="h-screen">
-				<ValidationPage />
+		<Router>
+			<div className="min-h-screen bg-base-100 text-base-content flex flex-col">
+				<Navbar />
+				<div className="flex-1 flex flex-col">
+					<Routes>
+						<Route path="/" element={<UploadPage />} />
+						<Route path="/validation" element={<ValidationPage />} />
+					</Routes>
+				</div>
 			</div>
-		</>
+		</Router>
 	);
 }
 

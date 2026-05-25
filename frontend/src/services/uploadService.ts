@@ -18,3 +18,12 @@ export async function uploadPagesToBackend(previewSrcs: string[]): Promise<void>
     throw new Error(body.error ?? `Upload failed with status ${response.status}`);
   }
 }
+
+/**
+ * Returns a URL pointing at the image stored in the server session.
+ * Use this as the `src` for the Document Panel image — it hits
+ * GET /api/upload/image which streams the session-stored buffer back.
+ */
+export function getUploadedImageUrl(): string {
+  return '/api/upload/image';
+}

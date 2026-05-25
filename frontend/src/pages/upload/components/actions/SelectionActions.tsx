@@ -13,25 +13,25 @@ function SelectionActions({
 }: SelectionActionsProps) {
   return (
     <>
-      <p className="mb-1 mt-2 text-base font-semibold text-gray-200">Extract mode:</p>
+      <p className="mb-1 mt-2 text-base font-semibold text-base-content">Extract mode:</p>
       <button
         type="button"
         onClick={onSelectAll}
-        className="h-[42px] cursor-pointer rounded-lg border border-[#3b3f4d] bg-[#1f2028] text-[15px] font-semibold text-gray-100 transition hover:bg-[#292b36]"
+        className="btn btn-neutral w-full rounded-xl"
       >
-        Select All Documents
+        Select All Pages
       </button>
       <button
         type="button"
         onClick={onDeselectAll}
-        className="h-[42px] cursor-pointer rounded-lg border border-[#3b3f4d] bg-[#1f2028] text-[15px] font-semibold text-gray-100 transition hover:bg-[#292b36]"
+        className="btn btn-outline w-full rounded-xl"
       >
-        Deselect All Documents
+        Deselect All Pages
       </button>
 
-      <div className="rounded-lg border border-[#2f3d59] bg-[#1a2638] p-2.5 text-[13px] leading-[1.4] text-gray-200">
+      <div className="rounded-xl border border-base-300 bg-base-200 p-2.5 text-[13px] leading-[1.4] text-base-content mt-2">
         {totalCount > 0
-          ? `${selectedCount} of ${totalCount} document(s) selected for processing.`
+          ? `${selectedCount} of ${totalCount} page(s) selected for processing.`
           : "No uploaded files detected yet. Upload files to generate page previews."}
       </div>
     </>

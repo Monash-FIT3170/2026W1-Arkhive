@@ -6,107 +6,85 @@
 // To change PDF/canvas logic      →  edit components/preview/previewHelpers.ts
 // To change the preview cards     →  edit components/preview/PreviewCard.tsx
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { unlockStep } from '../../services/stepGuard.ts';
 
 import type { PreviewItem } from './types';
-import { buildPreviewItemsForFiles, revokeObjectUrlsFromPreviewItems } from './components/preview/previewHelpers';
+import { buildPreviewItemsForFiles } from './components/preview/previewHelpers';
 import EmptyUploadView from './components/EmptyUploadView';
-import UploadSidebar   from './components/UploadSidebar';
-import PreviewCard     from './components/preview/PreviewCard';
+import UploadSidebar from './components/UploadSidebar';
+import PreviewCard from './components/preview/PreviewCard';
 import {
   filterValidFiles,
   partitionBySize,
   MAX_FILE_SIZE_MB,
 } from './components/dropzone/DropZone';
+import { uploadPagesToBackend } from '../../services/uploadService';
 
 function UploadPage() {
   const navigate = useNavigate();
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [files,         setFiles]         = useState<File[]>([]);
-  const [previewItems,  setPreviewItems]  = useState<PreviewItem[]>([]);
+  const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
-  const [isProcessing,  setIsProcessing]  = useState(false);
-  const [uploadError,   setUploadError]   = useState<string | null>(null); // US-1.4
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null); // US-1.4
   const [uploadSuccess, setUploadSuccess] = useState(false);               // US-1.5
+  const [replaceConfirm, setReplaceConfirm] = useState<{
+    previewIndex: number;
+    newFile: File;
+    itemTitle: string;
+  } | null>(null);
 
-  // Refs let the async preview-sync effect read current values without
-  // needing them as dependencies (which would cause infinite loops).
-  const previousFilesRef  = useRef<File[] | null>(null);
-  const previewItemsRef   = useRef<PreviewItem[]>([]);
+  // Refs
+  const previewItemsRef = useRef<PreviewItem[]>([]);
+  const createdUrlsRef = useRef<string[]>([]);
 
   useEffect(() => { previewItemsRef.current = previewItems; }, [previewItems]);
 
-  // ── Keep preview grid in sync whenever the files array changes ─────────────
   useEffect(() => {
-    let isCancelled = false;
-    const createdObjectUrls: string[] = [];
-
-    async function syncPreviewItems() {
-      // Files cleared → reset everything
-      if (files.length === 0) {
-        setPreviewItems((prev) => { revokeObjectUrlsFromPreviewItems(prev); return []; });
-        setSelectedPages(new Set());
-        previousFilesRef.current = [];
-        return;
-      }
-
-      const previousFiles = previousFilesRef.current;
-
-      // Append-only: only render the newly added files, keep existing items
-      const isAppendOnly =
-        previousFiles !== null &&
-        previousFiles.length > 0 &&
-        files.length > previousFiles.length &&
-        previousFiles.every((f, i) => f === files[i]);
-
-      if (isAppendOnly) {
-        const newFiles      = files.slice(previousFiles.length);
-        const appendedItems = await buildPreviewItemsForFiles(newFiles, createdObjectUrls);
-        if (isCancelled) { createdObjectUrls.forEach(URL.revokeObjectURL); return; }
-
-        const startIndex = previewItemsRef.current.length;
-        setPreviewItems((prev) => [...prev, ...appendedItems]);
-
-        // Auto-select every newly added page
-        const newIndexes = appendedItems
-          .map((item, offset) => (item.hasFile ? startIndex + offset : -1))
-          .filter((i) => i >= 0);
-        setSelectedPages((prev) => {
-          const next = new Set(prev);
-          newIndexes.forEach((i) => next.add(i));
-          return next;
-        });
-
-        previousFilesRef.current = files;
-        return;
-      }
-
-      // Full rebuild (first load or files replaced)
-      const rebuiltItems = await buildPreviewItemsForFiles(files, createdObjectUrls);
-      if (isCancelled) { createdObjectUrls.forEach(URL.revokeObjectURL); return; }
-
-      setPreviewItems((prev) => { revokeObjectUrlsFromPreviewItems(prev); return rebuiltItems; });
-
-      const allIndexes = rebuiltItems
-        .map((item, i) => (item.hasFile ? i : -1))
-        .filter((i) => i >= 0);
-      setSelectedPages(new Set(allIndexes));
-      previousFilesRef.current = files;
+    if (previewItems.length > 0) {
+      navigate('/?step=preview', { replace: true });
     }
+  }, [previewItems, navigate]);
 
-    void syncPreviewItems();
 
+  // Clean up object URLs when leaving the page
+  useEffect(() => {
     return () => {
-      isCancelled = true;
-      createdObjectUrls.forEach(URL.revokeObjectURL);
+      createdUrlsRef.current.forEach(URL.revokeObjectURL);
     };
-  }, [files]);
+  }, []);
 
   // ── File capture ───────────────────────────────────────────────────────────
   function captureFiles(incoming: File[]) {
-    setFiles((prev) => [...prev, ...incoming]);
+    // Allow appending more files, instead of slicing/replacing
+    setIsProcessing(true);
+    buildPreviewItemsForFiles(incoming, createdUrlsRef.current)
+      .then(newItems => {
+        setPreviewItems(prev => {
+          const startIndex = prev.length;
+          const next = [...prev, ...newItems];
+          if (prev.length === 0 && next.length > 0) {
+            unlockStep(1); //unlock step 1 (preview) after successful file capture
+          }
+
+          setSelectedPages(prevSel => {
+            const nextSel = new Set(prevSel);
+            newItems.forEach((item, i) => {
+              if (item.hasFile) nextSel.add(startIndex + i);
+            });
+            return nextSel;
+          });
+
+          return next;
+        });
+
+      })
+      .finally(() => {
+        setIsProcessing(false);
+      });
   }
 
   // ── Page selection ─────────────────────────────────────────────────────────
@@ -129,25 +107,32 @@ function UploadPage() {
   }
 
   // ── Remove file from queue ───────────────────────────────────────────────────
-  // For pdfs with multiple pages, they share a file index, so removing one page removes the whole PDF.
   function handleRemovePreview(previewIndex: number) {
-    const item = previewItemsRef.current[previewIndex];
-    if (!item?.hasFile || item.fileIndex === undefined) return;
-    const { fileIndex } = item;
-    setFiles((prev) => {
-      if (fileIndex < 0 || fileIndex >= prev.length) return prev;
-      return prev.filter((_, i) => i !== fileIndex);
+    setPreviewItems((prev) => {
+      const next = [...prev];
+      next.splice(previewIndex, 1);
+
+      if (next.length === 0) navigate('/', { replace: true });
+      setSelectedPages(prevSel => {
+        const nextSel = new Set<number>();
+        for (const idx of prevSel) {
+          if (idx < previewIndex) nextSel.add(idx);
+          else if (idx > previewIndex) nextSel.add(idx - 1);
+        }
+        return nextSel;
+      });
+
+      return next;
     });
   }
 
   // ── Replace with file ───────────────────────────────────────────────────────
-  // Swap a file for another after type/size checks and user confirmation.
   function handleReplaceWithFile(previewIndex: number, picked: File) {
     const transfer = new DataTransfer();
     transfer.items.add(picked);
     const valid = filterValidFiles(transfer.files);
     if (valid.length === 0) {
-      window.alert(
+      setUploadError(
         'This file type is not supported. Use JPG, PNG, PDF, HEIC, HEIF, or TIFF.',
       );
       return;
@@ -155,32 +140,62 @@ function UploadPage() {
     const checked = valid[0];
     const { accepted, rejected } = partitionBySize([checked]);
     if (rejected.length > 0) {
-      window.alert(`File is too large. Maximum size is ${MAX_FILE_SIZE_MB} MB.`);
+      setUploadError(`File is too large. Maximum size is ${MAX_FILE_SIZE_MB} MB.`);
       return;
     }
     const newFile = accepted[0];
 
     const item = previewItemsRef.current[previewIndex];
-    if (!item?.hasFile || item.fileIndex === undefined) return;
-    const fi = item.fileIndex;
-    if (!window.confirm(
-      `Replace file "${item.subtitle ? `${item.label} (${item.subtitle})` : item.label}" with "${newFile.name}"?`,
-    )) return;
+    if (!item?.hasFile) return;
 
-    setFiles((prev) => {
-      if (fi < 0 || fi >= prev.length) return prev;
-      const next = [...prev];
-      next[fi] = newFile;
-      return next;
-    });
+    const itemTitle = item.subtitle ? `${item.label} (${item.subtitle})` : item.label;
+    setReplaceConfirm({ previewIndex, newFile, itemTitle });
+  }
+
+  function confirmReplace() {
+    if (!replaceConfirm) return;
+    const { previewIndex, newFile } = replaceConfirm;
+    setReplaceConfirm(null);
+
+    setIsProcessing(true);
+    buildPreviewItemsForFiles([newFile], createdUrlsRef.current)
+      .then(newItems => {
+        setPreviewItems(prev => {
+          const next = [...prev];
+          next.splice(previewIndex, 1, ...newItems);
+
+          setSelectedPages(prevSel => {
+            const nextSel = new Set<number>();
+            const shift = newItems.length - 1;
+
+            for (const idx of prevSel) {
+              if (idx < previewIndex) {
+                nextSel.add(idx);
+              } else if (idx > previewIndex) {
+                nextSel.add(idx + shift);
+              }
+            }
+
+            newItems.forEach((item, i) => {
+              if (item.hasFile) nextSel.add(previewIndex + i);
+            });
+            return nextSel;
+          });
+
+          return next;
+        });
+      })
+      .finally(() => {
+        setIsProcessing(false);
+      });
   }
 
   // ── Process: send selected pages to OCR backend, then navigate ─────────────
   async function handleProcess() {
     if (selectedPages.size === 0 || isProcessing) return;
     if (selectedPages.size > 1) {
-      window.alert(
-        'Only one page can be processed at a time for the current milestone. Deselect the extra files so exactly one is selected, then try again.',
+      setUploadError(
+        'Only one page can be processed at a time for the current milestone. Deselect the extra pages so exactly one is selected, then try again.'
       );
       return;
     }
@@ -189,37 +204,16 @@ function UploadPage() {
     setUploadSuccess(false); // US-1.5: clear any previous success before retrying
 
     try {
-      const selectedItems = [...selectedPages]
+      const selectedSrcs = [...selectedPages]
         .sort((a, b) => a - b)
         .map((i) => previewItems[i])
-        .filter((item) => item?.previewSrc);
+        .filter((item) => item?.previewSrc)
+        .map((item) => item.previewSrc!);
 
-      const formData = new FormData();
-      for (let i = 0; i < selectedItems.length; i++) {
-        // fetch() resolves both blob: URLs (images) and data: URLs (PDF canvases)
-        const blob = await fetch(selectedItems[i].previewSrc!).then((r) => r.blob());
-        formData.append('pages', blob, `page-${i}.png`);
-      }
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-
-      // US-1.4: detect upload failure and extract reason from response
-      if (!response.ok) {
-        let reason = `Upload failed (${response.status} ${response.statusText})`;
-        try {
-          const body = await response.json();
-          if (body?.message) reason = body.message;
-        } catch {
-          // response wasn't JSON — use the status-based reason above
-        }
-        throw new Error(reason);
-      }
+      await uploadPagesToBackend(selectedSrcs);
 
       // US-1.5: detect successful upload and show success notification
+      unlockStep(2);
       setUploadSuccess(true);
       setTimeout(() => {
         navigate('/validation');
@@ -235,50 +229,74 @@ function UploadPage() {
     }
   }
 
+  // Helper to render global notifications
+  const renderNotification = () => {
+    if (!uploadError && !uploadSuccess) return null;
+    return (
+      <div className="toast toast-top toast-center z-50 mt-16">
+        {uploadError && (
+          <div className="alert alert-error shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h3 className="font-bold">Error</h3>
+              <div className="text-xs">{uploadError}</div>
+            </div>
+            <button className="btn btn-sm btn-ghost" onClick={() => setUploadError(null)}>✕</button>
+          </div>
+        )}
+        {uploadSuccess && (
+          <div className="alert alert-success shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h3 className="font-bold">Success</h3>
+              <div className="text-xs">Redirecting to validation...</div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   // No files yet → full-screen landing dropzone
-  if (files.length === 0) {
-    return <EmptyUploadView onFilesCaptured={captureFiles} />;
+  if (previewItems.length === 0) {
+    return (
+      <>
+        {renderNotification()}
+        <EmptyUploadView onFilesCaptured={captureFiles} onError={setUploadError} />
+      </>
+    );
   }
 
   // Files loaded → split layout: preview grid left, sidebar right
   return (
-    <div className="bg-base-100 fixed inset-0 z-10 flex flex-col">
+    <div className="bg-base-100 fixed top-[92px] inset-x-0 bottom-0 z-0 flex flex-col">
 
-      <header className="border-base-300 bg-base-100 text-base-content flex h-16 shrink-0 items-center border-b px-5 text-2xl font-bold">
+
+      <header className="bg-base-100 text-base-content flex h-12 shrink-0 items-center px-6 text-xl font-extrabold border-b border-base-300">
         Preview
       </header>
 
-      {/* US-1.4: Error notification banner placed above the upload/preview area */}
-      {uploadError && (
-        <div className="bg-error/10 border-error text-error flex items-start gap-3 border-l-4 px-5 py-3 text-sm">
-          <svg xmlns="http://www.w3.org/2000/svg" className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-          <div className="flex-1">
-            <p className="font-semibold">Upload failed</p>
-            <p className="opacity-90">{uploadError}</p>
-          </div>
-          <button
-            className="opacity-60 hover:opacity-100"
-            onClick={() => setUploadError(null)}
-            aria-label="Dismiss error"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+      {/* Global Notifications */}
+      {renderNotification()}
 
-      {/* US-1.5: Success notification banner */}
-      {uploadSuccess && (
-        <div className="bg-success/10 border-success text-success flex items-center gap-3 border-l-4 px-5 py-3 text-sm">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-          </svg>
-          <div>
-            <p className="font-semibold">Upload successful</p>
-            <p className="opacity-90">Redirecting to validation...</p>
+      {/* Replace Confirmation Modal */}
+      {replaceConfirm && (
+        <div className="modal modal-open z-50">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Replace Page</h3>
+            <p className="py-4">
+              Are you sure you want to replace page <strong>{replaceConfirm.itemTitle}</strong> with <strong>{replaceConfirm.newFile.name}</strong>?
+            </p>
+            <div className="modal-action">
+              <button className="btn btn-ghost" onClick={() => setReplaceConfirm(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={confirmReplace}>Replace</button>
+            </div>
           </div>
         </div>
       )}
@@ -318,6 +336,7 @@ function UploadPage() {
           onDeselectAll={deselectAllPages}
           onProcess={handleProcess}
           onFilesCaptured={captureFiles}
+          onError={setUploadError}
         />
 
       </div>

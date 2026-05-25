@@ -12,12 +12,7 @@ function ProcessDocumentsButton({ selectedCount, isProcessing, onProcess }: Prop
       type="button"
       onClick={onProcess}
       disabled={isDisabled}
-      className={`
-        mt-auto h-12 rounded-[10px] border-none text-lg font-bold text-white transition
-        ${isDisabled
-          ? 'cursor-not-allowed bg-red-500/40 text-white/50'
-          : 'cursor-pointer bg-red-500 hover:bg-red-600'}
-      `}
+      className="btn btn-primary mt-auto w-full rounded-xl text-base shadow-md"
     >
       {isProcessing
         ? 'Processing…'
