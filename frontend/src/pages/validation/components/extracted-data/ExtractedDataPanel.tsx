@@ -163,7 +163,7 @@ function ExtractedDataPanel({
                       {/* White background keeps it subtle so it doesn't compete with more important UI elements */}
                       <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === "badge-success" ? "border-blue-500 text-blue-500 bg-white" :
                         tier.badgeClass === "badge-warning" ? "border-amber-500 text-amber-500 bg-white" :
-                          "border-red-500 text-red-500 bg-white"
+                          " border-blue-600 text-black-500 bg-blue-50"
                         }`}>
                         {tier.label}
                       </span>
