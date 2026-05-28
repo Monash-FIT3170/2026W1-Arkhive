@@ -162,14 +162,25 @@ function DocumentPanel({
                     const isActive =
                       hoveredOverlayId === id || hoveredOverlayId === comp.id;
 
+                    //obtaining the confidence for this component to determine the colour of the bounding box
+                    const confidenceInfo = ocrData.find((c) => c.id === comp.id);
+                    const confidence = confidenceInfo
+                      ? confidenceInfo.confidence || 0
+                      : 0;
+
+                    console.log(`Component ID: ${comp.id}, Confidence: ${confidence}`);
+
                     return (
                       <polygon
                         key={id}
                         points={pointsStr}
+                        //custom colour based on confidence tier, with low confidence highlighted in red and medium in amber, high confidence is a subtle green
                         fill={
-                          isActive ? "rgba(245, 158, 11, 0.35)" : "transparent"
+                          isActive ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.15)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'transparent'}` : "transparent"
                         }
-                        stroke={isActive ? "#f59e0b" : "transparent"}
+
+
+                        stroke={isActive ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.8)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.8)' : 'transparent'}` : "transparent"}
                         strokeWidth={isActive ? 3 : 1}
                         opacity={isActive ? 1 : 0.75}
                         filter={isActive ? "url(#highlightGlow)" : undefined}

@@ -13,7 +13,6 @@ function getConfidenceTier(confidence: number): {
   badgeClass?: string;
 } {
   const percent = Math.round(confidence * 100);
-  console.log(confidence);
   if (confidence >= 0.85) {
     return {
       colour: "#22c55e",
