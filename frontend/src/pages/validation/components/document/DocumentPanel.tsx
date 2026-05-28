@@ -176,11 +176,11 @@ function DocumentPanel({
                         points={pointsStr}
                         //custom colour based on confidence tier, with low confidence highlighted in red and medium in amber, high confidence is a subtle green
                         fill={
-                          isActive ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.15)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'transparent'}` : "transparent"
+                          isActive ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.15)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 0, 0, 0.15)'}` : "transparent"
                         }
 
 
-                        stroke={isActive ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.8)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.8)' : 'transparent'}` : "transparent"}
+                        stroke={isActive ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.8)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.8)' : 'rgba(255, 0, 0, 0.8)'}` : "transparent"}
                         strokeWidth={isActive ? 3 : 1}
                         opacity={isActive ? 1 : 0.75}
                         filter={isActive ? "url(#highlightGlow)" : undefined}
