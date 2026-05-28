@@ -158,15 +158,15 @@ function ExtractedDataPanel({
                     <div className="flex items-center gap-1">
                       {tier.isLow && (
                         <span title="please check this output">
-                          <AlertTriangle className="w-3 h-3 text-red-500 cursor-pointer flex-shrink-0" />
+                          <AlertTriangle className="w-3 h-3 text-error cursor-pointer flex-shrink-0" />
                         </span>
                       )}
                       {/* UPDATED: Switched from solid fill to outlined badge style */}
                       {/* High confidence uses brand blue, medium amber, low red */}
                       {/* White background keeps it subtle so it doesn't compete with more important UI elements */}
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === "badge-success" ? "border-blue-500 text-blue-500 bg-white" :
-                        tier.badgeClass === "badge-warning" ? "border-amber-500 text-amber-500 bg-white" :
-                          " border-red-500 text-red-500 bg-white"
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === "badge-success" ? "border-success text-success bg-white" :
+                        tier.badgeClass === "badge-warning" ? "border-warning text-warning bg-white" :
+                          " border-error text-error bg-white"
                         }`}>
                         {tier.label}
                       </span>
