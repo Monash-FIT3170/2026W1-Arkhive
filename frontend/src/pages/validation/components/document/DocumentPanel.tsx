@@ -168,8 +168,6 @@ function DocumentPanel({
                       ? confidenceInfo.confidence || 0
                       : 0;
 
-                    console.log(`Component ID: ${comp.id}, Confidence: ${confidence}`);
-
                     return (
                       <polygon
                         key={id}
