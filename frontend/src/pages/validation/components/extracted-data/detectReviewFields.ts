@@ -1,11 +1,5 @@
 import type { ExtractedData } from '../../../../models/TableData';
-
-export interface ReviewField {
-  rowId: string | number;
-  column: string;
-  value: string;
-  confidence: number;
-}
+import type { ReviewField } from '../../../../models/Message';
 
 const DOCUMENT_QUALITY_FLOOR = 0.85;
 const RELATIVE_OUTLIER_STDDEV = 1.5;

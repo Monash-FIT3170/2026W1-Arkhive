@@ -1,38 +1,31 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import DocumentPanel from "./components/document/DocumentPanel";
-import ExtractedDataPanel from "./components/extracted-data/ExtractedDataPanel";
-import ChatPanel from "./components/chat/ChatPanel";
-import type { ChatMessage } from "../../models/Message";
-import type { OCRComponent } from "../../models/OCRComponent";
-import { flattenOcrData } from "./components/extracted-data/FlattenOcrData";
-import type { ExtractedData } from "../../models/TableData";
-import {
-  getExtractionSession,
-  saveExtractionSession
-} from "../../services/extractionService";
-import { getUploadedImageUrl } from "../../services/uploadService";
+import { useState, useEffect, useRef, useCallback } from 'react';
+import DocumentPanel from './components/document/DocumentPanel';
+import ExtractedDataPanel from './components/extracted-data/ExtractedDataPanel';
+import ChatPanel from './components/chat/ChatPanel';
+import type { ChatMessage } from '../../models/Message';
+import type { OCRComponent } from '../../models/OCRComponent';
+import { flattenOcrData } from './components/extracted-data/FlattenOcrData';
+import type { ExtractedData } from '../../models/TableData';
+import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
+import { getUploadedImageUrl } from '../../services/uploadService';
+import { detectReviewFields } from './components/extracted-data/detectReviewFields';
 
 function useIsLargeScreen() {
-  const [isLarge, setIsLarge] = useState(
-    window.innerWidth >= 1024
-  );
+  const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
 
   useEffect(() => {
     const handleResize = () => setIsLarge(window.innerWidth >= 1024);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   return isLarge;
-
 }
 
 function ValidationPage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [documentContext, setDocumentContext] = useState<ExtractedData | null>(
-    null
-  );
+  const [documentContext, setDocumentContext] = useState<ExtractedData | null>(null);
   const [splitPercent, setSplitPercent] = useState(50);
   const [oldContext, setOldContext] = useState<ExtractedData | null>(null); //for AI suggesiton
   const [documentImageURL, setDocumentImageURL] = useState<string>();
@@ -50,10 +43,12 @@ function ValidationPage() {
         // if (!sessionData?.ocrData) {
         //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
         // }
+        let data: ExtractedData = flattenOcrData(ocrData as OCRComponent[]);
         setDocumentImageURL(await getUploadedImageUrl());
         setDocumentContext(flattenOcrData(ocrData as OCRComponent[]));
+        console.log(detectReviewFields(data));
       } catch (error) {
-        console.error("Failed to load extraction session", error);
+        console.error('Failed to load extraction session', error);
       }
     }
     loadSession();
@@ -63,8 +58,8 @@ function ValidationPage() {
   //Set dragging to be true
   const onMouseDown = useCallback(() => {
     isDragging.current = true;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
   }, []);
 
   //Given mouse even that is moving, we calculate the presentage of mouse relative to container size
@@ -82,16 +77,16 @@ function ValidationPage() {
   //On mouse up, we set dragging to be false
   const onMouseUp = useCallback(() => {
     isDragging.current = false;
-    document.body.style.cursor = "";
-    document.body.style.userSelect = "";
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
   }, []);
 
   useEffect(() => {
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
     return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
     };
   }, [onMouseMove, onMouseUp]);
 
@@ -110,9 +105,7 @@ function ValidationPage() {
 
   const resolveLastMessage = () => {
     setMessages((prev) =>
-      prev.map((msg, i) =>
-        i === prev.length - 1 ? { ...msg, resolved: true } : msg
-      )
+      prev.map((msg, i) => (i === prev.length - 1 ? { ...msg, resolved: true } : msg))
     );
   };
 
@@ -124,16 +117,16 @@ function ValidationPage() {
     try {
       await saveExtractionSession(documentContext); // accept content
     } catch (error) {
-      console.error("Failed to save session after accept", error);
+      console.error('Failed to save session after accept', error);
     }
     setOldContext(null); // old to null
     resolveLastMessage(); // hide buttons
     //ai confirmation message
     addMessage({
       id: crypto.randomUUID(),
-      role: "model",
-      content: "Got it! The changes have been applied and saved.",
-      timestamp: new Date().toISOString()
+      role: 'model',
+      content: 'Got it! The changes have been applied and saved.',
+      timestamp: new Date().toISOString(),
     });
   };
 
@@ -147,9 +140,9 @@ function ValidationPage() {
     resolveLastMessage(); // hide buttons
     addMessage({
       id: crypto.randomUUID(),
-      role: "model",
-      content: "No problem, the changes have been reverted.",
-      timestamp: new Date().toISOString()
+      role: 'model',
+      content: 'No problem, the changes have been reverted.',
+      timestamp: new Date().toISOString(),
     });
   };
 
@@ -169,9 +162,7 @@ function ValidationPage() {
       >
         <div
           className="w-full h-[50vh] lg:h-full"
-
-          style={isLarge ? { width: `${splitPercent}%` } : { width: "100%" }}
-
+          style={isLarge ? { width: `${splitPercent}%` } : { width: '100%' }}
         >
           <DocumentPanel
             hoveredOverlayId={hoveredOverlayId}
@@ -190,15 +181,15 @@ function ValidationPage() {
 
         <div
           className="w-full h-[50vh] lg:h-full"
-
-          style={isLarge ? {
-            width: `${100 - splitPercent}%`
-          } : { width: "100%" }}
+          style={
+            isLarge
+              ? {
+                  width: `${100 - splitPercent}%`,
+                }
+              : { width: '100%' }
+          }
         >
-          <ExtractedDataPanel
-            onHover={setHoveredOverlayId}
-            extractedData={documentContext}
-          />
+          <ExtractedDataPanel onHover={setHoveredOverlayId} extractedData={documentContext} />
         </div>
       </div>
 

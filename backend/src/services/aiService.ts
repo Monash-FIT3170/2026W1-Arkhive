@@ -1,174 +1,163 @@
-import { GoogleGenerativeAI, SchemaType, Schema } from "@google/generative-ai";
-import type { Message } from "../models/message";
-import dotenv from "dotenv";
-import { ExtractedData } from "../models/TableData";
+import { GoogleGenerativeAI, SchemaType, Schema } from '@google/generative-ai';
+import type { Message, ReviewField } from '../models/message';
+import dotenv from 'dotenv';
+import { ExtractedData } from '../models/TableData';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 // applies the users intent to the current document context and returns updated context
 function applyIntentToContext(context: ExtractedData, intent: any): ExtractedData {
-	const updated = {
-		columns: [...context.columns],
-		rows: context.rows.map((row) => ({ ...row }))
-	};
+  const updated = {
+    columns: [...context.columns],
+    rows: context.rows.map((row) => ({ ...row })),
+  };
 
-	if (intent.type === "column_correction" && intent.updates) {
+  if (intent.type === 'column_correction' && intent.updates) {
+    //rename columns
+    updated.columns = updated.columns.map((col: string) => {
+      const match = intent.updates.find((u: any) => u.from === col);
+      return match ? match.to : col;
+    });
 
-		//rename columns
-		updated.columns = updated.columns.map((col: string) => {
-			const match = intent.updates.find((u: any) => u.from === col);
-			return match ? match.to : col;
-		});
+    //rename keys
+    updated.rows = updated.rows.map((row) => {
+      const newRow = { ...row };
+      intent.updates.forEach(({ from, to }: { from: string; to: string }) => {
+        if (from in newRow) {
+          newRow[to] = newRow[from];
+          delete newRow[from];
+        }
+      });
+      return newRow;
+    });
+  }
 
-		//rename keys
-		updated.rows = updated.rows.map((row) => {
-			const newRow = { ...row };
-			intent.updates.forEach(({ from, to }: { from: string; to: string }) => {
-				if (from in newRow) {
-					newRow[to] = newRow[from];
-					delete newRow[from];
-				}
-			});
-			return newRow;
-		});
-	}
+  //remove deleted columns from column list
+  if (intent.type === 'column_delete' && intent.deletedColumns) {
+    updated.columns = updated.columns.filter((col: string) => !intent.deletedColumns.includes(col));
 
-	//remove deleted columns from column list
-	if (intent.type === "column_delete" && intent.deletedColumns) {
-		updated.columns = updated.columns.filter(
-			(col: string) => !intent.deletedColumns.includes(col)
-		);
+    //remove deleted column keys
+    updated.rows = updated.rows.map((row) => {
+      const newRow = { ...row };
+      intent.deletedColumns.forEach((col: string) => {
+        delete newRow[col];
+      });
+      return newRow;
+    });
+  }
 
-		//remove deleted column keys
-		updated.rows = updated.rows.map((row) => {
-			const newRow = { ...row };
-			intent.deletedColumns.forEach((col: string) => {
-				delete newRow[col];
-			});
-			return newRow;
-		});
-	}
-
-	//update cell value
-	if (intent.type === "correction" && intent.rowId && intent.column && intent.newValue) {
-		updated.rows = updated.rows.map((row) => {
-			if (row._id === intent.rowId) {
-				return { ...row, [intent.column]: intent.newValue };
-			}
-			return row;
-		});
-	}
-	return updated;
-
+  //update cell value
+  if (intent.type === 'correction' && intent.rowId && intent.column && intent.newValue) {
+    updated.rows = updated.rows.map((row) => {
+      if (row._id === intent.rowId) {
+        return { ...row, [intent.column]: intent.newValue };
+      }
+      return row;
+    });
+  }
+  return updated;
 }
 
-
 const chatResponseSchema: Schema = {
-	type: SchemaType.OBJECT,
-	properties: {
-		response: {
-			type: SchemaType.STRING,
-			description:
-				"Your human-readable, conversational reply to the user."
-		},
-		intent: {
-			type: SchemaType.OBJECT,
-			nullable: true,
-			description:
-				"The structured intent extracted from the user's request. Return null if no action is needed.",
-			properties: {
-				type: {
-					type: SchemaType.STRING,
-					format: "enum",
-					description: "The type of action to take.",
-					enum: [
-						"correction",
-						"context",
-						"approval",
-						"rejection",
-						"unclear",
-						"column_confirm",
-						"column_correction",
-						"column_delete",
-						"column_header_add"
-					]
-				},
-				column: {
-					type: SchemaType.STRING,
-					description:
-						"The specific column header from the provided document context (e.g., 'Price', 'Quantity')."
-				},
-				rowId: {
-					type: SchemaType.STRING,
-					description:
-						"The unique '_id' of the exact row the user wants to modify (extracted from the provided document context)."
-				},
-				oldValue: {
-					type: SchemaType.STRING,
-					description: "The previous value or column name."
-				},
-				newValue: {
-					type: SchemaType.STRING,
-					description:
-						"The new value or column name (e.g., 'banana')."
-				},
-				note: {
-					type: SchemaType.STRING,
-					description:
-						"Any extra context or reasoning the user provided."
-				},
-				approved: {
-					type: SchemaType.BOOLEAN,
-					description:
-						"True if the user confirmed the columns are correct (for column_confirm)."
-				},
-				updates: {
-					type: SchemaType.ARRAY,
-					description:
-						"A list of column name updates (for column_correction).",
-					items: {
-						type: SchemaType.OBJECT,
-						properties: {
-							from: {
-								type: SchemaType.STRING,
-								description: "The current column name."
-							},
-							to: {
-								type: SchemaType.STRING,
-								description: "The new column name."
-							}
-						},
-						required: ["from", "to"]
-					}
-				},
-				deletedColumns: {
-					type: SchemaType.ARRAY,
-					description:
-						"A list of column names to delete (for column_delete).",
-					items: {
-						type: SchemaType.STRING
-					}
-				}
-			},
-			required: ["type", "column", "newValue", "rowId"]
-		}
-	},
-	required: ["response"]
+  type: SchemaType.OBJECT,
+  properties: {
+    response: {
+      type: SchemaType.STRING,
+      description: 'Your human-readable, conversational reply to the user.',
+    },
+    intent: {
+      type: SchemaType.OBJECT,
+      nullable: true,
+      description:
+        "The structured intent extracted from the user's request. Return null if no action is needed.",
+      properties: {
+        type: {
+          type: SchemaType.STRING,
+          format: 'enum',
+          description: 'The type of action to take.',
+          enum: [
+            'correction',
+            'context',
+            'approval',
+            'rejection',
+            'unclear',
+            'column_confirm',
+            'column_correction',
+            'column_delete',
+            'column_header_add',
+          ],
+        },
+        column: {
+          type: SchemaType.STRING,
+          description:
+            "The specific column header from the provided document context (e.g., 'Price', 'Quantity').",
+        },
+        rowId: {
+          type: SchemaType.STRING,
+          description:
+            "The unique '_id' of the exact row the user wants to modify (extracted from the provided document context).",
+        },
+        oldValue: {
+          type: SchemaType.STRING,
+          description: 'The previous value or column name.',
+        },
+        newValue: {
+          type: SchemaType.STRING,
+          description: "The new value or column name (e.g., 'banana').",
+        },
+        note: {
+          type: SchemaType.STRING,
+          description: 'Any extra context or reasoning the user provided.',
+        },
+        approved: {
+          type: SchemaType.BOOLEAN,
+          description: 'True if the user confirmed the columns are correct (for column_confirm).',
+        },
+        updates: {
+          type: SchemaType.ARRAY,
+          description: 'A list of column name updates (for column_correction).',
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              from: {
+                type: SchemaType.STRING,
+                description: 'The current column name.',
+              },
+              to: {
+                type: SchemaType.STRING,
+                description: 'The new column name.',
+              },
+            },
+            required: ['from', 'to'],
+          },
+        },
+        deletedColumns: {
+          type: SchemaType.ARRAY,
+          description: 'A list of column names to delete (for column_delete).',
+          items: {
+            type: SchemaType.STRING,
+          },
+        },
+      },
+      required: ['type', 'column', 'newValue', 'rowId'],
+    },
+  },
+  required: ['response'],
 };
 
 export default {
-	sendMessageToGemini: async (
-		messages: Message[],
-		documentContext: ExtractedData | undefined
-	): Promise<any> => {
-		//turn into string
-		const formattedContext = JSON.stringify(documentContext, null, 2);
+  sendMessageToGemini: async (
+    messages: Message[],
+    documentContext: ExtractedData | undefined
+  ): Promise<any> => {
+    //turn into string
+    const formattedContext = JSON.stringify(documentContext, null, 2);
 
-		//set up model
-		const model = genAI.getGenerativeModel({
-			model: "gemini-2.5-flash",
-			systemInstruction: `You are an AI assistant helping a user validate and correct a digitized document/table. 
+    //set up model
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      systemInstruction: `You are an AI assistant helping a user validate and correct a digitized document/table. 
             Analyse the user's message. 
 						
 						If they want to change data in a specific cell (e.g., 'change apples to bananas in row X'), extract the intent as a 'correction'.
@@ -192,39 +181,85 @@ export default {
             
             ${formattedContext}
             `,
-			generationConfig: {
-				responseMimeType: "application/json",
-				responseSchema: chatResponseSchema
-			}
-		});
-		console.log(formattedContext);
-		// Gemini uses a history array + a final user message separately
-		const history = messages.slice(0, -1).map((m) => ({
-			role: m.role,
-			parts: [{ text: m.content }]
-		}));
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: chatResponseSchema,
+      },
+    });
+    console.log(formattedContext);
+    // Gemini uses a history array + a final user message separately
+    const history = messages.slice(0, -1).map((m) => ({
+      role: m.role,
+      parts: [{ text: m.content }],
+    }));
 
-		console.log(history);
+    console.log(history);
 
-		const lastMessage = messages[messages.length - 1].content;
+    const lastMessage = messages[messages.length - 1].content;
 
-		const chat = model.startChat({ history });
-		const result = await chat.sendMessage(lastMessage);
+    const chat = model.startChat({ history });
+    const result = await chat.sendMessage(lastMessage);
 
-		const parsed = JSON.parse(result.response.text());
+    const parsed = JSON.parse(result.response.text());
 
-		const updatedContext =
-			parsed.intent &&
-				documentContext &&
-				["correction", "column_correction", "column_delete"].includes(parsed.intent.type)
-				? applyIntentToContext(documentContext, parsed.intent)
-				: undefined;
+    const updatedContext =
+      parsed.intent &&
+      documentContext &&
+      ['correction', 'column_correction', 'column_delete'].includes(parsed.intent.type)
+        ? applyIntentToContext(documentContext, parsed.intent)
+        : undefined;
 
-		return {
-			...parsed,
-			updatedContext
-		};
+    return {
+      ...parsed,
+      updatedContext,
+    };
 
-		// return JSON.parse(result.response.text());
-	}
+    // return JSON.parse(result.response.text());
+  },
+  suggestFieldCorrection: async (
+    field: ReviewField,
+    documentContext: ExtractedData
+  ): Promise<any> => {
+    const formattedContext = JSON.stringify(documentContext, null, 2);
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      systemInstruction: `You are helping verify OCR-extracted table data. One specific cell has low confidence and needs to be checked with the user.
+
+        The cell in question:
+        - Row ID: ${field.rowId}
+        - Column: ${field.column}
+        - OCR-read value: "${field.value}"
+        - OCR confidence: ${field.confidence.toFixed(2)}
+
+        Your job:
+        1. Look at the surrounding row and column data in the table context below to judge what the value most likely should be.
+        2. Write a short, specific question for the user confirming this one field (e.g. "The quantity in this row looks like it could be 8 or 3 — did you mean 8?"). Put this in 'response'.
+        3. Set 'intent.type' to 'correction', 'intent.rowId' to "${field.rowId}", 'intent.column' to "${field.column}", and 'intent.newValue' to your best-guess corrected value.
+        4. Set 'intent.oldValue' to the original OCR value "${field.value}".
+        5. Set 'intent.note' to a brief reason (e.g. "Low OCR confidence").
+
+        Only address this one field. Do not comment on or change any other cell.
+
+        CURRENT TABLE CONTEXT:
+        ${formattedContext}
+        `,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: chatResponseSchema, // reused as-is — same shape works
+      },
+    });
+
+    const result = await model.generateContent(
+      `Please review the ${field.column} field in row ${field.rowId}.`
+    );
+    const parsed = JSON.parse(result.response.text());
+
+    const updatedContext =
+      parsed.intent && parsed.intent.type === 'correction'
+        ? applyIntentToContext(documentContext, parsed.intent)
+        : undefined;
+
+    return { ...parsed, updatedContext };
+  },
 };

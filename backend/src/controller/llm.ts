@@ -1,30 +1,44 @@
-import { ChatRequest, Message } from "../models/message";
-import { Router, Request, Response } from "express";
+import { ChatRequest, Message, ReviewField, ReviewFieldRequest } from '../models/message';
+import { Router, Request, Response } from 'express';
 
-import aiService from "../services/aiService";
+import aiService from '../services/aiService';
 
 export default {
-	chatWithModel: async (req: Request<{}, {}, ChatRequest>, res: Response) => {
-		try {
-			const { messages, documentContext } = req.body;
+  chatWithModel: async (req: Request<{}, {}, ChatRequest>, res: Response) => {
+    try {
+      const { messages, documentContext } = req.body;
 
-			if (!messages || messages.length === 0) {
-				res.status(400).json({ error: "No messages provided" });
-				return;
-			}
+      if (!messages || messages.length === 0) {
+        res.status(400).json({ error: 'No messages provided' });
+        return;
+      }
 
-			const reply = await aiService.sendMessageToGemini(
-				messages,
-				documentContext
-			);
-			console.log(reply);
-			res.json({ reply });
-		} catch (error) {
-			console.error("Error communicating with Gemini:", error);
-			res.status(500).json({
-				response: "Sorry, I encountered an error on the server.",
-				intent: null
-			});
-		}
-	}
+      const reply = await aiService.sendMessageToGemini(messages, documentContext);
+      console.log(reply);
+      res.json({ reply });
+    } catch (error) {
+      console.error('Error communicating with Gemini:', error);
+      res.status(500).json({
+        response: 'Sorry, I encountered an error on the server.',
+        intent: null,
+      });
+    }
+  },
+  reviewField: async (req: Request<{}, {}, ReviewFieldRequest>, res: Response) => {
+    try {
+      const { field, documentContext } = req.body;
+      if (!field || !documentContext) {
+        return res.status(400).json({ error: 'field and documentContext are required' });
+      }
+      const reply = await aiService.suggestFieldCorrection(field, documentContext);
+      console.log(reply);
+      res.json({ reply });
+    } catch (error) {
+      console.error('Error communicating with Gemini:', error);
+      res.status(500).json({
+        response: 'Sorry, I encountered an error while checking that field.',
+        intent: null,
+      });
+    }
+  },
 };
