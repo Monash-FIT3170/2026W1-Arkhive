@@ -251,7 +251,7 @@ export default {
     });
 
     const result = await model.generateContent(
-      `Please review the ${field.column} field in row ${field.rowId}.`
+      `Please review the ${field.column} field in row ${field.rowId}. Ensure that when referencing the row/column it isn't based on the ID but rather then row number`
     );
     const parsed = JSON.parse(result.response.text());
 

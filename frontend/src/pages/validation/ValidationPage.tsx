@@ -9,6 +9,7 @@ import type { ExtractedData } from '../../models/TableData';
 import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
 import { getUploadedImageUrl } from '../../services/uploadService';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
+import { requestFieldReview } from '../../services/llmService';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -33,6 +34,9 @@ function ValidationPage() {
   const isLarge = useIsLargeScreen();
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const [reviewedFieldKeys, setReviewedFieldKeys] = useState<Set<string>>(new Set());
+  const [isReviewLoading, setIsReviewLoading] = useState(false);
   useEffect(() => {
     async function loadSession() {
       try {
@@ -43,16 +47,18 @@ function ValidationPage() {
         // if (!sessionData?.ocrData) {
         //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
         // }
-        let data: ExtractedData = flattenOcrData(ocrData as OCRComponent[]);
         setDocumentImageURL(await getUploadedImageUrl());
         setDocumentContext(flattenOcrData(ocrData as OCRComponent[]));
-        console.log(detectReviewFields(data));
       } catch (error) {
         console.error('Failed to load extraction session', error);
       }
     }
     loadSession();
   }, []);
+
+  useEffect(() => {
+    triggerFieldReview();
+  }, [oldContext, documentContext]);
 
   //Resizing Functions
   //Set dragging to be true
@@ -145,6 +151,38 @@ function ValidationPage() {
       timestamp: new Date().toISOString(),
     });
   };
+
+  const triggerFieldReview = useCallback(async () => {
+    // don't interrupt: a suggestion is already pending, one's already loading, or no data yet
+    if (!documentContext || oldContext || isReviewLoading) return;
+
+    const fields = detectReviewFields(documentContext);
+    const next = fields.find((f) => !reviewedFieldKeys.has(`${f.rowId}:${f.column}`));
+    if (!next) return;
+
+    setIsReviewLoading(true);
+    try {
+      const reply = await requestFieldReview(next, documentContext);
+
+      setReviewedFieldKeys((prev) => new Set(prev).add(`${next.rowId}:${next.column}`));
+
+      addMessage({
+        id: crypto.randomUUID(),
+        role: 'model',
+        content: reply.response,
+        timestamp: new Date().toISOString(),
+        intent: reply.intent ?? undefined,
+      });
+
+      if (reply.updatedContext) {
+        handleContextUpdate(reply.updatedContext); // reuses existing snapshot/preview logic
+      }
+    } catch (error) {
+      console.error('Failed to get field review suggestion', error);
+    } finally {
+      setIsReviewLoading(false);
+    }
+  }, [documentContext, oldContext, isReviewLoading, reviewedFieldKeys]);
 
   if (!documentContext) {
     return (
