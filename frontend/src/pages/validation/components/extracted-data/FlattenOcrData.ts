@@ -1,11 +1,11 @@
-import type { ExtractedData, ExtractedRow } from "../../../../models/TableData";
-import type { OCRComponent } from "../../../../models/OCRComponent";
+import type { ExtractedData, ExtractedRow } from '../../../../models/TableData';
+import type { OCRComponent } from '../../../../models/OCRComponent';
 
 export function normalizeColKey(col: string): string {
   return col
-    .replace(/\(.*?\)/g, "")
-    .replace(/\./g, "")
-    .replace(/\s+/g, "_")
+    .replace(/\(.*?\)/g, '')
+    .replace(/\./g, '')
+    .replace(/\s+/g, '_')
     .trim()
     .toUpperCase();
 }
@@ -19,12 +19,13 @@ export function cellMidX(component: OCRComponent, key: string): number | null {
   return (Math.min(...xs) + Math.max(...xs)) / 2;
 }
 
+/** Confidence for a specific cell, falling back to the component's overall confidence */
+export function cellConfidence(component: OCRComponent, cellIndex: number): number {
+  return component.boundingBoxes?.[`cell_${cellIndex}`]?.confidence ?? component.confidence;
+}
+
 /** Helper to find the index of the closest number */
-function findClosestIndex(
-  target: number,
-  values: number[],
-  startIndex = 0
-): number {
+function findClosestIndex(target: number, values: number[], startIndex = 0): number {
   let bestIdx = startIndex;
   let minScore = Infinity;
 
@@ -40,7 +41,7 @@ function findClosestIndex(
 
 /** Extract column headers + positions */
 export function extractColumns(data: OCRComponent[]) {
-  const colComp = data.find((c) => c.type === "TABLE_COLS");
+  const colComp = data.find((c) => c.type === 'TABLE_COLS');
   const rawCols = colComp?.cells ?? [];
 
   const keys = rawCols.map(normalizeColKey);
@@ -52,14 +53,11 @@ export function extractColumns(data: OCRComponent[]) {
 }
 
 /** Detect main item column */
-export function detectItemColumn(
-  components: OCRComponent[],
-  colXs: number[]
-): number {
+export function detectItemColumn(components: OCRComponent[], colXs: number[]): number {
   const freq = new Map<number, number>();
 
   components.forEach((c) => {
-    const startX = cellMidX(c, "cell_0");
+    const startX = cellMidX(c, 'cell_0');
     if (startX === null) return;
 
     const closestColIdx = findClosestIndex(startX, colXs);
@@ -78,7 +76,7 @@ export function resolveLevels(components: OCRComponent[]) {
   const INDENT_THRESHOLD = 6;
 
   for (const c of components) {
-    const verts = c.boundingBoxes?.["cell_0"]?.vertices;
+    const verts = c.boundingBoxes?.['cell_0']?.vertices;
     const currentIndent = verts?.length
       ? (Math.min(...verts.map((v) => Number(v.x))) + (c.indentation ?? 0)) / 2
       : (c.indentation ?? 0);
@@ -130,6 +128,47 @@ function resolveCellColIdx(
   return findClosestIndex(mX, colXs, safeStartIndex);
 }
 
+/** A single mapped cell: its value, which column it landed in, and how confident OCR was */
+type MappedCell = { val: string; colIdx: number; confidence: number };
+
+function mapComponentCells(
+  component: OCRComponent,
+  colKeys: string[],
+  colXs: number[]
+): MappedCell[] {
+  let lastColIdx = -1;
+  return (component.cells ?? []).map((val, i) => {
+    const colIdx = resolveCellColIdx(component, i, colKeys, colXs, lastColIdx);
+    lastColIdx = colIdx;
+    return { val, colIdx, confidence: cellConfidence(component, i) };
+  });
+}
+
+/** One cascade slot: the value/confidence currently "in effect" at a given depth */
+type CascadeEntry = { value: string; confidence: number };
+
+/**
+ * Updates a per-column cascade stack for the current depth.
+ * If this row has its own value for the column, use it.
+ * Otherwise inherit the nearest ancestor's value+confidence (or a blank default at depth 0).
+ */
+function updateCascade(
+  cascade: CascadeEntry[],
+  depth: number,
+  match: MappedCell | undefined,
+  fallbackConfidence: number
+): CascadeEntry {
+  const entry: CascadeEntry = match
+    ? { value: match.val, confidence: match.confidence }
+    : depth > 0
+      ? (cascade[depth - 1] ?? { value: '', confidence: fallbackConfidence })
+      : { value: '', confidence: fallbackConfidence };
+
+  cascade[depth] = entry;
+  cascade.length = depth + 1;
+  return entry;
+}
+
 type BuildRowsParams = {
   components: OCRComponent[];
   colKeys: string[];
@@ -138,76 +177,70 @@ type BuildRowsParams = {
   idToDepth: Map<string, number>;
 };
 
-export function buildRows({
-  components,
-  colKeys,
-  colXs,
-  itemCol,
-  idToDepth
-}: BuildRowsParams): { rows: ExtractedRow[]; levelCols: string[] } {
+export function buildRows({ components, colKeys, colXs, itemCol, idToDepth }: BuildRowsParams): {
+  rows: ExtractedRow[];
+  levelCols: string[];
+} {
   const maxDepth = Math.max(...idToDepth.values(), 0);
-
   const subItemCols = Array.from(
     { length: maxDepth },
     (_, i) => `SUB_${colKeys[itemCol]}_${i + 1}`
   );
 
   const rows: ExtractedRow[] = [];
-  const cascadingLeftValues: Record<string, string[]> = {};
-  const hierarchyValues: string[] = [];
 
-  for (let i = 0; i < itemCol; i++) {
-    cascadingLeftValues[colKeys[i]] = [];
-  }
+  // One cascade stack per left-side (hierarchy-defining) column, plus one for the item column itself
+  const leftCascades: Record<string, CascadeEntry[]> = {};
+  for (let i = 0; i < itemCol; i++) leftCascades[colKeys[i]] = [];
+  const itemCascade: CascadeEntry[] = [];
 
-  components.forEach((c) => {
-    const depth = idToDepth.get(c.id) ?? 0;
-    let lastColIdx = -1;
+  components.forEach((component) => {
+    const depth = idToDepth.get(component.id) ?? 0;
+    const mappedCells = mapComponentCells(component, colKeys, colXs);
+    const fallbackConfidence = component.confidence;
 
-    const mappedCells = (c.cells ?? []).map((val, i) => {
-      const colIdx = resolveCellColIdx(c, i, colKeys, colXs, lastColIdx);
-      lastColIdx = colIdx;
-      return { val, colIdx };
+    const row: ExtractedRow = {
+      _id: component.id,
+      _confidence: component.confidence,
+      _cellConfidence: {},
+    };
+    [...colKeys, ...subItemCols].forEach((col) => (row[col] = ''));
+
+    mappedCells.forEach(({ val, colIdx, confidence }) => {
+      if (colIdx >= itemCol && colIdx !== itemCol && colKeys[colIdx]) {
+        row[colKeys[colIdx]] = val;
+        row._cellConfidence[colKeys[colIdx]] = confidence;
+      }
     });
 
     for (let i = 0; i < itemCol; i++) {
       const colKey = colKeys[i];
-      const cellValue = mappedCells.find((mc) => mc.colIdx === i)?.val;
-
-      if (cellValue) {
-        cascadingLeftValues[colKey][depth] = cellValue;
-      } else if (depth > 0) {
-        cascadingLeftValues[colKey][depth] =
-          cascadingLeftValues[colKey][depth - 1] ?? "";
-      } else {
-        cascadingLeftValues[colKey][depth] = "";
-      }
-      cascadingLeftValues[colKey].length = depth + 1;
+      const match = mappedCells.find((mc) => mc.colIdx === i);
+      const { value, confidence } = updateCascade(
+        leftCascades[colKey],
+        depth,
+        match,
+        fallbackConfidence
+      );
+      row[colKey] = value;
+      row._cellConfidence[colKey] = confidence;
     }
 
-    const itemValue =
-      mappedCells.find((mc) => mc.colIdx === itemCol)?.val ?? "";
-
-    hierarchyValues[depth] = itemValue;
-    hierarchyValues.length = depth + 1;
-
-    const row: ExtractedRow = { _id: c.id, _confidence: c.confidence };
-    [...colKeys, ...subItemCols].forEach((col) => (row[col] = ""));
-
-    mappedCells.forEach(({ val, colIdx }) => {
-      if (colIdx >= itemCol && colIdx !== itemCol && colKeys[colIdx]) {
-        row[colKeys[colIdx]] = val;
-      }
-    });
-
-    for (let i = 0; i < itemCol; i++) {
-      row[colKeys[i]] = cascadingLeftValues[colKeys[i]][depth] ?? "";
-    }
-
-    row[colKeys[itemCol]] = hierarchyValues[0] ?? "";
+    const itemMatch = mappedCells.find((mc) => mc.colIdx === itemCol);
+    const { value: itemValue, confidence: itemConfidence } = updateCascade(
+      itemCascade,
+      depth,
+      itemMatch,
+      fallbackConfidence
+    );
+    row[colKeys[itemCol]] = depth === 0 ? itemValue : (itemCascade[0]?.value ?? '');
+    row._cellConfidence[colKeys[itemCol]] =
+      depth === 0 ? itemConfidence : (itemCascade[0]?.confidence ?? fallbackConfidence);
 
     subItemCols.forEach((col, i) => {
-      row[col] = hierarchyValues[i + 1] ?? "";
+      const entry = itemCascade[i + 1];
+      row[col] = entry?.value ?? '';
+      row._cellConfidence[col] = entry?.confidence ?? fallbackConfidence;
     });
 
     rows.push(row);
@@ -219,7 +252,7 @@ export function buildRows({
 /** ✅ FINAL clean version */
 export function flattenOcrData(data: OCRComponent[]): ExtractedData {
   const components = data.filter(
-    (c) => c.cells && !["HEADER", "BODY_TEXT", "TABLE_COLS"].includes(c.type)
+    (c) => c.cells && !['HEADER', 'BODY_TEXT', 'TABLE_COLS'].includes(c.type)
   );
 
   const { keys, positions } = extractColumns(data);
@@ -231,7 +264,7 @@ export function flattenOcrData(data: OCRComponent[]): ExtractedData {
     colKeys: keys,
     colXs: positions,
     itemCol,
-    idToDepth
+    idToDepth,
   });
 
   const finalCols: string[] = [];
