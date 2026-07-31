@@ -10,6 +10,8 @@ import { getExtractionSession, saveExtractionSession } from '../../services/extr
 import { getUploadedImageUrl } from '../../services/uploadService';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
 import { requestFieldReview } from '../../services/llmService';
+import OcrReviewWidget from './components/chat/OcrReviewWidget';
+import type { OcrIssue } from './components/chat/OcrReviewWidget';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -35,8 +37,9 @@ function ValidationPage() {
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [reviewedFieldKeys, setReviewedFieldKeys] = useState<Set<string>>(new Set());
-  const [isReviewLoading, setIsReviewLoading] = useState(false);
+  const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
+  const [hasDetected, setHasDetected] = useState(false);
+  
   useEffect(() => {
     async function loadSession() {
       try {
@@ -57,8 +60,18 @@ function ValidationPage() {
   }, []);
 
   useEffect(() => {
-    triggerFieldReview();
-  }, [oldContext, documentContext]);
+    if (documentContext && !hasDetected) {
+      const fields = detectReviewFields(documentContext);
+      const issues = fields.map(f => ({
+        fieldId: `${f.rowId}:${f.column}`,
+        fieldName: f.column,
+        ocrValue: String(f.value),
+        confidenceScore: f.confidence
+      }));
+      setFlaggedIssues(issues);
+      setHasDetected(true);
+    }
+  }, [documentContext, hasDetected]);
 
   //Resizing Functions
   //Set dragging to be true
@@ -152,37 +165,35 @@ function ValidationPage() {
     });
   };
 
-  const triggerFieldReview = useCallback(async () => {
-    // don't interrupt: a suggestion is already pending, one's already loading, or no data yet
-    if (!documentContext || oldContext || isReviewLoading) return;
+  const handleCarouselAccept = (_fieldId: string) => {
+    if (documentContext) saveExtractionSession(documentContext);
+  };
 
-    const fields = detectReviewFields(documentContext);
-    const next = fields.find((f) => !reviewedFieldKeys.has(`${f.rowId}:${f.column}`));
-    if (!next) return;
+  const handleCarouselReject = (fieldId: string) => {
+    if (!documentContext) return;
+    const [rowId, column] = fieldId.split(':');
+    const newContext = {
+      ...documentContext,
+      rows: documentContext.rows.map(r => 
+        r._id === rowId ? { ...r, [column]: '' } : r
+      )
+    };
+    setDocumentContext(newContext);
+    saveExtractionSession(newContext);
+  };
 
-    setIsReviewLoading(true);
-    try {
-      const reply = await requestFieldReview(next, documentContext);
-
-      setReviewedFieldKeys((prev) => new Set(prev).add(`${next.rowId}:${next.column}`));
-
-      addMessage({
-        id: crypto.randomUUID(),
-        role: 'model',
-        content: reply.response,
-        timestamp: new Date().toISOString(),
-        intent: reply.intent ?? undefined,
-      });
-
-      if (reply.updatedContext) {
-        handleContextUpdate(reply.updatedContext); // reuses existing snapshot/preview logic
-      }
-    } catch (error) {
-      console.error('Failed to get field review suggestion', error);
-    } finally {
-      setIsReviewLoading(false);
-    }
-  }, [documentContext, oldContext, isReviewLoading, reviewedFieldKeys]);
+  const handleCarouselManualEdit = (fieldId: string, newValue: string) => {
+    if (!documentContext) return;
+    const [rowId, column] = fieldId.split(':');
+    const newContext = {
+      ...documentContext,
+      rows: documentContext.rows.map(r => 
+        r._id === rowId ? { ...r, [column]: newValue } : r
+      )
+    };
+    setDocumentContext(newContext);
+    saveExtractionSession(newContext);
+  };
 
   if (!documentContext) {
     return (
@@ -231,7 +242,7 @@ function ValidationPage() {
         </div>
       </div>
 
-      {/* Floating Chat Modal */}
+      {/* Floating Chat Modal / Review Panel */}
       <ChatPanel
         isOpen={isChatOpen}
         onToggle={() => setIsChatOpen(!isChatOpen)}
@@ -241,6 +252,11 @@ function ValidationPage() {
         onContextUpdate={handleContextUpdate}
         onAccept={handleAccept}
         onReject={handleReject}
+        flaggedIssues={flaggedIssues}
+        onCarouselAccept={handleCarouselAccept}
+        onCarouselReject={handleCarouselReject}
+        onCarouselManualEdit={handleCarouselManualEdit}
+        onSlideChange={setHoveredOverlayId}
       />
     </>
   );
