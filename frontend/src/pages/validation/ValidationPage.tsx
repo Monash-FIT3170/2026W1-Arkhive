@@ -165,8 +165,17 @@ function ValidationPage() {
     });
   };
 
-  const handleCarouselAccept = (_fieldId: string) => {
-    if (documentContext) saveExtractionSession(documentContext);
+  const handleCarouselAccept = (fieldId: string, newValue: string) => {
+    if (!documentContext) return;
+    const [rowId, column] = fieldId.split(':');
+    const newContext = {
+      ...documentContext,
+      rows: documentContext.rows.map(r => 
+        r._id === rowId ? { ...r, [column]: newValue } : r
+      )
+    };
+    setDocumentContext(newContext);
+    saveExtractionSession(newContext);
   };
 
   const handleCarouselReject = (fieldId: string) => {
@@ -194,6 +203,32 @@ function ValidationPage() {
     setDocumentContext(newContext);
     saveExtractionSession(newContext);
   };
+
+  const handleFetchSuggestion = useCallback(async (fieldId: string) => {
+    if (!documentContext) return null;
+    const [rowId, column] = fieldId.split(':');
+    const issue = flaggedIssues.find(i => i.fieldId === fieldId);
+    if (!issue) return null;
+
+    const field = { rowId, column, value: issue.ocrValue, confidence: issue.confidenceScore };
+    
+    try {
+      const reply = await requestFieldReview(field, documentContext);
+      if (reply.intent?.newValue) {
+         return reply.intent.newValue;
+      }
+      if (reply.updatedContext) {
+        const updatedRow = reply.updatedContext.rows.find(r => r._id === rowId || String(r._id) === rowId);
+        if (updatedRow && updatedRow[column] !== undefined) {
+           return String(updatedRow[column]);
+        }
+      }
+      return reply.response; // fallback to text response
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  }, [documentContext, flaggedIssues]);
 
   if (!documentContext) {
     return (
@@ -257,6 +292,7 @@ function ValidationPage() {
         onCarouselReject={handleCarouselReject}
         onCarouselManualEdit={handleCarouselManualEdit}
         onSlideChange={setHoveredOverlayId}
+        onFetchSuggestion={handleFetchSuggestion}
       />
     </>
   );

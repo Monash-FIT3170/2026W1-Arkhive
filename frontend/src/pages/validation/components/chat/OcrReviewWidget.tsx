@@ -6,7 +6,8 @@ import {
   ChevronRight, 
   AlertCircle, 
   Edit2, 
-  CheckCircle2 
+  CheckCircle2,
+  Bot
 } from 'lucide-react';
 
 // Acknowledgement: Google Gemini was used to help generate this file
@@ -20,10 +21,11 @@ export interface OcrIssue {
 
 interface OcrReviewWidgetProps {
   issues: OcrIssue[];
-  onAccept: (fieldId: string) => void;
+  onAccept: (fieldId: string, newValue: string) => void;
   onReject: (fieldId: string) => void;
   onManualEdit: (fieldId: string, newValue: string) => void;
   onSlideChange?: (fieldId: string) => void; // Optional: Emits when slide changes to highlight field in main document
+  onFetchSuggestion?: (fieldId: string) => Promise<string | null>;
 }
 
 export default function OcrReviewWidget({ 
@@ -31,22 +33,42 @@ export default function OcrReviewWidget({
   onAccept, 
   onReject, 
   onManualEdit,
-  onSlideChange 
+  onSlideChange,
+  onFetchSuggestion
 }: OcrReviewWidgetProps) {
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [currentIndex, setCurrentIndex] = useState(0);
   const [manualValue, setManualValue] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   
+  const [suggestions, setSuggestions] = useState<Record<string, string | null>>({});
+  const [isFetchingSuggestion, setIsFetchingSuggestion] = useState(false);
+  
   // Filter out issues that have already been resolved
   const unresolvedIssues = issues.filter(issue => !resolvedIds.has(issue.fieldId));
   
   // Emit event when the slide changes so parent can highlight the document
   useEffect(() => {
-    if (unresolvedIssues.length > 0 && onSlideChange) {
-       onSlideChange(unresolvedIssues[currentIndex]?.fieldId);
+    const currentIssue = unresolvedIssues[currentIndex];
+    if (unresolvedIssues.length > 0 && onSlideChange && currentIssue) {
+       onSlideChange(currentIssue.fieldId);
     }
-  }, [currentIndex, unresolvedIssues.length, onSlideChange]);
+    
+    // Fetch AI suggestion if not already fetched
+    if (currentIssue && onFetchSuggestion) {
+      setSuggestions(prev => {
+        if (prev[currentIssue.fieldId] !== undefined) return prev;
+        
+        setIsFetchingSuggestion(true);
+        onFetchSuggestion(currentIssue.fieldId).then(val => {
+          setSuggestions(s => ({...s, [currentIssue.fieldId]: val}));
+          setIsFetchingSuggestion(false);
+        });
+        
+        return { ...prev, [currentIssue.fieldId]: null }; // Mark as fetching
+      });
+    }
+  }, [currentIndex, unresolvedIssues.length, onSlideChange, onFetchSuggestion, unresolvedIssues]);
 
   const handleNext = () => {
     if (currentIndex < unresolvedIssues.length - 1) {
@@ -85,7 +107,8 @@ export default function OcrReviewWidget({
   const handleAcceptClick = () => {
     const currentIssue = unresolvedIssues[currentIndex];
     if (!currentIssue) return;
-    onAccept(currentIssue.fieldId);
+    const finalValue = suggestions[currentIssue.fieldId] || currentIssue.ocrValue;
+    onAccept(currentIssue.fieldId, finalValue);
     markAsResolved(currentIssue.fieldId);
   };
 
@@ -130,21 +153,44 @@ export default function OcrReviewWidget({
              {/* Carousel Slide */}
              <div className="flex-1 flex flex-col justify-center items-center text-center space-y-5 transition-all w-full">
                 <div className="bg-base-100 px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider text-primary shadow-sm border border-primary/20">
-                  {unresolvedIssues[currentIndex].fieldName}
+                  {unresolvedIssues[currentIndex]?.fieldName}
                 </div>
                 
-                <div className="w-full relative group">
-                   <div className="absolute inset-0 bg-gradient-to-r from-error/5 to-warning/5 rounded-2xl blur-md transition-all" />
-                   <div className="bg-base-100 relative p-6 rounded-2xl w-full border border-base-300 shadow-md">
-                     <p className="text-2xl font-medium break-all text-base-content">
-                       "{unresolvedIssues[currentIndex].ocrValue}"
+                <div className="w-full relative group space-y-4 text-left">
+                   {/* Detected Value */}
+                   <div>
+                     <p className="text-xs text-base-content/60 font-semibold mb-1 uppercase tracking-wider ml-1 flex justify-between items-center">
+                        Detected Data
+                        <span className="text-[10px] font-medium text-warning flex items-center gap-1 bg-warning/10 px-2 py-0.5 rounded-full">
+                           <AlertCircle size={12} />
+                           {(unresolvedIssues[currentIndex]?.confidenceScore * 100).toFixed(0)}%
+                        </span>
                      </p>
+                     <div className="bg-base-100 relative p-4 rounded-xl w-full border border-base-300 shadow-sm">
+                       <p className="text-lg font-medium break-all text-base-content line-through opacity-60">
+                         "{unresolvedIssues[currentIndex]?.ocrValue}"
+                       </p>
+                     </div>
                    </div>
-                </div>
-                
-                <div className="text-sm font-medium text-warning flex items-center gap-1.5 bg-warning/10 px-3 py-1 rounded-full">
-                   <AlertCircle size={16} />
-                   Confidence: <span className="font-bold">{(unresolvedIssues[currentIndex].confidenceScore * 100).toFixed(0)}%</span>
+
+                   {/* AI Suggestion */}
+                   <div>
+                     <p className="text-xs text-primary/80 font-semibold mb-1 uppercase tracking-wider ml-1 flex items-center gap-1.5">
+                       <Bot size={14} /> AI Suggestion
+                     </p>
+                     <div className="bg-primary/5 relative p-4 rounded-xl w-full border border-primary/20 shadow-sm">
+                       {isFetchingSuggestion && suggestions[unresolvedIssues[currentIndex]?.fieldId] === undefined ? (
+                         <div className="flex items-center justify-center gap-2 py-1 text-primary/60">
+                           <span className="loading loading-spinner loading-sm"></span>
+                           <span className="text-sm font-medium animate-pulse">Analyzing document context...</span>
+                         </div>
+                       ) : (
+                         <p className="text-xl font-bold break-all text-primary-content bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                           "{suggestions[unresolvedIssues[currentIndex]?.fieldId] || unresolvedIssues[currentIndex]?.ocrValue}"
+                         </p>
+                       )}
+                     </div>
+                   </div>
                 </div>
              </div>
 
@@ -172,7 +218,8 @@ export default function OcrReviewWidget({
                    <button 
                      className="btn btn-circle btn-lg btn-success text-white shadow-md hover:shadow-lg hover:-translate-y-1 transition-all"
                      onClick={handleAcceptClick}
-                     title="Accept OCR Value"
+                     disabled={isFetchingSuggestion && suggestions[unresolvedIssues[currentIndex]?.fieldId] === undefined}
+                     title="Accept Suggestion"
                    >
                      <Check size={28} />
                    </button>

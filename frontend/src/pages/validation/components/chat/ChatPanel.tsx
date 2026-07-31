@@ -22,6 +22,7 @@ function ChatPanel({
   onCarouselReject,
   onCarouselManualEdit,
   onSlideChange,
+  onFetchSuggestion,
 }: {
   isOpen: boolean;
   onToggle: () => void;
@@ -32,10 +33,11 @@ function ChatPanel({
   onAccept: () => void;
   onReject: () => void;
   flaggedIssues?: OcrIssue[];
-  onCarouselAccept?: (fieldId: string) => void;
+  onCarouselAccept?: (fieldId: string, newValue: string) => void;
   onCarouselReject?: (fieldId: string) => void;
   onCarouselManualEdit?: (fieldId: string, newValue: string) => void;
   onSlideChange?: (fieldId: string) => void;
+  onFetchSuggestion?: (fieldId: string) => Promise<string | null>;
 }) {
   const [input, setInput] = useState("");
   const [isLoading, setLoading] = useState(false);
@@ -167,6 +169,7 @@ function ChatPanel({
                 onReject={onCarouselReject!}
                 onManualEdit={onCarouselManualEdit!}
                 onSlideChange={onSlideChange}
+                onFetchSuggestion={onFetchSuggestion}
               />
             </div>
           ) : (
