@@ -176,6 +176,7 @@ function ValidationPage() {
     };
     setDocumentContext(newContext);
     saveExtractionSession(newContext);
+    setFlaggedIssues(prev => prev.filter(issue => issue.fieldId !== fieldId));
   };
 
   const handleCarouselReject = (fieldId: string) => {
@@ -189,6 +190,7 @@ function ValidationPage() {
     };
     setDocumentContext(newContext);
     saveExtractionSession(newContext);
+    setFlaggedIssues(prev => prev.filter(issue => issue.fieldId !== fieldId));
   };
 
   const handleCarouselManualEdit = (fieldId: string, newValue: string) => {
@@ -202,6 +204,7 @@ function ValidationPage() {
     };
     setDocumentContext(newContext);
     saveExtractionSession(newContext);
+    setFlaggedIssues(prev => prev.filter(issue => issue.fieldId !== fieldId));
   };
 
   const handleFetchSuggestion = useCallback(async (fieldId: string) => {
