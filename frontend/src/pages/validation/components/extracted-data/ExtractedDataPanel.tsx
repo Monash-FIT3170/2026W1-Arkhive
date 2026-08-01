@@ -2,6 +2,7 @@ import { AlertTriangle, Download, Check } from "lucide-react"; // NEW: Importing
 import { useState } from "react";
 import type { ExtractedData } from "../../../../models/TableData";
 import { exportExtractedDataAsCSV } from "../../../../services/csvDownloadService";
+import { exportExtractedDataAsTXT } from "../../../../services/txtDownloadService"; // NEW: TXT export service
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
@@ -52,38 +53,65 @@ function ExtractedDataPanel({
     }).format(amount);
   };
 
-  // used to check if file exported
-  const [exported, setExported] = useState(false);
+  // used to check if file exported, and which format was last exported
+  // UPDATED: was a plain boolean for CSV only; now tracks which format
+  // (csv/txt) was exported so a single button/dropdown can serve both
+  const [exportedFormat, setExportedFormat] = useState<null | "csv" | "txt">(null);
 
-  // function to import csvService export and trigger CSV download
-  function handleExportCSV() {
-    exportExtractedDataAsCSV(extractedData);
-    setExported(true);
-    setTimeout(() => setExported(false), 2500);
+  // function to import csv/txt download services and trigger the download
+  // for whichever format the user picked from the dropdown
+  // UPDATED: replaces the old handleExportCSV, now handles both formats
+  function handleExport(format: "csv" | "txt") {
+    if (format === "csv") {
+      exportExtractedDataAsCSV(extractedData);
+    } else if (format === "txt") {
+      exportExtractedDataAsTXT(extractedData);
+    }
+
+    setExportedFormat(format);
+    setTimeout(() => setExportedFormat(null), 2500);
+
+    // close the dropdown menu after a selection is made
+    (document.activeElement as HTMLElement)?.blur();
   }
 
 
   return (
     <div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
 
-      {/* Download Button */}
+      {/* Export Button */}
+      {/* UPDATED: was a single "Download Button" for CSV only; now a dropdown
+          so more export formats (TXT, and future formats) can share one button */}
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-base-content">EXTRACTED DATA</h2>
-        <button
-          onClick={handleExportCSV}
-          disabled={exported}
-          className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${exported
-            ? "btn-success"
-            : "btn-primary"
-            }`}
-          title="Export to CSV"
-        >
-          {exported ? (
-            <><Check className="w-3.5 h-3.5" />Exported!</>
-          ) : (
-            <><Download className="w-3.5 h-3.5" />Export CSV</>
-          )}
-        </button>
+
+        <div className="dropdown dropdown-end">
+          <button
+            tabIndex={0}
+            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${exportedFormat
+              ? "btn-success"
+              : "btn-primary"
+              }`}
+          >
+            {exportedFormat ? (
+              <><Check className="w-3.5 h-3.5" />Downloaded!</>
+            ) : (
+              <><Download className="w-3.5 h-3.5" />Download</>
+            )}
+          </button>
+          <ul
+            tabIndex={0}
+            className="dropdown-content menu bg-base-100 rounded-box z-10 w-45 p-2 shadow-md border border-base-300"
+          >
+            <li>
+              <a onClick={() => handleExport("csv")}>Download as CSV</a>
+            </li>
+            <li>
+              <a onClick={() => handleExport("txt")}>Download as TXT</a>
+            </li>
+            {/* Future export formats can be added here as new <li> entries */}
+          </ul>
+        </div>
       </div>
 
       {/* Table */}
