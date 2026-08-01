@@ -1,7 +1,8 @@
 import { GoogleGenerativeAI, SchemaType, Schema } from '@google/generative-ai';
-import type { Message, ReviewField } from '../models/message';
+import type { Message, ReviewField } from '../../models/message';
 import dotenv from 'dotenv';
-import { ExtractedData } from '../models/TableData';
+import { ExtractedData } from '../../models/TableData';
+import { buildFocusedContext } from './utils/contextMaker';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -220,17 +221,29 @@ export default {
     field: ReviewField,
     documentContext: ExtractedData
   ): Promise<any> => {
+    const { rowIndex, otherFieldsInRow, columnValuesFromOtherRows, columnType } =
+      buildFocusedContext(documentContext, field);
     const formattedContext = JSON.stringify(documentContext, null, 2);
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
       systemInstruction: `You are helping verify OCR-extracted table data. One specific cell has low confidence and needs to be checked with the user.
 
-        The cell in question:
-        - Row ID: ${field.rowId}
-        - Column: ${field.column}
-        - OCR-read value: "${field.value}"
-        - OCR confidence: ${field.confidence.toFixed(2)}
+      The cell in question:
+      - Row position: index ${rowIndex} in the rows array (0-indexed) — ignore any row ID, use this position
+      - Column: "${field.column}" — inferred column type: ${columnType}
+      - OCR-read value: "${field.value}"
+      - OCR confidence: ${field.confidence.toFixed(2)}
+
+        Other already-confirmed values in this same row, for context:
+        ${JSON.stringify(otherFieldsInRow, null, 2)}
+
+        This column's values from other rows, to judge typical format/range/pattern:
+        ${JSON.stringify(
+          columnValuesFromOtherRows.map((r) => r.value),
+          null,
+          2
+        )}
 
         Your job:
         1. Look at the surrounding row and column data in the table context below to judge what the value most likely should be.
@@ -241,17 +254,16 @@ export default {
 
         Only address this one field. Do not comment on or change any other cell.
 
-        CURRENT TABLE CONTEXT:
-        ${formattedContext}
         `,
       generationConfig: {
         responseMimeType: 'application/json',
         responseSchema: chatResponseSchema, // reused as-is — same shape works
+        temperature: 0.2,
       },
     });
 
     const result = await model.generateContent(
-      `Please review the ${field.column} field in row ${field.rowId}. Ensure that when referencing the row/column it isn't based on the ID but rather then row number`
+      `Please review the "${field.column}" field at row index ${rowIndex}.`
     );
     const parsed = JSON.parse(result.response.text());
 

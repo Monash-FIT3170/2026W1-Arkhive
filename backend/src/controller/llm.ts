@@ -1,7 +1,7 @@
 import { ChatRequest, Message, ReviewField, ReviewFieldRequest } from '../models/message';
 import { Router, Request, Response } from 'express';
 
-import aiService from '../services/aiService';
+import aiService from '../services/llm/aiService';
 
 export default {
   chatWithModel: async (req: Request<{}, {}, ChatRequest>, res: Response) => {
