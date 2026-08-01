@@ -23,6 +23,8 @@ function ChatPanel({
   onCarouselManualEdit,
   onSlideChange,
   onFetchSuggestion,
+  activeTab,
+  onTabChange,
 }: {
   isOpen: boolean;
   onToggle: () => void;
@@ -38,15 +40,12 @@ function ChatPanel({
   onCarouselManualEdit?: (fieldId: string, newValue: string) => void;
   onSlideChange?: (fieldId: string) => void;
   onFetchSuggestion?: (fieldId: string) => Promise<string | null>;
+  activeTab?: "chat" | "review";
+  onTabChange?: (tab: "chat" | "review") => void;
 }) {
   const [input, setInput] = useState("");
   const [isLoading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<"chat" | "review">(flaggedIssues.length > 0 ? "review" : "chat");
-
-  useEffect(() => {
-    if (flaggedIssues.length > 0) setActiveTab("review");
-  }, [flaggedIssues.length]);
 
   useEffect(() => {
     //whenever messages changes it scrolls to the button of the chat
@@ -145,13 +144,13 @@ function ChatPanel({
             <div className="flex px-4 gap-6 mt-1">
               <button 
                 className={`pb-2 font-medium border-b-2 transition-colors ${activeTab === 'chat' ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`}
-                onClick={() => setActiveTab('chat')}
+                onClick={() => onTabChange?.('chat')}
               >
                 Chat
               </button>
               <button 
                 className={`pb-2 font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'review' ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`}
-                onClick={() => setActiveTab('review')}
+                onClick={() => onTabChange?.('review')}
               >
                 Review
                 {flaggedIssues.length > 0 && (

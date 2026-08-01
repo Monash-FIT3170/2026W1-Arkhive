@@ -39,6 +39,7 @@ function ValidationPage() {
 
   const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
   const [hasDetected, setHasDetected] = useState(false);
+  const [chatActiveTab, setChatActiveTab] = useState<"chat" | "review">("chat");
   
   useEffect(() => {
     async function loadSession() {
@@ -70,6 +71,9 @@ function ValidationPage() {
       }));
       setFlaggedIssues(issues);
       setHasDetected(true);
+      if (issues.length > 0) {
+        setChatActiveTab("review");
+      }
     }
   }, [documentContext, hasDetected]);
 
@@ -110,7 +114,25 @@ function ValidationPage() {
   }, [onMouseMove, onMouseUp]);
 
   //bounding box hover state
-  const [hoveredOverlayId, setHoveredOverlayId] = useState<string | null>(null);
+  const [hoveredTableFieldId, setHoveredTableFieldId] = useState<string | null>(null);
+  const [hoveredDocumentOverlayId, setHoveredDocumentOverlayId] = useState<string | null>(null);
+
+  const handleSlideChange = useCallback((fieldId: string | null) => {
+    setHoveredTableFieldId(fieldId);
+    if (!fieldId) {
+      setHoveredDocumentOverlayId(null);
+      return;
+    }
+    const [rowId, column] = fieldId.split(':');
+    if (documentContext) {
+      const row = documentContext.rows.find(r => String(r._id) === rowId);
+      if (row && row._cellKeyMap && row._cellKeyMap[column]) {
+        setHoveredDocumentOverlayId(row._cellKeyMap[column]);
+        return;
+      }
+    }
+    setHoveredDocumentOverlayId(null);
+  }, [documentContext]);
 
   const addMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
@@ -252,7 +274,7 @@ function ValidationPage() {
           style={isLarge ? { width: `${splitPercent}%` } : { width: '100%' }}
         >
           <DocumentPanel
-            hoveredOverlayId={hoveredOverlayId}
+            hoveredOverlayId={hoveredDocumentOverlayId}
             documentImageUrl={documentImageURL}
             ocrData={ocrData}
           />
@@ -276,7 +298,21 @@ function ValidationPage() {
               : { width: '100%' }
           }
         >
-          <ExtractedDataPanel onHover={setHoveredOverlayId} extractedData={documentContext} />
+          <ExtractedDataPanel 
+            onHover={(id) => {
+              if (isChatOpen && chatActiveTab === "review") return;
+              setHoveredTableFieldId(id);
+              if (id && documentContext) {
+                const [rowId, column] = id.split(':');
+                const row = documentContext.rows.find(r => String(r._id) === rowId);
+                setHoveredDocumentOverlayId(row?._cellKeyMap?.[column] ?? null);
+              } else {
+                setHoveredDocumentOverlayId(null);
+              }
+            }} 
+            extractedData={documentContext} 
+            hoveredOverlayId={hoveredTableFieldId} 
+          />
         </div>
       </div>
 
@@ -294,8 +330,10 @@ function ValidationPage() {
         onCarouselAccept={handleCarouselAccept}
         onCarouselReject={handleCarouselReject}
         onCarouselManualEdit={handleCarouselManualEdit}
-        onSlideChange={setHoveredOverlayId}
+        onSlideChange={handleSlideChange}
         onFetchSuggestion={handleFetchSuggestion}
+        activeTab={chatActiveTab}
+        onTabChange={setChatActiveTab}
       />
     </>
   );

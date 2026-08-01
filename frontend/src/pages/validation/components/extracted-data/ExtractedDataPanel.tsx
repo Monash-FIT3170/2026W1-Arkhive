@@ -1,5 +1,5 @@
 import { AlertTriangle, Download, Check } from "lucide-react"; // NEW: Importing icons for confidence badges and export button
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ExtractedData } from "../../../../models/TableData";
 import { exportExtractedDataAsCSV } from "../../../../services/csvDownloadService";
 
@@ -39,10 +39,12 @@ function getConfidenceTier(confidence: number): {
 
 function ExtractedDataPanel({
   onHover,
-  extractedData
+  extractedData,
+  hoveredOverlayId
 }: {
   onHover: (id: string | null) => void;
   extractedData: ExtractedData;
+  hoveredOverlayId?: string | null;
 }) {
   // Currency formatting function (unchanged)
   const formatCurrency = (amount: number) => {
@@ -61,10 +63,28 @@ function ExtractedDataPanel({
     setExported(true);
     setTimeout(() => setExported(false), 2500);
   }
+  
+  const [isMouseInside, setIsMouseInside] = useState(false);
+  
+  useEffect(() => {
+    if (hoveredOverlayId && !isMouseInside) {
+      // hoveredOverlayId is now fieldId (e.g. comp_4:SUB_ITEM_2)
+      // replace colons to make it a valid DOM id
+      const safeId = hoveredOverlayId.replace(/:/g, '-');
+      const el = document.getElementById(`cell-${safeId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [hoveredOverlayId, isMouseInside]);
 
 
   return (
-    <div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
+    <div 
+      className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col"
+      onMouseEnter={() => setIsMouseInside(true)}
+      onMouseLeave={() => setIsMouseInside(false)}
+    >
 
       {/* Download Button */}
       <div className="mb-4 flex items-center justify-between">
@@ -129,16 +149,19 @@ function ExtractedDataPanel({
                     }`}
                 >
                   {extractedData.columns.map((column) => {
-                    const cellKey = row._cellKeyMap?.[column];
+                    const fieldId = `${String(row._id)}:${column}`;
+                    const isCellHighlighted = hoveredOverlayId === fieldId;
+                    const safeId = fieldId.replace(/:/g, '-');
 
                     return (
                       <td
                         key={column}
-                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 cursor-pointer text-base-content text-[13px]`}
+                        id={`cell-${safeId}`}
+                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 cursor-pointer text-base-content text-[13px] transition-colors ${
+                          isCellHighlighted ? "bg-primary text-primary-content font-bold rounded shadow-inner" : ""
+                        }`}
                         onMouseEnter={() =>
-                          onHover(
-                            cellKey ? `${row._id}:${cellKey}` : String(row._id)
-                          )
+                          onHover(fieldId)
                         }
                         onMouseLeave={() => onHover(null)}
                       >

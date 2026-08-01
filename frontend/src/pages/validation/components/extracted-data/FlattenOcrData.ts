@@ -128,8 +128,8 @@ function resolveCellColIdx(
   return findClosestIndex(mX, colXs, safeStartIndex);
 }
 
-/** A single mapped cell: its value, which column it landed in, and how confident OCR was */
-type MappedCell = { val: string; colIdx: number; confidence: number };
+/** A single mapped cell: its value, which column it landed in, and how confident OCR was, plus original cell index */
+type MappedCell = { val: string; colIdx: number; confidence: number; cellIndex: number; componentId: string };
 
 function mapComponentCells(
   component: OCRComponent,
@@ -140,12 +140,12 @@ function mapComponentCells(
   return (component.cells ?? []).map((val, i) => {
     const colIdx = resolveCellColIdx(component, i, colKeys, colXs, lastColIdx);
     lastColIdx = colIdx;
-    return { val, colIdx, confidence: cellConfidence(component, i) };
+    return { val, colIdx, confidence: cellConfidence(component, i), cellIndex: i, componentId: component.id };
   });
 }
 
 /** One cascade slot: the value/confidence currently "in effect" at a given depth */
-type CascadeEntry = { value: string; confidence: number };
+type CascadeEntry = { value: string; confidence: number; cellIndex?: number; componentId?: string };
 
 /**
  * Updates a per-column cascade stack for the current depth.
@@ -159,7 +159,7 @@ function updateCascade(
   fallbackConfidence: number
 ): CascadeEntry {
   const entry: CascadeEntry = match
-    ? { value: match.val, confidence: match.confidence }
+    ? { value: match.val, confidence: match.confidence, cellIndex: match.cellIndex, componentId: match.componentId }
     : depth > 0
       ? (cascade[depth - 1] ?? { value: '', confidence: fallbackConfidence })
       : { value: '', confidence: fallbackConfidence };
@@ -203,20 +203,22 @@ export function buildRows({ components, colKeys, colXs, itemCol, idToDepth }: Bu
       _id: component.id,
       _confidence: component.confidence,
       _cellConfidence: {},
+      _cellKeyMap: {},
     };
     [...colKeys, ...subItemCols].forEach((col) => (row[col] = ''));
 
-    mappedCells.forEach(({ val, colIdx, confidence }) => {
+    mappedCells.forEach(({ val, colIdx, confidence, cellIndex, componentId }) => {
       if (colIdx >= itemCol && colIdx !== itemCol && colKeys[colIdx]) {
         row[colKeys[colIdx]] = val;
         row._cellConfidence[colKeys[colIdx]] = confidence;
+        row._cellKeyMap![colKeys[colIdx]] = `${componentId}:cell_${cellIndex}`;
       }
     });
 
     for (let i = 0; i < itemCol; i++) {
       const colKey = colKeys[i];
       const match = mappedCells.find((mc) => mc.colIdx === i);
-      const { value, confidence } = updateCascade(
+      const { value, confidence, cellIndex, componentId } = updateCascade(
         leftCascades[colKey],
         depth,
         match,
@@ -224,10 +226,13 @@ export function buildRows({ components, colKeys, colXs, itemCol, idToDepth }: Bu
       );
       row[colKey] = value;
       row._cellConfidence[colKey] = confidence;
+      if (cellIndex !== undefined && componentId !== undefined) {
+         row._cellKeyMap![colKey] = `${componentId}:cell_${cellIndex}`;
+      }
     }
 
     const itemMatch = mappedCells.find((mc) => mc.colIdx === itemCol);
-    const { value: itemValue, confidence: itemConfidence } = updateCascade(
+    const { value: itemValue, confidence: itemConfidence, cellIndex: itemCellIndex } = updateCascade(
       itemCascade,
       depth,
       itemMatch,
@@ -236,11 +241,19 @@ export function buildRows({ components, colKeys, colXs, itemCol, idToDepth }: Bu
     row[colKeys[itemCol]] = depth === 0 ? itemValue : (itemCascade[0]?.value ?? '');
     row._cellConfidence[colKeys[itemCol]] =
       depth === 0 ? itemConfidence : (itemCascade[0]?.confidence ?? fallbackConfidence);
+    if (depth === 0 && itemCellIndex !== undefined && itemMatch?.componentId) {
+      row._cellKeyMap![colKeys[itemCol]] = `${itemMatch.componentId}:cell_${itemCellIndex}`;
+    } else if (itemCascade[0]?.cellIndex !== undefined && itemCascade[0]?.componentId) {
+      row._cellKeyMap![colKeys[itemCol]] = `${itemCascade[0].componentId}:cell_${itemCascade[0].cellIndex}`;
+    }
 
     subItemCols.forEach((col, i) => {
       const entry = itemCascade[i + 1];
       row[col] = entry?.value ?? '';
       row._cellConfidence[col] = entry?.confidence ?? fallbackConfidence;
+      if (entry?.cellIndex !== undefined && entry?.componentId !== undefined) {
+        row._cellKeyMap![col] = `${entry.componentId}:cell_${entry.cellIndex}`;
+      }
     });
 
     rows.push(row);
