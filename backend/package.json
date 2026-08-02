@@ -1,5 +1,5 @@
 {
-  "type":"module",
+  "type": "module",
   "scripts": {
     "dev": "tsx watch app.ts"
   },
@@ -20,5 +20,8 @@
     "pdf-to-img": "^6.0.0",
     "pdf2img": "^0.5.0",
     "tsc": "^2.0.4"
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.8"
   }
 }
