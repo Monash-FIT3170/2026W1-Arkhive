@@ -24,9 +24,9 @@ app.use(session({
 
 const PORT = process.env.PORT || 3000;
 
-app.use("/llm", llmRoutes);
-app.use("/extraction", extractionRoutes);
-app.use("/upload", uploadRouter);
+app.use("api/llm", llmRoutes);
+app.use("api/extraction", extractionRoutes);
+app.use("api/upload", uploadRouter);
 
 app.use((req: Request, res: Response, next) => {
   console.log("HIT:", req.method, req.url);
