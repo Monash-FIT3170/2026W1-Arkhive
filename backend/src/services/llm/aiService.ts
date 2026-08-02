@@ -247,10 +247,11 @@ export default {
 
         Your job:
         1. Look at the surrounding row and column data in the table context below to judge what the value most likely should be.
-        2. Write a short, specific question for the user confirming this one field (e.g. "The quantity in this row looks like it could be 8 or 3 — did you mean 8?"). Put this in 'response'.
-        3. Set 'intent.type' to 'correction', 'intent.rowId' to "${field.rowId}", 'intent.column' to "${field.column}", and 'intent.newValue' to your best-guess corrected value.
-        4. Set 'intent.oldValue' to the original OCR value "${field.value}".
-        5. Set 'intent.note' to a brief reason (e.g. "Low OCR confidence").
+        2. Clean and normalize the OCR value. Remove any unnecessary leading/trailing whitespace, stray punctuation (like leading hyphens, bullets, or random dots), and formatting artifacts. The corrected value should make logical sense within the context of the document and match the pattern of other rows. Do NOT just echo the literal OCR value back if it contains these artifacts.
+        3. Write a short, specific question for the user confirming this one field (e.g. "The quantity in this row looks like it could be 8 or 3 — did you mean 8?"). Put this in 'response'.
+        4. Set 'intent.type' to 'correction', 'intent.rowId' to "${field.rowId}", 'intent.column' to "${field.column}", and 'intent.newValue' to your cleaned, best-guess corrected value.
+        5. Set 'intent.oldValue' to the original OCR value "${field.value}".
+        6. Set 'intent.note' to a brief reason (e.g. "Removed stray hyphen and whitespace").
 
         Only address this one field. Do not comment on or change any other cell.
 
