@@ -56,6 +56,12 @@ function ExtractedDataPanel({
 
   // used to check if file exported
   const [exported, setExported] = useState(false);
+  const [isMouseInside, setIsMouseInside] = useState(false);
+
+  // Editing state
+  const [editingCellId, setEditingCellId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>("");
+  const [localEdits, setLocalEdits] = useState<Record<string, string>>({});
 
   // function to import csvService export and trigger CSV download
   function handleExportCSV() {
@@ -63,8 +69,6 @@ function ExtractedDataPanel({
     setExported(true);
     setTimeout(() => setExported(false), 2500);
   }
-  
-  const [isMouseInside, setIsMouseInside] = useState(false);
   
   useEffect(() => {
     if (hoveredOverlayId && !isMouseInside) {
@@ -77,6 +81,27 @@ function ExtractedDataPanel({
       }
     }
   }, [hoveredOverlayId, isMouseInside]);
+
+  const handleCellClick = (fieldId: string, initialValue: string) => {
+    setEditingCellId(fieldId);
+    setEditValue(initialValue);
+  };
+
+  const handleCellBlur = (fieldId: string) => {
+    setLocalEdits(prev => ({
+      ...prev,
+      [fieldId]: editValue
+    }));
+    setEditingCellId(null);
+  };
+
+  const handleCellKeyDown = (e: React.KeyboardEvent, fieldId: string) => {
+    if (e.key === 'Enter') {
+      handleCellBlur(fieldId);
+    } else if (e.key === 'Escape') {
+      setEditingCellId(null);
+    }
+  };
 
 
   return (
@@ -107,12 +132,7 @@ function ExtractedDataPanel({
       </div>
 
       {/* Table */}
-
-      {/* Table */}
       <div className="flex-1 overflow-auto min-h-0 max-w-full">
-        {/* UPDATED: Removed table-fixed to allow columns to size based on content */}
-
-        {/* UPDATED: Removed table-fixed to allow columns to size based on content */}
         <table className="table table-fixed w-full border border-base-300 text-[10px]">
 
           {/* Table Header */}
@@ -120,11 +140,9 @@ function ExtractedDataPanel({
             <tr className="text-base-content/70">
               {/* Existing columns (unchanged) */}
               {extractedData.columns.map((column) => (
-                // 	UPDATED: whitespace-nowrap prevents headers from breaking mid-word.
                 <th
                   key={column}
                   className="p-3 whitespace-normal break-words text-left text-[12px] font-bold border-b border-base-300"
-
                 >
                   {column.replace(/_/g, " ")}
                 </th>
@@ -152,30 +170,45 @@ function ExtractedDataPanel({
                     const fieldId = `${String(row._id)}:${column}`;
                     const isCellHighlighted = hoveredOverlayId === fieldId;
                     const safeId = fieldId.replace(/:/g, '-');
+                    
+                    const isEditing = editingCellId === fieldId;
+                    const displayValue = localEdits[fieldId] !== undefined ? localEdits[fieldId] : String(row[column] || "");
 
                     return (
                       <td
                         key={column}
                         id={`cell-${safeId}`}
                         className={`p-2 break-words whitespace-normal hover:bg-warning/10 cursor-pointer text-base-content text-[13px] transition-colors ${
-                          isCellHighlighted ? "bg-primary text-primary-content font-bold rounded shadow-inner" : ""
+                          isCellHighlighted && !isEditing ? "bg-primary text-primary-content font-bold rounded shadow-inner" : ""
                         }`}
                         onMouseEnter={() =>
                           onHover(fieldId)
                         }
                         onMouseLeave={() => onHover(null)}
+                        onClick={() => {
+                          if (!isEditing) {
+                            handleCellClick(fieldId, displayValue);
+                          }
+                        }}
                       >
-                        {row[column] || ""}
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            className="input input-xs input-bordered w-full max-w-xs bg-base-100 text-base-content"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onBlur={() => handleCellBlur(fieldId)}
+                            onKeyDown={(e) => handleCellKeyDown(e, fieldId)}
+                            autoFocus
+                          />
+                        ) : (
+                          displayValue
+                        )}
                       </td>
                     );
                   })}
 
-                  {/* NEW: Confidence score cell added at the end of each row
-										Shows a DaisyUI badge with the score percentage
-										Green ≥85%, Amber 70-84%, Red <70%
-										Low confidence rows also show a warning icon from lucide-react */}
-                  {/* UPDATED: Capsule shape with solid background colours for high visibility */}
-                  {/* Alert icon on left only for low confidence rows with hover tooltip */}
+                  {/* NEW: Confidence score cell added at the end of each row */}
                   <td className="p-2">
                     <div className="flex items-center gap-1">
                       {tier.isLow && (
@@ -183,9 +216,6 @@ function ExtractedDataPanel({
                           <AlertTriangle className="w-3 h-3 text-error cursor-pointer flex-shrink-0" />
                         </span>
                       )}
-                      {/* UPDATED: Switched from solid fill to outlined badge style */}
-                      {/* High confidence uses brand blue, medium amber, low red */}
-                      {/* White background keeps it subtle so it doesn't compete with more important UI elements */}
                       <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === "badge-success" ? "border-success text-success bg-white" :
                         tier.badgeClass === "badge-warning" ? "border-warning text-warning bg-white" :
                           " border-error text-error bg-white"
