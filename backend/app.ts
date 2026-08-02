@@ -5,6 +5,11 @@ import llmRoutes from "./src/routes/llmRoutes";
 import extractionRoutes from "./src/routes/extractionRoutes";
 import uploadRouter from "./src/routes/upload";
 
+//
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 app.set("trust proxy", 1);
 
@@ -24,9 +29,9 @@ app.use(session({
 
 const PORT = process.env.PORT || 3000;
 
-app.use("api/llm", llmRoutes);
-app.use("api/extraction", extractionRoutes);
-app.use("api/upload", uploadRouter);
+app.use("/api/llm", llmRoutes);
+app.use("/api/extraction", extractionRoutes);
+app.use("/api/upload", uploadRouter);
 
 app.use((req: Request, res: Response, next) => {
   console.log("HIT:", req.method, req.url);
@@ -36,7 +41,7 @@ app.use((req: Request, res: Response, next) => {
 // Serve the built frontend
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("*", (req: Request, res: Response) => {
+app.get("/*splat", (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 

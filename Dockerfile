@@ -4,7 +4,7 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ .
-RUN npm run build
+RUN npx vite build
 # output: /app/frontend/dist
 
 # ---- Stage 2: backend + serve frontend ----
