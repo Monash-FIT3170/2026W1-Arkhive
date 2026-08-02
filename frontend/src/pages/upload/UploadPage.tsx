@@ -210,6 +210,10 @@ function UploadPage() {
         .filter((item) => item?.previewSrc)
         .map((item) => item.previewSrc!);
 
+      //TEMPORARY !! TO CHECK LOADING APPEARANCE
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+
+
       await uploadPagesToBackend(selectedSrcs);
 
       // US-1.5: detect successful upload and show success notification
