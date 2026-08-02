@@ -2,6 +2,9 @@
 // Composes three existing components that are left completely unchanged:
 //   SelectionActions, UploadMoreButton, ProcessDocumentsButton
 // To reorder, add, or remove sidebar sections, this is the only file to touch.
+//
+// UPDATED: SelectionActions now also receives bulk remove/replace handlers
+// so it can render "Replace Selected" / "Remove Selected" actions.
 
 import SelectionActions       from './actions/SelectionActions';
 import ProcessDocumentsButton from './actions/ProcessDocumentsButton';
@@ -16,6 +19,8 @@ type Props = {
   onProcess:       () => void;
   onFilesCaptured: (files: File[]) => void;
   onError?: (msg: string | null) => void;
+  onBulkRemove: () => void;                     // triggers bulk-remove confirmation
+  onBulkReplaceFiles: (files: File[]) => void;   // triggers bulk-replace confirmation
 };
 
 function UploadSidebar({
@@ -27,6 +32,8 @@ function UploadSidebar({
   onProcess,
   onFilesCaptured,
   onError,
+  onBulkRemove,        
+  onBulkReplaceFiles,  
 }: Props) {
   return (
     <aside className="border-base-300 bg-base-100 flex w-80 shrink-0 flex-col gap-4 border-l px-4 py-6 overflow-y-auto">
@@ -42,6 +49,8 @@ function UploadSidebar({
         onDeselectAll={onDeselectAll}
         selectedCount={selectedCount}
         totalCount={totalCount}
+        onBulkRemove={onBulkRemove}               
+        onBulkReplaceFiles={onBulkReplaceFiles}   
       />
 
       <div className="divider my-0" />

@@ -37,6 +37,17 @@ function UploadPage() {
     itemTitle: string;
   } | null>(null);
 
+  // bulk-remove confirmation — holds the sorted list of preview indices
+  // the user wants to remove, so we can show a confirmation modal before doing it
+  const [removeConfirm, setRemoveConfirm] = useState<number[] | null>(null);
+
+  // bulk-replace confirmation — holds the previewIndex/newFile/title pairs
+  // computed after the user picks files for their selected pages, so we can show
+  // a "this page → this file" summary modal before committing the swap
+  const [bulkReplaceConfirm, setBulkReplaceConfirm] = useState<
+    { previewIndex: number; newFile: File; itemTitle: string }[] | null
+  >(null);
+
   // Refs
   const previewItemsRef = useRef<PreviewItem[]>([]);
   const createdUrlsRef = useRef<string[]>([]);
@@ -126,6 +137,29 @@ function UploadPage() {
     });
   }
 
+  // ── Bulk remove from queue ───────────────────────────────────────────
+  // Step 1: user clicks "Remove Selected" in the sidebar → just opens the
+  // confirmation modal with the sorted indices, nothing is deleted yet.
+  function requestBulkRemove() {
+    if (selectedPages.size === 0) return;
+    setRemoveConfirm([...selectedPages].sort((a, b) => a - b));
+  }
+
+  // Step 2: user confirms in the modal → actually remove all selected pages
+  // at once and clear the selection.
+  function confirmBulkRemove() {
+    if (!removeConfirm) return;
+    const toRemove = new Set(removeConfirm);
+    setRemoveConfirm(null);
+
+    setPreviewItems((prev) => {
+      const next = prev.filter((_, idx) => !toRemove.has(idx));
+      if (next.length === 0) navigate('/', { replace: true });
+      return next;
+    });
+    setSelectedPages(new Set());
+  }
+
   // ── Replace with file ───────────────────────────────────────────────────────
   function handleReplaceWithFile(previewIndex: number, picked: File) {
     const transfer = new DataTransfer();
@@ -184,6 +218,73 @@ function UploadPage() {
 
           return next;
         });
+      })
+      .finally(() => {
+        setIsProcessing(false);
+      });
+  }
+
+  // ── Bulk replace with files ──────────────────────────────────────────
+  // Step 1: user clicks "Replace Selected" and picks files via the native
+  // multi-file input. We require exactly one file per selected page, validate
+  // type/size for all of them, then pair each file with a selected page
+  // (sorted ascending) in the order the files were picked. Nothing is applied
+  // yet — this just builds the confirmation list.
+  function handleBulkReplaceFiles(pickedFiles: File[]) {
+    const selectedIndices = [...selectedPages].sort((a, b) => a - b);
+    if (selectedIndices.length === 0) return;
+
+    if (pickedFiles.length !== selectedIndices.length) {
+      setUploadError(
+        `You selected ${selectedIndices.length} page(s) but chose ${pickedFiles.length} file(s). Pick exactly one file per selected page.`
+      );
+      return;
+    }
+
+    const transfer = new DataTransfer();
+    pickedFiles.forEach((f) => transfer.items.add(f));
+    const valid = filterValidFiles(transfer.files);
+    if (valid.length !== pickedFiles.length) {
+      setUploadError('One or more files have an unsupported type. Use JPG, PNG, PDF, HEIC, HEIF, or TIFF.');
+      return;
+    }
+    const { accepted, rejected } = partitionBySize(valid);
+    if (rejected.length > 0) {
+      setUploadError(`One or more files are too large. Maximum size is ${MAX_FILE_SIZE_MB} MB.`);
+      return;
+    }
+
+    const pairs = selectedIndices.map((previewIndex, i) => {
+      const item = previewItemsRef.current[previewIndex];
+      const itemTitle = item?.subtitle ? `${item.label} (${item.subtitle})` : item?.label ?? `Page ${previewIndex + 1}`;
+      return { previewIndex, newFile: accepted[i], itemTitle };
+    });
+
+    setBulkReplaceConfirm(pairs);
+  }
+
+  // Step 2: user confirms in the modal → build preview items for every new
+  // file, then splice them into previewItems from the highest index down to
+  // the lowest so earlier splices don't shift the indices we still need to use.
+  function confirmBulkReplace() {
+    if (!bulkReplaceConfirm) return;
+    const pairs = bulkReplaceConfirm;
+    setBulkReplaceConfirm(null);
+
+    setIsProcessing(true);
+    Promise.all(
+      pairs.map((pair) => buildPreviewItemsForFiles([pair.newFile], createdUrlsRef.current))
+    )
+      .then((allNewItems) => {
+        setPreviewItems((prev) => {
+          const next = [...prev];
+          [...pairs].reverse().forEach((pair, i) => {
+            const newItems = allNewItems[pairs.length - 1 - i];
+            next.splice(pair.previewIndex, 1, ...newItems);
+          });
+          return next;
+        });
+        setSelectedPages(new Set());
       })
       .finally(() => {
         setIsProcessing(false);
@@ -301,6 +402,42 @@ function UploadPage() {
         </div>
       )}
 
+      {/* Bulk Remove Confirmation Modal */}
+      {removeConfirm && (
+        <div className="modal modal-open z-50">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Remove Pages</h3>
+            <p className="py-4">
+              Are you sure you want to remove <strong>{removeConfirm.length}</strong> selected page(s)? This cannot be undone.
+            </p>
+            <div className="modal-action">
+              <button className="btn btn-ghost" onClick={() => setRemoveConfirm(null)}>Cancel</button>
+              <button className="btn btn-error" onClick={confirmBulkRemove}>Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Replace Confirmation Modal */}
+      {bulkReplaceConfirm && (
+        <div className="modal modal-open z-50">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Replace Pages</h3>
+            <ul className="py-4 text-sm space-y-1">
+              {bulkReplaceConfirm.map((pair) => (
+                <li key={pair.previewIndex}>
+                  <strong>{pair.itemTitle}</strong> → {pair.newFile.name}
+                </li>
+              ))}
+            </ul>
+            <div className="modal-action">
+              <button className="btn btn-ghost" onClick={() => setBulkReplaceConfirm(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={confirmBulkReplace}>Replace</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1">
 
         {/* Preview grid */}
@@ -337,6 +474,8 @@ function UploadPage() {
           onProcess={handleProcess}
           onFilesCaptured={captureFiles}
           onError={setUploadError}
+          onBulkRemove={requestBulkRemove}           
+          onBulkReplaceFiles={handleBulkReplaceFiles} 
         />
 
       </div>
