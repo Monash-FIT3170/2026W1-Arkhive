@@ -1,10 +1,13 @@
 import express, { Request, Response } from "express";
 import session from "express-session";
+import path from "path";
 import llmRoutes from "./src/routes/llmRoutes";
 import extractionRoutes from "./src/routes/extractionRoutes";
 import uploadRouter from "./src/routes/upload";
 
 const app = express();
+app.set("trust proxy", 1);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -15,7 +18,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
-		maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
 
@@ -30,7 +33,13 @@ app.use((req: Request, res: Response, next) => {
   next();
 });
 
+// Serve the built frontend
+app.use(express.static(path.join(__dirname, "public")));
+
+app.get("*", (req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running locally at ${PORT}`);
-  console.log("http://localhost:3000/");
 });
