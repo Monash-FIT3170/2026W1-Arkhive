@@ -1,4 +1,4 @@
-import { AlertTriangle, Download, Check } from "lucide-react"; // NEW: Importing icons for confidence badges and export button
+import { AlertTriangle, Download, Check, X } from "lucide-react"; // NEW: Importing icons for confidence badges and export button
 import { useState, useEffect } from "react";
 import type { ExtractedData } from "../../../../models/TableData";
 import { exportExtractedDataAsCSV } from "../../../../services/csvDownloadService";
@@ -63,7 +63,10 @@ function ExtractedDataPanel({
   // Editing state
   const [editingCellId, setEditingCellId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
+  const [initialEditValue, setInitialEditValue] = useState<string>("");
   const [localEdits, setLocalEdits] = useState<Record<string, string>>({});
+  const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
+  const [showDiscardMessage, setShowDiscardMessage] = useState<boolean>(false);
 
   // function to import csvService export and trigger CSV download
   function handleExportCSV() {
@@ -87,23 +90,37 @@ function ExtractedDataPanel({
   const handleCellClick = (fieldId: string, initialValue: string) => {
     setEditingCellId(fieldId);
     setEditValue(initialValue);
+    setInitialEditValue(initialValue);
   };
 
   const handleCellBlur = (fieldId: string) => {
-    setLocalEdits(prev => ({
-      ...prev,
-      [fieldId]: editValue
-    }));
-    setEditingCellId(null);
-    if (onCellEdit) {
-      onCellEdit(fieldId, editValue);
+    if (editValue !== initialEditValue) {
+      setLocalEdits(prev => ({
+        ...prev,
+        [fieldId]: editValue
+      }));
+      if (onCellEdit) {
+        onCellEdit(fieldId, editValue);
+      }
+      
+      setShowSuccessMessage(true);
+      setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 2000);
     }
+    setEditingCellId(null);
   };
 
   const handleCellKeyDown = (e: React.KeyboardEvent, fieldId: string) => {
     if (e.key === 'Enter') {
       handleCellBlur(fieldId);
     } else if (e.key === 'Escape') {
+      if (editValue !== initialEditValue) {
+        setShowDiscardMessage(true);
+        setTimeout(() => {
+          setShowDiscardMessage(false);
+        }, 2000);
+      }
       setEditingCellId(null);
     }
   };
@@ -116,9 +133,23 @@ function ExtractedDataPanel({
       onMouseLeave={() => setIsMouseInside(false)}
     >
 
-      {/* Download Button */}
+      {/* Download Button & Notifications */}
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-base-content">EXTRACTED DATA</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold text-base-content">EXTRACTED DATA</h2>
+          {showSuccessMessage && (
+            <span className="text-success text-xs font-semibold animate-fade-in-out flex items-center gap-1">
+              <Check className="w-3.5 h-3.5" />
+              Success, changes saved!
+            </span>
+          )}
+          {showDiscardMessage && (
+            <span className="text-error text-xs font-semibold animate-fade-in-out flex items-center gap-1">
+              <X className="w-3.5 h-3.5" />
+              Changes discarded
+            </span>
+          )}
+        </div>
         <button
           onClick={handleExportCSV}
           disabled={exported}
