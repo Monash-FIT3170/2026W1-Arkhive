@@ -312,6 +312,18 @@ function ValidationPage() {
             }} 
             extractedData={documentContext} 
             hoveredOverlayId={hoveredTableFieldId} 
+            onCellEdit={(fieldId, newValue) => {
+              if (!documentContext) return;
+              const [rowId, column] = fieldId.split(':');
+              const newContext = {
+                ...documentContext,
+                rows: documentContext.rows.map(r => 
+                  String(r._id) === rowId ? { ...r, [column]: newValue } : r
+                )
+              };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
           />
         </div>
       </div>

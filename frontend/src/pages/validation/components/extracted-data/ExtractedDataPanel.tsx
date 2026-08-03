@@ -40,11 +40,13 @@ function getConfidenceTier(confidence: number): {
 function ExtractedDataPanel({
   onHover,
   extractedData,
-  hoveredOverlayId
+  hoveredOverlayId,
+  onCellEdit
 }: {
   onHover: (id: string | null) => void;
   extractedData: ExtractedData;
   hoveredOverlayId?: string | null;
+  onCellEdit?: (fieldId: string, newValue: string) => void;
 }) {
   // Currency formatting function (unchanged)
   const formatCurrency = (amount: number) => {
@@ -93,6 +95,9 @@ function ExtractedDataPanel({
       [fieldId]: editValue
     }));
     setEditingCellId(null);
+    if (onCellEdit) {
+      onCellEdit(fieldId, editValue);
+    }
   };
 
   const handleCellKeyDown = (e: React.KeyboardEvent, fieldId: string) => {
