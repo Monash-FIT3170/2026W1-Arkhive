@@ -5,8 +5,8 @@ export function normalizeColKey(col: string): string {
   return col
     .replace(/\(.*?\)/g, '')
     .replace(/\./g, '')
-    .replace(/\s+/g, '_')
     .trim()
+    .replace(/\s+/g, '_')
     .toUpperCase();
 }
 
