@@ -36,6 +36,10 @@ function ValidationPage() {
   const isLarge = useIsLargeScreen();
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const undoStack = useRef<ExtractedData[]>([]);
+  const documentContextRef = useRef<ExtractedData | null>(null);
+  const [tableKey, setTableKey] = useState(0);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
   const [hasDetected, setHasDetected] = useState(false);
@@ -76,6 +80,36 @@ function ValidationPage() {
       }
     }
   }, [documentContext, hasDetected]);
+
+  useEffect(() => {
+    documentContextRef.current = documentContext;
+  }, [documentContext]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const isUndo = e.metaKey && e.key === 'z' && !e.shiftKey;
+
+      if (isUndo) {
+        e.preventDefault();
+
+        if (undoStack.current.length === 0) {
+          return;
+        }
+
+        // pop last state from undo stack
+        const previous = undoStack.current.pop()!;
+
+        //restore previous state
+        setDocumentContext(previous);
+        saveExtractionSession(previous);
+        setTableKey((k) => k + 1);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   //Resizing Functions
   //Set dragging to be true
@@ -301,6 +335,9 @@ function ValidationPage() {
           }
         >
           <ExtractedDataPanel
+            key={tableKey}
+            isEditMode={isEditMode}
+            onEditModeChange={setIsEditMode}
             onHover={(id) => {
               if (isChatOpen && chatActiveTab === 'review') return;
               setHoveredTableFieldId(id);
@@ -316,6 +353,7 @@ function ValidationPage() {
             hoveredOverlayId={hoveredTableFieldId}
             onCellEdit={(fieldId, newValue) => {
               if (!documentContext) return;
+
               const [rowId, column] = fieldId.split(':');
               const newContext = {
                 ...documentContext,
@@ -323,6 +361,9 @@ function ValidationPage() {
                   String(r._id) === rowId ? { ...r, [column]: newValue } : r
                 ),
               };
+
+              undoStack.current.push(documentContext);
+
               setDocumentContext(newContext);
               saveExtractionSession(newContext);
               setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
