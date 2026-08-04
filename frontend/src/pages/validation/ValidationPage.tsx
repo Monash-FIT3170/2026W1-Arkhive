@@ -37,6 +37,7 @@ function ValidationPage() {
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const undoStack = useRef<ExtractedData[]>([]);
+  const redoStack = useRef<ExtractedData[]>([]);
   const documentContextRef = useRef<ExtractedData | null>(null);
   const [tableKey, setTableKey] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -89,6 +90,7 @@ function ValidationPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMac = navigator.platform.toUpperCase().includes('MAC');
       const isUndo = e.metaKey && e.key === 'z' && !e.shiftKey;
+      const isRedo = e.metaKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey));
 
       if (isUndo) {
         e.preventDefault();
@@ -100,9 +102,30 @@ function ValidationPage() {
         // pop last state from undo stack
         const previous = undoStack.current.pop()!;
 
+        // push current into redo stack
+        redoStack.current.push(documentContextRef.current!);
+
         //restore previous state
         setDocumentContext(previous);
         saveExtractionSession(previous);
+        setTableKey((k) => k + 1);
+      }
+
+      if (isRedo) {
+        e.preventDefault();
+
+        if (redoStack.current.length === 0) {
+          return;
+        }
+
+        // pop last state from redo stack
+        const next = redoStack.current.pop()!;
+
+        // push current into undo stack
+        undoStack.current.push(documentContextRef.current!);
+
+        setDocumentContext(next);
+        saveExtractionSession(next);
         setTableKey((k) => k + 1);
       }
     };
@@ -363,6 +386,7 @@ function ValidationPage() {
               };
 
               undoStack.current.push(documentContext);
+              redoStack.current = [];
 
               setDocumentContext(newContext);
               saveExtractionSession(newContext);
