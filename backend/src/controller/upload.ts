@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { parseTableWithRetries } from '../services/ocr/ocr.ts';
 import 'express-session';
+import 'multer';
 import fs from 'fs';
 import path from 'path';
 
@@ -20,7 +21,7 @@ declare module "express-session" {
 
 export default {
   processUpload: async (req: Request, res: Response) => {
-    const files = req.files as Express.Multer.File[] | undefined;
+    const files = (req as any).files as Express.Multer.File[] | undefined;
 
     if (!files || files.length === 0) {
       res.status(400).json({
