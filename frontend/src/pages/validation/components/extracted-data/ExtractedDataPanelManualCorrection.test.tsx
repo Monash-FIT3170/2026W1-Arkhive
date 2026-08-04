@@ -43,13 +43,16 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     expect(screen.getByText('Value2')).toBeDefined();
   });
 
-  it('turns a cell into an input field when clicked', async () => {
+  it('turns a cell into an input field when clicked in edit mode', async () => {
     render(
       <ExtractedDataPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
       />
     );
+    
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
     
     const cell = screen.getByText('Value1');
     fireEvent.click(cell);
@@ -68,6 +71,9 @@ describe('ExtractedDataPanel - Manual Correction', () => {
         onCellEdit={onCellEditMock}
       />
     );
+    
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
     
     fireEvent.click(screen.getByText('Value1'));
     const input = screen.getByRole('textbox');
@@ -91,6 +97,9 @@ describe('ExtractedDataPanel - Manual Correction', () => {
       />
     );
     
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+    
     fireEvent.click(screen.getByText('Value1'));
     const input = screen.getByRole('textbox');
     
@@ -112,6 +121,9 @@ describe('ExtractedDataPanel - Manual Correction', () => {
       />
     );
     
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+    
     fireEvent.click(screen.getByText('Value1'));
     const input = screen.getByRole('textbox');
     
@@ -122,5 +134,152 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     expect(screen.getByText('Changes discarded')).toBeDefined();
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.getByText('Value1')).toBeDefined();
+  });
+
+  it('triggers onRowAdd when Add Row button is clicked', () => {
+    const onRowAddMock = vi.fn();
+    render(
+      <ExtractedDataPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onRowAdd={onRowAddMock}
+      />
+    );
+    
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+    
+    fireEvent.click(screen.getByText('Add Row'));
+    expect(onRowAddMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('triggers onRowDelete when row trash icon is clicked', () => {
+    const onRowDeleteMock = vi.fn();
+    render(
+      <ExtractedDataPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onRowDelete={onRowDeleteMock}
+      />
+    );
+    
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+    
+    // By title or somehow find the trash icon
+    const deleteRowBtn = screen.getByTitle('Delete Row');
+    fireEvent.click(deleteRowBtn);
+    
+    expect(onRowDeleteMock).toHaveBeenCalledWith('row1');
+  });
+
+  it('triggers onColumnAdd when Add Column is clicked and a name is provided', () => {
+    const onColumnAddMock = vi.fn();
+    
+    // Mock the prompt
+    vi.spyOn(window, 'prompt').mockReturnValue('New_Field');
+    
+    render(
+      <ExtractedDataPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onColumnAdd={onColumnAddMock}
+      />
+    );
+    
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+    
+    fireEvent.click(screen.getByText('Add Column'));
+    expect(onColumnAddMock).toHaveBeenCalledWith('New_Field');
+    
+    vi.restoreAllMocks();
+  });
+
+  it('does not trigger onColumnAdd when prompt is cancelled', () => {
+    const onColumnAddMock = vi.fn();
+    vi.spyOn(window, 'prompt').mockReturnValue(null);
+    
+    render(
+      <ExtractedDataPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onColumnAdd={onColumnAddMock}
+      />
+    );
+    
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+    
+    fireEvent.click(screen.getByText('Add Column'));
+    expect(onColumnAddMock).not.toHaveBeenCalled();
+    
+    vi.restoreAllMocks();
+  });
+
+  it('triggers onColumnDelete when column trash icon is clicked', () => {
+    const onColumnDeleteMock = vi.fn();
+    render(
+      <ExtractedDataPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onColumnDelete={onColumnDeleteMock}
+      />
+    );
+    
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+    
+    const deleteColBtns = screen.getAllByTitle('Delete Column');
+    expect(deleteColBtns.length).toBe(2);
+    
+    fireEvent.click(deleteColBtns[0]);
+    expect(onColumnDeleteMock).toHaveBeenCalledWith('Field1');
+  });
+
+  it('triggers onRowMove with up/down directions when move buttons are clicked', () => {
+    const onRowMoveMock = vi.fn();
+    render(
+      <ExtractedDataPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onRowMove={onRowMoveMock}
+      />
+    );
+    
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+    
+    const moveUpBtn = screen.getByTitle('Move Row Up');
+    const moveDownBtn = screen.getByTitle('Move Row Down');
+    
+    fireEvent.click(moveUpBtn);
+    expect(onRowMoveMock).toHaveBeenCalledWith('row1', 'up');
+    
+    fireEvent.click(moveDownBtn);
+    expect(onRowMoveMock).toHaveBeenCalledWith('row1', 'down');
+  });
+
+  it('triggers onColumnMove with left/right directions when move buttons are clicked', () => {
+    const onColumnMoveMock = vi.fn();
+    render(
+      <ExtractedDataPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onColumnMove={onColumnMoveMock}
+      />
+    );
+    
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+    
+    const moveLeftBtns = screen.getAllByTitle('Move Column Left');
+    const moveRightBtns = screen.getAllByTitle('Move Column Right');
+    
+    fireEvent.click(moveLeftBtns[0]);
+    expect(onColumnMoveMock).toHaveBeenCalledWith('Field1', 'left');
+    
+    fireEvent.click(moveRightBtns[0]);
+    expect(onColumnMoveMock).toHaveBeenCalledWith('Field1', 'right');
   });
 });

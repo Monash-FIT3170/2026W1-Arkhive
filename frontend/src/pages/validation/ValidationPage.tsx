@@ -324,6 +324,102 @@ function ValidationPage() {
               setDocumentContext(newContext);
               saveExtractionSession(newContext);
             }}
+            //Acknowledgement: AI (Google Gemini) was used while coding the
+            // manual corrections
+            onRowAdd={() => {
+              if (!documentContext) return;
+              const newRowId = `manual_row_${Date.now()}`;
+              const newRow: any = { _id: newRowId, _confidence: 1, _cellConfidence: {} };
+              documentContext.columns.forEach(col => {
+                newRow[col] = "";
+              });
+              const newContext = {
+                ...documentContext,
+                rows: [...documentContext.rows, newRow]
+              };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
+            onRowDelete={(rowId) => {
+              if (!documentContext) return;
+              const newContext = {
+                ...documentContext,
+                rows: documentContext.rows.filter(r => r._id !== rowId)
+              };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
+            onColumnAdd={(columnName) => {
+              if (!documentContext) return;
+              // Avoid duplicates
+              if (documentContext.columns.includes(columnName)) return;
+              
+              const newContext = {
+                ...documentContext,
+                columns: [...documentContext.columns, columnName],
+                rows: documentContext.rows.map(r => ({ ...r, [columnName]: "" }))
+              };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
+            onColumnDelete={(columnName) => {
+              if (!documentContext) return;
+              const newContext = {
+                ...documentContext,
+                columns: documentContext.columns.filter(c => c !== columnName),
+                rows: documentContext.rows.map(r => {
+                  const newRow = { ...r };
+                  delete newRow[columnName];
+                  return newRow;
+                })
+              };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
+            onRowMove={(rowId, direction) => {
+              if (!documentContext) return;
+              const rows = [...documentContext.rows];
+              const idx = rows.findIndex(r => r._id === rowId);
+              if (idx === -1) return;
+              
+              if (direction === 'up' && idx > 0) {
+                const temp = rows[idx];
+                rows[idx] = rows[idx - 1];
+                rows[idx - 1] = temp;
+              } else if (direction === 'down' && idx < rows.length - 1) {
+                const temp = rows[idx];
+                rows[idx] = rows[idx + 1];
+                rows[idx + 1] = temp;
+              } else {
+                return; // No move needed
+              }
+              
+              const newContext = { ...documentContext, rows };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
+            onColumnMove={(columnName, direction) => {
+              if (!documentContext) return;
+              const columns = [...documentContext.columns];
+              const idx = columns.findIndex(c => c === columnName);
+              if (idx === -1) return;
+              
+              if (direction === 'left' && idx > 0) {
+                const temp = columns[idx];
+                columns[idx] = columns[idx - 1];
+                columns[idx - 1] = temp;
+              } else if (direction === 'right' && idx < columns.length - 1) {
+                const temp = columns[idx];
+                columns[idx] = columns[idx + 1];
+                columns[idx + 1] = temp;
+              } else {
+                return; // No move needed
+              }
+              
+              const newContext = { ...documentContext, columns };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
           />
         </div>
       </div>
