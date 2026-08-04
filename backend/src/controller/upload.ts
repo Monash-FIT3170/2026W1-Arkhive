@@ -1,8 +1,8 @@
-import { Request, Response } from "express";
-import { textExtraction, parseTableWithRetries } from "../services/ocr/ocr.ts";
-import { Multer } from "multer";
-import { SessionData } from "express-session";
-import { parse } from "node:path";
+import { Request, Response } from 'express';
+import { parseTableWithRetries } from '../services/ocr/ocr.ts';
+import 'express-session';
+import fs from 'fs';
+import path from 'path';
 
 declare module "express-session" {
   interface SessionData {
@@ -11,10 +11,10 @@ declare module "express-session" {
       createdAt: number;
       updatedAt: number;
     };
-    uploadedImage?: {
-      data: string;
-      mimeType: string;
-    };
+    // Replaced Base64 'uploadedImage' with an array of filenames stored on disk
+    uploadedFiles?: string[];
+    // Array of string types mapping to the uploaded files (e.g. ['Invoice', 'Receipt'])
+    uploadedTypes?: string[];
   }
 }
 
@@ -31,23 +31,44 @@ export default {
     }
 
     try {
-      // Save the first file to session to show as the document
-      if (files.length > 0) {
-        req.session.uploadedImage = {
-          data: files[0].buffer.toString("base64"),
-          mimeType: files[0].mimetype
-        };
+      // Auto-cleanup: If the user previously uploaded files in this session, delete them to keep the disk clear.
+      // This ensures we do not hoard unused images indefinitely.
+      if (req.session.uploadedFiles) {
+        for (const filename of req.session.uploadedFiles) {
+          const oldPath = path.join(process.cwd(), 'uploads', filename);
+          if (fs.existsSync(oldPath)) {
+            try {
+              fs.unlinkSync(oldPath);
+            } catch (err) {
+              console.error('Failed to delete old session file:', oldPath, err);
+            }
+          }
+        }
       }
+
+      // Parse metadata if sent from frontend
+      const metadataStr = req.body.metadata;
+      let metadata: { type: string }[] = [];
+      if (metadataStr) {
+        try {
+          metadata = JSON.parse(metadataStr);
+        } catch (e) {
+          console.error("Failed to parse metadata", e);
+        }
+      }
+
+      // Save the new filenames and their classifications to the session
+      req.session.uploadedFiles = files.map((f) => f.filename);
+      req.session.uploadedTypes = metadata.map(m => m.type);
 
       // Run OCR on each page in parallel
       const ocrResults = await Promise.all(
         files.map(async (file) => {
           console.log(`Processing file: ${file.originalname}`);
           try {
-            // textExtraction expects a path, but file.buffer should be used ideally.
-            // For now, since we only have originalname, it might fail.
-            // Let's wrap in try-catch to avoid breaking the whole upload if OCR fails locally.
-            const text = await parseTableWithRetries(file.buffer);
+            // Read the file buffer from the disk temporarily for OCR
+            const buffer = fs.readFileSync(file.path);
+            const text = await parseTableWithRetries(buffer);
             return text;
           } catch (e) {
             console.error("OCR failed for file", file.originalname, e);
