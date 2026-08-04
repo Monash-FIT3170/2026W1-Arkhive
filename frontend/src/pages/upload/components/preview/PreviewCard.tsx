@@ -1,9 +1,9 @@
 import { useRef } from "react";
-import { Trash2, Upload } from "lucide-react";
+import { Trash2, Upload, Tag } from "lucide-react";
 
 const REPLACE_INPUT_ACCEPT = ".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif";
 
-type PreviewCardProps = {
+type Props = {
   label: string;
   subtitle?: string;
   hasFile: boolean;
@@ -17,9 +17,11 @@ type PreviewCardProps = {
   onToggle: (index: number) => void;
   onRemove?: (index: number) => void;
   onReplaceWithFile?: (index: number, file: File) => void;
+  documentType?: string;
+  onChangeType?: (index: number) => void;
 };
 
-function PreviewCard({
+export default function PreviewCard({
   label,
   subtitle,
   hasFile,
@@ -33,7 +35,9 @@ function PreviewCard({
   onToggle,
   onRemove,
   onReplaceWithFile,
-}: PreviewCardProps) {
+  documentType,
+  onChangeType,
+}: Props) {
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const displayName = subtitle ? `${label} - ${subtitle}` : label;
   const warningMessage = shouldWarn
@@ -46,20 +50,18 @@ function PreviewCard({
 
   return (
     <article
-      className={`relative min-h-[380px] rounded-[10px] border p-3 transition ${
-        isSelected
-          ? "border-primary bg-primary/5 ring-1 ring-primary"
-          : "border-base-300 bg-base-200"
-      } ${hasFile ? "cursor-pointer" : "cursor-default"}`}
+      className={`relative min-h-[380px] rounded-[10px] border p-3 transition ${isSelected
+        ? "border-primary bg-primary/5 ring-1 ring-primary"
+        : "border-base-300 bg-base-200"
+        } ${hasFile ? "cursor-pointer" : "cursor-default"}`}
       onClick={() => hasFile && onToggle(index)}
     >
       {hasFile && (
         <span
-          className={`absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${
-            isSelected
-              ? "bg-primary text-primary-content"
-              : "border border-base-content/20 bg-base-300 text-transparent"
-          }`}
+          className={`absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${isSelected
+            ? "bg-primary text-primary-content"
+            : "border border-base-content/20 bg-base-300 text-transparent"
+            }`}
         >
           ✓
         </span>
@@ -81,6 +83,13 @@ function PreviewCard({
           <p className="mt-1 truncate text-center text-xs text-base-content/70">{subtitle}</p>
         ) : (
           <p className="mt-1.5 text-center text-xs text-base-content/50">{index + 1}</p>
+        )}
+        {documentType && (
+          <div className="mt-1 flex justify-center">
+            <span className="badge badge-primary badge-outline badge-sm">
+              {documentType}
+            </span>
+          </div>
         )}
       </div>
 
@@ -129,6 +138,20 @@ function PreviewCard({
               Remove Page
             </button>
           )}
+          {onChangeType && (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm w-full max-w-[11rem] font-normal"
+              aria-label={`Change type of page ${displayName}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onChangeType(index);
+              }}
+            >
+              <Tag className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+              Change Type
+            </button>
+          )}
 
           {shouldWarn && warningMessage && (
             <div className="mb-2 rounded-md border border-warning/80 bg-warning/10 px-2 py-1 text-center text-[12px] text-warning font-bold">
@@ -141,4 +164,3 @@ function PreviewCard({
   );
 }
 
-export default PreviewCard;

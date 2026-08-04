@@ -21,16 +21,17 @@ import {
   MAX_FILE_SIZE_MB,
 } from './components/dropzone/DropZone';
 import { uploadPagesToBackend } from '../../services/uploadService';
+import ClassificationModal from './components/ClassificationModal';
 
-function UploadPage() {
+export default function UploadPage() {
   const navigate = useNavigate();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null); // US-1.4
-  const [uploadSuccess, setUploadSuccess] = useState(false);               // US-1.5
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const [replaceConfirm, setReplaceConfirm] = useState<{
     previewIndex: number;
     newFile: File;
@@ -47,6 +48,9 @@ function UploadPage() {
   const [bulkReplaceConfirm, setBulkReplaceConfirm] = useState<
     { previewIndex: number; newFile: File; itemTitle: string }[] | null
   >(null);
+
+  // tracks indices of previewItems that need their type assigned
+  const [pendingClassificationIndices, setPendingClassificationIndices] = useState<number[] | null>(null);
 
   // Refs
   const previewItemsRef = useRef<PreviewItem[]>([]);
@@ -80,6 +84,10 @@ function UploadPage() {
           if (prev.length === 0 && next.length > 0) {
             unlockStep(1); //unlock step 1 (preview) after successful file capture
           }
+
+          // queue classification for the newly added items
+          const newIndices = newItems.map((_, i) => startIndex + i);
+          setPendingClassificationIndices(newIndices);
 
           setSelectedPages(prevSel => {
             const nextSel = new Set(prevSel);
@@ -198,6 +206,10 @@ function UploadPage() {
           const next = [...prev];
           next.splice(previewIndex, 1, ...newItems);
 
+          const newIndices = newItems.map((_, i) => previewIndex + i);
+          // Set pending classification immediately for this replace
+          setTimeout(() => setPendingClassificationIndices(newIndices), 0);
+
           setSelectedPages(prevSel => {
             const nextSel = new Set<number>();
             const shift = newItems.length - 1;
@@ -278,10 +290,13 @@ function UploadPage() {
       .then((allNewItems) => {
         setPreviewItems((prev) => {
           const next = [...prev];
+          const newIndices: number[] = [];
           [...pairs].reverse().forEach((pair, i) => {
             const newItems = allNewItems[pairs.length - 1 - i];
             next.splice(pair.previewIndex, 1, ...newItems);
+            newItems.forEach((_, idx) => newIndices.push(pair.previewIndex + idx));
           });
+          setTimeout(() => setPendingClassificationIndices(newIndices.sort((a, b) => a - b)), 0);
           return next;
         });
         setSelectedPages(new Set());
@@ -289,6 +304,45 @@ function UploadPage() {
       .finally(() => {
         setIsProcessing(false);
       });
+  }
+
+  // ── Change Type ────────────────────────────────────────────────────────────
+  function requestBulkChangeType() {
+    if (selectedPages.size === 0) return;
+    setPendingClassificationIndices([...selectedPages].sort((a, b) => a - b));
+  }
+
+  function handleChangeType(index: number) {
+    setPendingClassificationIndices([index]);
+  }
+
+  function handleClassificationComplete(updates: { index: number; documentType: string }[]) {
+    setPreviewItems(prev => {
+      const next = [...prev];
+      updates.forEach(({ index, documentType }) => {
+        if (next[index]) {
+          next[index] = { ...next[index], documentType };
+        }
+      });
+      return next;
+    });
+    setPendingClassificationIndices(null);
+  }
+
+  function handleClassificationCancel() {
+    if (!pendingClassificationIndices) return;
+
+    setPreviewItems(prev => {
+      const next = [...prev];
+      pendingClassificationIndices.forEach((index) => {
+        // If a document doesn't have a type yet, default to 'Other'
+        if (next[index] && !next[index].documentType) {
+          next[index] = { ...next[index], documentType: 'Other' };
+        }
+      });
+      return next;
+    });
+    setPendingClassificationIndices(null);
   }
 
   // ── Process: send selected pages to OCR backend, then navigate ─────────────
@@ -305,13 +359,16 @@ function UploadPage() {
     setUploadSuccess(false); // US-1.5: clear any previous success before retrying
 
     try {
-      const selectedSrcs = [...selectedPages]
+      const selectedItems = [...selectedPages]
         .sort((a, b) => a - b)
         .map((i) => previewItems[i])
         .filter((item) => item?.previewSrc)
-        .map((item) => item.previewSrc!);
+        .map((item) => ({
+          src: item.previewSrc!,
+          type: item.documentType || 'Other'
+        }));
 
-      await uploadPagesToBackend(selectedSrcs);
+      await uploadPagesToBackend(selectedItems);
 
       // US-1.5: detect successful upload and show success notification
       unlockStep(2);
@@ -369,6 +426,13 @@ function UploadPage() {
     return (
       <>
         {renderNotification()}
+        {pendingClassificationIndices && pendingClassificationIndices.length > 0 && (
+          <ClassificationModal
+            items={pendingClassificationIndices.map(index => ({ index, item: previewItems[index] }))}
+            onComplete={handleClassificationComplete}
+            onCancel={handleClassificationCancel}
+          />
+        )}
         <EmptyUploadView onFilesCaptured={captureFiles} onError={setUploadError} />
       </>
     );
@@ -438,6 +502,15 @@ function UploadPage() {
         </div>
       )}
 
+      {/* Classification Modal */}
+      {pendingClassificationIndices && pendingClassificationIndices.length > 0 && (
+        <ClassificationModal
+          items={pendingClassificationIndices.map(index => ({ index, item: previewItems[index] }))}
+          onComplete={handleClassificationComplete}
+          onCancel={handleClassificationCancel}
+        />
+      )}
+
       <div className="flex min-h-0 flex-1">
 
         {/* Preview grid */}
@@ -456,9 +529,11 @@ function UploadPage() {
                 isBlurry={item.isBlurry}
                 isDark={item.isDark}
                 shouldWarn={item.shouldWarn}
+                documentType={item.documentType}
                 onToggle={togglePageSelection}
                 onRemove={handleRemovePreview}
                 onReplaceWithFile={handleReplaceWithFile}
+                onChangeType={handleChangeType}
               />
             ))}
           </div>
@@ -474,13 +549,12 @@ function UploadPage() {
           onProcess={handleProcess}
           onFilesCaptured={captureFiles}
           onError={setUploadError}
-          onBulkRemove={requestBulkRemove}           
-          onBulkReplaceFiles={handleBulkReplaceFiles} 
+          onBulkRemove={requestBulkRemove}
+          onBulkReplaceFiles={handleBulkReplaceFiles}
+          onBulkChangeType={requestBulkChangeType}
         />
 
       </div>
     </div>
   );
 }
-
-export default UploadPage;
