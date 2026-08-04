@@ -19,10 +19,7 @@ fs.writeFileSync(credsPath, Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64!, 
 process.env.GOOGLE_APPLICATION_CREDENTIALS = credsPath;
 
 const client = new vision.ImageAnnotatorClient({
-  keyFilename: path.resolve(
-    process.cwd(),
-    "./temp/google-vision-key.json"
-  ),
+  keyFilename: credsPath,
   features: [
     {
       type: "DOCUMENT_TEXT_DETECTION"
