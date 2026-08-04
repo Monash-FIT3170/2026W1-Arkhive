@@ -21,7 +21,7 @@ process.env.GOOGLE_APPLICATION_CREDENTIALS = credsPath;
 const client = new vision.ImageAnnotatorClient({
   keyFilename: path.resolve(
     process.cwd(),
-    "../backend/src/credentials/google-vision-key.json"
+    "../temp/google-vision-key.json"
   ),
   features: [
     {
