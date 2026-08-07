@@ -7,9 +7,8 @@ import LlamaCloud from "@llamaindex/llama-cloud";
 import { convertTable } from './utils/utils_table_extraction_new.js';
 
 
-console.log(process.env)
 const client2 = new LlamaCloud({
-  apiKey:  process.env.LLAMA_API_KEY,
+  apiKey: process.env.LLAMA_API_KEY,
 });
 
 /*const result = await client2.extract.create({
