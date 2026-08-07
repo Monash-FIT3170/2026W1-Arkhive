@@ -1,21 +1,15 @@
 import path from 'path';
 import vision from '@google-cloud/vision';
-import fs, { ReadStream } from 'fs';
+import fs from 'fs';
 import { extractStructuredComponents } from './utils/utils_table_extraction.js';
 import { withRetry } from './utils/utils.js';
 import LlamaCloud from "@llamaindex/llama-cloud";
-import { file } from 'zod';
-import { text } from 'stream/consumers';
-import { Readable } from 'stream';
-import { Uploadable } from "@llamaindex/llama-cloud"; 
+import { convertTable } from './utils/utils_table_extraction_new.js';
 
+
+console.log(process.env)
 const client2 = new LlamaCloud({
-  apiKey: process.env.LLAMA_API_KEY,
-});
-
-const fileObj = await client2.files.create({
-  file: fs.createReadStream("./sample-file-1_page-0001.jpg"),
-  purpose: "extract",
+  apiKey:  process.env.LLAMA_API_KEY,
 });
 
 /*const result = await client2.extract.create({
@@ -64,6 +58,8 @@ export async function textExtraction(buffer: Buffer): Promise<string> {
     granular_bboxes: ["cell"]
   }})
 
+  client2.files.delete(fileObj.id)
+
   return result.markdown_full ?? "";
 }
 
@@ -83,7 +79,7 @@ export async function textExtraction(buffer: Buffer): Promise<string> {
 function for getting bounding boxes for all words detected
  @author Harsha Sharma (33879303)
 */  
-async function parseTable(imageBuffer: Buffer) {
+async function parseTableLegacy(imageBuffer: Buffer) {
   const [response] = await client.documentTextDetection(imageBuffer);
   const fullTextAnnotation = response.fullTextAnnotation;
   return extractStructuredComponents(fullTextAnnotation!.pages!);
@@ -93,14 +89,24 @@ export async function parseTableWithRetries(imageBuffer: Buffer){
   return await withRetry(() => parseTable(imageBuffer))
 }
 
+/*
+ @author Harsha Sharma (33879303)
+*/  
+async function parseTable(imageBuffer: Buffer) {
+  const [response] = await client.documentTextDetection(imageBuffer);
+  const fullTextAnnotation = response.fullTextAnnotation;
+  return extractStructuredComponents(fullTextAnnotation!.pages!);
+}
+
+
 // function for getting overall averaged confidence score
 
-const jsonOut = JSON.stringify(
-  await parseTable(fs.readFileSync("./receipt-template-us-classic-white-750px.png")),
-  null,
-  2
-);
+//const jsonOut = JSON.stringify(
+//  await parseTable(fs.readFileSync("c:/Users/harsh/OneDrive/Pictures/sample-file-1.pdf")),
+//  null,
+//  2
+//);
 
-fs.writeFileSync("boundingBox.json", jsonOut, "utf-8");
+//fs.writeFileSync("boundingBox.json", jsonOut, "utf-8");
 
-console.log(await textExtraction(fs.readFileSync("./receipt-template-us-classic-white-750px.png")))
+await convertTable(fs.readFileSync("c:/Users/harsh/OneDrive/Pictures/sample-file-1.pdf"), client2)
