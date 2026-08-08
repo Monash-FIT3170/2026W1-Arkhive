@@ -156,6 +156,36 @@ function ExtractedDataPanel({
         }, 2000);
       }
       setEditingCellId(null);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      handleCellBlur(fieldId);
+
+      const [rowId, column] = fieldId.split(':');
+      const columns = extractedData.columns;
+      const rows = extractedData.rows;
+      const colIdx = columns.indexOf(column);
+      const rowIdx = rows.findIndex((r) => String(r._id) === rowId);
+
+      let nextColIdx = colIdx + 1;
+      let nextRowIdx = rowIdx;
+
+      if (nextColIdx >= columns.length) {
+        nextColIdx = 0;
+        nextRowIdx = rowIdx + 1;
+      }
+
+      if (nextRowIdx >= rows.length) {
+        return;
+      }
+
+      const nextRow = rows[nextRowIdx];
+      const nextColumn = columns[nextColIdx];
+      const nextFieldId = `${String(nextRow._id)}:${nextColumn}`;
+      const nextValue = String(nextRow[nextColumn] || '');
+
+      setEditingCellId(nextFieldId);
+      setEditValue(nextValue);
+      setInitialEditValue(nextValue);
     }
   };
 
