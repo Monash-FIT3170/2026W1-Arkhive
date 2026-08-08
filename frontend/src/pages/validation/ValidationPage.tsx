@@ -41,6 +41,7 @@ function ValidationPage() {
   const documentContextRef = useRef<ExtractedData | null>(null);
   const [tableKey, setTableKey] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
 
   const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
   const [hasDetected, setHasDetected] = useState(false);
@@ -108,6 +109,7 @@ function ValidationPage() {
         //restore previous state
         setDocumentContext(previous);
         saveExtractionSession(previous);
+        setEditedCells(new Set());
         setTableKey((k) => k + 1);
       }
 
@@ -126,6 +128,7 @@ function ValidationPage() {
 
         setDocumentContext(next);
         saveExtractionSession(next);
+        setEditedCells(new Set());
         setTableKey((k) => k + 1);
       }
     };
@@ -361,6 +364,7 @@ function ValidationPage() {
             key={tableKey}
             isEditMode={isEditMode}
             onEditModeChange={setIsEditMode}
+            editedCells={editedCells}
             onHover={(id) => {
               if (isChatOpen && chatActiveTab === 'review') return;
               setHoveredTableFieldId(id);
@@ -377,6 +381,9 @@ function ValidationPage() {
             onCellEdit={(fieldId, newValue) => {
               if (!documentContext) return;
 
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
+
               const [rowId, column] = fieldId.split(':');
               const newContext = {
                 ...documentContext,
@@ -385,9 +392,7 @@ function ValidationPage() {
                 ),
               };
 
-              undoStack.current.push(documentContext);
-              redoStack.current = [];
-
+              setEditedCells((prev) => new Set(prev).add(fieldId));
               setDocumentContext(newContext);
               saveExtractionSession(newContext);
               setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));

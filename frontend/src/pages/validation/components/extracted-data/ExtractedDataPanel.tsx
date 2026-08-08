@@ -60,6 +60,7 @@ function ExtractedDataPanel({
   onColumnReorder,
   isEditMode,
   onEditModeChange,
+  editedCells,
 }: {
   onHover: (id: string | null) => void;
   extractedData: ExtractedData;
@@ -73,6 +74,7 @@ function ExtractedDataPanel({
   onColumnReorder?: (newColumns: string[]) => void;
   isEditMode?: boolean;
   onEditModeChange?: (value: boolean) => void;
+  editedCells?: Set<string>;
 }) {
   // Currency formatting function (unchanged)
   const formatCurrency = (amount: number) => {
@@ -352,9 +354,12 @@ function ExtractedDataPanel({
                         className={`p-2 break-words whitespace-normal hover:bg-warning/10 text-base-content text-[13px] transition-colors ${
                           isEditMode ? 'cursor-pointer' : ''
                         } ${
+                          //yellow tint
                           isCellHighlighted && !isEditing
                             ? 'bg-primary text-primary-content font-bold rounded shadow-inner'
-                            : ''
+                            : editedCells?.has(fieldId)
+                              ? 'bg-warning/15'
+                              : ''
                         }`}
                         onMouseEnter={() => onHover(fieldId)}
                         onMouseLeave={() => onHover(null)}
@@ -375,7 +380,13 @@ function ExtractedDataPanel({
                             autoFocus
                           />
                         ) : (
-                          displayValue
+                          //pencil icon
+                          <div className="relative">
+                            {editedCells?.has(fieldId) && (
+                              <Edit2 className="w-2.5 h-2.5 text-warning absolute top-0 right-0 opacity-60" />
+                            )}
+                            {displayValue}
+                          </div>
                         )}
                       </td>
                     );
