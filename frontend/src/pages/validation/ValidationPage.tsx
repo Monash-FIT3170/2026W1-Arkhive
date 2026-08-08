@@ -12,6 +12,7 @@ import { detectReviewFields } from './components/extracted-data/detectReviewFiel
 import { requestFieldReview } from '../../services/llmService';
 import OcrReviewWidget from './components/chat/OcrReviewWidget';
 import type { OcrIssue } from './components/chat/OcrReviewWidget';
+import { flatten } from './components/extracted-data/flattener';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -58,7 +59,7 @@ function ValidationPage() {
         //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
         // }
         setDocumentImageURL(await getUploadedImageUrl());
-        setDocumentContext(flattenOcrData(ocrData as OCRComponent[]));
+        setDocumentContext(flatten(ocrData as OCRComponent[]));
       } catch (error) {
         console.error('Failed to load extraction session', error);
       }
