@@ -1,7 +1,17 @@
-import { AlertTriangle, Download, Check } from "lucide-react"; // NEW: Importing icons for confidence badges and export button
-import { useState, useEffect } from "react";
-import type { ExtractedData } from "../../../../models/TableData";
-import { exportExtractedDataAsCSV } from "../../../../services/csvDownloadService";
+import {
+  AlertTriangle,
+  Download,
+  Check,
+  X,
+  Plus,
+  Trash,
+  Edit2,
+  ChevronUp,
+  ChevronDown,
+} from 'lucide-react'; // NEW: Importing icons for confidence badges and export button
+import { useState, useEffect } from 'react';
+import type { ExtractedData } from '../../../../models/TableData';
+import { exportExtractedDataAsCSV } from '../../../../services/csvDownloadService';
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
@@ -15,24 +25,24 @@ function getConfidenceTier(confidence: number): {
   const percent = Math.round(confidence * 100);
   if (confidence >= 0.85) {
     return {
-      colour: "#22c55e",
+      colour: '#22c55e',
       label: `${percent}% - High`,
       isLow: false,
-      badgeClass: "badge-success"
+      badgeClass: 'badge-success',
     };
   } else if (confidence >= 0.7) {
     return {
-      colour: "#f59e0b",
+      colour: '#f59e0b',
       label: `${percent}% - Medium`,
       isLow: false,
-      badgeClass: "badge-warning"
+      badgeClass: 'badge-warning',
     };
   } else {
     return {
-      colour: "#f59e0b",
+      colour: '#f59e0b',
       label: `${percent}% - Low`,
       isLow: true, // triggers row highlight and warning icon
-      badgeClass: "badge-error"
+      badgeClass: 'badge-error',
     };
   }
 }
@@ -40,22 +50,56 @@ function getConfidenceTier(confidence: number): {
 function ExtractedDataPanel({
   onHover,
   extractedData,
-  hoveredOverlayId
+  hoveredOverlayId,
+  onCellEdit,
+  onRowAdd,
+  onRowDelete,
+  onColumnAdd,
+  onColumnDelete,
+  onRowMove,
+  onColumnReorder,
+  isEditMode,
+  onEditModeChange,
+  editedCells,
 }: {
   onHover: (id: string | null) => void;
   extractedData: ExtractedData;
   hoveredOverlayId?: string | null;
+  onCellEdit?: (fieldId: string, newValue: string) => void;
+  onRowAdd?: () => void;
+  onRowDelete?: (rowId: string | number) => void;
+  onColumnAdd?: (columnName: string) => void;
+  onColumnDelete?: (columnName: string) => void;
+  onRowMove?: (rowId: string | number, direction: 'up' | 'down') => void;
+  onColumnReorder?: (newColumns: string[]) => void;
+  isEditMode?: boolean;
+  onEditModeChange?: (value: boolean) => void;
+  editedCells?: Set<string>;
 }) {
   // Currency formatting function (unchanged)
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR"
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
     }).format(amount);
   };
 
   // used to check if file exported
   const [exported, setExported] = useState(false);
+  const [isMouseInside, setIsMouseInside] = useState(false);
+
+  // Editing state
+  const [editingCellId, setEditingCellId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+  const [initialEditValue, setInitialEditValue] = useState<string>('');
+  const [localEdits, setLocalEdits] = useState<Record<string, string>>({});
+  const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
+  const [showDiscardMessage, setShowDiscardMessage] = useState<boolean>(false);
+  // const [isEditMode, setIsEditMode] = useState<boolean>(false);
+
+  // Column re-ordering
+  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
   // function to import csvService export and trigger CSV download
   function handleExportCSV() {
@@ -63,9 +107,7 @@ function ExtractedDataPanel({
     setExported(true);
     setTimeout(() => setExported(false), 2500);
   }
-  
-  const [isMouseInside, setIsMouseInside] = useState(false);
-  
+
   useEffect(() => {
     if (hoveredOverlayId && !isMouseInside) {
       // hoveredOverlayId is now fieldId (e.g. comp_4:SUB_ITEM_2)
@@ -73,67 +115,242 @@ function ExtractedDataPanel({
       const safeId = hoveredOverlayId.replace(/:/g, '-');
       const el = document.getElementById(`cell-${safeId}`);
       if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
   }, [hoveredOverlayId, isMouseInside]);
 
+  const handleCellClick = (fieldId: string, initialValue: string) => {
+    if (!isEditMode) return;
+    setEditingCellId(fieldId);
+    setEditValue(initialValue);
+    setInitialEditValue(initialValue);
+  };
+
+  const handleCellBlur = (fieldId: string) => {
+    if (editValue !== initialEditValue) {
+      setLocalEdits((prev) => ({
+        ...prev,
+        [fieldId]: editValue,
+      }));
+      if (onCellEdit) {
+        onCellEdit(fieldId, editValue);
+      }
+
+      setShowSuccessMessage(true);
+      setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 2000);
+    }
+    setEditingCellId(null);
+  };
+
+  const handleCellKeyDown = (e: React.KeyboardEvent, fieldId: string) => {
+    if (e.key === 'Enter') {
+      handleCellBlur(fieldId);
+    } else if (e.key === 'Escape') {
+      if (editValue !== initialEditValue) {
+        setShowDiscardMessage(true);
+        setTimeout(() => {
+          setShowDiscardMessage(false);
+        }, 2000);
+      }
+      setEditingCellId(null);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      handleCellBlur(fieldId);
+
+      const [rowId, column] = fieldId.split(':');
+      const columns = extractedData.columns;
+      const rows = extractedData.rows;
+      const colIdx = columns.indexOf(column);
+      const rowIdx = rows.findIndex((r) => String(r._id) === rowId);
+
+      let nextColIdx = colIdx + 1;
+      let nextRowIdx = rowIdx;
+
+      if (nextColIdx >= columns.length) {
+        nextColIdx = 0;
+        nextRowIdx = rowIdx + 1;
+      }
+
+      if (nextRowIdx >= rows.length) {
+        return;
+      }
+
+      const nextRow = rows[nextRowIdx];
+      const nextColumn = columns[nextColIdx];
+      const nextFieldId = `${String(nextRow._id)}:${nextColumn}`;
+      const nextValue = String(nextRow[nextColumn] || '');
+
+      setEditingCellId(nextFieldId);
+      setEditValue(nextValue);
+      setInitialEditValue(nextValue);
+    }
+  };
 
   return (
-    <div 
+    <div
       className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col"
       onMouseEnter={() => setIsMouseInside(true)}
       onMouseLeave={() => setIsMouseInside(false)}
     >
-
-      {/* Download Button */}
+      {/* Download Button & Notifications */}
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-base-content">EXTRACTED DATA</h2>
-        <button
-          onClick={handleExportCSV}
-          disabled={exported}
-          className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${exported
-            ? "btn-success"
-            : "btn-primary"
-            }`}
-          title="Export to CSV"
-        >
-          {exported ? (
-            <><Check className="w-3.5 h-3.5" />Exported!</>
-          ) : (
-            <><Download className="w-3.5 h-3.5" />Export CSV</>
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold text-base-content">EXTRACTED DATA</h2>
+          {showSuccessMessage && (
+            <span className="text-success text-xs font-semibold animate-fade-in-out flex items-center gap-1">
+              <Check className="w-3.5 h-3.5" />
+              Success, changes saved!
+            </span>
           )}
-        </button>
+          {showDiscardMessage && (
+            <span className="text-error text-xs font-semibold animate-fade-in-out flex items-center gap-1">
+              <X className="w-3.5 h-3.5" />
+              Changes discarded
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              onEditModeChange?.(!isEditMode);
+              setEditingCellId(null);
+            }}
+            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${isEditMode ? 'btn-warning' : 'btn-outline'}`}
+            title="Toggle Edit Mode"
+          >
+            {isEditMode ? (
+              <>
+                <Check className="w-3.5 h-3.5" /> Done Editing
+              </>
+            ) : (
+              <>
+                <Edit2 className="w-3.5 h-3.5" /> Edit Table
+              </>
+            )}
+          </button>
+          {isEditMode && onColumnAdd && (
+            <button
+              onClick={() => {
+                const newColName = prompt('Enter the name of the new column:');
+                if (newColName && newColName.trim() !== '') {
+                  onColumnAdd(newColName.trim());
+                }
+              }}
+              className="btn btn-sm gap-2 text-xs transition-all rounded-xl btn-outline"
+              title="Add Column"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Column
+            </button>
+          )}
+          <button
+            onClick={handleExportCSV}
+            disabled={exported}
+            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${
+              exported ? 'btn-success' : 'btn-primary'
+            }`}
+            title="Export to CSV"
+          >
+            {exported ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                Exported!
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5" />
+                Export CSV
+              </>
+            )}
+          </button>
+        </div>
       </div>
-
-      {/* Table */}
-
+      {/*Acknowledgement: AI (Google Gemini) was used while coding the
+            manual corrections*/}
       {/* Table */}
       <div className="flex-1 overflow-auto min-h-0 max-w-full">
-        {/* UPDATED: Removed table-fixed to allow columns to size based on content */}
-
-        {/* UPDATED: Removed table-fixed to allow columns to size based on content */}
         <table className="table table-fixed w-full border border-base-300 text-[10px]">
-
           {/* Table Header */}
           <thead>
             <tr className="text-base-content/70">
               {/* Existing columns (unchanged) */}
               {extractedData.columns.map((column) => (
-                // 	UPDATED: whitespace-nowrap prevents headers from breaking mid-word.
                 <th
                   key={column}
-                  className="p-3 whitespace-normal break-words text-left text-[12px] font-bold border-b border-base-300"
-
+                  className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${
+                    isEditMode && dragOverColumn === column && draggedColumn !== column
+                      ? 'bg-primary/20'
+                      : ''
+                  }`}
+                  style={{ height: '1px' }}
+                  draggable={isEditMode}
+                  onDragStart={() => {
+                    if (!isEditMode) {
+                      return;
+                    }
+                    setDraggedColumn(column);
+                  }}
+                  onDragOver={(e) => {
+                    if (!isEditMode) {
+                      return;
+                    }
+                    e.preventDefault();
+                    setDragOverColumn(column);
+                  }}
+                  onDragLeave={() => {
+                    setDragOverColumn(null);
+                  }}
+                  onDrop={() => {
+                    if (!isEditMode || !draggedColumn || draggedColumn === column) {
+                      return;
+                    }
+                    const cols = [...extractedData.columns];
+                    const fromIdx = cols.indexOf(draggedColumn);
+                    const toIdx = cols.indexOf(column);
+                    cols.splice(fromIdx, 1);
+                    cols.splice(toIdx, 0, draggedColumn);
+                    onColumnReorder?.(cols);
+                    setDraggedColumn(null);
+                    setDragOverColumn(null);
+                  }}
                 >
-                  {column.replace(/_/g, " ")}
+                  <div className="flex flex-col items-center justify-between h-full gap-2">
+                    {/* drag handle icon only shown in edit mode */}
+                    {isEditMode && (
+                      <div className="cursor-grab text-base-content/40 hover:text-base-content/80 w-full flex justify-center">
+                        ⠿
+                      </div>
+                    )}
+
+                    <span className="text-left w-full flex-grow">{column.replace(/_/g, ' ')}</span>
+
+                    {isEditMode && onColumnDelete && (
+                      <div className="flex items-center justify-center gap-1 w-full bg-base-300/30 rounded px-1 py-0.5">
+                        {onColumnDelete && (
+                          <button
+                            className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-error opacity-60 hover:opacity-100 hover:bg-error/20"
+                            title="Delete Column"
+                            onClick={() => onColumnDelete(column)}
+                          >
+                            <Trash className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </th>
               ))}
 
               {/* NEW: Confidence column header added at the end of the table */}
-              <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal break-words">
+              <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal break-words w-[120px]">
                 CONFIDENCE SCORE
               </th>
+              {isEditMode && (onRowDelete || onRowMove) && (
+                <th className="p-3 border-b border-base-300 w-24"></th>
+              )}
             </tr>
           </thead>
 
@@ -145,37 +362,67 @@ function ExtractedDataPanel({
               return (
                 <tr
                   key={row._id}
-                  className={`border-b border-base-300 hover:bg-base-300/40 ${tier.isLow ? "bg-error/10" : ""
-                    }`}
+                  className={`border-b border-base-300 hover:bg-base-300/40 ${
+                    tier.isLow ? 'bg-error/10' : ''
+                  }`}
                 >
                   {extractedData.columns.map((column) => {
                     const fieldId = `${String(row._id)}:${column}`;
                     const isCellHighlighted = hoveredOverlayId === fieldId;
                     const safeId = fieldId.replace(/:/g, '-');
 
+                    const isEditing = editingCellId === fieldId;
+                    const displayValue =
+                      localEdits[fieldId] !== undefined
+                        ? localEdits[fieldId]
+                        : String(row[column] || '');
+
                     return (
                       <td
                         key={column}
                         id={`cell-${safeId}`}
-                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 cursor-pointer text-base-content text-[13px] transition-colors ${
-                          isCellHighlighted ? "bg-primary text-primary-content font-bold rounded shadow-inner" : ""
+                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 text-base-content text-[13px] transition-colors ${
+                          isEditMode ? 'cursor-pointer' : ''
+                        } ${
+                          //yellow tint
+                          isCellHighlighted && !isEditing
+                            ? 'bg-primary text-primary-content font-bold rounded shadow-inner'
+                            : editedCells?.has(fieldId)
+                              ? 'bg-warning/15'
+                              : ''
                         }`}
-                        onMouseEnter={() =>
-                          onHover(fieldId)
-                        }
+                        onMouseEnter={() => onHover(fieldId)}
                         onMouseLeave={() => onHover(null)}
+                        onClick={() => {
+                          if (!isEditing) {
+                            handleCellClick(fieldId, displayValue);
+                          }
+                        }}
                       >
-                        {row[column] || ""}
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            className="input input-xs input-bordered w-full max-w-xs bg-base-100 text-base-content"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onBlur={() => handleCellBlur(fieldId)}
+                            onKeyDown={(e) => handleCellKeyDown(e, fieldId)}
+                            autoFocus
+                          />
+                        ) : (
+                          //pencil icon
+                          <div className="relative">
+                            {editedCells?.has(fieldId) && (
+                              <Edit2 className="w-2.5 h-2.5 text-warning absolute top-0 right-0 opacity-60" />
+                            )}
+                            {displayValue}
+                          </div>
+                        )}
                       </td>
                     );
                   })}
 
-                  {/* NEW: Confidence score cell added at the end of each row
-										Shows a DaisyUI badge with the score percentage
-										Green ≥85%, Amber 70-84%, Red <70%
-										Low confidence rows also show a warning icon from lucide-react */}
-                  {/* UPDATED: Capsule shape with solid background colours for high visibility */}
-                  {/* Alert icon on left only for low confidence rows with hover tooltip */}
+                  {/* NEW: Confidence score cell added at the end of each row */}
                   <td className="p-2">
                     <div className="flex items-center gap-1">
                       {tier.isLow && (
@@ -183,25 +430,72 @@ function ExtractedDataPanel({
                           <AlertTriangle className="w-3 h-3 text-error cursor-pointer flex-shrink-0" />
                         </span>
                       )}
-                      {/* UPDATED: Switched from solid fill to outlined badge style */}
-                      {/* High confidence uses brand blue, medium amber, low red */}
-                      {/* White background keeps it subtle so it doesn't compete with more important UI elements */}
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === "badge-success" ? "border-success text-success bg-white" :
-                        tier.badgeClass === "badge-warning" ? "border-warning text-warning bg-white" :
-                          " border-error text-error bg-white"
-                        }`}>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                          tier.badgeClass === 'badge-success'
+                            ? 'border-success text-success bg-white'
+                            : tier.badgeClass === 'badge-warning'
+                              ? 'border-warning text-warning bg-white'
+                              : ' border-error text-error bg-white'
+                        }`}
+                      >
                         {tier.label}
                       </span>
                     </div>
                   </td>
+                  {isEditMode && (onRowDelete || onRowMove) && (
+                    <td className="p-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {onRowMove && (
+                          <div className="flex flex-col">
+                            <button
+                              className="btn btn-ghost btn-[0.5rem] min-h-0 h-4 px-1 text-base-content opacity-50 hover:opacity-100"
+                              title="Move Row Up"
+                              onClick={() => onRowMove(row._id, 'up')}
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              className="btn btn-ghost btn-[0.5rem] min-h-0 h-4 px-1 text-base-content opacity-50 hover:opacity-100"
+                              title="Move Row Down"
+                              onClick={() => onRowMove(row._id, 'down')}
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                        {onRowDelete && (
+                          <button
+                            className="btn btn-ghost btn-xs btn-square text-error opacity-50 hover:opacity-100"
+                            title="Delete Row"
+                            onClick={() => onRowDelete(row._id)}
+                          >
+                            <Trash className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-    </div>
 
+      {/* Add Row Button */}
+      {isEditMode && onRowAdd && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={onRowAdd}
+            className="btn btn-sm btn-outline gap-2 text-xs transition-all rounded-xl w-full max-w-xs border-dashed"
+            title="Add Row"
+          >
+            <Plus className="w-4 h-4" /> Add Row
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

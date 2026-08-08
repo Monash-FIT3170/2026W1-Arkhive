@@ -36,11 +36,17 @@ function ValidationPage() {
   const isLarge = useIsLargeScreen();
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const undoStack = useRef<ExtractedData[]>([]);
+  const redoStack = useRef<ExtractedData[]>([]);
+  const documentContextRef = useRef<ExtractedData | null>(null);
+  const [tableKey, setTableKey] = useState(0);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
 
   const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
   const [hasDetected, setHasDetected] = useState(false);
-  const [chatActiveTab, setChatActiveTab] = useState<"chat" | "review">("chat");
-  
+  const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review'>('chat');
+
   useEffect(() => {
     async function loadSession() {
       try {
@@ -63,19 +69,73 @@ function ValidationPage() {
   useEffect(() => {
     if (documentContext && !hasDetected) {
       const fields = detectReviewFields(documentContext);
-      const issues = fields.map(f => ({
+      const issues = fields.map((f) => ({
         fieldId: `${f.rowId}:${f.column}`,
         fieldName: f.column,
         ocrValue: String(f.value),
-        confidenceScore: f.confidence
+        confidenceScore: f.confidence,
       }));
       setFlaggedIssues(issues);
       setHasDetected(true);
       if (issues.length > 0) {
-        setChatActiveTab("review");
+        setChatActiveTab('review');
       }
     }
   }, [documentContext, hasDetected]);
+
+  useEffect(() => {
+    documentContextRef.current = documentContext;
+  }, [documentContext]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const isUndo = e.metaKey && e.key === 'z' && !e.shiftKey;
+      const isRedo = e.metaKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey));
+
+      if (isUndo) {
+        e.preventDefault();
+
+        if (undoStack.current.length === 0) {
+          return;
+        }
+
+        // pop last state from undo stack
+        const previous = undoStack.current.pop()!;
+
+        // push current into redo stack
+        redoStack.current.push(documentContextRef.current!);
+
+        //restore previous state
+        setDocumentContext(previous);
+        saveExtractionSession(previous);
+        setEditedCells(new Set());
+        setTableKey((k) => k + 1);
+      }
+
+      if (isRedo) {
+        e.preventDefault();
+
+        if (redoStack.current.length === 0) {
+          return;
+        }
+
+        // pop last state from redo stack
+        const next = redoStack.current.pop()!;
+
+        // push current into undo stack
+        undoStack.current.push(documentContextRef.current!);
+
+        setDocumentContext(next);
+        saveExtractionSession(next);
+        setEditedCells(new Set());
+        setTableKey((k) => k + 1);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   //Resizing Functions
   //Set dragging to be true
@@ -117,22 +177,25 @@ function ValidationPage() {
   const [hoveredTableFieldId, setHoveredTableFieldId] = useState<string | null>(null);
   const [hoveredDocumentOverlayId, setHoveredDocumentOverlayId] = useState<string | null>(null);
 
-  const handleSlideChange = useCallback((fieldId: string | null) => {
-    setHoveredTableFieldId(fieldId);
-    if (!fieldId) {
-      setHoveredDocumentOverlayId(null);
-      return;
-    }
-    const [rowId, column] = fieldId.split(':');
-    if (documentContext) {
-      const row = documentContext.rows.find(r => String(r._id) === rowId);
-      if (row && row._cellKeyMap && row._cellKeyMap[column]) {
-        setHoveredDocumentOverlayId(row._cellKeyMap[column]);
+  const handleSlideChange = useCallback(
+    (fieldId: string | null) => {
+      setHoveredTableFieldId(fieldId);
+      if (!fieldId) {
+        setHoveredDocumentOverlayId(null);
         return;
       }
-    }
-    setHoveredDocumentOverlayId(null);
-  }, [documentContext]);
+      const [rowId, column] = fieldId.split(':');
+      if (documentContext) {
+        const row = documentContext.rows.find((r) => String(r._id) === rowId);
+        if (row && row._cellKeyMap && row._cellKeyMap[column]) {
+          setHoveredDocumentOverlayId(row._cellKeyMap[column]);
+          return;
+        }
+      }
+      setHoveredDocumentOverlayId(null);
+    },
+    [documentContext]
+  );
 
   const addMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
@@ -192,13 +255,11 @@ function ValidationPage() {
     const [rowId, column] = fieldId.split(':');
     const newContext = {
       ...documentContext,
-      rows: documentContext.rows.map(r => 
-        r._id === rowId ? { ...r, [column]: newValue } : r
-      )
+      rows: documentContext.rows.map((r) => (r._id === rowId ? { ...r, [column]: newValue } : r)),
     };
     setDocumentContext(newContext);
     saveExtractionSession(newContext);
-    setFlaggedIssues(prev => prev.filter(issue => issue.fieldId !== fieldId));
+    setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
   };
 
   const handleCarouselReject = (fieldId: string) => {
@@ -206,13 +267,11 @@ function ValidationPage() {
     const [rowId, column] = fieldId.split(':');
     const newContext = {
       ...documentContext,
-      rows: documentContext.rows.map(r => 
-        r._id === rowId ? { ...r, [column]: '' } : r
-      )
+      rows: documentContext.rows.map((r) => (r._id === rowId ? { ...r, [column]: '' } : r)),
     };
     setDocumentContext(newContext);
     saveExtractionSession(newContext);
-    setFlaggedIssues(prev => prev.filter(issue => issue.fieldId !== fieldId));
+    setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
   };
 
   const handleCarouselManualEdit = (fieldId: string, newValue: string) => {
@@ -220,40 +279,43 @@ function ValidationPage() {
     const [rowId, column] = fieldId.split(':');
     const newContext = {
       ...documentContext,
-      rows: documentContext.rows.map(r => 
-        r._id === rowId ? { ...r, [column]: newValue } : r
-      )
+      rows: documentContext.rows.map((r) => (r._id === rowId ? { ...r, [column]: newValue } : r)),
     };
     setDocumentContext(newContext);
     saveExtractionSession(newContext);
-    setFlaggedIssues(prev => prev.filter(issue => issue.fieldId !== fieldId));
+    setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
   };
 
-  const handleFetchSuggestion = useCallback(async (fieldId: string) => {
-    if (!documentContext) return null;
-    const [rowId, column] = fieldId.split(':');
-    const issue = flaggedIssues.find(i => i.fieldId === fieldId);
-    if (!issue) return null;
+  const handleFetchSuggestion = useCallback(
+    async (fieldId: string) => {
+      if (!documentContext) return null;
+      const [rowId, column] = fieldId.split(':');
+      const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
+      if (!issue) return null;
 
-    const field = { rowId, column, value: issue.ocrValue, confidence: issue.confidenceScore };
-    
-    try {
-      const reply = await requestFieldReview(field, documentContext);
-      if (reply.intent?.newValue) {
-         return reply.intent.newValue;
-      }
-      if (reply.updatedContext) {
-        const updatedRow = reply.updatedContext.rows.find(r => r._id === rowId || String(r._id) === rowId);
-        if (updatedRow && updatedRow[column] !== undefined) {
-           return String(updatedRow[column]);
+      const field = { rowId, column, value: issue.ocrValue, confidence: issue.confidenceScore };
+
+      try {
+        const reply = await requestFieldReview(field, documentContext);
+        if (reply.intent?.newValue) {
+          return reply.intent.newValue;
         }
+        if (reply.updatedContext) {
+          const updatedRow = reply.updatedContext.rows.find(
+            (r) => r._id === rowId || String(r._id) === rowId
+          );
+          if (updatedRow && updatedRow[column] !== undefined) {
+            return String(updatedRow[column]);
+          }
+        }
+        return reply.response; // fallback to text response
+      } catch (e) {
+        console.error(e);
+        return null;
       }
-      return reply.response; // fallback to text response
-    } catch (e) {
-      console.error(e);
-      return null;
-    }
-  }, [documentContext, flaggedIssues]);
+    },
+    [documentContext, flaggedIssues]
+  );
 
   if (!documentContext) {
     return (
@@ -298,20 +360,140 @@ function ValidationPage() {
               : { width: '100%' }
           }
         >
-          <ExtractedDataPanel 
+          <ExtractedDataPanel
+            key={tableKey}
+            isEditMode={isEditMode}
+            onEditModeChange={setIsEditMode}
+            editedCells={editedCells}
             onHover={(id) => {
-              if (isChatOpen && chatActiveTab === "review") return;
+              if (isChatOpen && chatActiveTab === 'review') return;
               setHoveredTableFieldId(id);
               if (id && documentContext) {
                 const [rowId, column] = id.split(':');
-                const row = documentContext.rows.find(r => String(r._id) === rowId);
+                const row = documentContext.rows.find((r) => String(r._id) === rowId);
                 setHoveredDocumentOverlayId(row?._cellKeyMap?.[column] ?? null);
               } else {
                 setHoveredDocumentOverlayId(null);
               }
-            }} 
-            extractedData={documentContext} 
-            hoveredOverlayId={hoveredTableFieldId} 
+            }}
+            extractedData={documentContext}
+            hoveredOverlayId={hoveredTableFieldId}
+            onCellEdit={(fieldId, newValue) => {
+              if (!documentContext) return;
+
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
+
+              const [rowId, column] = fieldId.split(':');
+              const newContext = {
+                ...documentContext,
+                rows: documentContext.rows.map((r) =>
+                  String(r._id) === rowId ? { ...r, [column]: newValue } : r
+                ),
+              };
+
+              setEditedCells((prev) => new Set(prev).add(fieldId));
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+              setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
+            }}
+            //Acknowledgement: AI (Google Gemini) was used while coding the
+            // manual corrections
+            onRowAdd={() => {
+              if (!documentContext) return;
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
+              const newRowId = `manual_row_${Date.now()}`;
+              const newRow: any = { _id: newRowId, _confidence: 1, _cellConfidence: {} };
+              documentContext.columns.forEach((col) => {
+                newRow[col] = '';
+              });
+              const newContext = {
+                ...documentContext,
+                rows: [...documentContext.rows, newRow],
+              };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
+            onRowDelete={(rowId) => {
+              if (!documentContext) return;
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
+              const newContext = {
+                ...documentContext,
+                rows: documentContext.rows.filter((r) => r._id !== rowId),
+              };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
+            onColumnAdd={(columnName) => {
+              if (!documentContext) return;
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
+              // Avoid duplicates
+              if (documentContext.columns.includes(columnName)) return;
+
+              const newContext = {
+                ...documentContext,
+                columns: [...documentContext.columns, columnName],
+                rows: documentContext.rows.map((r) => ({ ...r, [columnName]: '' })),
+              };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
+            onColumnDelete={(columnName) => {
+              if (!documentContext) return;
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
+              const newContext = {
+                ...documentContext,
+                columns: documentContext.columns.filter((c) => c !== columnName),
+                rows: documentContext.rows.map((r) => {
+                  const newRow = { ...r };
+                  delete newRow[columnName];
+                  return newRow;
+                }),
+              };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
+            onRowMove={(rowId, direction) => {
+              if (!documentContext) return;
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
+              const rows = [...documentContext.rows];
+              const idx = rows.findIndex((r) => r._id === rowId);
+              if (idx === -1) return;
+
+              if (direction === 'up' && idx > 0) {
+                const temp = rows[idx];
+                rows[idx] = rows[idx - 1];
+                rows[idx - 1] = temp;
+              } else if (direction === 'down' && idx < rows.length - 1) {
+                const temp = rows[idx];
+                rows[idx] = rows[idx + 1];
+                rows[idx + 1] = temp;
+              } else {
+                return; // No move needed
+              }
+
+              const newContext = { ...documentContext, rows };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
+            onColumnReorder={(newColumns) => {
+              if (!documentContext) {
+                return;
+              }
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
+              const newContext = {
+                ...documentContext,
+                columns: newColumns,
+              };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
           />
         </div>
       </div>
