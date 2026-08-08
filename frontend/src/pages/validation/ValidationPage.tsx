@@ -396,6 +396,8 @@ function ValidationPage() {
             // manual corrections
             onRowAdd={() => {
               if (!documentContext) return;
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
               const newRowId = `manual_row_${Date.now()}`;
               const newRow: any = { _id: newRowId, _confidence: 1, _cellConfidence: {} };
               documentContext.columns.forEach((col) => {
@@ -410,6 +412,8 @@ function ValidationPage() {
             }}
             onRowDelete={(rowId) => {
               if (!documentContext) return;
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
               const newContext = {
                 ...documentContext,
                 rows: documentContext.rows.filter((r) => r._id !== rowId),
@@ -419,6 +423,8 @@ function ValidationPage() {
             }}
             onColumnAdd={(columnName) => {
               if (!documentContext) return;
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
               // Avoid duplicates
               if (documentContext.columns.includes(columnName)) return;
 
@@ -432,6 +438,8 @@ function ValidationPage() {
             }}
             onColumnDelete={(columnName) => {
               if (!documentContext) return;
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
               const newContext = {
                 ...documentContext,
                 columns: documentContext.columns.filter((c) => c !== columnName),
@@ -446,6 +454,8 @@ function ValidationPage() {
             }}
             onRowMove={(rowId, direction) => {
               if (!documentContext) return;
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
               const rows = [...documentContext.rows];
               const idx = rows.findIndex((r) => r._id === rowId);
               if (idx === -1) return;
@@ -466,32 +476,12 @@ function ValidationPage() {
               setDocumentContext(newContext);
               saveExtractionSession(newContext);
             }}
-            onColumnMove={(columnName, direction) => {
-              if (!documentContext) return;
-              const columns = [...documentContext.columns];
-              const idx = columns.findIndex((c) => c === columnName);
-              if (idx === -1) return;
-
-              if (direction === 'left' && idx > 0) {
-                const temp = columns[idx];
-                columns[idx] = columns[idx - 1];
-                columns[idx - 1] = temp;
-              } else if (direction === 'right' && idx < columns.length - 1) {
-                const temp = columns[idx];
-                columns[idx] = columns[idx + 1];
-                columns[idx + 1] = temp;
-              } else {
-                return; // No move needed
-              }
-
-              const newContext = { ...documentContext, columns };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
-            }}
             onColumnReorder={(newColumns) => {
               if (!documentContext) {
                 return;
               }
+              undoStack.current.push(documentContext);
+              redoStack.current = [];
               const newContext = {
                 ...documentContext,
                 columns: newColumns,
