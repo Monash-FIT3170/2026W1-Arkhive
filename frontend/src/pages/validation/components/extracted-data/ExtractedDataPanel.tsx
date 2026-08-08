@@ -8,8 +8,6 @@ import {
   Edit2,
   ChevronUp,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react'; // NEW: Importing icons for confidence badges and export button
 import { useState, useEffect } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
@@ -59,7 +57,7 @@ function ExtractedDataPanel({
   onColumnAdd,
   onColumnDelete,
   onRowMove,
-  onColumnMove,
+  onColumnReorder,
   isEditMode,
   onEditModeChange,
 }: {
@@ -72,7 +70,7 @@ function ExtractedDataPanel({
   onColumnAdd?: (columnName: string) => void;
   onColumnDelete?: (columnName: string) => void;
   onRowMove?: (rowId: string | number, direction: 'up' | 'down') => void;
-  onColumnMove?: (columnName: string, direction: 'left' | 'right') => void;
+  onColumnReorder?: (newColumns: string[]) => void;
   isEditMode?: boolean;
   onEditModeChange?: (value: boolean) => void;
 }) {
@@ -96,6 +94,10 @@ function ExtractedDataPanel({
   const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
   const [showDiscardMessage, setShowDiscardMessage] = useState<boolean>(false);
   // const [isEditMode, setIsEditMode] = useState<boolean>(false);
+
+  // Column re-ordering
+  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
   // function to import csvService export and trigger CSV download
   function handleExportCSV() {
@@ -246,22 +248,55 @@ function ExtractedDataPanel({
               {extractedData.columns.map((column) => (
                 <th
                   key={column}
-                  className="p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top"
+                  className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${
+                    isEditMode && dragOverColumn === column && draggedColumn !== column
+                      ? 'bg-primary/20'
+                      : ''
+                  }`}
                   style={{ height: '1px' }}
+                  draggable={isEditMode}
+                  onDragStart={() => {
+                    if (!isEditMode) {
+                      return;
+                    }
+                    setDraggedColumn(column);
+                  }}
+                  onDragOver={(e) => {
+                    if (!isEditMode) {
+                      return;
+                    }
+                    e.preventDefault();
+                    setDragOverColumn(column);
+                  }}
+                  onDragLeave={() => {
+                    setDragOverColumn(null);
+                  }}
+                  onDrop={() => {
+                    if (!isEditMode || !draggedColumn || draggedColumn === column) {
+                      return;
+                    }
+                    const cols = [...extractedData.columns];
+                    const fromIdx = cols.indexOf(draggedColumn);
+                    const toIdx = cols.indexOf(column);
+                    cols.splice(fromIdx, 1);
+                    cols.splice(toIdx, 0, draggedColumn);
+                    onColumnReorder?.(cols);
+                    setDraggedColumn(null);
+                    setDragOverColumn(null);
+                  }}
                 >
                   <div className="flex flex-col items-center justify-between h-full gap-2">
-                    <span className="text-left w-full flex-grow">{column.replace(/_/g, ' ')}</span>
+                    {/* drag handle icon only shown in edit mode */}
                     {isEditMode && (
+                      <div className="cursor-grab text-base-content/40 hover:text-base-content/80 w-full flex justify-center">
+                        ⠿
+                      </div>
+                    )}
+
+                    <span className="text-left w-full flex-grow">{column.replace(/_/g, ' ')}</span>
+
+                    {isEditMode && onColumnDelete && (
                       <div className="flex items-center justify-center gap-1 w-full bg-base-300/30 rounded px-1 py-0.5">
-                        {onColumnMove && (
-                          <button
-                            className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-base-content opacity-60 hover:opacity-100 hover:bg-base-300"
-                            title="Move Column Left"
-                            onClick={() => onColumnMove(column, 'left')}
-                          >
-                            <ChevronLeft className="w-3 h-3" />
-                          </button>
-                        )}
                         {onColumnDelete && (
                           <button
                             className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-error opacity-60 hover:opacity-100 hover:bg-error/20"
@@ -269,15 +304,6 @@ function ExtractedDataPanel({
                             onClick={() => onColumnDelete(column)}
                           >
                             <Trash className="w-3 h-3" />
-                          </button>
-                        )}
-                        {onColumnMove && (
-                          <button
-                            className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-base-content opacity-60 hover:opacity-100 hover:bg-base-300"
-                            title="Move Column Right"
-                            onClick={() => onColumnMove(column, 'right')}
-                          >
-                            <ChevronRight className="w-3 h-3" />
                           </button>
                         )}
                       </div>

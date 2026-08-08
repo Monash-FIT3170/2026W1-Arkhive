@@ -488,6 +488,17 @@ function ValidationPage() {
               setDocumentContext(newContext);
               saveExtractionSession(newContext);
             }}
+            onColumnReorder={(newColumns) => {
+              if (!documentContext) {
+                return;
+              }
+              const newContext = {
+                ...documentContext,
+                columns: newColumns,
+              };
+              setDocumentContext(newContext);
+              saveExtractionSession(newContext);
+            }}
           />
         </div>
       </div>
