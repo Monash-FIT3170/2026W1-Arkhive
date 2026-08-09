@@ -1,12 +1,44 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
+import type { ComponentProps } from 'react';
 import ExtractedDataPanel from './ExtractedDataPanel';
 import type { ExtractedData } from '../../../../models/TableData';
 
 // Unit test for ExtractedDataPanel
 // Acknowledgment: The generation of these tests was done with the 
 // assistance of Google Gemini
+
+type PanelProps = ComponentProps<typeof ExtractedDataPanel>;
+
+function ControlledPanel(props: PanelProps) {
+  const [isEditMode, setIsEditMode] = useState(false);
+  return (
+    <ExtractedDataPanel
+      {...props}
+      isEditMode={isEditMode}
+      onEditModeChange={setIsEditMode}
+    />
+  );
+}
+
+function ReorderPanel(props: PanelProps) {
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [columns, setColumns] = useState<string[]>(props.extractedData.columns);
+  return (
+    <ExtractedDataPanel
+      {...props}
+      extractedData={{ ...props.extractedData, columns }}
+      isEditMode={isEditMode}
+      onEditModeChange={setIsEditMode}
+      onColumnReorder={(newCols) => {
+        props.onColumnReorder?.(newCols);
+        setColumns(newCols);
+      }}
+    />
+  );
+}
 
 const mockExtractedData: ExtractedData = {
   columns: ['Field1', 'Field2'],
@@ -30,7 +62,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
 
   it('renders the table data correctly', () => {
     render(
-      <ExtractedDataPanel
+      <ControlledPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
       />
@@ -44,7 +76,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
 
   it('turns a cell into an input field when clicked in edit mode', async () => {
     render(
-      <ExtractedDataPanel
+      <ControlledPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
       />
@@ -64,7 +96,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
   it('saves edits via Enter key and shows success message', async () => {
     const user = userEvent.setup();
     render(
-      <ExtractedDataPanel
+      <ControlledPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
         onCellEdit={onCellEditMock}
@@ -89,7 +121,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
   it('saves edits when clicking outside (onBlur)', async () => {
     const user = userEvent.setup();
     render(
-      <ExtractedDataPanel
+      <ControlledPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
         onCellEdit={onCellEditMock}
@@ -113,7 +145,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
   it('discards edits when pressing Escape', async () => {
     const user = userEvent.setup();
     render(
-      <ExtractedDataPanel
+      <ControlledPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
         onCellEdit={onCellEditMock}
@@ -138,7 +170,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
   it('triggers onRowAdd when Add Row button is clicked', () => {
     const onRowAddMock = vi.fn();
     render(
-      <ExtractedDataPanel
+      <ControlledPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
         onRowAdd={onRowAddMock}
@@ -155,7 +187,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
   it('triggers onRowDelete when row trash icon is clicked', () => {
     const onRowDeleteMock = vi.fn();
     render(
-      <ExtractedDataPanel
+      <ControlledPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
         onRowDelete={onRowDeleteMock}
@@ -179,7 +211,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     vi.spyOn(window, 'prompt').mockReturnValue('New_Field');
 
     render(
-      <ExtractedDataPanel
+      <ControlledPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
         onColumnAdd={onColumnAddMock}
@@ -200,7 +232,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     vi.spyOn(window, 'prompt').mockReturnValue(null);
 
     render(
-      <ExtractedDataPanel
+      <ControlledPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
         onColumnAdd={onColumnAddMock}
@@ -219,7 +251,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
   it('triggers onColumnDelete when column trash icon is clicked', () => {
     const onColumnDeleteMock = vi.fn();
     render(
-      <ExtractedDataPanel
+      <ControlledPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
         onColumnDelete={onColumnDeleteMock}
@@ -239,7 +271,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
   it('triggers onRowMove with up/down directions when move buttons are clicked', () => {
     const onRowMoveMock = vi.fn();
     render(
-      <ExtractedDataPanel
+      <ControlledPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
         onRowMove={onRowMoveMock}
@@ -259,10 +291,10 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     expect(onRowMoveMock).toHaveBeenCalledWith('row1', 'down');
   });
 
-  it('triggers onColumnReorder with left/right directions when move buttons are clicked', () => {
+  it('triggers onColumnReorder when columns are dragged', () => {
     const onColumnReorderMock = vi.fn();
     render(
-      <ExtractedDataPanel
+      <ReorderPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
         onColumnReorder={onColumnReorderMock}
@@ -272,13 +304,18 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
 
-    const moveLeftBtns = screen.getAllByTitle('Move Column Left');
-    const moveRightBtns = screen.getAllByTitle('Move Column Right');
+    let [firstHeader, secondHeader] = screen.getAllByRole('columnheader');
 
-    fireEvent.click(moveLeftBtns[0]);
+    fireEvent.dragStart(firstHeader);
+    fireEvent.dragOver(secondHeader);
+    fireEvent.drop(secondHeader);
     expect(onColumnReorderMock).toHaveBeenCalledWith(['Field2', 'Field1']);
 
-    fireEvent.click(moveRightBtns[0]);
+    [firstHeader, secondHeader] = screen.getAllByRole('columnheader');
+
+    fireEvent.dragStart(firstHeader);
+    fireEvent.dragOver(secondHeader);
+    fireEvent.drop(secondHeader);
     expect(onColumnReorderMock).toHaveBeenCalledWith(['Field1', 'Field2']);
   });
 });
