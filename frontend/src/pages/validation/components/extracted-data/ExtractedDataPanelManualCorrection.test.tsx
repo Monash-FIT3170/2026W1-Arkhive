@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ExtractedDataPanel from './ExtractedDataPanel';
 import type { ExtractedData } from '../../../../models/TableData';
-import React from 'react';
 
 // Unit test for ExtractedDataPanel
 // Acknowledgment: The generation of these tests was done with the 
@@ -14,7 +13,7 @@ const mockExtractedData: ExtractedData = {
   rows: [
     {
       _id: 'row1',
-      _confidence: 0.9,
+      _cellConfidence: { Field1: 0.9, Field2: 0.9 },
       Field1: 'Value1',
       Field2: 'Value2',
     },
@@ -50,13 +49,13 @@ describe('ExtractedDataPanel - Manual Correction', () => {
         extractedData={mockExtractedData}
       />
     );
-    
+
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
-    
+
     const cell = screen.getByText('Value1');
     fireEvent.click(cell);
-    
+
     const input = screen.getByRole('textbox') as HTMLInputElement;
     expect(input).toBeDefined();
     expect(input.value).toBe('Value1');
@@ -71,16 +70,16 @@ describe('ExtractedDataPanel - Manual Correction', () => {
         onCellEdit={onCellEditMock}
       />
     );
-    
+
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
-    
+
     fireEvent.click(screen.getByText('Value1'));
     const input = screen.getByRole('textbox');
-    
+
     await user.clear(input);
     await user.type(input, 'NewValue1{Enter}');
-    
+
     expect(onCellEditMock).toHaveBeenCalledWith('row1:Field1', 'NewValue1');
     expect(screen.getByText('Success, changes saved!')).toBeDefined();
     expect(screen.queryByRole('textbox')).toBeNull();
@@ -96,17 +95,17 @@ describe('ExtractedDataPanel - Manual Correction', () => {
         onCellEdit={onCellEditMock}
       />
     );
-    
+
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
-    
+
     fireEvent.click(screen.getByText('Value1'));
     const input = screen.getByRole('textbox');
-    
+
     await user.clear(input);
     await user.type(input, 'AnotherValue');
     fireEvent.blur(input);
-    
+
     expect(onCellEditMock).toHaveBeenCalledWith('row1:Field1', 'AnotherValue');
     expect(screen.getByText('Success, changes saved!')).toBeDefined();
   });
@@ -120,16 +119,16 @@ describe('ExtractedDataPanel - Manual Correction', () => {
         onCellEdit={onCellEditMock}
       />
     );
-    
+
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
-    
+
     fireEvent.click(screen.getByText('Value1'));
     const input = screen.getByRole('textbox');
-    
+
     await user.clear(input);
     await user.type(input, 'WillBeDiscarded{Escape}');
-    
+
     expect(onCellEditMock).not.toHaveBeenCalled();
     expect(screen.getByText('Changes discarded')).toBeDefined();
     expect(screen.queryByRole('textbox')).toBeNull();
@@ -145,10 +144,10 @@ describe('ExtractedDataPanel - Manual Correction', () => {
         onRowAdd={onRowAddMock}
       />
     );
-    
+
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
-    
+
     fireEvent.click(screen.getByText('Add Row'));
     expect(onRowAddMock).toHaveBeenCalledTimes(1);
   });
@@ -162,23 +161,23 @@ describe('ExtractedDataPanel - Manual Correction', () => {
         onRowDelete={onRowDeleteMock}
       />
     );
-    
+
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
-    
+
     // By title or somehow find the trash icon
     const deleteRowBtn = screen.getByTitle('Delete Row');
     fireEvent.click(deleteRowBtn);
-    
+
     expect(onRowDeleteMock).toHaveBeenCalledWith('row1');
   });
 
   it('triggers onColumnAdd when Add Column is clicked and a name is provided', () => {
     const onColumnAddMock = vi.fn();
-    
+
     // Mock the prompt
     vi.spyOn(window, 'prompt').mockReturnValue('New_Field');
-    
+
     render(
       <ExtractedDataPanel
         onHover={onHoverMock}
@@ -186,20 +185,20 @@ describe('ExtractedDataPanel - Manual Correction', () => {
         onColumnAdd={onColumnAddMock}
       />
     );
-    
+
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
-    
+
     fireEvent.click(screen.getByText('Add Column'));
     expect(onColumnAddMock).toHaveBeenCalledWith('New_Field');
-    
+
     vi.restoreAllMocks();
   });
 
   it('does not trigger onColumnAdd when prompt is cancelled', () => {
     const onColumnAddMock = vi.fn();
     vi.spyOn(window, 'prompt').mockReturnValue(null);
-    
+
     render(
       <ExtractedDataPanel
         onHover={onHoverMock}
@@ -207,13 +206,13 @@ describe('ExtractedDataPanel - Manual Correction', () => {
         onColumnAdd={onColumnAddMock}
       />
     );
-    
+
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
-    
+
     fireEvent.click(screen.getByText('Add Column'));
     expect(onColumnAddMock).not.toHaveBeenCalled();
-    
+
     vi.restoreAllMocks();
   });
 
@@ -226,13 +225,13 @@ describe('ExtractedDataPanel - Manual Correction', () => {
         onColumnDelete={onColumnDeleteMock}
       />
     );
-    
+
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
-    
+
     const deleteColBtns = screen.getAllByTitle('Delete Column');
     expect(deleteColBtns.length).toBe(2);
-    
+
     fireEvent.click(deleteColBtns[0]);
     expect(onColumnDeleteMock).toHaveBeenCalledWith('Field1');
   });
@@ -246,40 +245,40 @@ describe('ExtractedDataPanel - Manual Correction', () => {
         onRowMove={onRowMoveMock}
       />
     );
-    
+
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
-    
+
     const moveUpBtn = screen.getByTitle('Move Row Up');
     const moveDownBtn = screen.getByTitle('Move Row Down');
-    
+
     fireEvent.click(moveUpBtn);
     expect(onRowMoveMock).toHaveBeenCalledWith('row1', 'up');
-    
+
     fireEvent.click(moveDownBtn);
     expect(onRowMoveMock).toHaveBeenCalledWith('row1', 'down');
   });
 
-  it('triggers onColumnMove with left/right directions when move buttons are clicked', () => {
-    const onColumnMoveMock = vi.fn();
+  it('triggers onColumnReorder with left/right directions when move buttons are clicked', () => {
+    const onColumnReorderMock = vi.fn();
     render(
       <ExtractedDataPanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
-        onColumnMove={onColumnMoveMock}
+        onColumnReorder={onColumnReorderMock}
       />
     );
-    
+
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
-    
+
     const moveLeftBtns = screen.getAllByTitle('Move Column Left');
     const moveRightBtns = screen.getAllByTitle('Move Column Right');
-    
+
     fireEvent.click(moveLeftBtns[0]);
-    expect(onColumnMoveMock).toHaveBeenCalledWith('Field1', 'left');
-    
+    expect(onColumnReorderMock).toHaveBeenCalledWith(['Field2', 'Field1']);
+
     fireEvent.click(moveRightBtns[0]);
-    expect(onColumnMoveMock).toHaveBeenCalledWith('Field1', 'right');
+    expect(onColumnReorderMock).toHaveBeenCalledWith(['Field1', 'Field2']);
   });
 });
