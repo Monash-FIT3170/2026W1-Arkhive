@@ -2,6 +2,7 @@ import { AlertTriangle, Download, Check } from "lucide-react"; // NEW: Importing
 import { useState } from "react";
 import type { ExtractedData } from "../../../../models/TableData";
 import { exportExtractedDataAsCSV } from "../../../../services/csvDownloadService";
+import { exportExtractedDataAsJSON } from "../../../../services/jsonDownloadService";
 import { exportExtractedDataAsTXT } from "../../../../services/txtDownloadService"; // NEW: TXT export service
 import { exportExtractedDataAsXLSX } from "../../../../services/xlsxDownloadService"; // NEW: Excel export service (US-4.5)
 
@@ -58,18 +59,20 @@ function ExtractedDataPanel({
   // used to check if file exported, and which format was last exported
   // UPDATED: was a plain boolean for CSV only; now tracks which format
   // (csv/txt/xlsx) was exported so a single button/dropdown can serve all three
-  const [exportedFormat, setExportedFormat] = useState<null | "csv" | "txt" | "xlsx">(null);
+  const [exportedFormat, setExportedFormat] = useState<null | "csv" | "txt" | "xlsx" | "json">(null);
 
-  // function to import csv/txt/xlsx download services and trigger the download
+  // function to import csv/txt/xlsx/json download services and trigger the download
   // for whichever format the user picked from the dropdown
-  // UPDATED: replaces the old handleExportCSV, now handles all three formats
-  function handleExport(format: "csv" | "txt" | "xlsx") {
+  // UPDATED: replaces the old handleExportCSV, now handles all export formats
+  function handleExport(format: "csv" | "txt" | "xlsx" | "json") {
     if (format === "csv") {
       exportExtractedDataAsCSV(extractedData);
     } else if (format === "txt") {
       exportExtractedDataAsTXT(extractedData);
     } else if (format === "xlsx") {
       exportExtractedDataAsXLSX(extractedData);
+    } else if (format === "json") {
+      exportExtractedDataAsJSON(extractedData);
     }
 
     setExportedFormat(format);
@@ -117,7 +120,9 @@ function ExtractedDataPanel({
             <li>
               <a onClick={() => handleExport("xlsx")}>Download as Excel</a>
             </li>
-            {/* Future export formats can be added here as new <li> entries */}
+            <li>
+              <a onClick={() => handleExport("json")}>Download as JSON</a>
+            </li>
           </ul>
         </div>
       </div>
