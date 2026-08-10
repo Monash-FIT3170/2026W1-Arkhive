@@ -8,7 +8,7 @@ import { convertTable } from './utils/utils_table_extraction_new.js';
 
 
 const client2 = new LlamaCloud({
-  apiKey: process.env.LLAMA_API_KEY,
+  apiKey: "no key",
 });
 
 /*const result = await client2.extract.create({
@@ -100,12 +100,12 @@ async function parseTable(imageBuffer: Buffer) {
 
 // function for getting overall averaged confidence score
 
-//const jsonOut = JSON.stringify(
-//  await parseTable(fs.readFileSync("c:/Users/harsh/OneDrive/Pictures/sample-file-1.pdf")),
-//  null,
-//  2
-//);
+const jsonOut = JSON.stringify(
+ await parseTable(fs.readFileSync("sample-file-1_page-0001.jpg")),
+ null,
+  2
+);
 
-//fs.writeFileSync("boundingBox.json", jsonOut, "utf-8");
+fs.writeFileSync("boundingBox1.json", jsonOut, "utf-8");
 
 await convertTable(fs.readFileSync("c:/Users/harsh/OneDrive/Pictures/sample-file-1.pdf"), client2)

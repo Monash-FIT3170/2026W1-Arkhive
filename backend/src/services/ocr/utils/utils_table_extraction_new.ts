@@ -1,5 +1,6 @@
 import fs from 'fs';
 import LlamaCloud from "@llamaindex/llama-cloud";
+import { OCRBoundingBox } from '../types/boundingBoxTypes';
 
 interface LlamaBBox {
     start_index: number;
@@ -77,6 +78,7 @@ export async function convertTable(buffer: Buffer, client: LlamaCloud){
   const jsonData = JSON.parse(await fetchedData.text())
   //console.log(" rows out " + JSON.stringify(jsonData.items.filter(s => s.type === "table")[0].grounding.rows[0][0], null, 2))
   extractStructuredComponents(result, client)
+  
 
 }
 
@@ -153,17 +155,86 @@ async function extractStructuredComponents(result: LlamaCloud.Parsing.ParsingGet
   }
 
   job.configuration?.confidence_scores
-  //console.log(JSON.stringify(job.extract_result, null, 2))
   console.log(job.extract_metadata?.field_metadata?.document_metadata?.components)
+  console.log(`look at this one man ${JSON.stringify(mapBoundingBoxes(result, job), null, 2)}`)
   return job
 }
 
-function extractBboxes(thing: LlamaCloudResponse){
-  return JSON.stringify(thing.items.filter(s => s.type === "table")[0].grounding?.rows ?? [], null, 2)
-}
 
-function extractTextCells(thing: LlamaCloudResponse){
-  return JSON.stringify(thing.items.filter(s => s.type === "table")[0].rows ?? [], null, 2)
+async function mapBoundingBoxes(llamaparseData: LlamaCloud.Parsing.ParsingGetResponse, llamaextractData: LlamaCloud.Extract.ExtractV2Job) {
+  // 1. Build lookup map from LlamaParse table data
+  const lookup = new Map<string, any>();
+
+  // 1. Correctly traverse LlamaParse items
+  // In LlamaParse SDK, parse results reside in result_content_metadata or items array depending on endpoint version
+  const items = await fetch(llamaparseData.result_content_metadata?.grounded_items?.presigned_url!)
+  if (!items){
+    throw Error("")
+  }
+  const itemss = await items.json()
+  // Extract the actual array (handles both raw array and wrapper objects)
+  const itemsss: any[] = Array.isArray(itemss)
+  ? itemss : itemss?.items ?? itemss?.grounded_items ?? [];
+
+  itemsss.forEach((item: any) => {
+    console.log("passed here man")
+    if (item.type === "table") {
+      const textRows = item.rows || [];
+      const groundingRows = item.grounding?.rows || [];
+
+      textRows.forEach((row: any[], rIdx: number) => {
+        row.forEach((cellText: any, cIdx: number) => {
+          if (!cellText || typeof cellText !== "string") return;
+
+          // Normalize text key to improve matching
+          const cleanKey = cellText.trim().replace(/^-\s*/, "").replace(/\s*:\s*$/, "");
+          
+          // Safely access row and column grounding
+          const cellGrounding = groundingRows[rIdx]?.[cIdx];
+          const bbox = cellGrounding?.bbox || null;
+
+          if (cleanKey && !lookup.has(cleanKey)) {
+            lookup.set(cleanKey, bbox);
+          }
+        });
+      });
+    }
+  });
+
+  interface ExtractedSchema {
+    components?: Array<{
+      id: string;
+      type: string;
+      text: string;
+      cells: string[];
+      [key: string]: any;
+    }>;
+  }
+
+  // 2. Extract components safely with type casting
+  const extractObj = llamaextractData.extract_result as ExtractedSchema;
+  const comp_ = extractObj?.components ?? [];
+  const updatedComponents = comp_.map((component: { cells: string[]; }) => {
+    if (!component.cells) return component;
+
+    const cellBboxes = component.cells.map((cellText: string) => {
+      if (!cellText) return null;
+      
+      const cleanCellKey = cellText.trim().replace(/^-\s*/, "").replace(/\s*:\s*$/, "");
+      return lookup.get(cleanCellKey) || null;
+    });
+
+    return {
+      ...component,
+      cell_bboxes: cellBboxes,
+    };
+  });
+  console.log(JSON.stringify(updatedComponents, null, 2))
+  //console.log(llamaextractData.extract_result)
+  return {
+    ...llamaextractData,
+    components: updatedComponents
+  };
 }
 
 
