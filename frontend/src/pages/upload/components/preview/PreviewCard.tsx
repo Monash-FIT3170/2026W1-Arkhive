@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { Trash2, Upload, Tag } from "lucide-react";
+import { useRef, useState } from "react";
+import { Trash2, RefreshCw, Tag, Eye, X } from "lucide-react";
 
 const REPLACE_INPUT_ACCEPT = ".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif";
 
@@ -48,6 +48,9 @@ export default function PreviewCard({
         : "Image may be too dark"
     : null;
 
+  // NEW: controls the zoomed-image lightbox modal
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
+
   return (
     <article
       className={`relative min-h-[380px] rounded-[10px] border p-3 transition ${isSelected
@@ -65,6 +68,21 @@ export default function PreviewCard({
         >
           ✓
         </span>
+      )}
+
+      {/* NEW: Zoom button — top-right corner, opens a lightbox with the full-size image */}
+      {hasFile && isImage && previewSrc && (
+        <button
+          type="button"
+          className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-base-100/90 border border-base-300 text-base-content hover:bg-primary hover:text-primary-content transition"
+          aria-label={`Zoom in on page ${displayName}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsZoomOpen(true);
+          }}
+        >
+          <Eye className="h-3.5 w-3.5" aria-hidden />
+        </button>
       )}
 
       <div className="mx-auto mb-[10px] mt-4 h-[220px] w-[160px] overflow-hidden rounded-[2px] border border-base-300 bg-base-100 shadow-sm">
@@ -93,65 +111,69 @@ export default function PreviewCard({
         )}
       </div>
 
-      {hasFile && (onRemove || onReplaceWithFile) && (
+      {/* UPDATED: Replace/Remove/Change Type are now a compact icon-only row
+          instead of stacked full-width text buttons */}
+      {hasFile && (onRemove || onReplaceWithFile || onChangeType) && (
         <div className="mt-3 flex flex-col items-center gap-2">
-          {onReplaceWithFile && (
-            <>
-              <input
-                ref={replaceInputRef}
-                type="file"
-                className="hidden"
-                accept={REPLACE_INPUT_ACCEPT}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (file) onReplaceWithFile(index, file);
-                }}
-              />
+          <div className="flex items-center justify-center gap-2">
+            {onReplaceWithFile && (
+              <>
+                <input
+                  ref={replaceInputRef}
+                  type="file"
+                  className="hidden"
+                  accept={REPLACE_INPUT_ACCEPT}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) onReplaceWithFile(index, file);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm btn-square"
+                  aria-label={`Replace page ${displayName}`}
+                  title="Replace Page"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    replaceInputRef.current?.click();
+                  }}
+                >
+                  <RefreshCw className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                </button>
+              </>
+            )}
+            {onRemove && (
               <button
                 type="button"
-                className="btn btn-outline btn-sm w-full max-w-[11rem] font-normal"
-                aria-label={`Replace page ${displayName}`}
+                className="btn btn-outline btn-error btn-sm btn-square"
+                aria-label={`Remove page ${displayName}`}
+                title="Remove Page"
                 onClick={(e) => {
                   e.stopPropagation();
-                  replaceInputRef.current?.click();
+                  onRemove(index);
                 }}
               >
-                <Upload className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
-                Replace Page
+                <Trash2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
               </button>
-            </>
-          )}
-          {onRemove && (
-            <button
-              type="button"
-              className="btn btn-outline btn-error btn-sm w-full max-w-[11rem] font-normal"
-              aria-label={`Remove page ${displayName}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove(index);
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
-              Remove Page
-            </button>
-          )}
-          {onChangeType && (
-            <button
-              type="button"
-              className="btn btn-outline btn-sm w-full max-w-[11rem] font-normal"
-              aria-label={`Change type of page ${displayName}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onChangeType(index);
-              }}
-            >
-              <Tag className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
-              Change Type
-            </button>
-          )}
+            )}
+            {onChangeType && (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm btn-square"
+                aria-label={`Change type of page ${displayName}`}
+                title="Change Type"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChangeType(index);
+                }}
+              >
+                <Tag className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+              </button>
+            )}
+          </div>
 
           {shouldWarn && warningMessage && (
             <div className="mb-2 rounded-md border border-warning/80 bg-warning/10 px-2 py-1 text-center text-[12px] text-warning font-bold">
@@ -160,7 +182,35 @@ export default function PreviewCard({
           )}
         </div>
       )}
+
+      {/* NEW: Zoom lightbox — shows the full-size image over a dark backdrop */}
+      {isZoomOpen && previewSrc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsZoomOpen(false);
+          }}
+        >
+          <button
+            type="button"
+            className="absolute right-6 top-6 flex h-9 w-9 items-center justify-center rounded-full bg-base-100 text-base-content hover:bg-error hover:text-error-content transition"
+            aria-label="Close zoomed image"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsZoomOpen(false);
+            }}
+          >
+            <X className="h-5 w-5" aria-hidden />
+          </button>
+          <img
+            src={previewSrc}
+            alt={displayName}
+            className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </article>
   );
 }
-
