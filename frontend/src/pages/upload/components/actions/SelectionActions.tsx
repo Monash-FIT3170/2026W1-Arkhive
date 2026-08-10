@@ -3,27 +3,29 @@
 // page is selected. These sit below the existing selection summary box.
 
 import { useRef } from "react";
-import { Trash2, RefreshCw } from "lucide-react"; // icons for bulk replace/remove buttons
+import { Trash2, RefreshCw, Tag } from "lucide-react";
 
-const REPLACE_INPUT_ACCEPT = ".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif"; // matches PreviewCard's replace input
+const REPLACE_INPUT_ACCEPT = ".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif";
 
-type SelectionActionsProps = {
+type Props = {
   onSelectAll: () => void;
   onDeselectAll: () => void;
   selectedCount: number;
   totalCount: number;
-  onBulkRemove: () => void;                     
-  onBulkReplaceFiles: (files: File[]) => void;   
+  onBulkRemove: () => void;
+  onBulkReplaceFiles: (files: File[]) => void;
+  onBulkChangeType: () => void;
 };
 
-function SelectionActions({
+export default function SelectionActions({
   onSelectAll,
   onDeselectAll,
   selectedCount,
   totalCount,
-  onBulkRemove,          
-  onBulkReplaceFiles,    
-}: SelectionActionsProps) {
+  onBulkRemove,
+  onBulkReplaceFiles,
+  onBulkChangeType,
+}: Props) {
   // hidden native multi-file input used to pick replacement files
   // for all currently selected pages at once
   const bulkReplaceInputRef = useRef<HTMLInputElement>(null);
@@ -79,6 +81,14 @@ function SelectionActions({
           </button>
           <button
             type="button"
+            onClick={onBulkChangeType}
+            className="btn btn-outline btn-sm w-full rounded-xl"
+          >
+            <Tag className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+            Change Type ({selectedCount})
+          </button>
+          <button
+            type="button"
             onClick={onBulkRemove}
             className="btn btn-outline btn-error btn-sm w-full rounded-xl"
           >
@@ -90,5 +100,3 @@ function SelectionActions({
     </>
   );
 }
-
-export default SelectionActions;

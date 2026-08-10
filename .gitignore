@@ -19,7 +19,7 @@ secrets/
 service-account.json
 
 # Local storage (backend uploads)
-uploads/
+# uploads/  <-- Removed so backend/uploads/.gitignore works
 storage/
 tmp/
 

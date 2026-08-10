@@ -3,10 +3,12 @@ import { useState } from "react";
 import type { ExtractedData } from "../../../../models/TableData";
 import { exportExtractedDataAsCSV } from "../../../../services/csvDownloadService";
 import { exportExtractedDataAsTXT } from "../../../../services/txtDownloadService"; // NEW: TXT export service
+import { exportExtractedDataAsXLSX } from "../../../../services/xlsxDownloadService"; // NEW: Excel export service (US-4.5)
+
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
-// Thresholds: ≥0.85 = high (green), 0.70-0.84 = medium (amber), <0.70 = low (red)
+// Thresholds: >=0.85 = high (green), 0.70-0.84 = medium (amber), <0.70 = low (red)
 function getConfidenceTier(confidence: number): {
   colour: string;
   label: string;
@@ -55,17 +57,19 @@ function ExtractedDataPanel({
 
   // used to check if file exported, and which format was last exported
   // UPDATED: was a plain boolean for CSV only; now tracks which format
-  // (csv/txt) was exported so a single button/dropdown can serve both
-  const [exportedFormat, setExportedFormat] = useState<null | "csv" | "txt">(null);
+  // (csv/txt/xlsx) was exported so a single button/dropdown can serve all three
+  const [exportedFormat, setExportedFormat] = useState<null | "csv" | "txt" | "xlsx">(null);
 
-  // function to import csv/txt download services and trigger the download
+  // function to import csv/txt/xlsx download services and trigger the download
   // for whichever format the user picked from the dropdown
-  // UPDATED: replaces the old handleExportCSV, now handles both formats
-  function handleExport(format: "csv" | "txt") {
+  // UPDATED: replaces the old handleExportCSV, now handles all three formats
+  function handleExport(format: "csv" | "txt" | "xlsx") {
     if (format === "csv") {
       exportExtractedDataAsCSV(extractedData);
     } else if (format === "txt") {
       exportExtractedDataAsTXT(extractedData);
+    } else if (format === "xlsx") {
+      exportExtractedDataAsXLSX(extractedData);
     }
 
     setExportedFormat(format);
@@ -81,7 +85,7 @@ function ExtractedDataPanel({
 
       {/* Export Button */}
       {/* UPDATED: was a single "Download Button" for CSV only; now a dropdown
-          so more export formats (TXT, and future formats) can share one button */}
+          so more export formats (TXT, Excel, and future formats) can share one button */}
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-base-content">EXTRACTED DATA</h2>
 
@@ -108,6 +112,10 @@ function ExtractedDataPanel({
             </li>
             <li>
               <a onClick={() => handleExport("txt")}>Download as TXT</a>
+            </li>
+            {/* NEW: Excel export option (US-4.5) */}
+            <li>
+              <a onClick={() => handleExport("xlsx")}>Download as Excel</a>
             </li>
             {/* Future export formats can be added here as new <li> entries */}
           </ul>
@@ -177,7 +185,7 @@ function ExtractedDataPanel({
 
                   {/* NEW: Confidence score cell added at the end of each row
 										Shows a DaisyUI badge with the score percentage
-										Green ≥85%, Amber 70-84%, Red <70%
+										Green >=85%, Amber 70-84%, Red <70%
 										Low confidence rows also show a warning icon from lucide-react */}
                   {/* UPDATED: Capsule shape with solid background colours for high visibility */}
                   {/* Alert icon on left only for low confidence rows with hover tooltip */}
