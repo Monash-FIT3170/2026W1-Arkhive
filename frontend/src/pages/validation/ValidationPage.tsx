@@ -13,6 +13,7 @@ import { requestFieldReview } from '../../services/llmService';
 import OcrReviewWidget from './components/chat/OcrReviewWidget';
 import type { OcrIssue } from './components/chat/OcrReviewWidget';
 import { flatten } from './components/extracted-data/flattener';
+import { checkTableFormats, type ColumnRegexMap } from './components/extracted-data/detectFormat';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -69,13 +70,27 @@ function ValidationPage() {
 
   useEffect(() => {
     if (documentContext && !hasDetected) {
+      // Low Confidence Detection
       const fields = detectReviewFields(documentContext);
-      const issues = fields.map((f) => ({
+      const confidenceIssues = fields.map((f) => ({
         fieldId: `${f.rowId}:${f.column}`,
         fieldName: f.column,
         ocrValue: String(f.value),
         confidenceScore: f.confidence,
       }));
+
+      // Format detection
+      const columnRegexMap: ColumnRegexMap = {}; // Plug in LLM
+      const formatIssues = checkTableFormats(documentContext, columnRegexMap).map((f) => ({
+        fieldId: `${f.rowId}:${f.column}`,
+        fieldName: f.column,
+        ocrValue: String(f.value),
+        confidenceScore: 0.3,
+      }));
+
+      // Merge Issues
+      const issues = confidenceIssues.concat(formatIssues);
+
       setFlaggedIssues(issues);
       setHasDetected(true);
       if (issues.length > 0) {
