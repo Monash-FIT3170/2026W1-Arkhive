@@ -154,13 +154,14 @@ function DocumentPanel({
                 return Object.entries(comp.boundingBoxes).map(
                   ([cellKey, box]: [string, any]) => {
                     const id = `${comp.id}:${cellKey}`;
+                    const normalizedHoverId = hoveredOverlayId && !hoveredOverlayId.startsWith("comp_") ? `comp_${hoveredOverlayId}` : hoveredOverlayId;
 
                     const pointsStr = box.vertices
                       .map((v: any) => `${v.x},${v.y}`)
                       .join(" ");
 
                     const isActive =
-                      hoveredOverlayId === id || hoveredOverlayId === comp.id;
+                      normalizedHoverId === id || normalizedHoverId === comp.id;
 
                     //obtaining the confidence for this component to determine the colour of the bounding box
                     const confidenceInfo = ocrData.find((c) => c.id === comp.id);
