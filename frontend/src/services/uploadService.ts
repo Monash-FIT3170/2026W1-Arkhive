@@ -18,6 +18,9 @@ export async function uploadPagesToBackend(
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
+    if (response.status === 502) {
+      throw new Error("OCR Service failed. Please double check your credentials");
+    }
     throw new Error(body.error ?? `Upload failed with status ${response.status}`);
   }
 

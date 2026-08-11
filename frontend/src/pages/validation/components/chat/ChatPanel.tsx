@@ -26,6 +26,7 @@ function ChatPanel({
 }) {
   const [input, setInput] = useState("");
   const [isLoading, setLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,9 +71,14 @@ function ChatPanel({
       onAddMessage({
         id: crypto.randomUUID(),
         role: "model",
-        content: "Sorry, something went wrong while analysing the columns.",
+        content: "Error: Chatbot service failed. Please double check your Chatbot service credentials",
         timestamp: new Date().toISOString(),
-      });
+      })
+      if (isOpen) {
+        onToggle();
+      }
+      setChatError("Error: Chatbot service failed. Please double check your Chatbot service credentials");
+      // setTimeout(() => setChatError(null), 5000);
     } finally {
       setLoading(false);
     }
@@ -86,6 +92,25 @@ function ChatPanel({
 
   return (
     <>
+      {/* Error Alert */}
+      {chatError && (
+        <div className="fixed bottom-24 right-6 z-50 w-72 animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <div className="alert alert-error mb-2 p-3 text-sm rounded-xl flex items-start gap-2 shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <span className="flex-1">{chatError}</span>
+            <button
+              onClick={() => setChatError(null)}
+              className="btn btn-ghost btn-xs btn-circle -mr-1 -mt-1 hover:bg-error-content/20"
+              title="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* AI Button to open and close modal */}
       <div className="fixed bottom-6 right-6 z-50">
         <div className="indicator">
