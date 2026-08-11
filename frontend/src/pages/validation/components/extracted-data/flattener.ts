@@ -109,7 +109,13 @@ export function detectItemColumn(components: OCRComponent[], colXs: number[]): n
   return counts.indexOf(Math.max(...counts));
 }
 
-/** Parses a flat array of component cells into a dictionary mapped to column keys */
+/**
+ * Parses a flat array of component cells into a dictionary mapped to column keys
+ * @param comp Components of RAW OCR
+ * @param keys Column Headers
+ * @param positions Middle X position of each Column in Table
+ * @returns Record of <column key - cell>
+ */
 function mapCellsToColumns(
   comp: OCRComponent,
   keys: string[],
@@ -150,7 +156,13 @@ function mapCellsToColumns(
 // TREE BUILDING
 // ==========================================
 
-/** Constructs a parent-child tree hierarchy based on spatial indentation */
+/**
+ * Constructs a parent-child tree hierarchy based on spatial indentation
+ * @param components RAW OCR components
+ * @param keys Column Keys
+ * @param positions Mid X position of each column
+ * @returns { roots, maxDepth } - roots are top level of the tree (nodes no parent), maximum depth of the tree
+ */
 function buildTree(components: OCRComponent[], keys: string[], positions: number[]) {
   const roots: TreeNode[] = [];
   const stack: TreeNode[] = []; // Stack of "active" parents a row can be a child of
@@ -194,7 +206,15 @@ function buildTree(components: OCRComponent[], keys: string[], positions: number
 // TREE TRAVERSAL & FLATTENING
 // ==========================================
 
-/** Recursively flattens the tree into table rows, inheriting data from ancestors */
+/**
+ * Recursively flattens the tree into table rows, inheriting data from ancestors
+ * @param nodes Current TreeNode (Row) tht is being converted into ExtractedRow
+ * @param ancestors Previous Row/Parents of the current TreeNode
+ * @param keys Column keys
+ * @param itemColIdx The column index of the main item column (column that contains nested rows)
+ * @param subItemCols Column key names for the nested childern
+ * @returns List of ExtractedRow
+ */
 function flattenTree(
   nodes: TreeNode[],
   ancestors: TreeNode[],
@@ -253,6 +273,11 @@ function flattenTree(
 // MAIN EXPORT
 // ==========================================
 
+/**
+ *  Flatten RAW OCR data into flattened ExtractedData
+ * @param data RAW OCR data
+ * @returns flattened ExtractedData
+ */
 export function flatten(data: OCRComponent[]): ExtractedData {
   const components = data.filter(
     (c) => c.cells && !['HEADER', 'BODY_TEXT', 'TABLE_COLS'].includes(c.type)
