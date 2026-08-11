@@ -4,7 +4,7 @@ type Props = {
   onProcess: () => void;
 };
 
-function ProcessDocumentsButton({
+export default function ProcessDocumentsButton({
   selectedCount,
   isProcessing,
   onProcess,
@@ -35,5 +35,3 @@ function ProcessDocumentsButton({
     </button>
   );
 }
-
-export default ProcessDocumentsButton;

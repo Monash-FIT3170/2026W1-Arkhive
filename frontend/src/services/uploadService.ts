@@ -1,14 +1,18 @@
 export async function uploadPagesToBackend(
-  previewSrcs: string[],
-  onRetryMessage?: (msg: string) => void
+    pages: { src: string; type: string }[],
+    onRetryMessage?: (msg: string) => void
 ): Promise<void> {
   const formData = new FormData();
+  const metadata: { type: string }[] = [];
 
-  for (let i = 0; i < previewSrcs.length; i++) {
-    const res = await fetch(previewSrcs[i]);
+  for (let i = 0; i < pages.length; i++) {
+    const res = await fetch(pages[i].src);
     const blob = await res.blob();
     formData.append('pages', blob, `page-${i}.png`);
+    metadata.push({ type: pages[i].type });
   }
+
+  formData.append('metadata', JSON.stringify(metadata));
 
   const response = await fetch('/api/upload', {
     method: 'POST',
@@ -66,4 +70,15 @@ export async function uploadPagesToBackend(
  */
 export function getUploadedImageUrl(): string {
   return '/api/upload/image';
+}
+
+/**
+ * Returns a list of URLs for all uploaded images in the session.
+ */
+export async function getUploadedImageUrls(): Promise<string[]> {
+  const response = await fetch('/api/upload/images');
+  if (!response.ok) {
+    throw new Error('Failed to fetch image URLs');
+  }
+  return await response.json();
 }
