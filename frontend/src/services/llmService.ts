@@ -39,3 +39,18 @@ export async function requestFieldReview(
   const data = await response.json();
   return data.reply;
 }
+
+export async function requestFormatDetection(
+  sampledData: Record<string, string[]>
+): Promise<Record<string, string>> {
+  const response = await fetch('/api/llm/chat/detect-format', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sampledData }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to get format detection');
+  }
+  const data = await response.json();
+  return data.regexMap;
+}

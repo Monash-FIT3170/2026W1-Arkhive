@@ -147,6 +147,32 @@ const chatResponseSchema: Schema = {
   required: ['response'],
 };
 
+const formatDetectionSchema: Schema = {
+  type: SchemaType.OBJECT,
+  description: 'A map of column names to a regular expression validating their format. Only include columns that are Date, Time, or Currency formats.',
+  properties: {
+    formats: {
+      type: SchemaType.ARRAY,
+      description: 'List of detected formats for Date, Time, and Currency columns.',
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          column: {
+            type: SchemaType.STRING,
+            description: 'The name of the column.',
+          },
+          regex: {
+            type: SchemaType.STRING,
+            description: 'The regular expression validating the most common format in this column.',
+          }
+        },
+        required: ['column', 'regex'],
+      },
+    },
+  },
+  required: ['formats'],
+};
+
 export default {
   sendMessageToGemini: async (
     messages: Message[],
@@ -274,5 +300,44 @@ export default {
         : undefined;
 
     return { ...parsed, updatedContext };
+  },
+  //This function was made with the help of Google Gemini
+  detectTableFormats: async (sampledData: Record<string, string[]>): Promise<any> => {
+    const formattedSample = JSON.stringify(sampledData, null, 2);
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      systemInstruction: `You are an AI assistant helping validate table data extracted via OCR.
+      Your task is to identify which columns represent Dates, Times, or Currencies based on the provided sample data.
+      For each column that you identify as Date, Time, or Currency, provide a regular expression that matches the most common format found in the sample for that column.
+      Do not include columns that are not Dates, Times, or Currencies (e.g. ignore text, names, generic IDs, statuses, etc.).
+      
+      Here is the sample of the first few non-empty rows for each column:
+      ${formattedSample}
+      
+      Return the results as a list of { column, regex } objects inside 'formats'.
+      Make sure the regex is strict enough to catch formatting inconsistencies, e.g. '\\d{2}-\\d{2}-\\d{4}' or '\\$\\d+\\.\\d{2}'.
+      `,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: formatDetectionSchema,
+        temperature: 0.1,
+      },
+    });
+
+    const result = await model.generateContent('Identify Date, Time, and Currency columns and provide validation regexes.');
+    const parsed = JSON.parse(result.response.text());
+    
+    // Convert { formats: [{column, regex}] } into Record<string, string>
+    const regexMap: Record<string, string> = {};
+    if (parsed.formats && Array.isArray(parsed.formats)) {
+      parsed.formats.forEach((f: any) => {
+        if (f.column && f.regex) {
+          regexMap[f.column] = f.regex;
+        }
+      });
+    }
+
+    return regexMap;
   },
 };

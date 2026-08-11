@@ -41,4 +41,20 @@ export default {
       });
     }
   },
+  detectFormat: async (req: Request, res: Response) => {
+    try {
+      const { sampledData } = req.body;
+      if (!sampledData) {
+        return res.status(400).json({ error: 'sampledData is required' });
+      }
+      const regexMap = await aiService.detectTableFormats(sampledData);
+      console.log('Detected formats:', regexMap);
+      res.json({ regexMap });
+    } catch (error) {
+      console.error('Error in format detection:', error);
+      res.status(500).json({
+        error: 'Sorry, I encountered an error during format detection.',
+      });
+    }
+  },
 };

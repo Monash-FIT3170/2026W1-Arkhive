@@ -4,4 +4,5 @@ const router = Router();
 
 router.post('/chat', llmController.chatWithModel);
 router.post('/chat/review-field', llmController.reviewField);
+router.post('/chat/detect-format', llmController.detectFormat);
 export default router;

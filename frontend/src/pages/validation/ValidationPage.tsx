@@ -9,11 +9,11 @@ import type { ExtractedData } from '../../models/TableData';
 import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
 import { getUploadedImageUrl } from '../../services/uploadService';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
-import { requestFieldReview } from '../../services/llmService';
+import { requestFieldReview, requestFormatDetection } from '../../services/llmService';
 import OcrReviewWidget from './components/chat/OcrReviewWidget';
 import type { OcrIssue } from './components/chat/OcrReviewWidget';
 import { flatten } from './components/extracted-data/flattener';
-import { checkTableFormats, type ColumnRegexMap } from './components/extracted-data/detectFormat';
+import { checkTableFormats } from './components/extracted-data/detectFormat';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -69,7 +69,9 @@ function ValidationPage() {
   }, []);
 
   useEffect(() => {
-    if (documentContext && !hasDetected) {
+    async function performFormatDetection() {
+      if (!documentContext || hasDetected) return;
+
       // Low Confidence Detection
       const fields = detectReviewFields(documentContext);
       const confidenceIssues = fields.map((f) => ({
@@ -79,14 +81,34 @@ function ValidationPage() {
         confidenceScore: f.confidence,
       }));
 
-      // Format detection
-      const columnRegexMap: ColumnRegexMap = {}; // Plug in LLM
-      const formatIssues = checkTableFormats(documentContext, columnRegexMap).map((f) => ({
-        fieldId: `${f.rowId}:${f.column}`,
-        fieldName: f.column,
-        ocrValue: String(f.value),
-        confidenceScore: 0.3,
-      }));
+      // Sample first 20 non-empty values per column for format detection
+      const sampledData: Record<string, string[]> = {};
+      for (const col of documentContext.columns) {
+        const samples: string[] = [];
+        for (const row of documentContext.rows) {
+          const val = row[col];
+          if (val !== null && val !== undefined && String(val).trim() !== '') {
+            samples.push(String(val).trim());
+            if (samples.length >= 20) break;
+          }
+        }
+        if (samples.length > 0) {
+          sampledData[col] = samples;
+        }
+      }
+
+      let formatIssues: OcrIssue[] = [];
+      try {
+        const columnRegexMap = await requestFormatDetection(sampledData);
+        formatIssues = checkTableFormats(documentContext, columnRegexMap).map((f) => ({
+          fieldId: `${f.rowId}:${f.column}`,
+          fieldName: f.column,
+          ocrValue: String(f.value),
+          confidenceScore: 0.3, // fallback confidence score for format issues
+        }));
+      } catch (error) {
+        console.error('Failed to detect format issues', error);
+      }
 
       // Merge Issues
       const issues = confidenceIssues.concat(formatIssues);
@@ -97,6 +119,8 @@ function ValidationPage() {
         setChatActiveTab('review');
       }
     }
+
+    performFormatDetection();
   }, [documentContext, hasDetected]);
 
   useEffect(() => {
@@ -105,7 +129,6 @@ function ValidationPage() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.toUpperCase().includes('MAC');
       const isUndo = e.metaKey && e.key === 'z' && !e.shiftKey;
       const isRedo = e.metaKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey));
 
