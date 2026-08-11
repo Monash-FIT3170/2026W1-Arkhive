@@ -15,7 +15,8 @@ export default defineConfig({
 			"/api": {
 				target: "http://localhost:3000",
 				changeOrigin: true,
-				rewrite: (path) => path.replace(/^\/api/, "")
+				// Keep the /api prefix so backend routes like /api/upload continue to match.
+				// Vite will forward /api/upload to http://localhost:3000/api/upload.
 			}
 		}
 	}

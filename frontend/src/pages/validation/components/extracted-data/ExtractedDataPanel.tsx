@@ -266,25 +266,39 @@ function ExtractedDataPanel({
               Add Column
             </button>
           )}
-          <button
-            onClick={handleExportCSV}
-            disabled={exported}
-            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${exported ? 'btn-success' : 'btn-primary'
-              }`}
-            title="Export to CSV"
-          >
-            {exported ? (
-              <>
-                <Check className="w-3.5 h-3.5" />
-                Exported!
-              </>
-            ) : (
-              <>
-                <Download className="w-3.5 h-3.5" />
-                Export CSV
-              </>
-            )}
-          </button>
+          <div className="dropdown dropdown-end">
+            <button
+              tabIndex={0}
+              className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${exportedFormat
+                ? "btn-success"
+                : "btn-primary"
+                }`}
+            >
+              {exportedFormat ? (
+                <><Check className="w-3.5 h-3.5" />Downloaded!</>
+              ) : (
+                <><Download className="w-3.5 h-3.5" />Download</>
+              )}
+            </button>
+            <ul
+              tabIndex={0}
+              className="dropdown-content menu bg-base-100 rounded-box z-10 w-45 p-2 shadow-md border border-base-300"
+            >
+              <li>
+                <a onClick={() => handleExport("csv")}>Download as CSV</a>
+              </li>
+              <li>
+                <a onClick={() => handleExport("txt")}>Download as TXT</a>
+              </li>
+              {/* NEW: Excel export option (US-4.5) */}
+              <li>
+                <a onClick={() => handleExport("xlsx")}>Download as Excel</a>
+              </li>
+              <li>
+                <a onClick={() => handleExport("json")}>Download as JSON</a>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
       {/*Acknowledgement: AI (Google Gemini) was used while coding the
@@ -300,8 +314,8 @@ function ExtractedDataPanel({
                 <th
                   key={column}
                   className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${isEditMode && dragOverColumn === column && draggedColumn !== column
-                      ? 'bg-primary/20'
-                      : ''
+                    ? 'bg-primary/20'
+                    : ''
                     }`}
                   style={{ height: '1px' }}
                   draggable={isEditMode}
@@ -453,10 +467,10 @@ function ExtractedDataPanel({
                       )}
                       <span
                         className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === 'badge-success'
-                            ? 'border-success text-success bg-white'
-                            : tier.badgeClass === 'badge-warning'
-                              ? 'border-warning text-warning bg-white'
-                              : ' border-error text-error bg-white'
+                          ? 'border-success text-success bg-white'
+                          : tier.badgeClass === 'badge-warning'
+                            ? 'border-warning text-warning bg-white'
+                            : ' border-error text-error bg-white'
                           }`}
                       >
                         {tier.label}

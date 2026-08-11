@@ -16,9 +16,25 @@ import { withRetry } from './utils/utils.js';
  * 
  * So all render sees is: GOOGLE_CREDENTIALS_BASE64 = <base64 encoded JSON>
  */
-const credsPath = path.join("/tmp", "google-vision-key.json");
-fs.writeFileSync(credsPath, Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64!, "base64"));
-process.env.GOOGLE_APPLICATION_CREDENTIALS = credsPath;
+const localCredsPath = path.resolve(
+  process.cwd(),
+  "../backend/src/credentials/google-vision-key.json"
+);
+const tempCredsPath = path.join("/tmp", "google-vision-key.json");
+
+let credsPath: string;
+
+if (process.env.GOOGLE_CREDENTIALS_BASE64) {
+  // Render (or any host with the base64 env var set): decode to /tmp
+  fs.writeFileSync(
+    tempCredsPath,
+    Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, "base64")
+  );
+  credsPath = tempCredsPath;
+} else {
+  // Local dev: use the JSON file already sitting in the repo
+  credsPath = localCredsPath;
+}
 
 const client = new vision.ImageAnnotatorClient({
   keyFilename: credsPath,
