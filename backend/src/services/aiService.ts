@@ -167,7 +167,7 @@ export default {
 
 		//set up model
 		const model = genAI.getGenerativeModel({
-			model: "gemini-2.5-flash",
+			model: "gemini-2.5-flash", // may need to use gemini-3.6-flash, worked better for me
 			systemInstruction: `You are an AI assistant helping a user validate and correct a digitized document/table. 
             Analyse the user's message. 
 						

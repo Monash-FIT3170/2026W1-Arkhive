@@ -2,10 +2,14 @@ import { AlertTriangle, Download, Check } from "lucide-react"; // NEW: Importing
 import { useState } from "react";
 import type { ExtractedData } from "../../../../models/TableData";
 import { exportExtractedDataAsCSV } from "../../../../services/csvDownloadService";
+import { exportExtractedDataAsJSON } from "../../../../services/jsonDownloadService";
+import { exportExtractedDataAsTXT } from "../../../../services/txtDownloadService"; // NEW: TXT export service
+import { exportExtractedDataAsXLSX } from "../../../../services/xlsxDownloadService"; // NEW: Excel export service (US-4.5)
+
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
-// Thresholds: ≥0.85 = high (green), 0.70-0.84 = medium (amber), <0.70 = low (red)
+// Thresholds: >=0.85 = high (green), 0.70-0.84 = medium (amber), <0.70 = low (red)
 function getConfidenceTier(confidence: number): {
   colour: string;
   label: string;
@@ -52,38 +56,75 @@ function ExtractedDataPanel({
     }).format(amount);
   };
 
-  // used to check if file exported
-  const [exported, setExported] = useState(false);
+  // used to check if file exported, and which format was last exported
+  // UPDATED: was a plain boolean for CSV only; now tracks which format
+  // (csv/txt/xlsx) was exported so a single button/dropdown can serve all three
+  const [exportedFormat, setExportedFormat] = useState<null | "csv" | "txt" | "xlsx" | "json">(null);
 
-  // function to import csvService export and trigger CSV download
-  function handleExportCSV() {
-    exportExtractedDataAsCSV(extractedData);
-    setExported(true);
-    setTimeout(() => setExported(false), 2500);
+  // function to import csv/txt/xlsx/json download services and trigger the download
+  // for whichever format the user picked from the dropdown
+  // UPDATED: replaces the old handleExportCSV, now handles all export formats
+  function handleExport(format: "csv" | "txt" | "xlsx" | "json") {
+    if (format === "csv") {
+      exportExtractedDataAsCSV(extractedData);
+    } else if (format === "txt") {
+      exportExtractedDataAsTXT(extractedData);
+    } else if (format === "xlsx") {
+      exportExtractedDataAsXLSX(extractedData);
+    } else if (format === "json") {
+      exportExtractedDataAsJSON(extractedData);
+    }
+
+    setExportedFormat(format);
+    setTimeout(() => setExportedFormat(null), 2500);
+
+    // close the dropdown menu after a selection is made
+    (document.activeElement as HTMLElement)?.blur();
   }
 
 
   return (
     <div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
 
-      {/* Download Button */}
+      {/* Export Button */}
+      {/* UPDATED: was a single "Download Button" for CSV only; now a dropdown
+          so more export formats (TXT, Excel, and future formats) can share one button */}
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-base-content">EXTRACTED DATA</h2>
-        <button
-          onClick={handleExportCSV}
-          disabled={exported}
-          className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${exported
-            ? "btn-success"
-            : "btn-primary"
-            }`}
-          title="Export to CSV"
-        >
-          {exported ? (
-            <><Check className="w-3.5 h-3.5" />Exported!</>
-          ) : (
-            <><Download className="w-3.5 h-3.5" />Export CSV</>
-          )}
-        </button>
+
+        <div className="dropdown dropdown-end">
+          <button
+            tabIndex={0}
+            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${exportedFormat
+              ? "btn-success"
+              : "btn-primary"
+              }`}
+          >
+            {exportedFormat ? (
+              <><Check className="w-3.5 h-3.5" />Downloaded!</>
+            ) : (
+              <><Download className="w-3.5 h-3.5" />Download</>
+            )}
+          </button>
+          <ul
+            tabIndex={0}
+            className="dropdown-content menu bg-base-100 rounded-box z-10 w-45 p-2 shadow-md border border-base-300"
+          >
+            <li>
+              <a onClick={() => handleExport("csv")}>Download as CSV</a>
+            </li>
+            <li>
+              <a onClick={() => handleExport("txt")}>Download as TXT</a>
+            </li>
+            {/* NEW: Excel export option (US-4.5) */}
+            <li>
+              <a onClick={() => handleExport("xlsx")}>Download as Excel</a>
+            </li>
+            <li>
+              <a onClick={() => handleExport("json")}>Download as JSON</a>
+            </li>
+          </ul>
+        </div>
       </div>
 
       {/* Table */}
@@ -149,7 +190,7 @@ function ExtractedDataPanel({
 
                   {/* NEW: Confidence score cell added at the end of each row
 										Shows a DaisyUI badge with the score percentage
-										Green ≥85%, Amber 70-84%, Red <70%
+										Green >=85%, Amber 70-84%, Red <70%
 										Low confidence rows also show a warning icon from lucide-react */}
                   {/* UPDATED: Capsule shape with solid background colours for high visibility */}
                   {/* Alert icon on left only for low confidence rows with hover tooltip */}

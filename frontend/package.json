@@ -18,14 +18,9 @@
     "pdfjs-dist": "^5.7.284",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-<<<<<<< HEAD
-    "react-router-dom": "^7.15.1",
-    "vitest": "^4.1.5"
-=======
     "react-router-dom": "^7.15.0",
     "vitest": "^4.1.5",
     "zod": "^4.4.3"
->>>>>>> ca75261 (feat [86d3uu0cr]: integration testing for json ocr to display)
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

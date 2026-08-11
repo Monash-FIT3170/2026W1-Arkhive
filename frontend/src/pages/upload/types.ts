@@ -10,4 +10,5 @@ export type PreviewItem = {
   isBlurry?: boolean;
   isDark?: boolean;
   shouldWarn?: boolean;
+  documentType?: string; // The classified type of the document (e.g. Receipt, Invoice)
 };
