@@ -1,25 +1,25 @@
-import React, {useState, useRef} from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
- * Configuration: Supported OCR MIME types.
- * Exported so it can be used in tests and by the next developer.
+ * Supported OCR MIME types.
+ * Exported so it can be used in tests.
  */
 export const ALLOWED_MIME_TYPES = [
-  'image/jpeg', 
-  'image/png', 
-  'application/pdf', 
-  'image/heic', 
-  'image/heif', 
+  'image/jpeg',
+  'image/png',
+  'application/pdf',
+  'image/heic',
+  'image/heif',
   'image/tiff'
 ];
 
-// US-1.6: define the maximum file size limit
+// Maximum file size limit in MB
 export const MAX_FILE_SIZE_MB = 5;
 export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 /**
- * Helper function to check if files are valid before we "store" them.
- * Filters based on both MIME types and file extensions for maximum compatibility.
+ * Helper function to check if files are valid based on MIME types and file extensions.
  * @param fileList - The raw FileList from an input or drop event
  * @returns An array of validated File objects
  */
@@ -32,14 +32,14 @@ export function filterValidFiles(fileList: FileList | null): File[] {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
     const isAcceptedExt = ['jpg', 'jpeg', 'png', 'pdf', 'heic', 'heif', 'tiff', 'tif'].includes(fileExtension || '');
     const isAcceptedMime = ALLOWED_MIME_TYPES.includes(file.type);
-    
+
     return isAcceptedMime || isAcceptedExt;
   });
 }
 
 /**
- * US-1.6: separate valid and oversized files before passing to parent.
- * Exported so EmptyUploadView and other consumers can reuse the same logic.
+ * Separate valid and oversized files before passing to parent.
+ * Exported so other consumers can reuse the same logic.
  * @param files - Array of type-validated files
  * @returns Object with accepted (within limit) and rejected (oversized) arrays
  */
@@ -56,22 +56,20 @@ export function partitionBySize(files: File[]): { accepted: File[]; rejected: Fi
   return { accepted, rejected };
 }
 
-/**
- * DropZone Component
- */
-function DropZone({ onFilesCaptured, onError }: { onFilesCaptured: (files: File[]) => void, onError?: (msg: string | null) => void }) {
-  
-  // State to track drag-over UI state
-  const [isDragOver, setIsDragOver] = useState(false);
+type DropZoneProps = {
+  onFilesCaptured: (files: File[]) => void;
+  onError?: (msg: string | null) => void;
+};
 
-  // US-1.6: state to track oversized file error message if onError isn't provided
+export default function DropZone({ onFilesCaptured, onError }: DropZoneProps) {
+
   const [sizeError, setSizeError] = useState<string | null>(null);
 
   // Reference to hidden file input element
   const inputRef = useRef<HTMLInputElement>(null);
 
   /**
-   * US-1.6: run files through size check before passing to parent.
+   * Run files through size check before passing to parent.
    * Accepted files proceed; rejected files trigger an error message.
    */
   function processFiles(files: File[]) {
@@ -91,42 +89,67 @@ function DropZone({ onFilesCaptured, onError }: { onFilesCaptured: (files: File[
   // Handles file selection via file picker
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const valid = filterValidFiles(e.target.files);
-    if (valid.length > 0) processFiles(valid); // US-1.6: check size
+    if (valid.length > 0) processFiles(valid);
 
     // Reset input to allow re-selecting same file
     if (inputRef.current) inputRef.current.value = '';
   }
 
-  /**
-   * Enables drop by preventing default browser behavior
-   * Also activates drag UI state
-   */
-  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    setIsDragOver(true);
-  }
+  // --- Global Drag and Drop ---
+  const [isGlobalDrag, setIsGlobalDrag] = useState(false);
 
-  // Resets drag UI when file leaves dropzone
-  function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    setIsDragOver(false);
-  }
+  useEffect(() => {
+    let dragCounter = 0;
 
-  /**
-   * Handles file drop event
-   * Filters valid files and sends them to parent
-   */
-  function handleFileDrop(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    setIsDragOver(false);
+    const handleWindowDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer?.types.includes('Files')) {
+        dragCounter++;
+        if (dragCounter === 1) {
+          setIsGlobalDrag(true);
+        }
+      }
+    };
 
-    const valid = filterValidFiles(e.dataTransfer.files);
+    const handleWindowDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer?.types.includes('Files')) {
+        dragCounter--;
+        if (dragCounter === 0) {
+          setIsGlobalDrag(false);
+        }
+      }
+    };
 
-    if (valid.length > 0) {
-      console.log(valid);      // Debug: confirm captured files
-      processFiles(valid);     // US-1.6: check size
-    }
-  }
+    const handleWindowDragOver = (e: DragEvent) => {
+      e.preventDefault(); // Necessary to allow dropping
+    };
+
+    const handleWindowDrop = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter = 0;
+      setIsGlobalDrag(false);
+
+      if (e.dataTransfer?.files) {
+        const valid = filterValidFiles(e.dataTransfer.files);
+        if (valid.length > 0) {
+          processFiles(valid);
+        }
+      }
+    };
+
+    window.addEventListener('dragenter', handleWindowDragEnter);
+    window.addEventListener('dragleave', handleWindowDragLeave);
+    window.addEventListener('dragover', handleWindowDragOver);
+    window.addEventListener('drop', handleWindowDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleWindowDragEnter);
+      window.removeEventListener('dragleave', handleWindowDragLeave);
+      window.removeEventListener('dragover', handleWindowDragOver);
+      window.removeEventListener('drop', handleWindowDrop);
+    };
+  }, [onError, onFilesCaptured]);
 
   return (
     <div className="dropzone-handoff-container">
@@ -139,7 +162,7 @@ function DropZone({ onFilesCaptured, onError }: { onFilesCaptured: (files: File[
         onChange={handleInputChange}
       />
 
-      {/* US-1.6: error message for oversized files, shown above the dropzone only if onError wasn't provided */}
+      {/* Error message for oversized files */}
       {!onError && sizeError && (
         <div className="alert alert-error mb-2 p-3 text-sm rounded-xl flex items-start gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -149,19 +172,15 @@ function DropZone({ onFilesCaptured, onError }: { onFilesCaptured: (files: File[
         </div>
       )}
 
-      {/* Basic UI for dropzone area (drag & drop interaction) */}
+      {/* Basic UI for dropzone area (click to select) */}
       <div
-        className={`flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center transition-all duration-200 ${
-          isDragOver ? 'border-primary bg-primary/10' : 'border-base-content/30 bg-base-200/50 hover:bg-base-200'
-        }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleFileDrop}
+        className={`flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center transition-all duration-200 border-base-content/30 bg-base-200/50 hover:bg-base-200`}
+        onClick={() => inputRef.current?.click()}
       >
-        <p className="text-base-content font-medium">Drag & drop files here, or click to select</p>
+        <p className="text-base-content font-medium">Click to select files, or drop them anywhere</p>
         <p className="text-base-content/60 mt-1 text-sm font-semibold">JPG · PNG · PDF · HEIC · HEIF · TIFF</p>
 
-        {/* US-1.6: display size limit so users know before selecting */}
+        {/* Size limit indicator */}
         <p className="text-base-content/40 mt-1 text-xs">
           Max file size: {MAX_FILE_SIZE_MB}MB
         </p>
@@ -178,8 +197,22 @@ function DropZone({ onFilesCaptured, onError }: { onFilesCaptured: (files: File[
           Select Files
         </button>
       </div>
+
+      {/* Global Full-Screen Drag Overlay */}
+      {isGlobalDrag && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-base-100/80 backdrop-blur-sm flex items-center justify-center p-8 transition-all duration-300 pointer-events-none">
+          <div className="w-full h-full border-[6px] border-primary border-dashed rounded-[3rem] flex flex-col items-center justify-center bg-primary/5 animate-pulse">
+            <div className="bg-base-100 p-8 rounded-full shadow-2xl mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+            <h2 className="text-5xl font-extrabold text-primary drop-shadow-sm tracking-tight">Drop files to upload</h2>
+            <p className="text-primary/70 mt-4 text-xl font-medium">Release your mouse to add files to ARKHIVE</p>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
-
-export default DropZone;
