@@ -29,6 +29,7 @@ function UploadPage() {
   const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
+  const [retryMessage, setRetryMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null); // US-1.4
   const [uploadSuccess, setUploadSuccess] = useState(false);               // US-1.5
   const [replaceConfirm, setReplaceConfirm] = useState<{
@@ -201,6 +202,7 @@ function UploadPage() {
     }
     setIsProcessing(true);
     setUploadError(null);    // US-1.4: clear any previous error before retrying
+    setRetryMessage(null);
     setUploadSuccess(false); // US-1.5: clear any previous success before retrying
 
     try {
@@ -214,7 +216,9 @@ function UploadPage() {
       await new Promise((resolve) => setTimeout(resolve, 5000));
 
 
-      await uploadPagesToBackend(selectedSrcs);
+      await uploadPagesToBackend(selectedSrcs, (msg) => {
+        setRetryMessage(msg);
+      });
 
       // US-1.5: detect successful upload and show success notification
       unlockStep(2);
@@ -227,6 +231,7 @@ function UploadPage() {
       // US-1.4: store error message in state to display near upload area
       const message = err instanceof Error ? err.message : 'An unexpected error occurred during upload.';
       setUploadError(message);
+      setRetryMessage(null); // Clear retry message when error is shown
       console.error('Processing failed:', err);
     } finally {
       setIsProcessing(false);
@@ -235,7 +240,7 @@ function UploadPage() {
 
   // Helper to render global notifications
   const renderNotification = () => {
-    if (!uploadError && !uploadSuccess) return null;
+    if (!uploadError && !uploadSuccess && !retryMessage) return null;
     return (
       <div className="toast toast-top toast-center z-50 mt-16">
         {uploadError && (
@@ -248,6 +253,17 @@ function UploadPage() {
               <div className="text-xs">{uploadError}</div>
             </div>
             <button className="btn btn-sm btn-ghost" onClick={() => setUploadError(null)}>✕</button>
+          </div>
+        )}
+        {retryMessage && (
+          <div className="alert alert-warning mb-2 p-3 text-sm rounded-xl flex items-start gap-2 shadow-lg max-w-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div className="flex-1">
+              <span>{retryMessage}</span>
+            </div>
+            <button className="btn btn-xs btn-ghost" onClick={() => setRetryMessage(null)}>✕</button>
           </div>
         )}
         {uploadSuccess && (

@@ -39,6 +39,9 @@ export default {
         };
       }
 
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Transfer-Encoding', 'chunked');
+
       // Run OCR on each page in parallel
       const ocrResults = await Promise.all(
         files.map(async (file) => {
@@ -47,10 +50,16 @@ export default {
             // textExtraction expects a path, but file.buffer should be used ideally.
             // For now, since we only have originalname, it might fail.
             // Let's wrap in try-catch to avoid breaking the whole upload if OCR fails locally.
-            const text = await parseTableWithRetries(file.buffer);
+            const text = await parseTableWithRetries(file.buffer, (attempt, max) => {
+              res.write(JSON.stringify({ type: 'retry', fileName: file.originalname, attempt, maxRetries: max }) + '\n');
+            });
             return text;
-          } catch (e) {
+          } catch (e: any) {
             console.error("OCR failed for file", file.originalname, e);
+            const errMsg = e && e.message && e.message.includes("NoTextDetectedError")
+              ? e.message.replace("NoTextDetectedError: ", "")
+              : "OCR failed. Please double check and reupload your document.";
+            res.write(JSON.stringify({ type: 'error', fileName: file.originalname, message: errMsg }) + '\n');
             return []; // return empty array on failure so upload still succeeds
           }
         })
@@ -66,13 +75,18 @@ export default {
         updatedAt: Date.now()
       };
 
-      res.json({ success: true, pageCount: files.length, ocrData });
+      res.write(JSON.stringify({ type: 'success', data: { success: true, pageCount: files.length, ocrData } }) + '\n');
+      res.end();
     } catch (error) {
       console.error("OCR processing error:", error);
-      res.status(500).json({
-        error:
-          "OCR processing failed. Check that your Google Vision credentials are configured."
-      });
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: "OCR processing failed. Check that your Google Vision credentials are configured."
+        });
+      } else {
+        res.write(JSON.stringify({ type: 'error', message: "OCR processing failed. Check your Google Vision credentials." }) + '\n');
+        res.end();
+      }
     }
   }
 };
