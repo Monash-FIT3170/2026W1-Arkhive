@@ -81,17 +81,31 @@ function ValidationPage() {
         confidenceScore: f.confidence,
       }));
 
-      // Sample first 20 non-empty values per column for format detection
+      // Randomly sample 10–30 non-empty values per column for format detection.
+      // Sample size is based on table size:
+      //   - Minimum: 10 values
+      //   - 10% of rows for medium-sized tables
+      //   - Maximum: 30 values
       const sampledData: Record<string, string[]> = {};
+
+      const sampleSize = Math.min(30, Math.max(10, Math.ceil(documentContext.rows.length * 0.1)));
+
       for (const col of documentContext.columns) {
-        const samples: string[] = [];
+        const values: string[] = [];
+
+        // Collect all non-empty values for this column
         for (const row of documentContext.rows) {
           const val = row[col];
+
           if (val !== null && val !== undefined && String(val).trim() !== '') {
-            samples.push(String(val).trim());
-            if (samples.length >= 20) break;
+            values.push(String(val).trim());
           }
         }
+
+        // Randomly sample up to the calculated sample size
+        const shuffled = values.sort(() => Math.random() - 0.5);
+        const samples = shuffled.slice(0, sampleSize);
+
         if (samples.length > 0) {
           sampledData[col] = samples;
         }
@@ -109,7 +123,7 @@ function ValidationPage() {
       } catch (error) {
         console.error('Failed to detect format issues', error);
       }
-
+      console.log(formatIssues);
       // Merge Issues
       const issues = confidenceIssues.concat(formatIssues);
 

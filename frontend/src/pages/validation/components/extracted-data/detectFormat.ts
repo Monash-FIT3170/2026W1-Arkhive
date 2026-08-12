@@ -18,6 +18,11 @@ function toRegex(source: string): RegExp {
   return new RegExp(pattern.endsWith('$') ? pattern : pattern + '$');
 }
 
+/** Matches the auto-generated nested sub-item columns from flatten.ts (SUB_<ITEMCOL>_<depth>). */
+function isSubItemColumn(column: string): boolean {
+  return /^SUB_.+_\d+$/.test(column);
+}
+
 /** Checks one column's values against its expected format regex. */
 export function checkColumnFormat(
   data: ExtractedData,
@@ -26,11 +31,21 @@ export function checkColumnFormat(
 ): FlaggedCell[] {
   const regex = toRegex(formatSource); // Turn string into regex
   const flagged: FlaggedCell[] = [];
+  const structural = isSubItemColumn(column);
 
   for (const row of data.rows) {
     //for each cell of the column
     const value = row[column];
-    if (value === null || value === undefined || String(value).trim() === '') continue; // skip empty cells
+    const isEmpty = value === null || value === undefined || String(value).trim() === '';
+
+    if (isEmpty) {
+      // Sub-item columns are expected to be empty for rows that don't nest that deep -- skip.
+      // Any other column being empty means no data was found for it at all -- flag it.
+      if (!structural) {
+        flagged.push({ rowId: row._id, column, value });
+      }
+      continue;
+    }
 
     if (!regex.test(String(value).trim())) {
       // test of value at cell matches regex
