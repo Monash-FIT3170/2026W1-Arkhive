@@ -23,16 +23,26 @@ const wait = (time: number) => {
 export async function withRetry<T>(
   fn: () => Promise<T>,
   maxRetries: number = 3,
-  delayMs: number = 1000
+  delayMs: number = 1000,
+  onRetry?: (attempt: number, maxRetries: number) => void
 ): Promise<T> {
-  try {
-    return await fn();
-  } catch (error) {
-    if (maxRetries <= 0) {
-      throw error; // No more retries left
+  let attempts = 0;
+  while (true) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      if (error && error.message && error.message.includes("NoTextDetectedError")) {
+        throw error;
+      }
+      if (attempts >= maxRetries) {
+        throw error;
+      }
+      attempts++;
+      console.log(`Retrying... attempt ${attempts} of ${maxRetries}`);
+      if (onRetry) {
+        onRetry(attempts, maxRetries);
+      }
+      await wait(3000);
     }
-    console.log(`Retrying... attempts left: ${maxRetries}`);
-    await wait(3000)
-    return withRetry(fn, maxRetries - 1, delayMs); // Recursive call
   }
 }

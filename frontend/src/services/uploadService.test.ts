@@ -24,7 +24,7 @@ describe('uploadService', () => {
         json: vi.fn().mockResolvedValueOnce({ success: true })
       });
       
-      await expect(uploadPagesToBackend(['blob:http://localhost/123'])).resolves.toBeUndefined();
+      await expect(uploadPagesToBackend([{ src: 'blob:http://localhost/123', type: 'Other' }])).resolves.toBeUndefined();
       
       expect(global.fetch).toHaveBeenCalledTimes(2);
       expect(global.fetch).toHaveBeenNthCalledWith(1, 'blob:http://localhost/123');
@@ -47,7 +47,7 @@ describe('uploadService', () => {
         json: vi.fn().mockResolvedValueOnce({ error: 'Server error' })
       });
       
-      await expect(uploadPagesToBackend(['blob:http://localhost/123'])).rejects.toThrow('Server error');
+      await expect(uploadPagesToBackend([{ src: 'blob:http://localhost/123', type: 'Other' }])).rejects.toThrow('Server error');
     });
   });
 
