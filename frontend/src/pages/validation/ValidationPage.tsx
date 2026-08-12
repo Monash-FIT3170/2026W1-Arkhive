@@ -67,11 +67,11 @@ function ValidationPage() {
     }
     loadSession();
   }, []);
-
+  const hasStartedRef = useRef(false);
   useEffect(() => {
     async function performFormatDetection() {
-      if (!documentContext || hasDetected) return;
-
+      if (!documentContext || hasStartedRef.current) return;
+      hasStartedRef.current = true;
       // Low Confidence Detection
       const fields = detectReviewFields(documentContext);
       const confidenceIssues = fields.map((f) => ({
@@ -135,7 +135,7 @@ function ValidationPage() {
     }
 
     performFormatDetection();
-  }, [documentContext, hasDetected]);
+  }, [documentContext]);
 
   useEffect(() => {
     documentContextRef.current = documentContext;

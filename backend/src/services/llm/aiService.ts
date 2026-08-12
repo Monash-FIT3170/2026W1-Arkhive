@@ -150,11 +150,12 @@ const chatResponseSchema: Schema = {
 const formatDetectionSchema: Schema = {
   type: SchemaType.OBJECT,
   description:
-    'A map of column names to a regular expression validating their format. Only include columns that are Date, Time, or Currency formats.',
+    'A map of column names to a regular expression validating their dominant structural format (separators, punctuation, casing, digit/letter layout) -- not limited to Date, Time, or Currency.',
   properties: {
     formats: {
       type: SchemaType.ARRAY,
-      description: 'List of detected formats for Date, Time, and Currency columns.',
+      description:
+        'List of columns with a detected dominant structural format, and a regex matching it.',
       items: {
         type: SchemaType.OBJECT,
         properties: {
@@ -164,7 +165,8 @@ const formatDetectionSchema: Schema = {
           },
           regex: {
             type: SchemaType.STRING,
-            description: 'The regular expression validating the most common format in this column.',
+            description:
+              'The regular expression validating the most common structural pattern in this column.',
           },
         },
         required: ['column', 'regex'],
@@ -327,9 +329,9 @@ export default {
     // });
 
     // const result = await model.generateContent('Identify Date, Time, and Currency columns and provide validation regexes.');
-
+    console.log('SENT TO MODEL:\n', formattedSample);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash-lite',
       systemInstruction: `You are an AI assistant helping validate table data extracted via OCR.
 
         Look at each column's sample values. If most non-empty values share the same structural
@@ -375,7 +377,7 @@ export default {
     const result = await model.generateContent(
       'Identify columns with a consistent format and provide validation regexes for each, following the rules above.'
     );
-
+    console.log('RAW RESPONSE:\n', result.response.text());
     const parsed = JSON.parse(result.response.text());
 
     // Convert { formats: [{column, regex}] } into Record<string, string>
