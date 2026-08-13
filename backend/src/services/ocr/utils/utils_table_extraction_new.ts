@@ -52,6 +52,16 @@ export interface StructuredFixtureProduct {
     subComponents: SubComponent[];
 }
 
+  interface ExtractedSchema {
+    components?: Array<{
+      id: string;
+      type: string;
+      text: string;
+      cells: string[];
+      [key: string]: any;
+    }>;
+  }
+
 export async function convertTable(buffer: Buffer, client: LlamaCloud){
   const uint8Array = new Uint8Array(buffer);
   const fileBlob = new Blob([uint8Array], { type: 'application/pdf' });
@@ -76,8 +86,8 @@ export async function convertTable(buffer: Buffer, client: LlamaCloud){
 
   const fetchedData = await fetch(result.result_content_metadata?.grounded_items?.presigned_url ?? "")
   const jsonData = JSON.parse(await fetchedData.text())
-  //console.log(" rows out " + JSON.stringify(jsonData.items.filter(s => s.type === "table")[0].grounding.rows[0][0], null, 2))
-  extractStructuredComponents(result, client)
+  const out = await extractStructuredComponents(result, client)
+ // console.log(JSON.stringify(await extractStructuredComponents(result, client), null, 2))
   
 
 }
@@ -120,7 +130,7 @@ async function extractStructuredComponents(result: LlamaCloud.Parsing.ParsingGet
           },
           cells: {
             type: "array",
-            description: "If this is a table row, the individual array of cell values strings.",
+            description: "If this is a table row or column, the individual array containing the cell",
             items: { type: "string" }
           }
         },
@@ -135,9 +145,8 @@ async function extractStructuredComponents(result: LlamaCloud.Parsing.ParsingGet
     file_input: result.job.id,
     configuration: {
       data_schema: dataSchema,
-      tier: "cost_effective",
+      tier: "agentic",
       extraction_target: "per_doc",
-      cite_sources: true,
       confidence_scores: true,
       
     }
@@ -155,21 +164,15 @@ async function extractStructuredComponents(result: LlamaCloud.Parsing.ParsingGet
   }
 
   job.configuration?.confidence_scores
-  console.log(job.extract_metadata?.field_metadata?.document_metadata?.components)
-  console.log(`look at this one man ${JSON.stringify(mapBoundingBoxes(result, job), null, 2)}`)
-  return job
+  return mapBoundingBoxes(result, job)
 }
 
 
-async function mapBoundingBoxes(llamaparseData: LlamaCloud.Parsing.ParsingGetResponse, llamaextractData: LlamaCloud.Extract.ExtractV2Job) {
-  // 1. Build lookup map from LlamaParse table data
+async function populateHashMapLookup(llamaparseData: LlamaCloud.Parsing.ParsingGetResponse): Promise<Map<string, any>>{
   const lookup = new Map<string, any>();
-
-  // 1. Correctly traverse LlamaParse items
-  // In LlamaParse SDK, parse results reside in result_content_metadata or items array depending on endpoint version
   const items = await fetch(llamaparseData.result_content_metadata?.grounded_items?.presigned_url!)
   if (!items){
-    throw Error("")
+    throw Error("");
   }
   const itemss = await items.json()
   // Extract the actual array (handles both raw array and wrapper objects)
@@ -177,7 +180,6 @@ async function mapBoundingBoxes(llamaparseData: LlamaCloud.Parsing.ParsingGetRes
   ? itemss : itemss?.items ?? itemss?.grounded_items ?? [];
 
   itemsss.forEach((item: any) => {
-    console.log("passed here man")
     if (item.type === "table") {
       const textRows = item.rows || [];
       const groundingRows = item.grounding?.rows || [];
@@ -201,36 +203,72 @@ async function mapBoundingBoxes(llamaparseData: LlamaCloud.Parsing.ParsingGetRes
     }
   });
 
-  interface ExtractedSchema {
-    components?: Array<{
-      id: string;
-      type: string;
-      text: string;
-      cells: string[];
-      [key: string]: any;
-    }>;
+  return lookup;
+}
+
+async function populateHashMapForConfidence(llamaextractData: LlamaCloud.Extract.ExtractV2Job, llamaparseData: LlamaCloud.Parsing.ParsingGetResponse): Promise<Map<string, any>>{
+  const lookup_meta = new Map<string, any>();
+
+  const smth = (llamaextractData.extract_metadata?.field_metadata?.document_metadata! as any).components;
+  const items = await fetch(llamaparseData.result_content_metadata?.grounded_items?.presigned_url!)
+  if (!items){
+    throw Error("");
   }
+  const itemss = await items.json()
+  // Extract the actual array (handles both raw array and wrapper objects)
+  const itemsss: any[] = Array.isArray(itemss)
+  ? itemss : itemss?.items ?? itemss?.grounded_items ?? [];
+
+  itemsss.forEach((item: any) => {
+    if (item.type === "table") {
+      const textRows = item.rows || [];
+      const groundingRows = item.grounding?.rows || [];
+
+      textRows.forEach((row: any[], rIdx: number) => {
+        lookup_meta.set(row.join("").replace(/^-\s*/, "").replace(/\s*:\s*$/, ""), smth[rIdx]?.text?.confidence ?? 0)
+      });
+    }
+  });
+  return lookup_meta;
+}
+
+
+
+
+async function mapBoundingBoxes(llamaparseData: LlamaCloud.Parsing.ParsingGetResponse, llamaextractData: LlamaCloud.Extract.ExtractV2Job) {
+  // 1. Build lookup map from LlamaParse table data
+  const lookup = await populateHashMapLookup(llamaparseData);
+  const lookup_meta = await populateHashMapForConfidence(llamaextractData, llamaparseData);
+  console.log(Array.from(lookup_meta.keys()))
+  console.log("\n")
+  console.log(Array.from(lookup.keys()))
+
+  console.log(`this is the lookup meta ${Array.from(lookup_meta.keys()).length} ${Array.from(lookup.keys()).length}`)
 
   // 2. Extract components safely with type casting
   const extractObj = llamaextractData.extract_result as ExtractedSchema;
+
   const comp_ = extractObj?.components ?? [];
-  const updatedComponents = comp_.map((component: { cells: string[]; }) => {
+  const updatedComponents = comp_.map((component: { cells: string[]; }, ind) => {
     if (!component.cells) return component;
 
-    const cellBboxes = component.cells.map((cellText: string) => {
+    const cellBboxes = component.cells.map((cellText: string, index) => {
       if (!cellText) return null;
       
       const cleanCellKey = cellText.trim().replace(/^-\s*/, "").replace(/\s*:\s*$/, "");
-      return lookup.get(cleanCellKey) || null;
+      const i = (llamaextractData.extract_metadata?.field_metadata?.document_metadata as any)?.components?.[ind]?.[index]
+      return {
+        ...lookup.get(cleanCellKey),
+      }
     });
-
+    
     return {
       ...component,
       cell_bboxes: cellBboxes,
+      confidence: lookup_meta
     };
   });
-  console.log(JSON.stringify(updatedComponents, null, 2))
-  //console.log(llamaextractData.extract_result)
+
   return {
     ...llamaextractData,
     components: updatedComponents
