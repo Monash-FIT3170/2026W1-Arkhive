@@ -5,8 +5,11 @@
 // To change the sidebar           →  edit UploadSidebar.tsx
 // To change PDF/canvas logic      →  edit components/preview/previewHelpers.ts
 // To change the preview cards     →  edit components/preview/PreviewCard.tsx
+//
+// UPDATED: Preview grid is now grouped into per-file sections (see "groups"
+// below) instead of one flat grid mixing pages from every file together.
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { unlockStep } from '../../services/stepGuard.ts';
 
@@ -56,6 +59,11 @@ export default function UploadPage() {
   const previewItemsRef = useRef<PreviewItem[]>([]);
   const createdUrlsRef = useRef<string[]>([]);
 
+  // NEW: tracks the next globally-unique fileIndex to hand out. Needed because
+  // buildPreviewItemsForFiles now takes an offset instead of always starting
+  // at 0, so pages added/replaced later don't collide with existing file groups.
+  const nextFileIndexRef = useRef(0);
+
   useEffect(() => { previewItemsRef.current = previewItems; }, [previewItems]);
 
   useEffect(() => {
@@ -76,8 +84,10 @@ export default function UploadPage() {
   function captureFiles(incoming: File[]) {
     // Allow appending more files, instead of slicing/replacing
     setIsProcessing(true);
-    buildPreviewItemsForFiles(incoming, createdUrlsRef.current)
+    const offset = nextFileIndexRef.current; // NEW
+    buildPreviewItemsForFiles(incoming, createdUrlsRef.current, offset) // NEW: pass offset
       .then(newItems => {
+        nextFileIndexRef.current = offset + incoming.length; // NEW: advance the counter
         setPreviewItems(prev => {
           const startIndex = prev.length;
           const next = [...prev, ...newItems];
@@ -200,8 +210,10 @@ export default function UploadPage() {
     setReplaceConfirm(null);
 
     setIsProcessing(true);
-    buildPreviewItemsForFiles([newFile], createdUrlsRef.current)
+    const offset = nextFileIndexRef.current; // NEW: replaced page(s) count as a new file group
+    buildPreviewItemsForFiles([newFile], createdUrlsRef.current, offset) // NEW: pass offset
       .then(newItems => {
+        nextFileIndexRef.current = offset + 1; // NEW: advance the counter
         setPreviewItems(prev => {
           const next = [...prev];
           next.splice(previewIndex, 1, ...newItems);
@@ -284,8 +296,10 @@ export default function UploadPage() {
     setBulkReplaceConfirm(null);
 
     setIsProcessing(true);
+    const startOffset = nextFileIndexRef.current; // NEW: each replaced page becomes its own new file group
+    nextFileIndexRef.current = startOffset + pairs.length; // NEW: advance the counter up front
     Promise.all(
-      pairs.map((pair) => buildPreviewItemsForFiles([pair.newFile], createdUrlsRef.current))
+      pairs.map((pair, i) => buildPreviewItemsForFiles([pair.newFile], createdUrlsRef.current, startOffset + i)) // NEW: pass unique offset per pair
     )
       .then((allNewItems) => {
         setPreviewItems((prev) => {
@@ -413,6 +427,23 @@ export default function UploadPage() {
     );
   };
 
+  // NEW: group previewItems by fileIndex, preserving the order each group
+  // first appears in. Each group renders as its own labeled section with
+  // its pages laid out in a horizontal row (see mockup: "File 1 / File 2 / File 3").
+  const groups = useMemo(() => {
+    const map = new Map<number, { originalIndex: number; item: PreviewItem }[]>();
+    previewItems.forEach((item, index) => {
+      const key = item.fileIndex ?? index; // fallback keeps placeholders/ungrouped items separate
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ originalIndex: index, item });
+    });
+    return Array.from(map.entries()).map(([fileIndex, entries], groupPos) => ({
+      fileIndex,
+      groupNumber: groupPos + 1,
+      entries,
+    }));
+  }, [previewItems]);
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   // No files yet → full-screen landing dropzone
@@ -507,28 +538,51 @@ export default function UploadPage() {
 
       <div className="flex min-h-0 flex-1">
 
-        {/* Preview grid */}
+        {/* Preview grid — UPDATED: now grouped into per-file sections instead
+            of one flat grid. Each section is its own labeled box (e.g. "File 1")
+            with that file's pages laid out in a horizontal, wrapping row. */}
         <main className="bg-base-100 flex-1 overflow-y-auto p-5">
-          <div className="grid auto-rows-auto grid-cols-[repeat(auto-fill,minmax(200px,1fr))] content-start gap-[18px]">
-            {previewItems.map((item, index) => (
-              <PreviewCard
-                key={`${item.label}-${item.subtitle ?? ""}-${index}`}
-                label={item.label}
-                subtitle={item.subtitle}
-                hasFile={item.hasFile}
-                index={index}
-                isSelected={selectedPages.has(index)}
-                previewSrc={item.previewSrc}
-                isImage={item.isImage}
-                isBlurry={item.isBlurry}
-                isDark={item.isDark}
-                shouldWarn={item.shouldWarn}
-                documentType={item.documentType}
-                onToggle={togglePageSelection}
-                onRemove={handleRemovePreview}
-                onReplaceWithFile={handleReplaceWithFile}
-                onChangeType={handleChangeType}
-              />
+          <div className="flex flex-col gap-6">
+            {groups.map((group) => (
+              <section
+                key={group.fileIndex}
+                className="rounded-lg border border-base-300 bg-base-200/40 p-4"
+              >
+                <h3 className="mb-3 text-sm font-semibold text-base-content/70">
+                  File {group.groupNumber}
+                  {group.entries[0]?.item.label && (
+                    <span className="ml-2 font-normal text-base-content/50">
+                      — {group.entries[0].item.label}
+                    </span>
+                  )}
+                </h3>
+                <div className="flex flex-wrap gap-[18px]">
+                  {group.entries.map(({ item, originalIndex }) => (
+                    <div
+                      key={`${item.label}-${item.subtitle ?? ""}-${originalIndex}`}
+                      className="w-[200px] shrink-0"
+                    >
+                      <PreviewCard
+                        label={item.label}
+                        subtitle={item.subtitle}
+                        hasFile={item.hasFile}
+                        index={originalIndex}
+                        isSelected={selectedPages.has(originalIndex)}
+                        previewSrc={item.previewSrc}
+                        isImage={item.isImage}
+                        isBlurry={item.isBlurry}
+                        isDark={item.isDark}
+                        shouldWarn={item.shouldWarn}
+                        documentType={item.documentType}
+                        onToggle={togglePageSelection}
+                        onRemove={handleRemovePreview}
+                        onReplaceWithFile={handleReplaceWithFile}
+                        onChangeType={handleChangeType}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         </main>
