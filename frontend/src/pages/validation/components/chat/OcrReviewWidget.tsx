@@ -317,26 +317,32 @@ export default function OcrReviewWidget({
             {/* Carousel Navigation */}
             <div className="flex justify-between items-center mt-8 w-full px-2">
               <button
-                className="btn btn-ghost btn-circle hover:bg-base-200 text-base-content/60 hover:text-base-content transition-colors"
+                className="btn btn-ghost btn-circle hover:bg-base-200 text-base-content/60 hover:text-base-content transition-colors flex-shrink-0"
                 onClick={handlePrev}
                 disabled={currentIndex === 0}
               >
                 <ChevronLeft size={24} />
               </button>
 
-              <div className="flex gap-2.5">
-                {unresolvedIssues.map((_, idx) => (
-                  <div
-                    key={idx}
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      idx === currentIndex ? 'w-6 bg-primary' : 'w-2 bg-base-300'
-                    }`}
-                  />
-                ))}
+              <div className="flex gap-2.5 flex-1 justify-center items-center px-4 overflow-hidden">
+                {unresolvedIssues.length <= 15 ? (
+                  unresolvedIssues.map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={`h-2 flex-shrink-0 rounded-full transition-all duration-300 ${
+                        idx === currentIndex ? 'w-6 bg-primary' : 'w-2 bg-base-300'
+                      }`}
+                    />
+                  ))
+                ) : (
+                  <span className="text-xs font-semibold text-base-content/40 tracking-wider">
+                    {currentIndex + 1} / {unresolvedIssues.length}
+                  </span>
+                )}
               </div>
 
               <button
-                className="btn btn-ghost btn-circle hover:bg-base-200 text-base-content/60 hover:text-base-content transition-colors"
+                className="btn btn-ghost btn-circle hover:bg-base-200 text-base-content/60 hover:text-base-content transition-colors flex-shrink-0"
                 onClick={handleNext}
                 disabled={currentIndex === unresolvedIssues.length - 1}
               >
