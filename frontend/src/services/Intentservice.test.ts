@@ -247,6 +247,74 @@ describe("applyIntent – column_confirm", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 6. "bulk_update" intent – applying many cell updates at once
+// ---------------------------------------------------------------------------
+describe("applyIntent – bulk_update", () => {
+
+  test("updates multiple cells across multiple rows", () => {
+    const intent: Intent = {
+      type: "bulk_update",
+      bulkUpdates: [
+        { rowId: "comp_1", column: "PRICE", newValue: "$5000" },
+        { rowId: "comp_2", column: "PRICE", newValue: "$3000" },
+        { rowId: "comp_2", column: "QTY", newValue: "7" },
+      ],
+    };
+
+    const result = applyIntent(cloneData(), intent);
+
+    expect(result.rows[0].PRICE).toBe("$5000");
+    expect(result.rows[0].QTY).toBe("10");
+    expect(result.rows[1].PRICE).toBe("$3000");
+    expect(result.rows[1].QTY).toBe("7");
+    expect(result.rows[0].ITEM).toBe("Apples");
+    expect(result.rows[1].ITEM).toBe("Bananas");
+  });
+
+  test("updates cells in rows whose _id is numeric", () => {
+    const data = cloneData();
+    data.rows[0]._id = 1;
+    data.rows[1]._id = 2;
+
+    const intent: Intent = {
+      type: "bulk_update",
+      bulkUpdates: [
+        { rowId: "1", column: "PRICE", newValue: "$5000" },
+      ],
+    };
+
+    const result = applyIntent(data, intent);
+
+    expect(result.rows[0].PRICE).toBe("$5000");
+    expect(result.rows[1].PRICE).toBe("3000");
+  });
+
+  test("returns data unchanged when bulkUpdates is missing or empty", () => {
+    const data = cloneData();
+    const original = JSON.stringify(data);
+
+    const missing = applyIntent(data, { type: "bulk_update" } as Intent);
+    expect(JSON.stringify(missing)).toBe(original);
+
+    const empty = applyIntent(data, { type: "bulk_update", bulkUpdates: [] });
+    expect(JSON.stringify(empty)).toBe(original);
+  });
+
+  test("does not mutate the original data object", () => {
+    const data = cloneData();
+    const original = JSON.stringify(data);
+
+    applyIntent(data, {
+      type: "bulk_update",
+      bulkUpdates: [{ rowId: "comp_1", column: "PRICE", newValue: "$5000" }],
+    });
+
+    expect(JSON.stringify(data)).toBe(original);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
 // 5. Unrecognised / fallback intent types
 // ---------------------------------------------------------------------------
 describe("applyIntent – unrecognised intent types", () => {

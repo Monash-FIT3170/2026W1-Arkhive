@@ -30,6 +30,12 @@ export function applyIntent(data: ExtractedData, intent: Intent): ExtractedData 
                 return data;
             }
             return confirmcolumns(data, intent.approved);
+        case "bulk_update":
+            if (!intent.bulkUpdates || intent.bulkUpdates.length === 0) {
+                console.error("Missing required field for bulk update intent");
+                return data;
+            }
+            return bulkUpdateCells(data, intent.bulkUpdates);
         default:
             return data;
     };
@@ -96,4 +102,22 @@ function confirmcolumns(data: ExtractedData, approved: boolean): ExtractedData {
         console.log("User indicated the columns are incorrect");
     }
     return data;
+}
+
+function bulkUpdateCells(data: ExtractedData, updates: Array<{ rowId: string; column: string; newValue: string }>): ExtractedData {
+    const updatedRows = data.rows.map((row) => {
+        const rowUpdates = updates.filter((update) => update.rowId === row._id);
+        if (rowUpdates.length > 0) {
+            const updatedRow = { ...row };
+            rowUpdates.forEach((update) => {
+                updatedRow[update.column] = update.newValue;
+            });
+            return updatedRow;
+        }
+        return row;
+    });
+    return {
+        ...data,
+        rows: updatedRows,
+    };
 }

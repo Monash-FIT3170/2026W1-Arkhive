@@ -35,7 +35,8 @@ export interface Intent {
     | 'unclear'
     | 'column_confirm'
     | 'column_correction'
-    | 'column_delete';
+    | 'column_delete'
+    | 'bulk_update';
   rowId?: string; // The unique ID of the row
   column?: string; // <-- Changed from 'field' to 'column'
   oldValue?: string;
@@ -43,6 +44,7 @@ export interface Intent {
   note?: string;
   updates?: Array<{ from: string; to: string }>; // for column renames
   deletedColumns?: string[]; // for column deletes
+  bulkUpdates?: Array<{ rowId: string; column: string; newValue: string }>; // for bulk updates
 }
 
 export interface ReviewField {

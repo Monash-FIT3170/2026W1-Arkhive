@@ -57,6 +57,27 @@ function applyIntentToContext(context: ExtractedData, intent: any): ExtractedDat
       return row;
     });
   }
+
+  //apply a batch of cell updates in one go
+  if (intent.type === 'bulk_update' && intent.bulkUpdates) {
+    const rowIdToUpdates = new Map<string, any[]>();
+    intent.bulkUpdates.forEach((u: any) => {
+      const key = String(u.rowId);
+      if (!rowIdToUpdates.has(key)) {
+        rowIdToUpdates.set(key, []);
+      }
+      rowIdToUpdates.get(key)!.push(u);
+    });
+    updated.rows = updated.rows.map((row) => {
+      const rowUpdates = rowIdToUpdates.get(String(row._id));
+      if (!rowUpdates) return row;
+      const newRow = { ...row };
+      rowUpdates.forEach((u) => {
+        newRow[u.column] = u.newValue;
+      });
+      return newRow;
+    });
+  }
   return updated;
 }
 
@@ -87,6 +108,7 @@ const chatResponseSchema: Schema = {
             'column_correction',
             'column_delete',
             'column_header_add',
+            'bulk_update',
           ],
         },
         column: {
@@ -138,6 +160,30 @@ const chatResponseSchema: Schema = {
           description: 'A list of column names to delete (for column_delete).',
           items: {
             type: SchemaType.STRING,
+          },
+        },
+        bulkUpdates: {
+          type: SchemaType.ARRAY,
+          description:
+            'A list of cell updates to apply in bulk (for bulk_update), e.g. applying the same transformation to every value in a column.',
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              rowId: {
+                type: SchemaType.STRING,
+                description:
+                  "The unique '_id' of the exact row to modify (extracted from the provided document context).",
+              },
+              column: {
+                type: SchemaType.STRING,
+                description: 'The specific column header key from the provided document context.',
+              },
+              newValue: {
+                type: SchemaType.STRING,
+                description: 'The new, transformed value for this cell.',
+              },
+            },
+            required: ['rowId', 'column', 'newValue'],
           },
         },
       },
@@ -202,6 +248,7 @@ export default {
             If they confirm the columns look correct, use the 'column_confirm' intent and set 'approved' to true.
             If they want to rename one or more column headers (e.g., 'change column header Supplier to Vendor Name'), use the 'column_correction' intent and populate the 'updates' array.
             If they want to remove or delete one or more columns (e.g., 'delete the tax column'), use the 'column_delete' intent and populate the 'deletedColumns' array.
+            If they want to apply the same change across many cells (e.g., 'add a $ prefix to every value in the PRICE column'), use the 'bulk_update' intent and populate the 'bulkUpdates' array with one entry per affected cell: 'rowId' from the document context, 'column' as the exact column header key, and 'newValue' as the fully transformed value. Never leave a cell out of 'bulkUpdates' that the user asked to change.
             If they approve or reject the document generally, use the 'approval' or 'rejection' intent.
             Always be polite and confirm what you are doing in the 'response' field.
             
@@ -235,7 +282,7 @@ export default {
     const updatedContext =
       parsed.intent &&
       documentContext &&
-      ['correction', 'column_correction', 'column_delete'].includes(parsed.intent.type)
+      ['correction', 'column_correction', 'column_delete', 'bulk_update'].includes(parsed.intent.type)
         ? applyIntentToContext(documentContext, parsed.intent)
         : undefined;
 
