@@ -18,6 +18,7 @@ export interface OcrIssue {
   fieldName: string;
   ocrValue: string;
   confidenceScore: number;
+  issueType?: 'confidence' | 'format';
 }
 
 interface OcrReviewWidgetProps {
@@ -194,11 +195,13 @@ export default function OcrReviewWidget({
                 {/* Detected Value */}
                 <div>
                   <p className="text-xs text-base-content/60 font-semibold mb-1 uppercase tracking-wider ml-1 flex justify-between items-center">
-                    Detected Data
-                    <span className="text-[10px] font-medium text-warning flex items-center gap-1 bg-warning/10 px-2 py-0.5 rounded-full">
-                      <AlertCircle size={12} />
-                      {(unresolvedIssues[currentIndex]?.confidenceScore * 100).toFixed(0)}%
-                    </span>
+                    {unresolvedIssues[currentIndex]?.issueType === 'format' ? 'Format Inconsistency' : 'Detected Data'}
+                    {unresolvedIssues[currentIndex]?.issueType !== 'format' && (
+                      <span className="text-[10px] font-medium text-warning flex items-center gap-1 bg-warning/10 px-2 py-0.5 rounded-full">
+                        <AlertCircle size={12} />
+                        {(unresolvedIssues[currentIndex]?.confidenceScore * 100).toFixed(0)}%
+                      </span>
+                    )}
                   </p>
                   <div className="bg-base-100 relative p-4 rounded-xl w-full border border-base-300 shadow-sm">
                     <p className="text-lg font-medium break-all text-base-content line-through opacity-60">

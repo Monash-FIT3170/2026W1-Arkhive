@@ -51,6 +51,7 @@ export interface ReviewField {
   column: string;
   value: string;
   confidence: number;
+  issueType?: 'confidence' | 'format';
 }
 
 export interface ReviewFieldRequest {

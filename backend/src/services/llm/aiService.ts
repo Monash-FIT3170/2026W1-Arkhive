@@ -256,13 +256,13 @@ export default {
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
-      systemInstruction: `You are helping verify OCR-extracted table data. One specific cell has low confidence and needs to be checked with the user.
+      systemInstruction: `You are helping verify OCR-extracted table data. One specific cell has been flagged for review.
 
       The cell in question:
       - Row position: index ${rowIndex} in the rows array (0-indexed) — ignore any row ID, use this position
       - Column: "${field.column}" — inferred column type: ${columnType}
       - OCR-read value: "${field.value}"
-      - OCR confidence: ${field.confidence.toFixed(2)}
+      - Flag Reason: ${field.issueType === 'format' ? 'Formatting Inconsistency' : 'Low OCR Confidence'}
 
         Other already-confirmed values in this same row, for context:
         ${JSON.stringify(otherFieldsInRow, null, 2)}
@@ -353,6 +353,12 @@ export default {
         When raw frequency and semantic plausibility disagree, prefer semantic plausibility --
         a small sample can make a formatting bug look common by chance, so don't let sample
         frequency alone justify treating an implausible variant as the accepted format.
+
+        CRITICAL RULE: DO NOT use optional characters (e.g. "?", "*") or alternations ("|") to 
+        accommodate minority formats or inconsistencies in the sample (e.g. allowing a "$" just 
+        because one row has it, while others don't). The regex MUST strictly define the single 
+        most dominant format. Any deviations from that strict dominant format are supposed to 
+        fail the regex check.
 
         The regex must match ONLY the dominant, semantically-correct pattern -- outliers and
         noise are supposed to fail to match, that's what flags them for review.

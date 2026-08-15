@@ -46,7 +46,6 @@ function ValidationPage() {
   const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
 
   const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
-  const [hasDetected, setHasDetected] = useState(false);
   const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review'>('chat');
 
   useEffect(() => {
@@ -74,11 +73,12 @@ function ValidationPage() {
       hasStartedRef.current = true;
       // Low Confidence Detection
       const fields = detectReviewFields(documentContext);
-      const confidenceIssues = fields.map((f) => ({
+      const confidenceIssues: OcrIssue[] = fields.map((f) => ({
         fieldId: `${f.rowId}:${f.column}`,
         fieldName: f.column,
         ocrValue: String(f.value),
         confidenceScore: f.confidence,
+        issueType: 'confidence',
       }));
 
       // Randomly sample 10–30 non-empty values per column for format detection.
@@ -119,6 +119,7 @@ function ValidationPage() {
           fieldName: f.column,
           ocrValue: String(f.value),
           confidenceScore: 0.3, // fallback confidence score for format issues
+          issueType: 'format' as const,
         }));
       } catch (error) {
         console.error('Failed to detect format issues', error);
@@ -128,7 +129,6 @@ function ValidationPage() {
       const issues = confidenceIssues.concat(formatIssues);
 
       setFlaggedIssues(issues);
-      setHasDetected(true);
       if (issues.length > 0) {
         setChatActiveTab('review');
       }
@@ -346,7 +346,13 @@ function ValidationPage() {
       const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
       if (!issue) return null;
 
-      const field = { rowId, column, value: issue.ocrValue, confidence: issue.confidenceScore };
+      const field: ReviewField = {
+        rowId,
+        column,
+        value: issue.ocrValue,
+        confidence: issue.confidenceScore,
+        issueType: issue.issueType,
+      };
 
       try {
         const reply = await requestFieldReview(field, documentContext);
