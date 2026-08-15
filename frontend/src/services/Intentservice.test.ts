@@ -9,8 +9,22 @@ import type { Intent } from "../models/Message";
 const baseData: ExtractedData = {
   columns: ["ITEM", "QTY", "PRICE"],
   rows: [
-    { _id: "comp_1", confidence: 0.95, ITEM: "Apples", QTY: "10", PRICE: "5000" },
-    { _id: "comp_2", confidence: 0.80, ITEM: "Bananas", QTY: "5", PRICE: "3000" }
+    {
+      _id: "comp_1",
+      confidence: 0.95,
+      _cellConfidence: { ITEM: 0.95, QTY: 0.95, PRICE: 0.95 },
+      ITEM: "Apples",
+      QTY: "10",
+      PRICE: "5000"
+    },
+    {
+      _id: "comp_2",
+      confidence: 0.80,
+      _cellConfidence: { ITEM: 0.80, QTY: 0.80, PRICE: 0.80 },
+      ITEM: "Bananas",
+      QTY: "5",
+      PRICE: "3000"
+    }
   ]
 };
 
