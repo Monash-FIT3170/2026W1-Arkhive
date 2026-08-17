@@ -2,15 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import DocumentPanel from './components/document/DocumentPanel';
 import ExtractedDataPanel from './components/extracted-data/ExtractedDataPanel';
 import ChatPanel from './components/chat/ChatPanel';
-import type { ChatMessage } from '../../models/Message';
+import type { ChatMessage, ReviewField } from '../../models/Message';
 import type { OCRComponent } from '../../models/OCRComponent';
-import { flattenOcrData } from './components/extracted-data/FlattenOcrData';
 import type { ExtractedData } from '../../models/TableData';
 import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
 import { getUploadedImageUrl } from '../../services/uploadService';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
 import { requestFieldReview, requestFormatDetection } from '../../services/llmService';
-import OcrReviewWidget from './components/chat/OcrReviewWidget';
 import type { OcrIssue } from './components/chat/OcrReviewWidget';
 import { flatten } from './components/extracted-data/flattener';
 import { checkTableFormats } from './components/extracted-data/detectFormat';
@@ -53,11 +51,6 @@ function ValidationPage() {
       try {
         let ocrData = await getExtractionSession();
         setOCRData(ocrData);
-        // console.log("SESSION DATA:", sessionData);
-        // console.log("OCR DATA:", sessionData?.ocrData);
-        // if (!sessionData?.ocrData) {
-        //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
-        // }
         setDocumentImageURL(await getUploadedImageUrl());
         setDocumentContext(flatten(ocrData as OCRComponent[]));
       } catch (error) {
