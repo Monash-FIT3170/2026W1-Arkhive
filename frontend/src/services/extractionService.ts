@@ -1,7 +1,7 @@
 import type { ExtractedData } from "../models/TableData";
 import type { OCRComponent } from "../models/OCRComponent";
 
-export async function getExtractionSession() {
+export async function getExtractionSession(): Promise<OCRComponent[] | null> {
 	const response = await fetch("/api/extraction", {
 		method: "GET",
 		credentials: "include"

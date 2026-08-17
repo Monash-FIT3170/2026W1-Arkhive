@@ -4,13 +4,58 @@ import ExtractedDataPanel from "./components/extracted-data/ExtractedDataPanel";
 import ChatPanel from "./components/chat/ChatPanel";
 import type { ChatMessage } from "../../models/Message";
 import type { OCRComponent } from "../../models/OCRComponent";
+import type { UploadedFileGroup } from "../../models/UploadedFileGroup";
 import { flattenOcrData } from "./components/extracted-data/FlattenOcrData";
 import type { ExtractedData } from "../../models/TableData";
 import {
   getExtractionSession,
   saveExtractionSession
 } from "../../services/extractionService";
-import { getUploadedImageUrl } from "../../services/uploadService";
+import {
+  getUploadedFileGroups,
+  getUploadedImageUrl
+} from "../../services/uploadService";
+
+function buildFallbackFileGroups(
+  ocrData: OCRComponent[]
+): UploadedFileGroup[] {
+  const groups = new Map<number, UploadedFileGroup>();
+
+  for (const component of ocrData) {
+    if (component.fileIndex === undefined) continue;
+
+    const group = groups.get(component.fileIndex) ?? {
+      fileIndex: component.fileIndex,
+      fileName: component.fileName ?? `File ${groups.size + 1}`,
+      pageIndices: []
+    };
+    if (
+      component.pageIndex !== undefined &&
+      !group.pageIndices.includes(component.pageIndex)
+    ) {
+      group.pageIndices.push(component.pageIndex);
+    }
+    groups.set(component.fileIndex, group);
+  }
+
+  if (groups.size > 0) return Array.from(groups.values());
+
+  return [{
+    fileIndex: 0,
+    fileName: "Uploaded document",
+    pageIndices: [0]
+  }];
+}
+
+function getOcrDataForFile(
+  ocrData: OCRComponent[],
+  fileIndex: number
+): OCRComponent[] {
+  const taggedData = ocrData.filter(
+    (component) => component.fileIndex === fileIndex
+  );
+  return taggedData.length > 0 ? taggedData : ocrData;
+}
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(
@@ -36,22 +81,42 @@ function ValidationPage() {
   const [splitPercent, setSplitPercent] = useState(50);
   const [oldContext, setOldContext] = useState<ExtractedData | null>(null); //for AI suggesiton
   const [documentImageURL, setDocumentImageURL] = useState<string>();
-  const [ocrData, setOCRData] = useState<OCRComponent[]>([]);
+  const [allOcrData, setAllOcrData] = useState<OCRComponent[]>([]);
+  const [fileGroups, setFileGroups] = useState<UploadedFileGroup[]>([]);
+  const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(
+    null
+  );
   const isLarge = useIsLargeScreen();
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     async function loadSession() {
       try {
-        let ocrData = await getExtractionSession();
-        setOCRData(ocrData);
-        // console.log("SESSION DATA:", sessionData);
-        // console.log("OCR DATA:", sessionData?.ocrData);
-        // if (!sessionData?.ocrData) {
-        //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
-        // }
-        setDocumentImageURL(await getUploadedImageUrl());
-        setDocumentContext(flattenOcrData(ocrData as OCRComponent[]));
+        const ocrData = (await getExtractionSession()) ?? [];
+        let groups: UploadedFileGroup[];
+        try {
+          groups = await getUploadedFileGroups();
+        } catch (error) {
+          console.warn("Failed to load uploaded file list", error);
+          groups = buildFallbackFileGroups(ocrData);
+        }
+        if (groups.length === 0) {
+          groups = buildFallbackFileGroups(ocrData);
+        }
+
+        const firstFile = groups[0];
+        const firstFileOcrData = getOcrDataForFile(
+          ocrData,
+          firstFile.fileIndex
+        );
+
+        setAllOcrData(ocrData);
+        setFileGroups(groups);
+        setSelectedFileIndex(firstFile.fileIndex);
+        setDocumentImageURL(
+          getUploadedImageUrl(firstFile.pageIndices[0] ?? 0)
+        );
+        setDocumentContext(flattenOcrData(firstFileOcrData));
       } catch (error) {
         console.error("Failed to load extraction session", error);
       }
@@ -97,6 +162,33 @@ function ValidationPage() {
 
   //bounding box hover state
   const [hoveredOverlayId, setHoveredOverlayId] = useState<string | null>(null);
+
+  const selectedFile = fileGroups.find(
+    (file) => file.fileIndex === selectedFileIndex
+  );
+  const selectedFileOcrData =
+    selectedFileIndex === null
+      ? allOcrData
+      : getOcrDataForFile(allOcrData, selectedFileIndex);
+  const displayedPageIndex = selectedFile?.pageIndices[0];
+  const displayedPageOcrData =
+    displayedPageIndex === undefined
+      ? selectedFileOcrData
+      : selectedFileOcrData.filter(
+          (component) => component.pageIndex === displayedPageIndex
+        );
+
+  const handleFileChange = (fileIndex: number) => {
+    const file = fileGroups.find((group) => group.fileIndex === fileIndex);
+    if (!file) return;
+
+    const fileOcrData = getOcrDataForFile(allOcrData, fileIndex);
+    setSelectedFileIndex(fileIndex);
+    setDocumentImageURL(getUploadedImageUrl(file.pageIndices[0] ?? 0));
+    setDocumentContext(flattenOcrData(fileOcrData));
+    setHoveredOverlayId(null);
+    setOldContext(null);
+  };
 
   const addMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
@@ -176,7 +268,14 @@ function ValidationPage() {
           <DocumentPanel
             hoveredOverlayId={hoveredOverlayId}
             documentImageUrl={documentImageURL}
-            ocrData={ocrData}
+            ocrData={
+              displayedPageOcrData.length > 0
+                ? displayedPageOcrData
+                : selectedFileOcrData
+            }
+            files={fileGroups}
+            selectedFileIndex={selectedFileIndex}
+            onFileChange={handleFileChange}
           />
         </div>
 

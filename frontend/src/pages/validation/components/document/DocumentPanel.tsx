@@ -1,5 +1,7 @@
 import { useState, useRef } from "react";
 import type { OCRComponent } from "../../../../models/OCRComponent";
+import type { UploadedFileGroup } from "../../../../models/UploadedFileGroup";
+import FileSelector from "./FileSelector";
 // NEW update: Calculating real average confidence from OCR data
 function calculateAverageConfidence(data: OCRComponent[]): number {
   const componentsWithConfidence = data.filter(
@@ -16,11 +18,17 @@ function calculateAverageConfidence(data: OCRComponent[]): number {
 function DocumentPanel({
   hoveredOverlayId,
   documentImageUrl,
-  ocrData
+  ocrData,
+  files,
+  selectedFileIndex,
+  onFileChange
 }: {
   hoveredOverlayId: string | null;
   documentImageUrl: string | undefined;
   ocrData: OCRComponent[];
+  files: UploadedFileGroup[];
+  selectedFileIndex: number | null;
+  onFileChange: (fileIndex: number) => void;
 }) {
   const [zoom, setZoom] = useState(1);
   const [viewBox, setViewBox] = useState("0 0 1000 1000"); // default
@@ -81,25 +89,32 @@ function DocumentPanel({
         <h2 className="mb-4 text-xl font-semibold text-base-content">
           DOCUMENT PANEL
         </h2>
-        {/* Row 2: Zoom buttoms*/}
-        <div className="mb-2 flex gap-2">
-          <button
-            className="btn btn-sm"
-            onClick={() => setZoom((z) => Math.max(1, z - 0.25))}
-          >
-            −
-          </button>
+        {/* Row 2: Zoom controls and file selector */}
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-2">
+            <button
+              className="btn btn-sm"
+              onClick={() => setZoom((z) => Math.max(1, z - 0.25))}
+            >
+              −
+            </button>
 
-          <button
-            className="btn btn-sm"
-            onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
-          >
-            +
-          </button>
+            <button
+              className="btn btn-sm"
+              onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
+            >
+              +
+            </button>
 
-          <button className="btn btn-sm" onClick={() => setZoom(1)}>
-            Reset
-          </button>
+            <button className="btn btn-sm" onClick={() => setZoom(1)}>
+              Reset
+            </button>
+          </div>
+          <FileSelector
+            files={files}
+            selectedFileIndex={selectedFileIndex}
+            onChange={onFileChange}
+          />
         </div>
         {/* Row 3: Image & Overlay Container */}
         <div

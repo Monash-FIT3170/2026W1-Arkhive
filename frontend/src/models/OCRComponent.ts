@@ -31,4 +31,8 @@ export interface OCRComponent {
 	cells?: string[];
 	confidence: number;
 	boundingBoxes?: OCRBoundingBoxes;
+	fileIndex?: number;
+	fileName?: string;
+	pageIndex?: number;
+	pageLabel?: string;
 }

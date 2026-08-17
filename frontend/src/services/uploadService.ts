@@ -1,3 +1,5 @@
+import type { UploadedFileGroup } from '../models/UploadedFileGroup';
+
 export type UploadPage = {
   src: string;
   type: string;
@@ -46,8 +48,10 @@ export async function uploadPagesToBackend(pages: UploadPage[]): Promise<void> {
  * Use this as the `src` for the Document Panel image — it hits
  * GET /api/upload/image which streams the session-stored buffer back.
  */
-export function getUploadedImageUrl(): string {
-  return '/api/upload/image';
+export function getUploadedImageUrl(pageIndex?: number): string {
+  return pageIndex === undefined
+    ? '/api/upload/image'
+    : `/api/upload/image/${pageIndex}`;
 }
 
 /**
@@ -57,6 +61,19 @@ export async function getUploadedImageUrls(): Promise<string[]> {
   const response = await fetch('/api/upload/images');
   if (!response.ok) {
     throw new Error('Failed to fetch image URLs');
+  }
+  return await response.json();
+}
+
+/**
+ * Returns uploaded pages grouped by the original source file.
+ */
+export async function getUploadedFileGroups(): Promise<UploadedFileGroup[]> {
+  const response = await fetch('/api/upload/files', {
+    credentials: 'include'
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch uploaded files');
   }
   return await response.json();
 }
