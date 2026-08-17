@@ -44,6 +44,10 @@ uploadRouter.get('/', (req, res) =>{
   return res.status(204).send(req.session.extraction ?? "")
 });
 
+// Returns uploaded pages grouped back into their source files
+// (e.g. a 3-page PDF is one group with pageIndices [0, 1, 2])
+uploadRouter.get('/files', uploadController.listFiles);
+
 // Returns an array of URLs for all uploaded images in the current session
 // This makes it easy for the frontend to know how many images exist and fetch them all
 uploadRouter.get('/images', (req, res) => {

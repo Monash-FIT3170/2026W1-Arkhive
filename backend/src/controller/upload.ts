@@ -4,19 +4,83 @@ import 'express-session';
 import 'multer';
 import fs from 'fs';
 import path from 'path';
+import type {
+  PageMetadata,
+  UploadedFileGroup,
+  UploadedPage
+} from '../types/upload.js';
 
-declare module "express-session" {
-  interface SessionData {
-    extraction?: {
-      ocrData: any[];
-      createdAt: number;
-      updatedAt: number;
-    };
-    // Replaced Base64 'uploadedImage' with an array of filenames stored on disk
-    uploadedFiles?: string[];
-    // Array of string types mapping to the uploaded files (e.g. ['Invoice', 'Receipt'])
-    uploadedTypes?: string[];
+function parseMetadata(metadataStr: unknown): PageMetadata[] {
+  if (typeof metadataStr !== 'string') return [];
+  try {
+    const parsed = JSON.parse(metadataStr);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.error("Failed to parse metadata", e);
+    return [];
   }
+}
+
+function buildUploadedPage(
+  filename: string,
+  pageIndex: number,
+  meta: PageMetadata | undefined
+): UploadedPage {
+  return {
+    filename,
+    pageIndex,
+    type: meta?.type ?? 'Other',
+    fileIndex: meta?.fileIndex ?? pageIndex,
+    fileName: meta?.fileName || `Page ${pageIndex + 1}`,
+    pageLabel: meta?.pageLabel
+  };
+}
+
+function tagOcrComponents(components: any[], page: UploadedPage) {
+  return components.map((comp) => {
+    const tagged = {
+      ...comp,
+      id: `p${page.pageIndex}_${comp.id}`,
+      fileIndex: page.fileIndex,
+      fileName: page.fileName,
+      pageIndex: page.pageIndex,
+      pageLabel: page.pageLabel
+    };
+    if (comp.parentId) {
+      tagged.parentId = `p${page.pageIndex}_${comp.parentId}`;
+    }
+    return tagged;
+  });
+}
+
+export function groupUploadedPages(pages: UploadedPage[]): UploadedFileGroup[] {
+  const groups = new Map<number, UploadedFileGroup>();
+  for (const page of pages) {
+    let group = groups.get(page.fileIndex);
+    if (!group) {
+      group = {
+        fileIndex: page.fileIndex,
+        fileName: page.fileName,
+        pageIndices: []
+      };
+      groups.set(page.fileIndex, group);
+    }
+    group.pageIndices.push(page.pageIndex);
+  }
+  return Array.from(groups.values());
+}
+
+function pagesFromSession(req: Request): UploadedPage[] {
+  if (req.session.uploadedPages && req.session.uploadedPages.length > 0) {
+    return req.session.uploadedPages;
+  }
+
+  // Older sessions only stored filenames; treat each page as its own file.
+  return (req.session.uploadedFiles ?? []).map((filename, pageIndex) =>
+    buildUploadedPage(filename, pageIndex, {
+      type: req.session.uploadedTypes?.[pageIndex]
+    })
+  );
 }
 
 export default {
@@ -47,30 +111,25 @@ export default {
         }
       }
 
-      // Parse metadata if sent from frontend
-      const metadataStr = req.body.metadata;
-      let metadata: { type: string }[] = [];
-      if (metadataStr) {
-        try {
-          metadata = JSON.parse(metadataStr);
-        } catch (e) {
-          console.error("Failed to parse metadata", e);
-        }
-      }
+      const metadata = parseMetadata(req.body.metadata);
+      const uploadedPages = files.map((file, pageIndex) =>
+        buildUploadedPage(file.filename, pageIndex, metadata[pageIndex])
+      );
 
       // Save the new filenames and their classifications to the session
       req.session.uploadedFiles = files.map((f) => f.filename);
-      req.session.uploadedTypes = metadata.map(m => m.type);
+      req.session.uploadedTypes = uploadedPages.map((page) => page.type);
+      req.session.uploadedPages = uploadedPages;
 
-      // Run OCR on each page in parallel
+      // Run OCR on each page in parallel, tagging components with their source file
       const ocrResults = await Promise.all(
-        files.map(async (file) => {
+        files.map(async (file, pageIndex) => {
           console.log(`Processing file: ${file.originalname}`);
           try {
             // Read the file buffer from the disk temporarily for OCR
             const buffer = fs.readFileSync(file.path);
             const text = await parseTableWithRetries(buffer);
-            return text;
+            return tagOcrComponents(text ?? [], uploadedPages[pageIndex]);
           } catch (e) {
             console.error("OCR failed for file", file.originalname, e);
             return []; // return empty array on failure so upload still succeeds
@@ -96,5 +155,9 @@ export default {
           "OCR processing failed. Check that your Google Vision credentials are configured."
       });
     }
+  },
+
+  listFiles: (req: Request, res: Response) => {
+    res.json(groupUploadedPages(pagesFromSession(req)));
   }
 };
