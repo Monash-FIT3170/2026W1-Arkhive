@@ -59,3 +59,10 @@ export interface ReviewFieldRequest {
   field: ReviewField;
   documentContext: ExtractedData;
 }
+
+export interface BulkReviewFieldRequest {
+  column: string;
+  fields: ReviewField[]; // multiple flagged cells sharing this column
+  formatRegex?: string; // the detected format for the column, if any
+  documentContext: ExtractedData;
+}

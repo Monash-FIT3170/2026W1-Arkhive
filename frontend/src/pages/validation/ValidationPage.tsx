@@ -8,7 +8,11 @@ import type { ExtractedData } from '../../models/TableData';
 import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
 import { getUploadedImageUrl } from '../../services/uploadService';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
-import { requestFieldReview, requestFormatDetection } from '../../services/llmService';
+import {
+  requestBulkFieldReview,
+  requestFieldReview,
+  requestFormatDetection,
+} from '../../services/llmService';
 import type { OcrIssue } from './components/chat/OcrReviewWidget';
 import { flatten } from './components/extracted-data/flattener';
 import { checkTableFormats } from './components/extracted-data/detectFormat';
@@ -72,6 +76,7 @@ function ValidationPage() {
         ocrValue: String(f.value),
         confidenceScore: f.confidence,
         issueType: 'confidence',
+        rowId: f.rowId,
       }));
 
       // Randomly sample 10–30 non-empty values per column for format detection.
@@ -105,19 +110,39 @@ function ValidationPage() {
       }
 
       let formatIssues: OcrIssue[] = [];
+      let columnRegexMap: Record<string, string> = {};
       try {
-        const columnRegexMap = await requestFormatDetection(sampledData);
+        columnRegexMap = await requestFormatDetection(sampledData);
         formatIssues = checkTableFormats(documentContext, columnRegexMap).map((f) => ({
           fieldId: `${f.rowId}:${f.column}`,
           fieldName: f.column,
           ocrValue: String(f.value),
           confidenceScore: 0.3, // fallback confidence score for format issues
           issueType: 'format' as const,
+          rowId: f.rowId,
         }));
       } catch (error) {
         console.error('Failed to detect format issues', error);
       }
-      console.log(formatIssues);
+
+      // Group format issues by column. Columns with >1 flagged cell become a single bulk-resolvable group.
+      // a lone flagged cell stays single-field.
+      const byColumn = formatIssues.reduce<Record<string, OcrIssue[]>>((acc, issue) => {
+        (acc[issue.fieldName] ??= []).push(issue);
+        return acc;
+      }, {});
+
+      Object.entries(byColumn).forEach(([column, colIssues]) => {
+        // If column has more then 1 issue - make a group and assign to each issue of that group
+        if (colIssues.length > 1) {
+          const groupId = `format:${column}`;
+          colIssues.forEach((issue) => {
+            issue.groupId = groupId;
+            issue.formatRegex = columnRegexMap[column];
+          });
+        }
+      });
+
       // Merge Issues
       const issues = confidenceIssues.concat(formatIssues);
 
@@ -220,25 +245,27 @@ function ValidationPage() {
   }, [onMouseMove, onMouseUp]);
 
   //bounding box hover state
-  const [hoveredTableFieldId, setHoveredTableFieldId] = useState<string | null>(null);
-  const [hoveredDocumentOverlayId, setHoveredDocumentOverlayId] = useState<string | null>(null);
+  const [hoveredTableFieldIds, setHoveredTableFieldIds] = useState<string[]>([]);
+  const [hoveredDocumentOverlayIds, setHoveredDocumentOverlayIds] = useState<string[]>([]);
 
   const handleSlideChange = useCallback(
-    (fieldId: string | null) => {
-      setHoveredTableFieldId(fieldId);
-      if (!fieldId) {
-        setHoveredDocumentOverlayId(null);
+    (fieldIds: string[]) => {
+      setHoveredTableFieldIds(fieldIds);
+
+      if (fieldIds.length === 0 || !documentContext) {
+        setHoveredDocumentOverlayIds([]);
         return;
       }
-      const [rowId, column] = fieldId.split(':');
-      if (documentContext) {
-        const row = documentContext.rows.find((r) => String(r._id) === rowId);
-        if (row && row._cellKeyMap && row._cellKeyMap[column]) {
-          setHoveredDocumentOverlayId(row._cellKeyMap[column]);
-          return;
-        }
-      }
-      setHoveredDocumentOverlayId(null);
+
+      const overlayIds = fieldIds
+        .map((fieldId) => {
+          const [rowId, column] = fieldId.split(':');
+          const row = documentContext.rows.find((r) => String(r._id) === rowId);
+          return row?._cellKeyMap?.[column];
+        })
+        .filter((id): id is string => Boolean(id));
+
+      setHoveredDocumentOverlayIds(overlayIds);
     },
     [documentContext]
   );
@@ -296,28 +323,66 @@ function ValidationPage() {
     });
   };
 
-  const handleCarouselAccept = (fieldId: string, newValue: string) => {
+  const handleCarouselAccept = (updates: { fieldId: string; newValue: string }[]) => {
     if (!documentContext) return;
-    const [rowId, column] = fieldId.split(':');
+
     const newContext = {
       ...documentContext,
-      rows: documentContext.rows.map((r) => (r._id === rowId ? { ...r, [column]: newValue } : r)),
+      rows: documentContext.rows.map((row) => {
+        const rowUpdates = updates.filter(({ fieldId }) => {
+          const [rowId] = fieldId.split(':');
+          return String(row._id) === String(rowId);
+        });
+
+        if (rowUpdates.length === 0) return row;
+
+        return rowUpdates.reduce((updatedRow, { fieldId, newValue }) => {
+          const [, column] = fieldId.split(':');
+
+          return {
+            ...updatedRow,
+            [column]: newValue,
+          };
+        }, row);
+      }),
     };
+
     setDocumentContext(newContext);
     saveExtractionSession(newContext);
-    setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
+
+    const fieldIds = updates.map(({ fieldId }) => fieldId);
+
+    setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
   };
 
-  const handleCarouselReject = (fieldId: string) => {
+  const handleCarouselReject = (fieldIds: string[]) => {
     if (!documentContext) return;
-    const [rowId, column] = fieldId.split(':');
+
     const newContext = {
       ...documentContext,
-      rows: documentContext.rows.map((r) => (r._id === rowId ? { ...r, [column]: '' } : r)),
+      rows: documentContext.rows.map((row) => {
+        const updatesForRow = fieldIds.filter((fieldId) => {
+          const [rowId] = fieldId.split(':');
+          return String(row._id) === String(rowId);
+        });
+
+        if (updatesForRow.length === 0) return row;
+
+        return updatesForRow.reduce((updatedRow, fieldId) => {
+          const [, column] = fieldId.split(':');
+
+          return {
+            ...updatedRow,
+            [column]: '',
+          };
+        }, row);
+      }),
     };
+
     setDocumentContext(newContext);
     saveExtractionSession(newContext);
-    setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
+
+    setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
   };
 
   const handleCarouselManualEdit = (fieldId: string, newValue: string) => {
@@ -369,6 +434,65 @@ function ValidationPage() {
     [documentContext, flaggedIssues]
   );
 
+  const handleFetchBulkSuggestion = useCallback(
+    async (
+      column: string,
+      fields: { fieldId: string; rowId: string | number; ocrValue: string }[],
+      formatRegex?: string
+    ): Promise<Record<string, string> | null> => {
+      if (!documentContext) return null;
+
+      const reviewFields: ReviewField[] = fields.map((f) => {
+        const issue = flaggedIssues.find((i) => i.fieldId === f.fieldId);
+        return {
+          rowId: f.rowId,
+          column,
+          value: f.ocrValue,
+          confidence: issue?.confidenceScore ?? 0.3,
+          issueType: issue?.issueType ?? 'format',
+        };
+      });
+
+      try {
+        const reply = await requestBulkFieldReview({
+          column,
+          fields: reviewFields,
+          formatRegex,
+          documentContext,
+        });
+
+        const map: Record<string, string> = {};
+
+        // Primary path: bulk_update intent with one entry per row.
+        if (reply.intent?.type === 'bulk_update' && reply.intent.bulkUpdates) {
+          reply.intent.bulkUpdates.forEach((u) => {
+            map[String(u.rowId)] = u.newValue;
+          });
+        }
+
+        // Fallback: pull corrected values out of updatedContext for any rows
+        // the intent path missed (mirrors the single-field fallback).
+        if (reply.updatedContext) {
+          fields.forEach(({ rowId }) => {
+            if (map[String(rowId)] !== undefined) return;
+            const updatedRow = reply.updatedContext!.rows.find(
+              (r) => r._id === rowId || String(r._id) === String(rowId)
+            );
+            if (updatedRow && updatedRow[column] !== undefined) {
+              map[String(rowId)] = String(updatedRow[column]);
+            }
+          });
+        }
+
+        return Object.keys(map).length > 0 ? map : null;
+      } catch (e) {
+        console.error(e);
+        return null;
+      }
+    },
+    [documentContext, flaggedIssues]
+  );
+
   if (!documentContext) {
     return (
       <div className="flex h-screen items-center justify-center font-semibold text-lg">
@@ -388,7 +512,7 @@ function ValidationPage() {
           style={isLarge ? { width: `${splitPercent}%` } : { width: '100%' }}
         >
           <DocumentPanel
-            hoveredOverlayId={hoveredDocumentOverlayId}
+            hoveredOverlayIds={hoveredDocumentOverlayIds}
             documentImageUrl={documentImageURL}
             ocrData={ocrData}
           />
@@ -419,17 +543,20 @@ function ValidationPage() {
             editedCells={editedCells}
             onHover={(id) => {
               if (isChatOpen && chatActiveTab === 'review') return;
-              setHoveredTableFieldId(id);
+
+              setHoveredTableFieldIds(id ? [id] : []);
+
               if (id && documentContext) {
                 const [rowId, column] = id.split(':');
                 const row = documentContext.rows.find((r) => String(r._id) === rowId);
-                setHoveredDocumentOverlayId(row?._cellKeyMap?.[column] ?? null);
+                const overlayId = row?._cellKeyMap?.[column] ?? null;
+                setHoveredDocumentOverlayIds(overlayId ? [overlayId] : []);
               } else {
-                setHoveredDocumentOverlayId(null);
+                setHoveredDocumentOverlayIds([]);
               }
             }}
             extractedData={documentContext}
-            hoveredOverlayId={hoveredTableFieldId}
+            hoveredOverlayIds={hoveredTableFieldIds}
             onCellEdit={(fieldId, newValue) => {
               if (!documentContext) return;
 
@@ -566,6 +693,7 @@ function ValidationPage() {
         onCarouselManualEdit={handleCarouselManualEdit}
         onSlideChange={handleSlideChange}
         onFetchSuggestion={handleFetchSuggestion}
+        onFetchBulkSuggestion={handleFetchBulkSuggestion}
         activeTab={chatActiveTab}
         onTabChange={setChatActiveTab}
       />

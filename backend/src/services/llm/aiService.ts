@@ -282,7 +282,9 @@ export default {
     const updatedContext =
       parsed.intent &&
       documentContext &&
-      ['correction', 'column_correction', 'column_delete', 'bulk_update'].includes(parsed.intent.type)
+      ['correction', 'column_correction', 'column_delete', 'bulk_update'].includes(
+        parsed.intent.type
+      )
         ? applyIntentToContext(documentContext, parsed.intent)
         : undefined;
 
@@ -351,6 +353,68 @@ export default {
 
     return { ...parsed, updatedContext };
   },
+  suggestBulkFieldCorrections: async (
+    column: string,
+    fields: ReviewField[],
+    documentContext: ExtractedData,
+    formatRegex?: string
+  ): Promise<any> => {
+    const flaggedIds = new Set(fields.map((f) => String(f.rowId)));
+
+    const rowContexts = fields.map(({ rowId }) => {
+      const row = documentContext.rows.find((r) => String(r._id) === String(rowId));
+      if (!row) return { rowId, otherFields: {} };
+      const { _id, _cellKeyMap, _confidence, _cellConfidence, ...otherFields } = row;
+      return { rowId, otherFields };
+    });
+
+    const referenceValues = documentContext.rows
+      .filter((r) => !flaggedIds.has(String(r._id)))
+      .map((r) => r[column])
+      .filter((v) => v !== null && v !== undefined && String(v).trim() !== '')
+      .slice(0, 20);
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      systemInstruction: `You are helping verify OCR-extracted table data. Multiple cells in the SAME column "${column}" have been flagged as inconsistent with the column's expected format.
+
+    ${
+      formatRegex
+        ? `The column's expected format was detected as this regular expression: ${formatRegex}. Every corrected value MUST match this pattern exactly.`
+        : ''
+    }
+
+    The flagged cells, with the rest of their row for context:
+    ${JSON.stringify(rowContexts, null, 2)}
+
+    Values from OTHER rows in this same column that already look correctly formatted, for reference:
+    ${JSON.stringify(referenceValues, null, 2)}
+
+    Your job:
+    1. For EACH flagged row, clean and normalize its "${column}" value so it matches the expected format. Remove stray punctuation/whitespace/OCR artifacts. Use the row's other fields and the reference values to judge the most plausible correction -- don't just blindly strip characters if that produces a value that doesn't make sense in context.
+    2. Set 'intent.type' to 'bulk_update'.
+    3. Populate 'intent.bulkUpdates' with EXACTLY one entry per flagged row: 'rowId' (the exact id given above), 'column' set to "${column}", and 'newValue' as your corrected value. Do not omit any row.
+    4. Set 'response' to a short, one-sentence summary of what you changed and why.
+    `,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: chatResponseSchema,
+        temperature: 0.2,
+      },
+    });
+
+    const result = await model.generateContent(
+      `Please review and correct the "${column}" field across the ${fields.length} flagged rows.`
+    );
+    const parsed = JSON.parse(result.response.text());
+
+    const updatedContext =
+      parsed.intent && parsed.intent.type === 'bulk_update'
+        ? applyIntentToContext(documentContext, parsed.intent)
+        : undefined;
+
+    return { ...parsed, updatedContext };
+  },
   //This function was made with the help of Google Gemini
   detectTableFormats: async (sampledData: Record<string, string[]>): Promise<any> => {
     const formattedSample = JSON.stringify(sampledData, null, 2);
@@ -378,7 +442,7 @@ export default {
     // const result = await model.generateContent('Identify Date, Time, and Currency columns and provide validation regexes.');
     console.log('SENT TO MODEL:\n', formattedSample);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.5-flash-lite',
+      model: 'gemini-3.5-flash',
       systemInstruction: `You are an AI assistant helping validate table data extracted via OCR.
 
         Look at each column's sample values. If most non-empty values share the same structural
