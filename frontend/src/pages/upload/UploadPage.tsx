@@ -371,9 +371,15 @@ export default function UploadPage() {
         .sort((a, b) => a - b)
         .map((i) => previewItems[i])
         .filter((item) => item?.previewSrc)
-        .map((item) => ({
+        .map((item, position) => ({
           src: item.previewSrc!,
-          type: item.documentType || 'Other'
+          type: item.documentType || 'Other',
+
+          // keep preview grouping through to the backend, for validation page.
+          // negative key for ungrouped items.
+          fileIndex: item.fileIndex ?? -(position + 1),
+          fileName: item.label,
+          pageLabel: item.subtitle
         }));
 
       await uploadPagesToBackend(selectedItems);

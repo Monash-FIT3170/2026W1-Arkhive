@@ -1,12 +1,30 @@
-export async function uploadPagesToBackend(pages: { src: string; type: string }[]): Promise<void> {
+export type UploadPage = {
+  src: string;
+  type: string;
+  /** Groups pages that came from the same source file (a PDF contributes many pages). */
+  fileIndex?: number;
+  /** Original file name, shown to the user when picking a file on the validation page. */
+  fileName?: string;
+  /** Human-readable page label within the source file, e.g. "Page 2". */
+  pageLabel?: string;
+};
+
+type UploadPageMetadata = Omit<UploadPage, 'src'>;
+
+export async function uploadPagesToBackend(pages: UploadPage[]): Promise<void> {
   const formData = new FormData();
-  const metadata: { type: string }[] = [];
+  const metadata: UploadPageMetadata[] = [];
 
   for (let i = 0; i < pages.length; i++) {
     const res = await fetch(pages[i].src);
     const blob = await res.blob();
     formData.append('pages', blob, `page-${i}.png`);
-    metadata.push({ type: pages[i].type });
+    metadata.push({
+      type: pages[i].type,
+      fileIndex: pages[i].fileIndex,
+      fileName: pages[i].fileName,
+      pageLabel: pages[i].pageLabel
+    });
   }
 
   formData.append('metadata', JSON.stringify(metadata));
