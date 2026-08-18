@@ -1,4 +1,4 @@
-// UploadPage is the orchestrator: it owns state, effects, and handlers.
+// UploadPage is the orchestrator: it owns state, effects, and handlers. test
 // All UI is delegated to focused child components.
 //
 // To change the empty-state look  →  edit EmptyUploadView.tsx
@@ -379,7 +379,7 @@ export default function UploadPage() {
         }));
 
       await uploadPagesToBackend(selectedItems, (msg) => {
-          setRetryMessage(msg);
+        setRetryMessage(msg);
       });
 
       // US-1.5: detect successful upload and show success notification
