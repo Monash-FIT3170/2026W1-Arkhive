@@ -1,4 +1,7 @@
-export async function uploadPagesToBackend(pages: { src: string; type: string }[]): Promise<void> {
+export async function uploadPagesToBackend(
+    pages: { src: string; type: string }[],
+    onRetryMessage?: (msg: string) => void
+): Promise<void> {
   const formData = new FormData();
   const metadata: { type: string }[] = [];
 
@@ -19,7 +22,44 @@ export async function uploadPagesToBackend(pages: { src: string; type: string }[
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
+    if (response.status === 502) {
+      throw new Error("OCR Service failed. Please double check your credentials");
+    }
     throw new Error(body.error ?? `Upload failed with status ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (reader) {
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (value) {
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const msg = JSON.parse(line);
+            if (msg.type === 'retry') {
+              if (onRetryMessage) {
+                onRetryMessage(`OCR is Retrying Attempt ${msg.attempt} of ${msg.maxRetries} for "${msg.fileName}" File`);
+              }
+            } else if (msg.type === 'error') {
+              throw new Error(msg.message || 'OCR failed. Please double check and reupload your document.');
+            } else if (msg.type === 'success') {
+              return;
+            }
+          } catch (e) {
+            if (e instanceof Error && e.message !== 'Unexpected end of JSON input' && !e.message.includes('Unexpected token')) {
+              throw e;
+            }
+          }
+        }
+      }
+      if (done) break;
+    }
   }
 }
 

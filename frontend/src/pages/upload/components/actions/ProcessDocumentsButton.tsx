@@ -4,7 +4,11 @@ type Props = {
   onProcess: () => void;
 };
 
-export default function ProcessDocumentsButton({ selectedCount, isProcessing, onProcess }: Props) {
+export default function ProcessDocumentsButton({
+  selectedCount,
+  isProcessing,
+  onProcess,
+}: Props) {
   const isDisabled = selectedCount === 0 || isProcessing;
 
   return (
