@@ -10,3 +10,7 @@ export interface ExtractedRow {
   _cellConfidence: Record<string, number>;
   [key: string]: any;
 }
+
+export interface ExtractedPage extends ExtractedData {
+  pageIndex: number;
+}

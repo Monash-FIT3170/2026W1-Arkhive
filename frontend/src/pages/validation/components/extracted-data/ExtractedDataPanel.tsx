@@ -12,10 +12,9 @@ import {
 import { useState, useEffect } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
 import { exportExtractedDataAsCSV } from '../../../../services/csvDownloadService';
-import { exportExtractedDataAsJSON } from "../../../../services/jsonDownloadService";
-import { exportExtractedDataAsTXT } from "../../../../services/txtDownloadService"; // NEW: TXT export service
-import { exportExtractedDataAsXLSX } from "../../../../services/xlsxDownloadService"; // NEW: Excel export service (US-4.5)
-
+import { exportExtractedDataAsJSON } from '../../../../services/jsonDownloadService';
+import { exportExtractedDataAsTXT } from '../../../../services/txtDownloadService'; // NEW: TXT export service
+import { exportExtractedDataAsXLSX } from '../../../../services/xlsxDownloadService'; // NEW: Excel export service (US-4.5)
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
@@ -91,7 +90,9 @@ function ExtractedDataPanel({
   // used to check if file exported, and which format was last exported
   // UPDATED: was a plain boolean for CSV only; now tracks which format
   // (csv/txt/xlsx) was exported so a single button/dropdown can serve all three
-  const [exportedFormat, setExportedFormat] = useState<null | "csv" | "txt" | "xlsx" | "json">(null);
+  const [exportedFormat, setExportedFormat] = useState<null | 'csv' | 'txt' | 'xlsx' | 'json'>(
+    null
+  );
   const [isMouseInside, setIsMouseInside] = useState(false);
 
   // Editing state
@@ -110,14 +111,14 @@ function ExtractedDataPanel({
   // function to import csv/txt/xlsx/json download services and trigger the download
   // for whichever format the user picked from the dropdown
   // UPDATED: replaces the old handleExportCSV, now handles all export formats
-  function handleExport(format: "csv" | "txt" | "xlsx" | "json") {
-    if (format === "csv") {
+  function handleExport(format: 'csv' | 'txt' | 'xlsx' | 'json') {
+    if (format === 'csv') {
       exportExtractedDataAsCSV(extractedData);
-    } else if (format === "txt") {
+    } else if (format === 'txt') {
       exportExtractedDataAsTXT(extractedData);
-    } else if (format === "xlsx") {
+    } else if (format === 'xlsx') {
       exportExtractedDataAsXLSX(extractedData);
-    } else if (format === "json") {
+    } else if (format === 'json') {
       exportExtractedDataAsJSON(extractedData);
     }
 
@@ -269,15 +270,20 @@ function ExtractedDataPanel({
           <div className="dropdown dropdown-end">
             <button
               tabIndex={0}
-              className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${exportedFormat
-                ? "btn-success"
-                : "btn-primary"
-                }`}
+              className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${
+                exportedFormat ? 'btn-success' : 'btn-primary'
+              }`}
             >
               {exportedFormat ? (
-                <><Check className="w-3.5 h-3.5" />Downloaded!</>
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  Downloaded!
+                </>
               ) : (
-                <><Download className="w-3.5 h-3.5" />Download</>
+                <>
+                  <Download className="w-3.5 h-3.5" />
+                  Download
+                </>
               )}
             </button>
             <ul
@@ -285,17 +291,17 @@ function ExtractedDataPanel({
               className="dropdown-content menu bg-base-100 rounded-box z-10 w-45 p-2 shadow-md border border-base-300"
             >
               <li>
-                <a onClick={() => handleExport("csv")}>Download as CSV</a>
+                <a onClick={() => handleExport('csv')}>Download as CSV</a>
               </li>
               <li>
-                <a onClick={() => handleExport("txt")}>Download as TXT</a>
+                <a onClick={() => handleExport('txt')}>Download as TXT</a>
               </li>
               {/* NEW: Excel export option (US-4.5) */}
               <li>
-                <a onClick={() => handleExport("xlsx")}>Download as Excel</a>
+                <a onClick={() => handleExport('xlsx')}>Download as Excel</a>
               </li>
               <li>
-                <a onClick={() => handleExport("json")}>Download as JSON</a>
+                <a onClick={() => handleExport('json')}>Download as JSON</a>
               </li>
             </ul>
           </div>
@@ -313,10 +319,11 @@ function ExtractedDataPanel({
               {extractedData.columns.map((column) => (
                 <th
                   key={column}
-                  className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${isEditMode && dragOverColumn === column && draggedColumn !== column
-                    ? 'bg-primary/20'
-                    : ''
-                    }`}
+                  className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${
+                    isEditMode && dragOverColumn === column && draggedColumn !== column
+                      ? 'bg-primary/20'
+                      : ''
+                  }`}
                   style={{ height: '1px' }}
                   draggable={isEditMode}
                   onDragStart={() => {
@@ -394,8 +401,9 @@ function ExtractedDataPanel({
               return (
                 <tr
                   key={row._id}
-                  className={`border-b border-base-300 hover:bg-base-300/40 ${tier.isLow ? 'bg-error/10' : ''
-                    }`}
+                  className={`border-b border-base-300 hover:bg-base-300/40 ${
+                    tier.isLow ? 'bg-error/10' : ''
+                  }`}
                 >
                   {extractedData.columns.map((column) => {
                     const fieldId = `${String(row._id)}:${column}`;
@@ -412,15 +420,16 @@ function ExtractedDataPanel({
                       <td
                         key={column}
                         id={`cell-${safeId}`}
-                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 text-base-content text-[13px] transition-colors ${isEditMode ? 'cursor-pointer' : ''
-                          } ${
+                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 text-base-content text-[13px] transition-colors ${
+                          isEditMode ? 'cursor-pointer' : ''
+                        } ${
                           //yellow tint
                           isCellHighlighted && !isEditing
                             ? 'bg-primary text-primary-content font-bold rounded shadow-inner'
                             : editedCells?.has(fieldId)
                               ? 'bg-warning/15'
                               : ''
-                          }`}
+                        }`}
                         onMouseEnter={() => onHover(fieldId)}
                         onMouseLeave={() => onHover(null)}
                         onClick={() => {
@@ -466,12 +475,13 @@ function ExtractedDataPanel({
                         </span>
                       )}
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === 'badge-success'
-                          ? 'border-success text-success bg-white'
-                          : tier.badgeClass === 'badge-warning'
-                            ? 'border-warning text-warning bg-white'
-                            : ' border-error text-error bg-white'
-                          }`}
+                        className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                          tier.badgeClass === 'badge-success'
+                            ? 'border-success text-success bg-white'
+                            : tier.badgeClass === 'badge-warning'
+                              ? 'border-warning text-warning bg-white'
+                              : ' border-error text-error bg-white'
+                        }`}
                       >
                         {tier.label}
                       </span>

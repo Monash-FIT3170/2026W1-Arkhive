@@ -12,6 +12,7 @@ import { requestFieldReview, requestFormatDetection } from '../../services/llmSe
 import type { OcrIssue } from './components/chat/OcrReviewWidget';
 import { flatten } from './components/extracted-data/flattener';
 import { checkTableFormats } from './components/extracted-data/detectFormat';
+import { getTestData, getTestImageUrls } from '../../services/testService';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -49,10 +50,15 @@ function ValidationPage() {
   useEffect(() => {
     async function loadSession() {
       try {
-        let ocrData = await getExtractionSession();
-        setOCRData(ocrData);
-        setDocumentImageURL(await getUploadedImageUrl());
-        setDocumentContext(flatten(ocrData as OCRComponent[]));
+        // let ocrData = await getExtractionSession();
+        let ocrData = await getTestData();
+        let urls = await getTestImageUrls();
+        console.log('hello');
+        console.log(ocrData[0]);
+        setOCRData(ocrData[0]);
+        // setDocumentImageURL(await getUploadedImageUrl());
+        setDocumentImageURL(urls[0]);
+        setDocumentContext(flatten(ocrData[0] as OCRComponent[]));
       } catch (error) {
         console.error('Failed to load extraction session', error);
       }
@@ -423,6 +429,7 @@ function ValidationPage() {
               if (id && documentContext) {
                 const [rowId, column] = id.split(':');
                 const row = documentContext.rows.find((r) => String(r._id) === rowId);
+                console.log(row?._cellKeyMap?.[column] ?? null);
                 setHoveredDocumentOverlayId(row?._cellKeyMap?.[column] ?? null);
               } else {
                 setHoveredDocumentOverlayId(null);
