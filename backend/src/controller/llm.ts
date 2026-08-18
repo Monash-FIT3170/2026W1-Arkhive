@@ -1,4 +1,10 @@
-import { ChatRequest, Message, ReviewField, ReviewFieldRequest } from '../models/message';
+import {
+  BulkReviewFieldRequest,
+  ChatRequest,
+  Message,
+  ReviewField,
+  ReviewFieldRequest,
+} from '../models/message';
 import { Router, Request, Response } from 'express';
 
 import aiService from '../services/llm/aiService';
@@ -31,6 +37,23 @@ export default {
         return res.status(400).json({ error: 'field and documentContext are required' });
       }
       const reply = await aiService.suggestFieldCorrection(field, documentContext);
+      console.log(reply);
+      res.json({ reply });
+    } catch (error) {
+      console.error('Error communicating with Gemini:', error);
+      res.status(500).json({
+        response: 'Sorry, I encountered an error while checking that field.',
+        intent: null,
+      });
+    }
+  },
+  reviewBulk: async (req: Request<{}, {}, BulkReviewFieldRequest>, res: Response) => {
+    try {
+      const { column, fields, formatRegex, documentContext } = req.body;
+      if (!fields || !documentContext) {
+        return res.status(400).json({ error: 'field and documentContext are required' });
+      }
+      const reply = await aiService.suggestBulkFieldCorrections(column, fields, documentContext);
       console.log(reply);
       res.json({ reply });
     } catch (error) {
