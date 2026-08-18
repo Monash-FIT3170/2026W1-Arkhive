@@ -1,13 +1,11 @@
-import DocumentIntelligence, { type DocumentFieldOutput, type DocumentPageOutput, type DocumentTableCellKindOutput, type DocumentTableCellOutput, type DocumentTableOutput, type DocumentWordOutput } from "@azure-rest/ai-document-intelligence";
+import DocumentIntelligence, { type DocumentTableCellOutput, type DocumentTableOutput, type DocumentWordOutput } from "@azure-rest/ai-document-intelligence";
 import { getLongRunningPoller, isUnexpected, type DocumentIntelligenceClient, type AnalyzeOperationOutput } from "@azure-rest/ai-document-intelligence";
 import fs from "fs"
-import { OCRBoundingBox, OCRComponent } from "../types/boundingBoxTypes";
+import { OCRComponent, Vertex } from "../types/boundingBoxTypes";
+import { OCRBoundingBoxes } from "./utils_table_extraction_new";
 
 const endpoint = "https://jonmeraqsadilam.cognitiveservices.azure.com";
-const key = "No";
-
-// sample document
-const formUrl = "https://raw.githubusercontent.com/Azure-Samples/cognitive-services-REST-api-samples/master/curl/form-recognizer/sample-layout.pdf"
+const key = "no key";
 
 export function getWordsInCell(
   cell: DocumentTableCellOutput,
@@ -52,8 +50,6 @@ export function getWordsInCell(
 
   return cellWords;
 }
-
-export type OCRBoundingBoxes = Record<string, OCRBoundingBox>
 
 export const mapTablesToOCRComponents = (
   OCRResponse: AnalyzeOperationOutput
@@ -165,7 +161,7 @@ export const mapTablesToOCRComponents = (
         indentation: indentLevel,
         y: minRowY === Infinity ? 0 : minRowY,
         layer: indentLevel + 1,
-        parentId,
+        parentId: parentId,
         text: rowCellTexts.join(" | "),
         cells: rowCellTexts,
         confidence: totalWordCount > 0 ? totalConfidenceSum / totalWordCount : 1,
@@ -177,48 +173,12 @@ export const mapTablesToOCRComponents = (
   return components;
 };
 
-const getFieldConfidence = (OCRResponse: AnalyzeOperationOutput) => {
-  const boundingBoxes = OCRResponse.analyzeResult?.tables?.flatMap((table: DocumentTableOutput) => {
-    
-    return table.cells.map((cell: DocumentTableCellOutput) => {
-      const smth = getWordsInCell(cell, OCRResponse.analyzeResult?.pages?.[0]?.words ?? [])
-      const avgConfidence = smth.length > 0 ? smth.reduce((acc, word) => acc + (word.confidence ?? 0), 0) / smth.length : 0; 
-      return {
-        content: cell.content,
-        rowIndex: cell.rowIndex,
-        columnIndex: cell.columnIndex,
-        confidence: avgConfidence,
-        boundingBoxes: [
-          {
-            x: cell.boundingRegions?.[0]?.polygon[0],
-            y: cell.boundingRegions?.[0]?.polygon[1]
-          },
-          {
-            x: cell.boundingRegions?.[0]?.polygon[2],
-            y: cell.boundingRegions?.[0]?.polygon[3]
-          },
-          {
-            x: cell.boundingRegions?.[0]?.polygon[4],
-            y: cell.boundingRegions?.[0]?.polygon[5]
-          },
-          {
-            x: cell.boundingRegions?.[0]?.polygon[6],
-            y: cell.boundingRegions?.[0]?.polygon[7]
-          }
-        ]
-      }    
-    }
-      )
-      
-    }
-  )
-}
-
 const client: DocumentIntelligenceClient = DocumentIntelligence(endpoint, {key: key}, { apiVersion: "2024-11-30" })
-export async function analyse() {
+
+export async function analyse_image(fileBuffer: Buffer) {
   const request = await client.path("/documentModels/{modelId}:analyze", "prebuilt-layout").post({
     contentType: "application/pdf",
-    body: fs.createReadStream("C:/Users/harsh/OneDrive/Pictures/sample-file-1.pdf")
+    body: fileBuffer
   });
 
   if (isUnexpected(request)){
@@ -230,10 +190,9 @@ export async function analyse() {
 
   const result = response.body as AnalyzeOperationOutput;
 
-  const tables = result.analyzeResult?.pages?.[0]?.words?.[0]?.confidence ?? 0;
   //console.log(JSON.stringify(tables, null, 2));
-  //fs.writeFileSync("smthToWorkWithPotentially.json", JSON.stringify(mapTablesToOCRComponents(result), null, 2))
   return mapTablesToOCRComponents(result)
 }
 
-await analyse();
+
+await analyse_image(fs.readFileSync("C:/Users/harsh/Downloads/sample-file (3).pdf"))

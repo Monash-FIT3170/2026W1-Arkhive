@@ -3,8 +3,8 @@ import vision from '@google-cloud/vision';
 import fs from 'fs';
 import { extractStructuredComponents } from './utils/utils_table_extraction.js';
 import { withRetry } from './utils/utils.js';
-import LlamaCloud from "@llamaindex/llama-cloud";
 import { convertTable } from './utils/utils_table_extraction_new.js';
+import { analyse_image } from './utils/utils_utils_table_extraction_new.js';
 
 
 const client2 = new LlamaCloud({
@@ -36,6 +36,32 @@ const client = new vision.ImageAnnotatorClient({
   }
 });
 
+export async function textExtraction1(buffer: Buffer): Promise<string> {
+  /*const [result] = await client.documentTextDetection({
+  /*const [result] = await client.documentTextDetection({
+    image: { content: buffer.toString("base64") }
+  });*/
+  const readableStream = fs.createReadStream(buffer)
+
+  const fileObj = await client2.files.create({
+  file: readableStream,
+  purpose: "extract",
+});
+
+  const result = await client2.parsing.parse({
+  file_id: fileObj.id,
+  tier: "fast",
+  expand: ["markdown_full", "metadata"],
+  version: "latest",
+  output_options: {
+    granular_bboxes: ["cell"]
+  }})
+
+  client2.files.delete(fileObj.id)
+
+  return result.markdown_full ?? "";
+}
+
 export async function textExtraction(buffer: Buffer): Promise<string> {
   /*const [result] = await client.documentTextDetection({
   /*const [result] = await client.documentTextDetection({
@@ -62,6 +88,7 @@ export async function textExtraction(buffer: Buffer): Promise<string> {
   return result.markdown_full ?? "";
 }
 
+
 // test ocr on 1 png page
 // export async function testOCR() {
 //   const text = await textExtraction("assets/sample-page-1.png");
@@ -84,17 +111,22 @@ async function parseTableLegacy(imageBuffer: Buffer) {
   return extractStructuredComponents(fullTextAnnotation!.pages!);
 }
 
-export async function parseTableWithRetries(imageBuffer: Buffer){
+export async function parseTableWithRetriesLegacy(imageBuffer: Buffer){
   return await withRetry(() => parseTable(imageBuffer))
+}
+
+/** 
+ @author Harsha Sharma (33879303)
+*/  
+async function parseTable(imageBuffer: Buffer) {
+  return analyse_image(imageBuffer);
 }
 
 /*
  @author Harsha Sharma (33879303)
 */  
-async function parseTable(imageBuffer: Buffer) {
-  const [response] = await client.documentTextDetection(imageBuffer);
-  const fullTextAnnotation = response.fullTextAnnotation;
-  return extractStructuredComponents(fullTextAnnotation!.pages!);
+async function parseTableWithRetries(imageBuffer: Buffer) {
+  return withRetry(() => analyse_image(imageBuffer));
 }
 
 
