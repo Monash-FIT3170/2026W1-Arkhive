@@ -7,7 +7,7 @@ import type { OCRComponent } from '../../models/OCRComponent';
 import { flattenOcrData } from './components/extracted-data/FlattenOcrData';
 import type { ExtractedData } from '../../models/TableData';
 import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
-import { getUploadedImageUrl } from '../../services/uploadService';
+import { getProcessedImageUrls, getUploadedImageUrl } from '../../services/uploadService';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
 import { requestFieldReview } from '../../services/llmService';
 import OcrReviewWidget from './components/chat/OcrReviewWidget';
@@ -58,7 +58,8 @@ function ValidationPage() {
         // if (!sessionData?.ocrData) {
         //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
         // }
-        setDocumentImageURL(await getUploadedImageUrl());
+        const processedUrls = await getProcessedImageUrls();
+        setDocumentImageURL(processedUrls.length > 0 ? processedUrls[0] : await getUploadedImageUrl());
         setDocumentContext(flatten(ocrData as OCRComponent[]));
       } catch (error) {
         console.error('Failed to load extraction session', error);
