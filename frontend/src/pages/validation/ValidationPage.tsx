@@ -2,15 +2,20 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import DocumentPanel from './components/document/DocumentPanel';
 import ExtractedDataPanel from './components/extracted-data/ExtractedDataPanel';
 import ChatPanel from './components/chat/ChatPanel';
+import BatchDocumentSelector from './components/batch/BatchDocumentSelector';
 import type { ChatMessage } from '../../models/Message';
 import type { OCRComponent } from '../../models/OCRComponent';
-import { flattenOcrData } from './components/extracted-data/FlattenOcrData';
 import type { ExtractedData } from '../../models/TableData';
-import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
+import type { DocumentJob } from '../../models/Job';
+import {
+  getExtractionSession,
+  saveExtractionSession,
+  getBatchJobs,
+  setActiveBatchJob
+} from '../../services/extractionService';
 import { getUploadedImageUrl } from '../../services/uploadService';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
 import { requestFieldReview } from '../../services/llmService';
-import OcrReviewWidget from './components/chat/OcrReviewWidget';
 import type { OcrIssue } from './components/chat/OcrReviewWidget';
 import { flatten } from './components/extracted-data/flattener';
 
@@ -27,11 +32,13 @@ function useIsLargeScreen() {
 }
 
 function ValidationPage() {
+  const [jobs, setJobs] = useState<DocumentJob[]>([]);
+  const [activeJobIndex, setActiveJobIndex] = useState<number>(0);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [documentContext, setDocumentContext] = useState<ExtractedData | null>(null);
   const [splitPercent, setSplitPercent] = useState(50);
-  const [oldContext, setOldContext] = useState<ExtractedData | null>(null); //for AI suggesiton
+  const [oldContext, setOldContext] = useState<ExtractedData | null>(null); // for AI suggestion
   const [documentImageURL, setDocumentImageURL] = useState<string>();
   const [ocrData, setOCRData] = useState<OCRComponent[]>([]);
   const isLarge = useIsLargeScreen();
@@ -48,18 +55,31 @@ function ValidationPage() {
   const [hasDetected, setHasDetected] = useState(false);
   const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review'>('chat');
 
+  // Load session & batch jobs on mount
   useEffect(() => {
     async function loadSession() {
       try {
-        let ocrData = await getExtractionSession();
-        setOCRData(ocrData);
-        // console.log("SESSION DATA:", sessionData);
-        // console.log("OCR DATA:", sessionData?.ocrData);
-        // if (!sessionData?.ocrData) {
-        //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
-        // }
-        setDocumentImageURL(await getUploadedImageUrl());
-        setDocumentContext(flatten(ocrData as OCRComponent[]));
+        const batchData = await getBatchJobs().catch(() => null);
+
+        if (batchData && batchData.jobs && batchData.jobs.length > 0) {
+          setJobs(batchData.jobs);
+          const initialIndex = batchData.activeJobIndex ?? 0;
+          setActiveJobIndex(initialIndex);
+
+          const activeJob = batchData.jobs[initialIndex] || batchData.jobs[0];
+          setOCRData(activeJob.ocrData || []);
+          setDocumentImageURL(getUploadedImageUrl(activeJob.imageIndex ?? initialIndex));
+
+          const initialTable = activeJob.extractedData || flatten(activeJob.ocrData as OCRComponent[]);
+          setDocumentContext(initialTable);
+          return;
+        }
+
+        // Fallback for single document extraction
+        const singleOcrData = await getExtractionSession();
+        setOCRData(singleOcrData || []);
+        setDocumentImageURL(getUploadedImageUrl());
+        setDocumentContext(flatten((singleOcrData || []) as OCRComponent[]));
       } catch (error) {
         console.error('Failed to load extraction session', error);
       }
@@ -67,6 +87,7 @@ function ValidationPage() {
     loadSession();
   }, []);
 
+  // Update flagged issues when documentContext changes
   useEffect(() => {
     if (documentContext && !hasDetected) {
       const fields = detectReviewFields(documentContext);
@@ -88,47 +109,73 @@ function ValidationPage() {
     documentContextRef.current = documentContext;
   }, [documentContext]);
 
+  // Handle switching between batch documents
+  const handleSelectJob = useCallback(
+    async (newIndex: number) => {
+      if (newIndex === activeJobIndex || newIndex < 0 || newIndex >= jobs.length) return;
+
+      // 1. Save current document context to jobs state & server
+      if (documentContext && jobs[activeJobIndex]) {
+        const currentJobId = jobs[activeJobIndex].id;
+        try {
+          await saveExtractionSession(documentContext, currentJobId);
+        } catch (e) {
+          console.error('Failed to auto-save previous document extraction', e);
+        }
+      }
+
+      // 2. Switch to target job
+      const targetJob = jobs[newIndex];
+      setActiveJobIndex(newIndex);
+      setActiveBatchJob(newIndex).catch(() => {});
+
+      const newOcrData = targetJob.ocrData || [];
+      const newExtractedData = targetJob.extractedData || flatten(newOcrData);
+
+      setOCRData(newOcrData);
+      setDocumentImageURL(getUploadedImageUrl(targetJob.imageIndex ?? newIndex));
+      setDocumentContext(newExtractedData);
+
+      // Reset state for new document
+      undoStack.current = [];
+      redoStack.current = [];
+      setEditedCells(new Set());
+      setOldContext(null);
+      setHasDetected(false);
+      setFlaggedIssues([]);
+      setTableKey((k) => k + 1);
+    },
+    [activeJobIndex, jobs, documentContext]
+  );
+
+  // Keyboard undo / redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.toUpperCase().includes('MAC');
       const isUndo = e.metaKey && e.key === 'z' && !e.shiftKey;
       const isRedo = e.metaKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey));
 
       if (isUndo) {
         e.preventDefault();
+        if (undoStack.current.length === 0) return;
 
-        if (undoStack.current.length === 0) {
-          return;
-        }
-
-        // pop last state from undo stack
         const previous = undoStack.current.pop()!;
-
-        // push current into redo stack
         redoStack.current.push(documentContextRef.current!);
 
-        //restore previous state
         setDocumentContext(previous);
-        saveExtractionSession(previous);
+        saveExtractionSession(previous, jobs[activeJobIndex]?.id || activeJobIndex);
         setEditedCells(new Set());
         setTableKey((k) => k + 1);
       }
 
       if (isRedo) {
         e.preventDefault();
+        if (redoStack.current.length === 0) return;
 
-        if (redoStack.current.length === 0) {
-          return;
-        }
-
-        // pop last state from redo stack
         const next = redoStack.current.pop()!;
-
-        // push current into undo stack
         undoStack.current.push(documentContextRef.current!);
 
         setDocumentContext(next);
-        saveExtractionSession(next);
+        saveExtractionSession(next, jobs[activeJobIndex]?.id || activeJobIndex);
         setEditedCells(new Set());
         setTableKey((k) => k + 1);
       }
@@ -136,29 +183,24 @@ function ValidationPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [jobs, activeJobIndex]);
 
-  //Resizing Functions
-  //Set dragging to be true
+  // Resizing Functions
   const onMouseDown = useCallback(() => {
     isDragging.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }, []);
 
-  //Given mouse even that is moving, we calculate the presentage of mouse relative to container size
   const onMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging.current || !containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
     const offsetX = e.clientX - rect.left;
     const percent = (offsetX / rect.width) * 100;
-
-    // Clamp between 20% and 80%
     setSplitPercent(Math.min(80, Math.max(20, percent)));
   }, []);
 
-  //On mouse up, we set dragging to be false
   const onMouseUp = useCallback(() => {
     isDragging.current = false;
     document.body.style.cursor = '';
@@ -174,7 +216,7 @@ function ValidationPage() {
     };
   }, [onMouseMove, onMouseUp]);
 
-  //bounding box hover state
+  // Bounding box hover state
   const [hoveredTableFieldId, setHoveredTableFieldId] = useState<string | null>(null);
   const [hoveredDocumentOverlayId, setHoveredDocumentOverlayId] = useState<string | null>(null);
 
@@ -202,9 +244,8 @@ function ValidationPage() {
     setMessages((prev) => [...prev, message]);
   };
 
-  // called when AI returns updatedContext after accepting suggestion
   const handleContextUpdate = (updatedData: ExtractedData) => {
-    setOldContext(documentContext); // save snapshot before overwriting
+    setOldContext(documentContext);
     setDocumentContext(updatedData);
   };
 
@@ -214,19 +255,37 @@ function ValidationPage() {
     );
   };
 
-  //handle accept
-  const handleAccept = async () => {
-    if (!documentContext) {
-      return;
+  const persistDocumentChanges = (newContext: ExtractedData) => {
+    setDocumentContext(newContext);
+    const currentJobId = jobs[activeJobIndex]?.id;
+    saveExtractionSession(newContext, currentJobId || activeJobIndex);
+
+    // Update local jobs array with extracted table data
+    if (jobs.length > 0) {
+      setJobs((prev) => {
+        const next = [...prev];
+        if (next[activeJobIndex]) {
+          next[activeJobIndex] = {
+            ...next[activeJobIndex],
+            extractedData: newContext,
+            updatedAt: Date.now()
+          };
+        }
+        return next;
+      });
     }
+  };
+
+  // Chat accept / reject
+  const handleAccept = async () => {
+    if (!documentContext) return;
     try {
-      await saveExtractionSession(documentContext); // accept content
+      persistDocumentChanges(documentContext);
     } catch (error) {
       console.error('Failed to save session after accept', error);
     }
-    setOldContext(null); // old to null
-    resolveLastMessage(); // hide buttons
-    //ai confirmation message
+    setOldContext(null);
+    resolveLastMessage();
     addMessage({
       id: crypto.randomUUID(),
       role: 'model',
@@ -235,14 +294,11 @@ function ValidationPage() {
     });
   };
 
-  //handle reject
   const handleReject = () => {
-    if (!oldContext) {
-      return;
-    }
-    setDocumentContext(oldContext); // back to old
-    setOldContext(null); // old to null
-    resolveLastMessage(); // hide buttons
+    if (!oldContext) return;
+    setDocumentContext(oldContext);
+    setOldContext(null);
+    resolveLastMessage();
     addMessage({
       id: crypto.randomUUID(),
       role: 'model',
@@ -258,8 +314,7 @@ function ValidationPage() {
       ...documentContext,
       rows: documentContext.rows.map((r) => (r._id === rowId ? { ...r, [column]: newValue } : r)),
     };
-    setDocumentContext(newContext);
-    saveExtractionSession(newContext);
+    persistDocumentChanges(newContext);
     setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
   };
 
@@ -270,8 +325,7 @@ function ValidationPage() {
       ...documentContext,
       rows: documentContext.rows.map((r) => (r._id === rowId ? { ...r, [column]: '' } : r)),
     };
-    setDocumentContext(newContext);
-    saveExtractionSession(newContext);
+    persistDocumentChanges(newContext);
     setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
   };
 
@@ -282,8 +336,7 @@ function ValidationPage() {
       ...documentContext,
       rows: documentContext.rows.map((r) => (r._id === rowId ? { ...r, [column]: newValue } : r)),
     };
-    setDocumentContext(newContext);
-    saveExtractionSession(newContext);
+    persistDocumentChanges(newContext);
     setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
   };
 
@@ -309,7 +362,7 @@ function ValidationPage() {
             return String(updatedRow[column]);
           }
         }
-        return reply.response; // fallback to text response
+        return reply.response;
       } catch (e) {
         console.error(e);
         return null;
@@ -321,16 +374,27 @@ function ValidationPage() {
   if (!documentContext) {
     return (
       <div className="flex h-screen items-center justify-center font-semibold text-lg">
-        Loading...
+        <span className="loading loading-spinner loading-md mr-2" />
+        Loading document extraction...
       </div>
     );
   }
 
   return (
-    <>
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Batch Document Selector Bar */}
+      {jobs.length > 0 && (
+        <BatchDocumentSelector
+          jobs={jobs}
+          activeJobIndex={activeJobIndex}
+          onSelectJob={handleSelectJob}
+        />
+      )}
+
+      {/* Main Split Panels */}
       <div
         ref={containerRef}
-        className="flex flex-col lg:flex-row w-full p-3 gap-3 h-auto lg:h-[calc(100vh-72px)] lg:overflow-hidden"
+        className="flex flex-col lg:flex-row w-full p-3 gap-3 flex-1 min-h-0 lg:overflow-hidden"
       >
         <div
           className="w-full h-[50vh] lg:h-full"
@@ -394,12 +458,9 @@ function ValidationPage() {
               };
 
               setEditedCells((prev) => new Set(prev).add(fieldId));
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+              persistDocumentChanges(newContext);
               setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
             }}
-            //Acknowledgement: AI (Google Gemini) was used while coding the
-            // manual corrections
             onRowAdd={() => {
               if (!documentContext) return;
               undoStack.current.push(documentContext);
@@ -413,8 +474,7 @@ function ValidationPage() {
                 ...documentContext,
                 rows: [...documentContext.rows, newRow],
               };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+              persistDocumentChanges(newContext);
             }}
             onRowDelete={(rowId) => {
               if (!documentContext) return;
@@ -424,14 +484,12 @@ function ValidationPage() {
                 ...documentContext,
                 rows: documentContext.rows.filter((r) => r._id !== rowId),
               };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+              persistDocumentChanges(newContext);
             }}
             onColumnAdd={(columnName) => {
               if (!documentContext) return;
               undoStack.current.push(documentContext);
               redoStack.current = [];
-              // Avoid duplicates
               if (documentContext.columns.includes(columnName)) return;
 
               const newContext = {
@@ -439,8 +497,7 @@ function ValidationPage() {
                 columns: [...documentContext.columns, columnName],
                 rows: documentContext.rows.map((r) => ({ ...r, [columnName]: '' })),
               };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+              persistDocumentChanges(newContext);
             }}
             onColumnDelete={(columnName) => {
               if (!documentContext) return;
@@ -455,8 +512,7 @@ function ValidationPage() {
                   return newRow;
                 }),
               };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+              persistDocumentChanges(newContext);
             }}
             onRowMove={(rowId, direction) => {
               if (!documentContext) return;
@@ -475,25 +531,21 @@ function ValidationPage() {
                 rows[idx] = rows[idx + 1];
                 rows[idx + 1] = temp;
               } else {
-                return; // No move needed
+                return;
               }
 
               const newContext = { ...documentContext, rows };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+              persistDocumentChanges(newContext);
             }}
             onColumnReorder={(newColumns) => {
-              if (!documentContext) {
-                return;
-              }
+              if (!documentContext) return;
               undoStack.current.push(documentContext);
               redoStack.current = [];
               const newContext = {
                 ...documentContext,
                 columns: newColumns,
               };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+              persistDocumentChanges(newContext);
             }}
           />
         </div>
@@ -518,7 +570,7 @@ function ValidationPage() {
         activeTab={chatActiveTab}
         onTabChange={setChatActiveTab}
       />
-    </>
+    </div>
   );
 }
 

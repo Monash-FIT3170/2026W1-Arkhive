@@ -1,15 +1,33 @@
+import type { BatchProgressEvent, DocumentJob } from '../models/Job';
+
+export interface UploadPageInput {
+  src: string;
+  type: string;
+  fileName?: string;
+}
+
+export interface BatchUploadResult {
+  success: boolean;
+  batchId?: string;
+  pageCount: number;
+  jobs?: DocumentJob[];
+  ocrData?: any[];
+}
+
 export async function uploadPagesToBackend(
-    pages: { src: string; type: string }[],
-    onRetryMessage?: (msg: string) => void
-): Promise<void> {
+  pages: UploadPageInput[],
+  onRetryMessage?: (msg: string) => void,
+  onProgress?: (event: BatchProgressEvent) => void
+): Promise<BatchUploadResult | void> {
   const formData = new FormData();
-  const metadata: { type: string }[] = [];
+  const metadata: { type: string; fileName?: string }[] = [];
 
   for (let i = 0; i < pages.length; i++) {
     const res = await fetch(pages[i].src);
     const blob = await res.blob();
-    formData.append('pages', blob, `page-${i}.png`);
-    metadata.push({ type: pages[i].type });
+    const fileName = pages[i].fileName || `page-${i}.png`;
+    formData.append('pages', blob, fileName);
+    metadata.push({ type: pages[i].type, fileName });
   }
 
   formData.append('metadata', JSON.stringify(metadata));
@@ -23,7 +41,7 @@ export async function uploadPagesToBackend(
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     if (response.status === 502) {
-      throw new Error("OCR Service failed. Please double check your credentials");
+      throw new Error('OCR Service failed. Please double check your credentials');
     }
     throw new Error(body.error ?? `Upload failed with status ${response.status}`);
   }
@@ -32,6 +50,8 @@ export async function uploadPagesToBackend(
   if (reader) {
     const decoder = new TextDecoder();
     let buffer = '';
+    let result: BatchUploadResult | undefined;
+
     while (true) {
       const { done, value } = await reader.read();
       if (value) {
@@ -41,18 +61,29 @@ export async function uploadPagesToBackend(
         for (const line of lines) {
           if (!line.trim()) continue;
           try {
-            const msg = JSON.parse(line);
+            const msg: BatchProgressEvent = JSON.parse(line);
+
+            if (onProgress) {
+              onProgress(msg);
+            }
+
             if (msg.type === 'retry') {
               if (onRetryMessage) {
-                onRetryMessage(`OCR is Retrying Attempt ${msg.attempt} of ${msg.maxRetries} for "${msg.fileName}" File`);
+                onRetryMessage(
+                  `OCR is Retrying Attempt ${msg.attempt} of ${msg.maxRetries} for "${msg.fileName}" File`
+                );
               }
             } else if (msg.type === 'error') {
               throw new Error(msg.message || 'OCR failed. Please double check and reupload your document.');
             } else if (msg.type === 'success') {
-              return;
+              result = msg.data;
             }
           } catch (e) {
-            if (e instanceof Error && e.message !== 'Unexpected end of JSON input' && !e.message.includes('Unexpected token')) {
+            if (
+              e instanceof Error &&
+              e.message !== 'Unexpected end of JSON input' &&
+              !e.message.includes('Unexpected token')
+            ) {
               throw e;
             }
           }
@@ -60,15 +91,20 @@ export async function uploadPagesToBackend(
       }
       if (done) break;
     }
+
+    return result;
   }
 }
 
 /**
  * Returns a URL pointing at the image stored in the server session.
  * Use this as the `src` for the Document Panel image — it hits
- * GET /api/upload/image which streams the session-stored buffer back.
+ * GET /api/upload/image or GET /api/upload/image/:index which streams the session-stored buffer back.
  */
-export function getUploadedImageUrl(): string {
+export function getUploadedImageUrl(index?: number): string {
+  if (typeof index === 'number') {
+    return `/api/upload/image/${index}`;
+  }
   return '/api/upload/image';
 }
 
