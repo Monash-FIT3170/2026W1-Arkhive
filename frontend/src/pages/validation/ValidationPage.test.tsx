@@ -15,6 +15,7 @@ vi.mock('../../services/extractionService', () => ({
 
 vi.mock('../../services/uploadService', () => ({
   getUploadedImageUrl: vi.fn().mockResolvedValue('http://localhost/mock-image.png'),
+  getProcessedImageUrls: vi.fn().mockResolvedValue(['http://localhost/mock-processed-image.png']),
 }));
 
 vi.mock('./components/extracted-data/detectReviewFields', () => ({

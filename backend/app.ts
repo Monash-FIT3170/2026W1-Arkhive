@@ -49,3 +49,36 @@ app.get("/*splat", (req: Request, res: Response) => {
 app.listen(PORT, () => {
   console.log(`Server is running locally at ${PORT}`);
 });
+
+// Cleanup old uploads (older than 3 days)
+import fs from "fs";
+
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
+function cleanupOldUploads() {
+  if (!fs.existsSync(UPLOADS_DIR)) return;
+  
+  const now = Date.now();
+  const sessions = fs.readdirSync(UPLOADS_DIR);
+  
+  for (const sessionFolder of sessions) {
+    const sessionPath = path.join(UPLOADS_DIR, sessionFolder);
+    const stats = fs.statSync(sessionPath);
+    
+    // Check if it's a directory and older than 3 days
+    if (stats.isDirectory() && (now - stats.mtimeMs > THREE_DAYS_MS)) {
+      try {
+        fs.rmSync(sessionPath, { recursive: true, force: true });
+        console.log(`Cleaned up expired session uploads: ${sessionFolder}`);
+      } catch (err) {
+        console.error(`Failed to cleanup session: ${sessionFolder}`, err);
+      }
+    }
+  }
+}
+
+// Run cleanup every 12 hours
+setInterval(cleanupOldUploads, 12 * 60 * 60 * 1000);
+// Run once on startup
+cleanupOldUploads();
