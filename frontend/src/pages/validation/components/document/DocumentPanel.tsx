@@ -1,25 +1,31 @@
 import { useState, useRef } from 'react';
 import type { OCRComponent } from '../../../../models/OCRComponent';
+import { useState, useRef } from 'react';
+import type { OCRComponent } from '../../../../models/OCRComponent';
 // NEW update: Calculating real average confidence from OCR data
 function calculateAverageConfidence(data: OCRComponent[]): number {
   const componentsWithConfidence = data.filter((comp) => typeof comp.confidence === 'number');
+  const componentsWithConfidence = data.filter((comp) => typeof comp.confidence === 'number');
   if (componentsWithConfidence.length === 0) return 0;
+  const total = componentsWithConfidence.reduce((sum, comp) => sum + comp.confidence, 0);
   const total = componentsWithConfidence.reduce((sum, comp) => sum + comp.confidence, 0);
   return total / componentsWithConfidence.length;
 }
 
 function DocumentPanel({
-  hoveredOverlayId,
+  hoveredOverlayIds,
   documentImageUrl,
   ocrData,
 }: {
-  hoveredOverlayId: string | null;
+  hoveredOverlayIds: string[];
   documentImageUrl: string | undefined;
   ocrData: OCRComponent[];
 }) {
   const [zoom, setZoom] = useState(1);
   const [viewBox, setViewBox] = useState('0 0 1000 1000'); // default
+  const [viewBox, setViewBox] = useState('0 0 1000 1000'); // default
   // NEW update: Real average confidence from mock data
+  const averageConfidence = calculateAverageConfidence(ocrData as OCRComponent[]);
   const averageConfidence = calculateAverageConfidence(ocrData as OCRComponent[]);
   const confidencePercent = Math.round(averageConfidence * 100);
 
@@ -74,12 +80,15 @@ function DocumentPanel({
       <div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
         {/* Row 1: Title */}
         <h2 className="mb-4 text-xl font-semibold text-base-content">DOCUMENT PANEL</h2>
+        <h2 className="mb-4 text-xl font-semibold text-base-content">DOCUMENT PANEL</h2>
         {/* Row 2: Zoom buttoms*/}
         <div className="mb-2 flex gap-2">
+          <button className="btn btn-sm" onClick={() => setZoom((z) => Math.max(1, z - 0.25))}>
           <button className="btn btn-sm" onClick={() => setZoom((z) => Math.max(1, z - 0.25))}>
             −
           </button>
 
+          <button className="btn btn-sm" onClick={() => setZoom((z) => Math.min(4, z + 0.25))}>
           <button className="btn btn-sm" onClick={() => setZoom((z) => Math.min(4, z + 0.25))}>
             +
           </button>
@@ -96,11 +105,14 @@ function DocumentPanel({
           onMouseUp={handleMouseUpOrLeave}
           onMouseLeave={handleMouseUpOrLeave}
           className={`flex-1 min-h-[250px] relative overflow-auto border border-base-300 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          className={`flex-1 min-h-[250px] relative overflow-auto border border-base-300 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         >
           <div
             className="absolute inset-0 w-full h-full origin-center"
             style={{
               transform: `scale(${zoom})`,
+              transformOrigin: 'top left',
+              transition: 'transform 0.2s ease',
               transformOrigin: 'top left',
               transition: 'transform 0.2s ease',
             }}
@@ -121,6 +133,7 @@ function DocumentPanel({
             >
               <defs>
                 <filter id="highlightGlow" x="-50%" y="-50%" width="200%" height="300%">
+                <filter id="highlightGlow" x="-50%" y="-50%" width="200%" height="300%">
                   <feGaussianBlur stdDeviation="4" result="glow" />
                   <feMerge>
                     <feMergeNode in="glow" />
@@ -129,8 +142,13 @@ function DocumentPanel({
                 </filter>
               </defs>
               {/* map all the bounding boxes */}
-              {(ocrData as OCRComponent[]).map((comp) => {
-                if (!comp.boundingBoxes) return null;
+              {(() => {
+                // Normalize once
+                const normalizedHoverIds = new Set(
+                  hoveredOverlayIds.map((id) => (id.startsWith('comp_') ? id : `comp_${id}`))
+                );
+                return (ocrData as OCRComponent[]).map((comp) => {
+                  if (!comp.boundingBoxes) return null;
 
                 return Object.entries(comp.boundingBoxes).map(([cellKey, box]: [string, any]) => {
                   const id = `${comp.id}:${cellKey}`;
@@ -172,6 +190,15 @@ function DocumentPanel({
         <div className="border-t pt-3 text-sm text-base-content/70 flex items-center gap-2">
           Confidence Score:
           {/* UPDATED: Matching outlined badge style to keep confidence score as secondary info */}
+          <span
+            className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+              confidencePercent >= 85
+                ? 'border-success text-success bg-white'
+                : confidencePercent >= 70
+                  ? 'border-warning text-warning bg-white'
+                  : ' border-error text-error bg-white'
+            }`}
+          >
           <span
             className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
               confidencePercent >= 85

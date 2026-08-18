@@ -19,15 +19,53 @@ export interface OcrIssue {
   ocrValue: string;
   confidenceScore: number;
   issueType?: 'confidence' | 'format';
+  rowId: string | number;
+  groupId?: string; //  shared by cells that should be resolved together
+  formatRegex?: string; // the detected regex for this column, if any
 }
+
+// The type of slide for review
+type ReviewSlide =
+  | { kind: 'single'; issue: OcrIssue }
+  | { kind: 'group'; groupId: string; fieldName: string; formatRegex?: string; issues: OcrIssue[] };
 
 interface OcrReviewWidgetProps {
   issues: OcrIssue[];
-  onAccept: (fieldId: string, newValue: string) => void;
-  onReject: (fieldId: string) => void;
+  onAccept: (updates: { fieldId: string; newValue: string }[]) => void;
+  onReject: (fieldIds: string[]) => void;
   onManualEdit: (fieldId: string, newValue: string) => void;
-  onSlideChange?: (fieldId: string) => void; // Optional: Emits when slide changes to highlight field in main document
+  onSlideChange?: (fieldIds: string[]) => void; // Optional: Emits when slide changes to highlight field in main document
   onFetchSuggestion?: (fieldId: string) => Promise<string | null>;
+  onFetchBulkSuggestion?: (
+    column: string,
+    fields: { fieldId: string; rowId: string | number; ocrValue: string }[],
+    formatRegex?: string
+  ) => Promise<Record<string, string> | null>;
+}
+
+// Function that turns each OCR Issue to a equivalent ReviewSlide format
+function buildSlides(issues: OcrIssue[]): ReviewSlide[] {
+  const slides: ReviewSlide[] = [];
+  const seenGroups = new Set<string>();
+
+  for (const issue of issues) {
+    if (issue.groupId) {
+      // Group Issues together
+      if (seenGroups.has(issue.groupId)) continue;
+      seenGroups.add(issue.groupId);
+      slides.push({
+        kind: 'group',
+        groupId: issue.groupId,
+        fieldName: issue.fieldName,
+        formatRegex: issue.formatRegex,
+        issues: issues.filter((i) => i.groupId === issue.groupId),
+      });
+    } else {
+      // Else single
+      slides.push({ kind: 'single', issue });
+    }
+  }
+  return slides;
 }
 
 export default function OcrReviewWidget({
@@ -37,6 +75,7 @@ export default function OcrReviewWidget({
   onManualEdit,
   onSlideChange,
   onFetchSuggestion,
+  onFetchBulkSuggestion,
 }: OcrReviewWidgetProps) {
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -44,52 +83,45 @@ export default function OcrReviewWidget({
   const [isEditing, setIsEditing] = useState(false);
 
   const [suggestions, setSuggestions] = useState<Record<string, string | null>>({});
-  //   const [isFetchingSuggestion, setIsFetchingSuggestion] = useState(false);
   const [fetchingId, setFetchingId] = useState<string | null>(null);
 
   // Filter out issues that have already been resolved
   const unresolvedIssues = issues.filter((issue) => !resolvedIds.has(issue.fieldId));
+  // Make review slide per ocr issue
+  const slides = buildSlides(unresolvedIssues);
+  // Current Slide UI is on
+  const currentSlide = slides[currentIndex];
 
-  // Emit event when the slide changes so parent can highlight the document
-  //   useEffect(() => {
-  //     const currentIssue = unresolvedIssues[currentIndex];
-  //     if (unresolvedIssues.length > 0 && onSlideChange && currentIssue) {
-  //        onSlideChange(currentIssue.fieldId);
-  //     }
-
-  //     // // Fetch AI suggestion if not already fetched
-  //     // if (currentIssue && onFetchSuggestion) {
-  //     //   setSuggestions(prev => {
-  //     //     if (prev[currentIssue.fieldId] !== undefined) return prev;
-
-  //     //     setIsFetchingSuggestion(true);
-  //     //     onFetchSuggestion(currentIssue.fieldId).then(val => {
-  //     //       setSuggestions(s => ({...s, [currentIssue.fieldId]: val}));
-  //     //       setIsFetchingSuggestion(false);
-  //     //     });
-
-  //     //     return { ...prev, [currentIssue.fieldId]: null }; // Mark as fetching
-  //     //   });
-  //     // }
-  //   }, [currentIndex, unresolvedIssues.length, onSlideChange, onFetchSuggestion, unresolvedIssues]);
-
-  // Current Issue looked at
-  const currentIssue = unresolvedIssues[currentIndex];
-  // Current suggested value
-  const currentSuggestion = currentIssue ? suggestions[currentIssue.fieldId] : undefined;
-  // Current issue whose suggestion is being fetched
-  const isFetchingCurrent = currentIssue ? fetchingId === currentIssue.fieldId : false;
+  // Upon render/If dependency change, change slide
   useEffect(() => {
-    if (unresolvedIssues.length > 0 && onSlideChange && currentIssue) {
-      onSlideChange(currentIssue.fieldId);
+    if (slides.length > 0 && onSlideChange && currentSlide) {
+      const fieldIds =
+        currentSlide.kind === 'single'
+          ? [currentSlide.issue.fieldId]
+          : currentSlide.issues.map((i) => i.fieldId);
+      onSlideChange(fieldIds);
     }
-  }, [currentIndex, unresolvedIssues.length, onSlideChange, unresolvedIssues]);
+  }, [currentIndex, slides.length, onSlideChange, unresolvedIssues]);
+
+  // Whenever the slide list shrinks (or changes) for any reason — resolving an
+  // issue, the parent updating `issues`, — make sure currentIndex still
+  // points at a real slide instead of relying on markResolved's one-off math.
+  useEffect(() => {
+    if (slides.length === 0) return;
+    if (currentIndex > slides.length - 1) {
+      setCurrentIndex(slides.length - 1);
+    }
+  }, [slides.length, currentIndex]);
+
+  // OCR ISSUE - SINGLE FIELD - ISSUE/SUGGESTION
+  const currentSingle = currentSlide?.kind === 'single' ? currentSlide.issue : undefined; // If issue is single -> current issues
+  const currentSuggestion = currentSingle ? suggestions[currentSingle.fieldId] : undefined; // If issue is signle -> current suggestion
+  const isFetchingCurrent = currentSingle ? fetchingId === currentSingle.fieldId : false; // If issue is signel -> is suggestion being fetched?
+
   // Trigger a fetch for the current issue
   const handleRequestSuggestion = () => {
-    if (!currentIssue || !onFetchSuggestion) return;
-    const fieldId = currentIssue.fieldId;
-
-    // Already have a resolved suggestion or a fetch in flight for this field — don't re-fetch.
+    if (!currentSingle || !onFetchSuggestion) return;
+    const fieldId = currentSingle.fieldId;
     if (suggestions[fieldId] !== undefined || fetchingId === fieldId) return;
 
     setFetchingId(fieldId);
@@ -98,13 +130,49 @@ export default function OcrReviewWidget({
         setSuggestions((s) => ({ ...s, [fieldId]: val }));
         setFetchingId((current) => (current === fieldId ? null : current));
       })
-      .catch(() => {
-        setFetchingId((current) => (current === fieldId ? null : current));
-      });
+      .catch(() => setFetchingId((current) => (current === fieldId ? null : current)));
   };
 
+  // BULK OCR ISSUE - CURRENT GROUP - SUGGESTION
+  const currentGroup = currentSlide?.kind === 'group' ? currentSlide : undefined; // If group --> current slide
+  const isFetchingGroup = currentGroup ? fetchingId === currentGroup.groupId : false; // if group --> is fetching suggestion?
+  const groupSuggestionsFetched =
+    !!currentGroup && currentGroup.issues.every((i) => suggestions[i.fieldId] !== undefined); // Boolean on whether it has been fetched (only if every issue in group has been fetched)
+
+  const handleRequestBulkSuggestion = () => {
+    if (!currentGroup || !onFetchBulkSuggestion) return;
+    const { groupId, fieldName, formatRegex, issues: groupIssues } = currentGroup;
+    if (fetchingId === groupId) return;
+
+    setFetchingId(groupId);
+    onFetchBulkSuggestion(
+      fieldName,
+      groupIssues.map((i) => ({ fieldId: i.fieldId, rowId: i.rowId, ocrValue: i.ocrValue })),
+      formatRegex
+    )
+      .then((map: Record<string, string> | null) => {
+        if (!map) {
+          // No suggestions came back at all — treat like a failed fetch so the
+          // "Get Suggestions" button reappears
+          setFetchingId((current) => (current === groupId ? null : current));
+          return;
+        }
+
+        setSuggestions((s) => {
+          const next = { ...s };
+          groupIssues.forEach((i) => {
+            // Per-row fallback: if this specific row wasn't in the map, mark it
+            // null so the UI falls back to the original OCR value for just that row.
+            next[i.fieldId] = map[String(i.rowId)] ?? null;
+          });
+          return next;
+        });
+        setFetchingId((current) => (current === groupId ? null : current));
+      })
+      .catch(() => setFetchingId((current) => (current === groupId ? null : current)));
+  };
   const handleNext = () => {
-    if (currentIndex < unresolvedIssues.length - 1) {
+    if (currentIndex < slides.length - 1) {
       setCurrentIndex((prev) => prev + 1);
       resetEditState();
     }
@@ -122,43 +190,55 @@ export default function OcrReviewWidget({
     setManualValue('');
   };
 
-  const markAsResolved = (fieldId: string) => {
+  const markResolved = (fieldIds: string[]) => {
     setResolvedIds((prev) => {
       const next = new Set(prev);
-      next.add(fieldId);
+      fieldIds.forEach((id) => next.add(id));
       return next;
     });
-
     resetEditState();
-    // Maintain slide index smoothly. If we resolve the last item, step back one index.
-    if (currentIndex >= unresolvedIssues.length - 1) {
-      setCurrentIndex(Math.max(0, unresolvedIssues.length - 2));
-    }
+    // currentIndex clamping is now handled by the useEffect watching slides.length
   };
 
   // Handlers matching requirements
   const handleAcceptClick = () => {
-    const currentIssue = unresolvedIssues[currentIndex];
-    if (!currentIssue) return;
-    const finalValue = suggestions[currentIssue.fieldId] || currentIssue.ocrValue;
-    onAccept(currentIssue.fieldId, finalValue);
-    markAsResolved(currentIssue.fieldId);
+    if (!currentSlide) return;
+
+    const updates =
+      currentSlide.kind === 'single'
+        ? [
+            {
+              fieldId: currentSlide.issue.fieldId,
+              newValue: suggestions[currentSlide.issue.fieldId] || currentSlide.issue.ocrValue,
+            },
+          ]
+        : currentSlide.issues.map((issue) => ({
+            fieldId: issue.fieldId,
+            newValue: suggestions[issue.fieldId] || issue.ocrValue,
+          }));
+
+    onAccept(updates);
+
+    markResolved(updates.map((update) => update.fieldId));
   };
 
   const handleRejectClick = () => {
-    const currentIssue = unresolvedIssues[currentIndex];
-    if (!currentIssue) return;
-    onReject(currentIssue.fieldId);
-    markAsResolved(currentIssue.fieldId);
+    if (!currentSlide) return;
+
+    const fieldIds =
+      currentSlide.kind === 'single'
+        ? [currentSlide.issue.fieldId]
+        : currentSlide.issues.map((issue) => issue.fieldId);
+
+    onReject(fieldIds);
+
+    markResolved(fieldIds);
   };
 
   const handleManualSubmit = () => {
-    if (manualValue.trim()) {
-      const currentIssue = unresolvedIssues[currentIndex];
-      if (!currentIssue) return;
-      onManualEdit(currentIssue.fieldId, manualValue.trim());
-      markAsResolved(currentIssue.fieldId);
-    }
+    if (!currentSingle || !manualValue.trim()) return;
+    onManualEdit(currentSingle.fieldId, manualValue.trim());
+    markResolved([currentSingle.fieldId]);
   };
 
   return (
@@ -179,7 +259,7 @@ export default function OcrReviewWidget({
           </div>
         ) : (
           // Carousel Interface
-          <div className="flex-1 flex flex-col h-full animate-in fade-in duration-300">
+          <div className="flex-1 flex flex-col min-h-0 animate-in fade-in duration-300">
             {/* Progress Indicator */}
             <div className="text-xs font-semibold text-base-content/50 mb-6 text-center uppercase tracking-widest">
               Issue {currentIndex + 1} of {unresolvedIssues.length}
@@ -188,83 +268,122 @@ export default function OcrReviewWidget({
             {/* Carousel Slide */}
             <div className="flex-1 flex flex-col justify-center items-center text-center space-y-5 transition-all w-full">
               <div className="bg-base-100 px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider text-primary shadow-sm border border-primary/20">
-                {unresolvedIssues[currentIndex]?.fieldName}
+                {currentSlide?.kind === 'single'
+                  ? currentSlide.issue.fieldName
+                  : currentSlide?.fieldName}
+                {currentSlide?.kind === 'group' && (
+                  <span className="ml-2 text-base-content/50 normal-case font-medium">
+                    · {currentSlide.issues.length} cells
+                  </span>
+                )}
               </div>
 
-              <div className="w-full relative group space-y-4 text-left">
-                {/* Detected Value */}
-                <div>
-                  <p className="text-xs text-base-content/60 font-semibold mb-1 uppercase tracking-wider ml-1 flex justify-between items-center">
-                    {unresolvedIssues[currentIndex]?.issueType === 'format' ? 'Format Inconsistency' : 'Detected Data'}
-                    {unresolvedIssues[currentIndex]?.issueType !== 'format' && (
-                      <span className="text-[10px] font-medium text-warning flex items-center gap-1 bg-warning/10 px-2 py-0.5 rounded-full">
-                        <AlertCircle size={12} />
-                        {(unresolvedIssues[currentIndex]?.confidenceScore * 100).toFixed(0)}%
-                      </span>
-                    )}
-                  </p>
-                  <div className="bg-base-100 relative p-4 rounded-xl w-full border border-base-300 shadow-sm">
-                    <p className="text-lg font-medium break-all text-base-content line-through opacity-60">
-                      "{unresolvedIssues[currentIndex]?.ocrValue}"
+              {currentSlide?.kind === 'single' ? (
+                <div className="w-full relative group space-y-4 text-left">
+                  {/* SLIDE FOR SINGLE ISSUES */}
+                  {/* Detected Value */}
+                  <div>
+                    <p className="text-xs text-base-content/60 font-semibold mb-1 uppercase tracking-wider ml-1 flex justify-between items-center">
+                      {currentSlide.issue.issueType === 'format'
+                        ? 'Format Inconsistency'
+                        : 'Detected Data'}
+                      {currentSlide.issue.issueType !== 'format' && (
+                        <span className="text-[10px] font-medium text-warning flex items-center gap-1 bg-warning/10 px-2 py-0.5 rounded-full">
+                          <AlertCircle size={12} />
+                          {(currentSlide.issue.confidenceScore * 100).toFixed(0)}%
+                        </span>
+                      )}
                     </p>
+                    <div className="bg-base-100 relative p-4 rounded-xl w-full border border-base-300 shadow-sm">
+                      <p className="text-lg font-medium break-all text-base-content line-through opacity-60">
+                        "{currentSlide.issue.ocrValue}"
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* AI Suggestion */}
+                  <div>
+                    {/* On demand fetch */}
+                    <p className="text-xs text-primary/80 font-semibold mb-1 uppercase tracking-wider ml-1 flex items-center gap-1.5">
+                      <Bot size={14} /> AI Suggestion
+                    </p>
+
+                    {currentSuggestion === undefined && !isFetchingCurrent ? (
+                      // Not requested yet
+                      <button
+                        className="btn btn-outline btn-primary w-full justify-center gap-2 shadow-sm"
+                        onClick={handleRequestSuggestion}
+                        disabled={!onFetchSuggestion}
+                      >
+                        <Sparkle size={16} />
+                        Get Suggestion
+                      </button>
+                    ) : (
+                      <div className="bg-primary/5 relative p-4 rounded-xl w-full border border-primary/20 shadow-sm">
+                        {isFetchingCurrent ? (
+                          <div className="flex items-center justify-center gap-2 py-1 text-primary/60">
+                            <span className="loading loading-spinner loading-sm"></span>
+                            <span className="text-sm font-medium animate-pulse">
+                              Analyzing document context...
+                            </span>
+                          </div>
+                        ) : (
+                          <p className="text-xl font-bold break-all text-primary-content bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                            "{currentSuggestion || currentSlide.issue.ocrValue}"
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {/* AI Suggestion */}
-                <div>
-                  {/* Auto fetch  */}
-                  {/* <p className="text-xs text-primary/80 font-semibold mb-1 uppercase tracking-wider ml-1 flex items-center gap-1.5">
-                       <Bot size={14} /> AI Suggestion
-                     </p>
-                     <div className="bg-primary/5 relative p-4 rounded-xl w-full border border-primary/20 shadow-sm">
-                       {isFetchingSuggestion && suggestions[unresolvedIssues[currentIndex]?.fieldId] === undefined ? (
-                         <div className="flex items-center justify-center gap-2 py-1 text-primary/60">
-                           <span className="loading loading-spinner loading-sm"></span>
-                           <span className="text-sm font-medium animate-pulse">Analyzing document context...</span>
-                         </div>
-                       ) : (
-                         <p className="text-xl font-bold break-all text-primary-content bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                           "{suggestions[unresolvedIssues[currentIndex]?.fieldId] || unresolvedIssues[currentIndex]?.ocrValue}"
-                         </p>
-                       )} */}
-                  {/* On demand fetch */}
-                  <p className="text-xs text-primary/80 font-semibold mb-1 uppercase tracking-wider ml-1 flex items-center gap-1.5">
-                    <Bot size={14} /> AI Suggestion
+              ) : currentSlide?.kind === 'group' ? (
+                <div className="w-full text-left space-y-3">
+                  {/* SLIDE FOR GROUP ISSUES */}
+                  <p className="text-xs text-base-content/60 font-semibold uppercase tracking-wider ml-1">
+                    Format Inconsistency · {currentSlide.issues.length} cells flagged in this column
                   </p>
 
-                  {currentSuggestion === undefined && !isFetchingCurrent ? (
-                    // Not requested yet
+                  {/* AI Suggestion */}
+                  {!groupSuggestionsFetched && !isFetchingGroup ? (
                     <button
                       className="btn btn-outline btn-primary w-full justify-center gap-2 shadow-sm"
-                      onClick={handleRequestSuggestion}
-                      disabled={!onFetchSuggestion}
+                      onClick={handleRequestBulkSuggestion}
+                      disabled={!onFetchBulkSuggestion}
                     >
                       <Sparkle size={16} />
-                      Get Suggestion
+                      Get Suggestions for all {currentSlide.issues.length}
                     </button>
+                  ) : isFetchingGroup ? (
+                    <div className="flex items-center justify-center gap-2 py-3 text-primary/60 bg-primary/5 rounded-xl border border-primary/20">
+                      <span className="loading loading-spinner loading-sm"></span>
+                      <span className="text-sm font-medium animate-pulse">
+                        Analyzing {currentSlide.issues.length} rows...
+                      </span>
+                    </div>
                   ) : (
-                    <div className="bg-primary/5 relative p-4 rounded-xl w-full border border-primary/20 shadow-sm">
-                      {isFetchingCurrent ? (
-                        <div className="flex items-center justify-center gap-2 py-1 text-primary/60">
-                          <span className="loading loading-spinner loading-sm"></span>
-                          <span className="text-sm font-medium animate-pulse">
-                            Analyzing document context...
+                    <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
+                      {currentSlide.issues.map((item) => (
+                        <div
+                          key={item.fieldId}
+                          className="bg-base-100 border border-base-300 rounded-lg p-3 flex items-center justify-between gap-3"
+                        >
+                          <span className="text-sm line-through opacity-60 break-all">
+                            "{item.ocrValue}"
+                          </span>
+                          <span className="text-sm font-bold text-primary break-all">
+                            "{suggestions[item.fieldId] || item.ocrValue}"
                           </span>
                         </div>
-                      ) : (
-                        <p className="text-xl font-bold break-all text-primary-content bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                          "{currentSuggestion || currentIssue?.ocrValue}"
-                        </p>
-                      )}
+                      ))}
                     </div>
                   )}
                 </div>
-              </div>
+              ) : null}
             </div>
 
             {/* Resolution Actions */}
             <div className="mt-8 h-14 flex items-center justify-center w-full">
-              {isEditing ? (
+              {isEditing && currentSlide?.kind === 'single' ? (
                 <div className="flex gap-2 w-full animate-in slide-in-from-bottom-2 duration-200">
                   <input
                     type="text"
@@ -285,16 +404,28 @@ export default function OcrReviewWidget({
                     Cancel
                   </button>
                 </div>
+              ) : currentSlide?.kind === 'group' ? (
+                <div className="flex justify-center gap-4 w-full">
+                  <button
+                    className="btn btn-success text-white shadow-md hover:shadow-lg hover:-translate-y-1 transition-all gap-2"
+                    onClick={handleAcceptClick}
+                    disabled={isFetchingGroup}
+                  >
+                    <Check size={20} /> Accept All
+                  </button>
+                  <button
+                    className="btn btn-error text-white shadow-md hover:shadow-lg hover:-translate-y-1 transition-all gap-2"
+                    onClick={handleRejectClick}
+                  >
+                    <X size={20} /> Reject All
+                  </button>
+                </div>
               ) : (
                 <div className="flex justify-center gap-6 w-full">
                   <button
                     className="btn btn-circle btn-lg btn-success text-white shadow-md hover:shadow-lg hover:-translate-y-1 transition-all"
                     onClick={handleAcceptClick}
-                    disabled={
-                      //   isFetchingSuggestion &&
-                      //   suggestions[unresolvedIssues[currentIndex]?.fieldId] === undefined
-                      isFetchingCurrent
-                    }
+                    disabled={isFetchingCurrent}
                     title="Accept Suggestion"
                   >
                     <Check size={28} />
@@ -328,7 +459,7 @@ export default function OcrReviewWidget({
               </button>
 
               <div className="flex gap-2.5 flex-1 justify-center items-center px-4 overflow-hidden">
-                {unresolvedIssues.length <= 15 ? (
+                {slides.length <= 15 ? (
                   unresolvedIssues.map((_, idx) => (
                     <div
                       key={idx}
@@ -339,7 +470,7 @@ export default function OcrReviewWidget({
                   ))
                 ) : (
                   <span className="text-xs font-semibold text-base-content/40 tracking-wider">
-                    {currentIndex + 1} / {unresolvedIssues.length}
+                    {currentIndex + 1} / {slides.length}
                   </span>
                 )}
               </div>
@@ -347,7 +478,7 @@ export default function OcrReviewWidget({
               <button
                 className="btn btn-ghost btn-circle hover:bg-base-200 text-base-content/60 hover:text-base-content transition-colors flex-shrink-0"
                 onClick={handleNext}
-                disabled={currentIndex === unresolvedIssues.length - 1}
+                disabled={currentIndex === slides.length - 1}
               >
                 <ChevronRight size={24} />
               </button>

@@ -53,7 +53,7 @@ function getConfidenceTier(confidence: number): {
 function ExtractedDataPanel({
   onHover,
   extractedData,
-  hoveredOverlayId,
+  hoveredOverlayIds,
   onCellEdit,
   onRowAdd,
   onRowDelete,
@@ -67,7 +67,7 @@ function ExtractedDataPanel({
 }: {
   onHover: (id: string | null) => void;
   extractedData: ExtractedData;
-  hoveredOverlayId?: string | null;
+  hoveredOverlayIds?: string[];
   onCellEdit?: (fieldId: string, newValue: string) => void;
   onRowAdd?: () => void;
   onRowDelete?: (rowId: string | number) => void;
@@ -130,16 +130,17 @@ function ExtractedDataPanel({
   }
 
   useEffect(() => {
-    if (hoveredOverlayId && !isMouseInside) {
-      // hoveredOverlayId is now fieldId (e.g. comp_4:SUB_ITEM_2)
-      // replace colons to make it a valid DOM id
-      const safeId = hoveredOverlayId.replace(/:/g, '-');
+    if (hoveredOverlayIds && hoveredOverlayIds.length > 0 && !isMouseInside) {
+      // hoveredOverlayIds are fieldIds (e.g. comp_4:SUB_ITEM_2)
+      // scroll to the first one — with a group hover there can be several,
+      // but only one scroll target makes sense.
+      const safeId = hoveredOverlayIds[0].replace(/:/g, '-');
       const el = document.getElementById(`cell-${safeId}`);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
-  }, [hoveredOverlayId, isMouseInside]);
+  }, [hoveredOverlayIds, isMouseInside]);
 
   const handleCellClick = (fieldId: string, initialValue: string) => {
     if (!isEditMode) return;
@@ -407,7 +408,9 @@ function ExtractedDataPanel({
                 >
                   {extractedData.columns.map((column) => {
                     const fieldId = `${String(row._id)}:${column}`;
-                    const isCellHighlighted = hoveredOverlayId === fieldId;
+                    const isCellHighlighted = hoveredOverlayIds
+                      ? hoveredOverlayIds.includes(fieldId)
+                      : false;
                     const safeId = fieldId.replace(/:/g, '-');
 
                     const isEditing = editingCellId === fieldId;
