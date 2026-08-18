@@ -14,6 +14,7 @@ type Props = {
   isBlurry?: boolean;
   isDark?: boolean;
   shouldWarn?: boolean;
+  isProcessed?: boolean;
   onToggle: (index: number) => void;
   onRemove?: (index: number) => void;
   onReplaceWithFile?: (index: number, file: File) => void;
@@ -32,6 +33,7 @@ export default function PreviewCard({
   isBlurry,
   isDark,
   shouldWarn,
+  isProcessed,
   onToggle,
   onRemove,
   onReplaceWithFile,
@@ -87,7 +89,7 @@ export default function PreviewCard({
 
       <div className="mx-auto mb-[10px] mt-4 h-[220px] w-[160px] overflow-hidden rounded-[2px] border border-base-300 bg-base-100 shadow-sm">
         {hasFile && isImage ? (
-          <img src={previewSrc} alt={displayName} className="h-full w-full object-contain" />
+          <img src={previewSrc} alt={displayName} className="h-full w-full object-contain" draggable={false} />
         ) : hasFile ? (
           <div className="flex h-full w-full items-center justify-center text-center text-xs font-semibold text-base-content/50">
             Preview unavailable
@@ -106,6 +108,13 @@ export default function PreviewCard({
           <div className="mt-1 flex justify-center">
             <span className="badge badge-primary badge-outline badge-sm">
               {documentType}
+            </span>
+          </div>
+        )}
+        {isProcessed && (
+          <div className="mt-1 flex justify-center">
+            <span className="badge badge-success badge-sm font-semibold">
+              ✓ Processed
             </span>
           </div>
         )}
