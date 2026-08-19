@@ -17,23 +17,22 @@ interface TreeNode {
   id: string; //unique ID
   confidence: number; //Confidence of the row
   indent: number; // indent in the row
-  hasChildMarker: boolean;
-  hasParentMarker: boolean;
+  level: number;
   cells: Record<string, CellData>; // Mapped by column key - cells in row
   children: TreeNode[]; // Rows whose are indented underneath this row
 }
 
 export interface FlattenerOptions {
   /**
-   * Regex used to identify rows that logically act as nested children.
-   * Defaults to matching common bullet characters followed by whitespace (e.g. "- ", "• ").
+   * Manual nesting-depth overrides, keyed by OCRComponent id.
+   * 0 = top-level. 1 = nested one level under the nearest preceding row
+   * with a lower resolved level. Always wins over geometric detection for
+   * that specific row. Rows without an entry fall back to geometric
+   * detection, compared against whatever is currently on the stack —
+   * so a manual override can start a fresh nesting scope that later
+   * un-overridden rows still nest into automatically.
    */
-  childMarkerRegex?: RegExp;
-  /**
-   * Regex used to identify rows that act as parents for subsequent rows.
-   * Defaults to matching strings that end with a colon (e.g. "Item Group :").
-   */
-  parentMarkerRegex?: RegExp;
+  manualIndentLevels?: Record<string, number>;
 }
 
 // ==========================================
@@ -215,70 +214,64 @@ function buildTree(
   components: OCRComponent[],
   keys: string[],
   positions: number[],
-  itemColKey: string,
   options?: FlattenerOptions
 ) {
   const roots: TreeNode[] = [];
   const stack: TreeNode[] = []; // Stack of "active" parents a row can be a child of
   let maxDepth = 0;
   const INDENT_THRESHOLD = estimateIndentThreshold(positions);
-  const childMarkerRegex = options?.childMarkerRegex ?? /^\s*[-–—•*]\s+/;
-  const parentMarkerRegex = options?.parentMarkerRegex ?? /:\s*$/;
+  const manualLevels = options?.manualIndentLevels ?? {};
 
   for (const comp of components) {
     const cells = mapCellsToColumns(comp, keys, positions);
     // Check logical markers on the primary column text
-    const itemText = cells[itemColKey]?.value || '';
-    const hasChildMarker = childMarkerRegex.test(itemText);
-    const hasParentMarker = parentMarkerRegex.test(itemText);
+    const rawIndent = getIndent(comp);
+    const manualLevel = manualLevels[comp.id];
+
+    let level: number;
+
+    if (manualLevel !== undefined) {
+      // A person has decided this row's depth explicitly. Pop anything
+      // at the same or deeper level - it's not this node's parent.
+      level = manualLevel;
+      while (stack.length > 0 && stack[stack.length - 1].level >= level) {
+        stack.pop();
+      }
+    } else {
+      // No override: fall back to comparing against whatever is
+      // currently on the stack (which may itself be a manually-placed
+      // row)
+      while (stack.length > 0) {
+        const top = stack[stack.length - 1];
+        const isDeeper = rawIndent > top.indent + INDENT_THRESHOLD;
+        if (isDeeper) {
+          level = top.level + 1;
+          break;
+        }
+        stack.pop();
+      }
+      // @ts-expect-error assigned in the loop above when a parent is found
+      if (typeof level === 'undefined') level = 0;
+    }
+
     const node: TreeNode = {
-      //For each component (row) make a TreeNode representation
       id: comp.id,
       confidence: comp.confidence,
-      indent: getIndent(comp),
-      hasChildMarker,
-      hasParentMarker,
-      cells, //List of cells in that row
+      indent: rawIndent,
+      level,
+      cells,
       children: [],
     };
 
-    // Pop the stack until we find the appropriate parent based on indentation
-    while (stack.length > 0) {
-      const top = stack[stack.length - 1];
-      // 1. Spatially further right (Visual layout always wins)
-      const isSpatiallyDeeper = node.indent > top.indent + INDENT_THRESHOLD;
-
-      if (isSpatiallyDeeper) {
-        top.children.push(node);
-        maxDepth = Math.max(maxDepth, stack.length);
-        break;
-      }
-
-      //   // 2. Logic Check: Does this row break the e.g. before in a bullet list, but this row doesn't have a bullet.
-      //   const isLogicallyHigher = !node.hasChildMarker && top.hasChildMarker;
-
-      //   if (!isLogicallyHigher) {
-      //     // 3. Logic Check: Does this row NEST inside the group?
-      //     // Top explicitly marks itself as a parent (e.g. colon), and node doesn't.
-      //     const isLogicallyDeeperParent = top.hasParentMarker && !node.hasParentMarker;
-      //     // Node explicitly marks itself as a child (e.g. bullet), and top doesn't.
-      //     const isLogicallyDeeperChild = node.hasChildMarker && !top.hasChildMarker;
-
-      //     if (isLogicallyDeeperParent || isLogicallyDeeperChild) {
-      //       top.children.push(node);
-      //       maxDepth = Math.max(maxDepth, stack.length);
-      //       break;
-      //     }
-      //   }
-      stack.pop(); //If it isn't a child, the stack's top isn't a parent canadidate anymore (no longer active)
-    }
-
     if (stack.length === 0) {
-      //If there is no parents to be a child of, the row must be parent row
-      roots.push(node);
+      roots.push(node); //If there ni no parent to be a child of, row must be a parent/root node
+    } else {
+      // It must be a child of the top of the stack
+      stack[stack.length - 1].children.push(node);
+      maxDepth = Math.max(maxDepth, stack.length);
     }
 
-    stack.push(node); // Add the new row be the the new current parent
+    stack.push(node);
   }
 
   return { roots, maxDepth };
@@ -313,6 +306,7 @@ function flattenTree(
       _confidence: node.confidence,
       _cellConfidence: {},
       _cellKeyMap: {},
+      _indentLevel: node.level,
     };
 
     // Helper to assign a cell to the ExtractedRow
@@ -370,7 +364,7 @@ export function flatten(data: OCRComponent[], options?: FlattenerOptions): Extra
   const itemColKey = keys[itemColIdx];
 
   // Build Tree
-  const { roots, maxDepth } = buildTree(components, keys, positions, itemColKey, options);
+  const { roots, maxDepth } = buildTree(components, keys, positions, options);
   const subItemCols = Array.from({ length: maxDepth }, (_, i) => `SUB_${itemColKey}_${i + 1}`); // Build array of column names for nested columns
 
   // Traverse & Generate Rows

@@ -47,9 +47,9 @@ function ValidationPage() {
   const [tableKey, setTableKey] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
-
   const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
   const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review'>('chat');
+  const [manualIndentLevels, setManualIndentLevels] = useState<Record<string, number>>({});
 
   useEffect(() => {
     async function loadSession() {
@@ -69,7 +69,9 @@ function ValidationPage() {
     }
     loadSession();
   }, []);
+
   const hasStartedRef = useRef(false);
+
   useEffect(() => {
     async function performFormatDetection() {
       if (!documentContext || hasStartedRef.current) return;
@@ -160,6 +162,12 @@ function ValidationPage() {
 
     performFormatDetection();
   }, [documentContext]);
+
+  // Re-flatten whenever the raw OCR data or the override map changes.
+  useEffect(() => {
+    if (ocrData.length === 0) return;
+    setDocumentContext(flatten(ocrData, { manualIndentLevels }));
+  }, [ocrData, manualIndentLevels]);
 
   useEffect(() => {
     documentContextRef.current = documentContext;
@@ -254,27 +262,25 @@ function ValidationPage() {
   const [hoveredTableFieldIds, setHoveredTableFieldIds] = useState<string[]>([]);
   const [hoveredDocumentOverlayIds, setHoveredDocumentOverlayIds] = useState<string[]>([]);
 
-  const handleSlideChange = useCallback(
-    (fieldIds: string[]) => {
-      setHoveredTableFieldIds(fieldIds);
+  const handleSlideChange = useCallback((fieldIds: string[]) => {
+    setHoveredTableFieldIds(fieldIds);
 
-      if (fieldIds.length === 0 || !documentContext) {
-        setHoveredDocumentOverlayIds([]);
-        return;
-      }
+    const currentContext = documentContextRef.current;
+    if (fieldIds.length === 0 || !currentContext) {
+      setHoveredDocumentOverlayIds([]);
+      return;
+    }
 
-      const overlayIds = fieldIds
-        .map((fieldId) => {
-          const [rowId, column] = fieldId.split(':');
-          const row = documentContext.rows.find((r) => String(r._id) === rowId);
-          return row?._cellKeyMap?.[column];
-        })
-        .filter((id): id is string => Boolean(id));
+    const overlayIds = fieldIds
+      .map((fieldId) => {
+        const [rowId, column] = fieldId.split(':');
+        const row = currentContext.rows.find((r) => String(r._id) === rowId);
+        return row?._cellKeyMap?.[column];
+      })
+      .filter((id): id is string => Boolean(id));
 
-      setHoveredDocumentOverlayIds(overlayIds);
-    },
-    [documentContext]
-  );
+    setHoveredDocumentOverlayIds(overlayIds);
+  }, []);
 
   const addMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
@@ -328,6 +334,36 @@ function ValidationPage() {
       timestamp: new Date().toISOString(),
     });
   };
+
+  //Handle Row Indent
+  const handleRowIndent = useCallback((rowId: string | number) => {
+    const currentContext = documentContextRef.current;
+    if (!currentContext) return;
+
+    const idx = currentContext.rows.findIndex((r) => r._id === rowId);
+    if (idx === -1) return;
+
+    const currentLevel = currentContext.rows[idx]._indentLevel ?? 0;
+    console.log(currentContext.rows[idx]);
+    const prevLevel = idx > 0 ? (currentContext.rows[idx - 1]._indentLevel ?? 0) : 0;
+    const nextLevel = Math.min(currentLevel + 1, prevLevel + 1);
+
+    setManualIndentLevels((prev) => ({ ...prev, [String(rowId)]: nextLevel }));
+  }, []);
+
+  //Handle Row Outdent
+  const handleRowOutdent = useCallback((rowId: string | number) => {
+    const currentContext = documentContextRef.current;
+    if (!currentContext) return;
+
+    const row = currentContext.rows.find((r) => r._id === rowId);
+    if (!row) return;
+
+    const currentLevel = row._indentLevel ?? 0;
+    const nextLevel = Math.max(0, currentLevel - 1);
+
+    setManualIndentLevels((prev) => ({ ...prev, [String(rowId)]: nextLevel }));
+  }, []);
 
   const handleCarouselAccept = (updates: { fieldId: string; newValue: string }[]) => {
     if (!documentContext) return;
@@ -612,6 +648,8 @@ function ValidationPage() {
               setDocumentContext(newContext);
               saveExtractionSession(newContext);
             }}
+            onRowIndent={handleRowIndent}
+            onRowOutdent={handleRowOutdent}
             onColumnAdd={(columnName) => {
               if (!documentContext) return;
               undoStack.current.push(documentContext);
