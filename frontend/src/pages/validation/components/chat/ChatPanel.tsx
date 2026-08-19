@@ -3,7 +3,7 @@ import type { ChatMessage } from '../../../../models/Message';
 import MessageItem from './MessageItem';
 import { useEffect, useRef, useState } from 'react';
 import { sendMessage } from '../../../../services/llmService';
-import type { ExtractedData } from '../../../../models/TableData';
+import type { ExtractedPage } from '../../../../models/TableData';
 
 import OcrReviewWidget from './OcrReviewWidget';
 import type { OcrIssue } from './OcrReviewWidget';
@@ -31,8 +31,8 @@ function ChatPanel({
   onToggle: () => void;
   messages: ChatMessage[];
   onAddMessage: (msg: ChatMessage) => void;
-  documentContext: ExtractedData;
-  onContextUpdate: (updated: ExtractedData) => void; // AI made a change + update table
+  documentContext: ExtractedPage;
+  onContextUpdate: (updated: ExtractedPage) => void;
   onAccept: () => void;
   onReject: () => void;
   flaggedIssues?: OcrIssue[];
@@ -82,7 +82,10 @@ function ChatPanel({
 
       //ai returns updated context
       if (reply.updatedContext) {
-        onContextUpdate(reply.updatedContext);
+        onContextUpdate({
+          ...reply.updatedContext,
+          pageIndex: documentContext.pageIndex,
+        });
       }
 
       onAddMessage({

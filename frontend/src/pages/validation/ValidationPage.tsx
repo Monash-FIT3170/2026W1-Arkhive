@@ -5,6 +5,7 @@ import ChatPanel from './components/chat/ChatPanel';
 import type { ChatMessage, ReviewField } from '../../models/Message';
 import type { OCRComponent } from '../../models/OCRComponent';
 import type { ExtractedData } from '../../models/TableData';
+import type { ExtractedPage } from '../../models/TableData';
 import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
 import { getUploadedImageUrl } from '../../services/uploadService';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
@@ -16,6 +17,7 @@ import {
 import type { OcrIssue } from './components/chat/OcrReviewWidget';
 import { flatten } from './components/extracted-data/flattener';
 import { checkTableFormats } from './components/extracted-data/detectFormat';
+import { getTestData, getTestImageUrls } from '../../services/testService';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -32,38 +34,91 @@ function useIsLargeScreen() {
 function ValidationPage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [documentContext, setDocumentContext] = useState<ExtractedData | null>(null);
   const [splitPercent, setSplitPercent] = useState(50);
-  const [oldContext, setOldContext] = useState<ExtractedData | null>(null); //for AI suggesiton
-  const [documentImageURL, setDocumentImageURL] = useState<string>();
-  const [ocrData, setOCRData] = useState<OCRComponent[]>([]);
+  const [oldContext, setOldContext] = useState<ExtractedPage | null>(null); //for AI suggesiton
+  const [imageUrls, setImageUrls] = useState<string[]>([]); // one image URL per page
+  const [ocrPages, setOcrPages] = useState<OCRComponent[][]>([]); // raw OCR, one array per page
+  const [extractedPages, setExtractedPages] = useState<ExtractedPage[]>([]); // flattened, one per page
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+
+  const documentContext: ExtractedPage | null = extractedPages[currentPageIndex] ?? null;
+  const ocrData: OCRComponent[] = ocrPages[currentPageIndex] ?? [];
+  const documentImageURL: string | undefined = imageUrls[currentPageIndex];
+
   const isLarge = useIsLargeScreen();
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const undoStack = useRef<ExtractedData[]>([]);
-  const redoStack = useRef<ExtractedData[]>([]);
-  const documentContextRef = useRef<ExtractedData | null>(null);
+  const undoStack = useRef<ExtractedPage[][]>([]);
+  const redoStack = useRef<ExtractedPage[][]>([]);
+
   const [tableKey, setTableKey] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
-
   const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
   const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review'>('chat');
+  const [manualIndentLevels, setManualIndentLevels] = useState<
+    Record<number, Record<string, number>>
+  >({});
+
+  const extractedPagesRef = useRef<ExtractedPage[]>([]);
+  const currentPageIndexRef = useRef(0);
+  useEffect(() => {
+    extractedPagesRef.current = extractedPages;
+  }, [extractedPages]);
+  useEffect(() => {
+    currentPageIndexRef.current = currentPageIndex;
+  }, [currentPageIndex]);
+
+  //   useEffect(() => {
+  //     async function loadSession() {
+  //       try {
+  //         // let ocrData = await getExtractionSession();
+  //         let ocrData = await getTestData();
+  //         let urls = await getTestImageUrls();
+  //         console.log(ocrData[0]);
+  //         setOCRData(ocrData[0]);
+  //         // setDocumentImageURL(await getUploadedImageUrl());
+  //         setDocumentImageURL(urls[0]);
+  //         setDocumentContext(flatten(ocrData[0] as OCRComponent[]));
+  //       } catch (error) {
+  //         console.error('Failed to load extraction session', error);
+  //       }
+  //     }
+  //     loadSession();
+  //   }, []);
 
   useEffect(() => {
     async function loadSession() {
       try {
-        let ocrData = await getExtractionSession();
-        setOCRData(ocrData);
-        setDocumentImageURL(await getUploadedImageUrl());
-        setDocumentContext(flatten(ocrData as OCRComponent[]));
+        const pages = await getTestData(); // OCRComponent[][]
+        const urls = await getTestImageUrls(); // string[]
+
+        setOcrPages(pages);
+        setImageUrls(urls);
+        // setDocumentImageURL(await getUploadedImageUrl()); // TODO: multi-page equivalent of this, if still needed
       } catch (error) {
         console.error('Failed to load extraction session', error);
       }
     }
     loadSession();
   }, []);
+
+  // re-flatten ALL pages whenever the raw OCR data or any page's
+  // manual indent overrides change. This is the single source of truth for
+  // extractedPages — nothing else should call flatten() directly
+  useEffect(() => {
+    if (ocrPages.length === 0) return;
+
+    const newExtractedPages: ExtractedPage[] = ocrPages.map((page, pageIndex) => ({
+      ...flatten(page, { manualIndentLevels: manualIndentLevels[pageIndex] ?? {} }),
+      pageIndex,
+    }));
+
+    setExtractedPages(newExtractedPages);
+  }, [ocrPages, manualIndentLevels]);
+
   const hasStartedRef = useRef(false);
+
   useEffect(() => {
     async function performFormatDetection() {
       if (!documentContext || hasStartedRef.current) return;
@@ -156,29 +211,18 @@ function ValidationPage() {
   }, [documentContext]);
 
   useEffect(() => {
-    documentContextRef.current = documentContext;
-  }, [documentContext]);
-
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isUndo = e.metaKey && e.key === 'z' && !e.shiftKey;
       const isRedo = e.metaKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey));
 
       if (isUndo) {
         e.preventDefault();
+        if (undoStack.current.length === 0) return;
 
-        if (undoStack.current.length === 0) {
-          return;
-        }
-
-        // pop last state from undo stack
         const previous = undoStack.current.pop()!;
+        redoStack.current.push(extractedPagesRef.current);
 
-        // push current into redo stack
-        redoStack.current.push(documentContextRef.current!);
-
-        //restore previous state
-        setDocumentContext(previous);
+        setExtractedPages(previous);
         saveExtractionSession(previous);
         setEditedCells(new Set());
         setTableKey((k) => k + 1);
@@ -186,18 +230,12 @@ function ValidationPage() {
 
       if (isRedo) {
         e.preventDefault();
+        if (redoStack.current.length === 0) return;
 
-        if (redoStack.current.length === 0) {
-          return;
-        }
-
-        // pop last state from redo stack
         const next = redoStack.current.pop()!;
+        undoStack.current.push(extractedPagesRef.current);
 
-        // push current into undo stack
-        undoStack.current.push(documentContextRef.current!);
-
-        setDocumentContext(next);
+        setExtractedPages(next);
         saveExtractionSession(next);
         setEditedCells(new Set());
         setTableKey((k) => k + 1);
@@ -248,36 +286,36 @@ function ValidationPage() {
   const [hoveredTableFieldIds, setHoveredTableFieldIds] = useState<string[]>([]);
   const [hoveredDocumentOverlayIds, setHoveredDocumentOverlayIds] = useState<string[]>([]);
 
-  const handleSlideChange = useCallback(
-    (fieldIds: string[]) => {
-      setHoveredTableFieldIds(fieldIds);
+  const handleSlideChange = useCallback((fieldIds: string[]) => {
+    setHoveredTableFieldIds(fieldIds);
 
-      if (fieldIds.length === 0 || !documentContext) {
-        setHoveredDocumentOverlayIds([]);
-        return;
-      }
+    const currentContext = extractedPagesRef.current[currentPageIndexRef.current];
+    if (fieldIds.length === 0 || !currentContext) {
+      setHoveredDocumentOverlayIds([]);
+      return;
+    }
 
-      const overlayIds = fieldIds
-        .map((fieldId) => {
-          const [rowId, column] = fieldId.split(':');
-          const row = documentContext.rows.find((r) => String(r._id) === rowId);
-          return row?._cellKeyMap?.[column];
-        })
-        .filter((id): id is string => Boolean(id));
+    const overlayIds = fieldIds
+      .map((fieldId) => {
+        const [rowId, column] = fieldId.split(':');
+        const row = currentContext.rows.find((r) => String(r._id) === rowId);
+        return row?._cellKeyMap?.[column];
+      })
+      .filter((id): id is string => Boolean(id));
 
-      setHoveredDocumentOverlayIds(overlayIds);
-    },
-    [documentContext]
-  );
+    setHoveredDocumentOverlayIds(overlayIds);
+  }, []);
 
   const addMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
   };
 
   // called when AI returns updatedContext after accepting suggestion
-  const handleContextUpdate = (updatedData: ExtractedData) => {
-    setOldContext(documentContext); // save snapshot before overwriting
-    setDocumentContext(updatedData);
+  const handleContextUpdate = (updatedData: ExtractedPage) => {
+    setOldContext(documentContext);
+    setExtractedPages((prev) =>
+      prev.map((page, i) => (i === currentPageIndex ? updatedData : page))
+    );
   };
 
   const resolveLastMessage = () => {
@@ -288,17 +326,14 @@ function ValidationPage() {
 
   //handle accept
   const handleAccept = async () => {
-    if (!documentContext) {
-      return;
-    }
+    if (!documentContext) return;
     try {
-      await saveExtractionSession(documentContext); // accept content
+      await saveExtractionSession(extractedPages);
     } catch (error) {
       console.error('Failed to save session after accept', error);
     }
-    setOldContext(null); // old to null
-    resolveLastMessage(); // hide buttons
-    //ai confirmation message
+    setOldContext(null);
+    resolveLastMessage();
     addMessage({
       id: crypto.randomUUID(),
       role: 'model',
@@ -309,12 +344,12 @@ function ValidationPage() {
 
   //handle reject
   const handleReject = () => {
-    if (!oldContext) {
-      return;
-    }
-    setDocumentContext(oldContext); // back to old
-    setOldContext(null); // old to null
-    resolveLastMessage(); // hide buttons
+    if (!oldContext) return;
+    setExtractedPages((prev) =>
+      prev.map((page, i) => (i === currentPageIndex ? oldContext : page))
+    );
+    setOldContext(null);
+    resolveLastMessage();
     addMessage({
       id: crypto.randomUUID(),
       role: 'model',
@@ -323,77 +358,114 @@ function ValidationPage() {
     });
   };
 
+  //Handle Row Indent
+  const handleRowIndent = useCallback((rowId: string | number) => {
+    const pageIndex = currentPageIndexRef.current;
+    const currentContext = extractedPagesRef.current[pageIndex];
+    if (!currentContext) return;
+
+    const idx = currentContext.rows.findIndex((r) => r._id === rowId);
+    if (idx === -1) return;
+
+    const currentLevel = currentContext.rows[idx]._indentLevel ?? 0;
+    const prevLevel = idx > 0 ? (currentContext.rows[idx - 1]._indentLevel ?? 0) : 0;
+    const nextLevel = Math.min(currentLevel + 1, prevLevel + 1);
+
+    setManualIndentLevels((prev) => ({
+      ...prev,
+      [pageIndex]: { ...(prev[pageIndex] ?? {}), [String(rowId)]: nextLevel },
+    }));
+  }, []);
+
+  //Handle Row Outdent
+  const handleRowOutdent = useCallback((rowId: string | number) => {
+    const pageIndex = currentPageIndexRef.current;
+    const currentContext = extractedPagesRef.current[pageIndex];
+    if (!currentContext) return;
+
+    const row = currentContext.rows.find((r) => r._id === rowId);
+    if (!row) return;
+
+    const currentLevel = row._indentLevel ?? 0;
+    const nextLevel = Math.max(0, currentLevel - 1);
+
+    setManualIndentLevels((prev) => ({
+      ...prev,
+      [pageIndex]: { ...(prev[pageIndex] ?? {}), [String(rowId)]: nextLevel },
+    }));
+  }, []);
+
   const handleCarouselAccept = (updates: { fieldId: string; newValue: string }[]) => {
     if (!documentContext) return;
 
-    const newContext = {
-      ...documentContext,
-      rows: documentContext.rows.map((row) => {
-        const rowUpdates = updates.filter(({ fieldId }) => {
-          const [rowId] = fieldId.split(':');
-          return String(row._id) === String(rowId);
-        });
+    setExtractedPages((prev) =>
+      prev.map((page, i) => {
+        if (i !== currentPageIndex) return page;
+        return {
+          ...page,
+          rows: page.rows.map((row) => {
+            const rowUpdates = updates.filter(({ fieldId }) => {
+              const [rowId] = fieldId.split(':');
+              return String(row._id) === String(rowId);
+            });
+            if (rowUpdates.length === 0) return row;
+            return rowUpdates.reduce((updatedRow, { fieldId, newValue }) => {
+              const [, column] = fieldId.split(':');
+              return { ...updatedRow, [column]: newValue };
+            }, row);
+          }),
+        };
+      })
+    );
 
-        if (rowUpdates.length === 0) return row;
-
-        return rowUpdates.reduce((updatedRow, { fieldId, newValue }) => {
-          const [, column] = fieldId.split(':');
-
-          return {
-            ...updatedRow,
-            [column]: newValue,
-          };
-        }, row);
-      }),
-    };
-
-    setDocumentContext(newContext);
-    saveExtractionSession(newContext);
+    saveExtractionSession(extractedPages);
 
     const fieldIds = updates.map(({ fieldId }) => fieldId);
-
     setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
   };
 
   const handleCarouselReject = (fieldIds: string[]) => {
     if (!documentContext) return;
 
-    const newContext = {
-      ...documentContext,
-      rows: documentContext.rows.map((row) => {
-        const updatesForRow = fieldIds.filter((fieldId) => {
-          const [rowId] = fieldId.split(':');
-          return String(row._id) === String(rowId);
-        });
+    setExtractedPages((prev) =>
+      prev.map((page, i) => {
+        if (i !== currentPageIndex) return page;
+        return {
+          ...page,
+          rows: page.rows.map((row) => {
+            const updatesForRow = fieldIds.filter((fieldId) => {
+              const [rowId] = fieldId.split(':');
+              return String(row._id) === String(rowId);
+            });
+            if (updatesForRow.length === 0) return row;
+            return updatesForRow.reduce((updatedRow, fieldId) => {
+              const [, column] = fieldId.split(':');
+              return { ...updatedRow, [column]: '' };
+            }, row);
+          }),
+        };
+      })
+    );
 
-        if (updatesForRow.length === 0) return row;
-
-        return updatesForRow.reduce((updatedRow, fieldId) => {
-          const [, column] = fieldId.split(':');
-
-          return {
-            ...updatedRow,
-            [column]: '',
-          };
-        }, row);
-      }),
-    };
-
-    setDocumentContext(newContext);
-    saveExtractionSession(newContext);
-
+    saveExtractionSession(extractedPages);
     setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
   };
 
   const handleCarouselManualEdit = (fieldId: string, newValue: string) => {
     if (!documentContext) return;
     const [rowId, column] = fieldId.split(':');
-    const newContext = {
-      ...documentContext,
-      rows: documentContext.rows.map((r) => (r._id === rowId ? { ...r, [column]: newValue } : r)),
-    };
-    setDocumentContext(newContext);
-    saveExtractionSession(newContext);
+
+    setExtractedPages((prev) =>
+      prev.map((page, i) => {
+        if (i !== currentPageIndex) return page;
+        return {
+          ...page,
+          rows: page.rows.map((r) => (r._id === rowId ? { ...r, [column]: newValue } : r)),
+        };
+      })
+    );
+
+    saveExtractionSession(extractedPages);
     setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
   };
 
@@ -425,7 +497,7 @@ function ValidationPage() {
             return String(updatedRow[column]);
           }
         }
-        return reply.response; // fallback to text response
+        return reply.response;
       } catch (e) {
         console.error(e);
         return null;
@@ -463,15 +535,12 @@ function ValidationPage() {
 
         const map: Record<string, string> = {};
 
-        // Primary path: bulk_update intent with one entry per row.
         if (reply.intent?.type === 'bulk_update' && reply.intent.bulkUpdates) {
           reply.intent.bulkUpdates.forEach((u) => {
             map[String(u.rowId)] = u.newValue;
           });
         }
 
-        // Fallback: pull corrected values out of updatedContext for any rows
-        // the intent path missed (mirrors the single-field fallback).
         if (reply.updatedContext) {
           fields.forEach(({ rowId }) => {
             if (map[String(rowId)] !== undefined) return;
@@ -503,6 +572,19 @@ function ValidationPage() {
 
   return (
     <>
+      {extractedPages.length > 1 && (
+        <div className="flex items-center justify-center gap-2 p-2">
+          {extractedPages.map((_, i) => (
+            <button
+              key={i}
+              className={`btn btn-sm ${i === currentPageIndex ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setCurrentPageIndex(i)}
+            >
+              Page {i + 1}
+            </button>
+          ))}
+        </div>
+      )}
       <div
         ref={containerRef}
         className="flex flex-col lg:flex-row w-full p-3 gap-3 h-auto lg:h-[calc(100vh-72px)] lg:overflow-hidden"
@@ -557,121 +639,140 @@ function ValidationPage() {
             }}
             extractedData={documentContext}
             hoveredOverlayIds={hoveredTableFieldIds}
+            onRowIndent={handleRowIndent}
+            onRowOutdent={handleRowOutdent}
             onCellEdit={(fieldId, newValue) => {
               if (!documentContext) return;
 
-              undoStack.current.push(documentContext);
+              undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
 
               const [rowId, column] = fieldId.split(':');
-              const newContext = {
-                ...documentContext,
-                rows: documentContext.rows.map((r) =>
-                  String(r._id) === rowId ? { ...r, [column]: newValue } : r
-                ),
-              };
+              setExtractedPages((prev) =>
+                prev.map((page, i) =>
+                  i !== currentPageIndex
+                    ? page
+                    : {
+                        ...page,
+                        rows: page.rows.map((r) =>
+                          String(r._id) === rowId ? { ...r, [column]: newValue } : r
+                        ),
+                      }
+                )
+              );
 
               setEditedCells((prev) => new Set(prev).add(fieldId));
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+              saveExtractionSession(extractedPagesRef.current);
               setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
             }}
-            //Acknowledgement: AI (Google Gemini) was used while coding the
-            // manual corrections
             onRowAdd={() => {
               if (!documentContext) return;
-              undoStack.current.push(documentContext);
+              undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
+
               const newRowId = `manual_row_${Date.now()}`;
               const newRow: any = { _id: newRowId, _confidence: 1, _cellConfidence: {} };
               documentContext.columns.forEach((col) => {
                 newRow[col] = '';
               });
-              const newContext = {
-                ...documentContext,
-                rows: [...documentContext.rows, newRow],
-              };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+
+              setExtractedPages((prev) =>
+                prev.map((page, i) =>
+                  i !== currentPageIndex ? page : { ...page, rows: [...page.rows, newRow] }
+                )
+              );
+              saveExtractionSession(extractedPagesRef.current);
             }}
             onRowDelete={(rowId) => {
               if (!documentContext) return;
-              undoStack.current.push(documentContext);
+              undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
-              const newContext = {
-                ...documentContext,
-                rows: documentContext.rows.filter((r) => r._id !== rowId),
-              };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+
+              setExtractedPages((prev) =>
+                prev.map((page, i) =>
+                  i !== currentPageIndex
+                    ? page
+                    : { ...page, rows: page.rows.filter((r) => r._id !== rowId) }
+                )
+              );
+              saveExtractionSession(extractedPagesRef.current);
             }}
             onColumnAdd={(columnName) => {
               if (!documentContext) return;
-              undoStack.current.push(documentContext);
+              undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
-              // Avoid duplicates
               if (documentContext.columns.includes(columnName)) return;
 
-              const newContext = {
-                ...documentContext,
-                columns: [...documentContext.columns, columnName],
-                rows: documentContext.rows.map((r) => ({ ...r, [columnName]: '' })),
-              };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+              setExtractedPages((prev) =>
+                prev.map((page, i) =>
+                  i !== currentPageIndex
+                    ? page
+                    : {
+                        ...page,
+                        columns: [...page.columns, columnName],
+                        rows: page.rows.map((r) => ({ ...r, [columnName]: '' })),
+                      }
+                )
+              );
+              saveExtractionSession(extractedPagesRef.current);
             }}
             onColumnDelete={(columnName) => {
               if (!documentContext) return;
-              undoStack.current.push(documentContext);
+              undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
-              const newContext = {
-                ...documentContext,
-                columns: documentContext.columns.filter((c) => c !== columnName),
-                rows: documentContext.rows.map((r) => {
-                  const newRow = { ...r };
-                  delete newRow[columnName];
-                  return newRow;
-                }),
-              };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+
+              setExtractedPages((prev) =>
+                prev.map((page, i) => {
+                  if (i !== currentPageIndex) return page;
+                  return {
+                    ...page,
+                    columns: page.columns.filter((c) => c !== columnName),
+                    rows: page.rows.map((r) => {
+                      const newRow = { ...r };
+                      delete newRow[columnName];
+                      return newRow;
+                    }),
+                  };
+                })
+              );
+              saveExtractionSession(extractedPagesRef.current);
             }}
             onRowMove={(rowId, direction) => {
               if (!documentContext) return;
-              undoStack.current.push(documentContext);
+              undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
-              const rows = [...documentContext.rows];
-              const idx = rows.findIndex((r) => r._id === rowId);
-              if (idx === -1) return;
 
-              if (direction === 'up' && idx > 0) {
-                const temp = rows[idx];
-                rows[idx] = rows[idx - 1];
-                rows[idx - 1] = temp;
-              } else if (direction === 'down' && idx < rows.length - 1) {
-                const temp = rows[idx];
-                rows[idx] = rows[idx + 1];
-                rows[idx + 1] = temp;
-              } else {
-                return; // No move needed
-              }
+              setExtractedPages((prev) =>
+                prev.map((page, i) => {
+                  if (i !== currentPageIndex) return page;
+                  const rows = [...page.rows];
+                  const idx = rows.findIndex((r) => r._id === rowId);
+                  if (idx === -1) return page;
 
-              const newContext = { ...documentContext, rows };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+                  if (direction === 'up' && idx > 0) {
+                    [rows[idx - 1], rows[idx]] = [rows[idx], rows[idx - 1]];
+                  } else if (direction === 'down' && idx < rows.length - 1) {
+                    [rows[idx], rows[idx + 1]] = [rows[idx + 1], rows[idx]];
+                  } else {
+                    return page;
+                  }
+
+                  return { ...page, rows };
+                })
+              );
+              saveExtractionSession(extractedPagesRef.current);
             }}
             onColumnReorder={(newColumns) => {
-              if (!documentContext) {
-                return;
-              }
-              undoStack.current.push(documentContext);
+              if (!documentContext) return;
+              undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
-              const newContext = {
-                ...documentContext,
-                columns: newColumns,
-              };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+
+              setExtractedPages((prev) =>
+                prev.map((page, i) =>
+                  i !== currentPageIndex ? page : { ...page, columns: newColumns }
+                )
+              );
+              saveExtractionSession(extractedPagesRef.current);
             }}
           />
         </div>

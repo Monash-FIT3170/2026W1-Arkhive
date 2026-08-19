@@ -1,4 +1,4 @@
-import type { ExtractedData, ExtractedRow } from '../../../../models/TableData';
+import type { ExtractedData, ExtractedPage, ExtractedRow } from '../../../../models/TableData';
 import type { OCRComponent } from '../../../../models/OCRComponent';
 
 // ==========================================
@@ -17,8 +17,22 @@ interface TreeNode {
   id: string; //unique ID
   confidence: number; //Confidence of the row
   indent: number; // indent in the row
+  level: number;
   cells: Record<string, CellData>; // Mapped by column key - cells in row
   children: TreeNode[]; // Rows whose are indented underneath this row
+}
+
+export interface FlattenerOptions {
+  /**
+   * Manual nesting-depth overrides, keyed by OCRComponent id.
+   * 0 = top-level. 1 = nested one level under the nearest preceding row
+   * with a lower resolved level. Always wins over geometric detection for
+   * that specific row. Rows without an entry fall back to geometric
+   * detection, compared against whatever is currently on the stack —
+   * so a manual override can start a fresh nesting scope that later
+   * un-overridden rows still nest into automatically.
+   */
+  manualIndentLevels?: Record<string, number>;
 }
 
 // ==========================================
@@ -34,11 +48,38 @@ export function normalizeColKey(col: string): string {
     .toUpperCase();
 }
 
+/** Column-related bounding box keys (`col_0`, `col_1`, ...) in column order. */
+function getColumnBBKeys(component: OCRComponent): string[] {
+  return Object.keys(component.boundingBoxes ?? {})
+    .filter((k) => /^cell_\d+$/.test(k))
+    .sort((a, b) => Number(a.split('_')[1]) - Number(b.split('_')[1]));
+}
+
+function resolveColumnIndex(rawCol: string | undefined): number | null {
+  if (!rawCol) return null;
+  const match = rawCol.match(/(\d+)\s*$/);
+  return match ? Number(match[1]) : null;
+}
+
 export function getMidX(component: OCRComponent, key: string): number | null {
   const verts = component.boundingBoxes?.[key]?.vertices;
   if (!verts?.length) return null;
   const xs = verts.map((v) => Number(v.x));
   return (Math.min(...xs) + Math.max(...xs)) / 2;
+}
+
+/**
+ * Estimates a reasonable "this counts as one indent level" distance, scaled to the
+ * table's own geometry
+ *
+ * Basing the threshold on a fraction of the average column width keeps it valid
+ * regardless of the coordinate system the OCR engine happens to use.
+ */
+function estimateIndentThreshold(positions: number[]): number {
+  if (positions.length < 2) return 0.01; // any positive delta counts
+  const gaps = positions.slice(1).map((p, i) => p - positions[i]);
+  const avgColWidth = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+  return Math.max(avgColWidth * 0.1, 0.01);
 }
 
 /**
@@ -63,10 +104,12 @@ function findClosestIndex(target: number, values: number[], startIndex = 0): num
 }
 
 function getIndent(c: OCRComponent): number {
-  const verts = c.boundingBoxes?.['cell_0']?.vertices;
-  const baseIndent = c.indentation ?? 0;
-  if (!verts?.length) return baseIndent;
-  return (Math.min(...verts.map((v) => Number(v.x))) + baseIndent) / 2;
+  const firstKey = getColumnBBKeys(c)[0];
+  const verts = firstKey ? c.boundingBoxes?.[firstKey]?.vertices : undefined;
+  if (verts?.length) {
+    return Math.min(...verts.map((v) => Number(v.x)));
+  }
+  return c.indentation ?? 0;
 }
 
 // ==========================================
@@ -79,11 +122,12 @@ function getIndent(c: OCRComponent): number {
  * @returns keys - list of column names, positions - the mid x position of each column
  */
 export function extractColumns(data: OCRComponent[]) {
-  const colComp = data.find((c) => c.type === 'TABLE_COLS');
+  const colComp = data.find((c) => c.type === 'HEADER');
   const rawCols = colComp?.cells ?? [];
+  const bbKeys = colComp ? getColumnBBKeys(colComp) : [];
 
   const keys = rawCols.map(normalizeColKey);
-  const positions = rawCols.map((_, i) => getMidX(colComp!, `cell_${i}`) ?? i * 100);
+  const positions = rawCols.map((_, i) => getMidX(colComp!, bbKeys[i]) ?? i * 100);
 
   return { keys, positions };
 }
@@ -99,8 +143,9 @@ export function detectItemColumn(components: OCRComponent[], colXs: number[]): n
 
   const counts = new Array(colXs.length).fill(0);
   for (const c of components) {
+    const bbKeys = getColumnBBKeys(c);
     //for each component increment the column counter for the first item
-    const startX = getMidX(c, 'cell_0'); // x coordinate of the first column in component
+    const startX = bbKeys[0] ? getMidX(c, bbKeys[0]) : null; // x coordinate of the first column in component
     if (startX !== null) {
       counts[findClosestIndex(startX, colXs)]++;
     }
@@ -122,17 +167,18 @@ function mapCellsToColumns(
   positions: number[]
 ): Record<string, CellData> {
   const result: Record<string, CellData> = {};
+  const bbKeys = getColumnBBKeys(comp);
   let lastColIdx = -1;
 
   comp.cells?.forEach((value, i) => {
-    const bbKey = `cell_${i}`; //Key of the cell
-    const rawCol = comp.boundingBoxes?.[bbKey]?.column; //Column assigned to this cell
+    const bbKey = bbKeys[i]; //Key of the cell
+    const rawCol = bbKey ? comp.boundingBoxes?.[bbKey]?.column : undefined; //Column assigned to this cell
 
-    let colIdx = rawCol ? keys.indexOf(normalizeColKey(rawCol)) : -1; //Column index
+    let colIdx = resolveColumnIndex(rawCol); //Column index
 
     // Fallback to spatial X coordinate if no explicit column matches
-    if (colIdx === -1) {
-      const midX = getMidX(comp, bbKey) ?? 0;
+    if (colIdx === null || colIdx < 0 || colIdx >= keys.length) {
+      const midX = (bbKey ? getMidX(comp, bbKey) : null) ?? 0;
       const safeStart = Math.min(lastColIdx + 1, positions.length - 1); //Only consider columns greater then the previous column
       colIdx = findClosestIndex(midX, positions, safeStart);
     }
@@ -143,8 +189,9 @@ function mapCellsToColumns(
       result[keys[colIdx]] = {
         //Make the cell data representation
         value,
-        confidence: comp.boundingBoxes?.[bbKey]?.confidence ?? comp.confidence,
-        ref: `${comp.id}:${bbKey}`,
+        confidence:
+          (bbKey ? comp.boundingBoxes?.[bbKey]?.confidence : undefined) ?? comp.confidence,
+        ref: `${comp.id}:${bbKey ?? i}`,
       };
     }
   });
@@ -163,40 +210,68 @@ function mapCellsToColumns(
  * @param positions Mid X position of each column
  * @returns { roots, maxDepth } - roots are top level of the tree (nodes no parent), maximum depth of the tree
  */
-function buildTree(components: OCRComponent[], keys: string[], positions: number[]) {
+function buildTree(
+  components: OCRComponent[],
+  keys: string[],
+  positions: number[],
+  options?: FlattenerOptions
+) {
   const roots: TreeNode[] = [];
   const stack: TreeNode[] = []; // Stack of "active" parents a row can be a child of
   let maxDepth = 0;
-  const INDENT_THRESHOLD = 6;
+  const INDENT_THRESHOLD = estimateIndentThreshold(positions);
+  const manualLevels = options?.manualIndentLevels ?? {};
 
   for (const comp of components) {
+    const cells = mapCellsToColumns(comp, keys, positions);
+    // Check logical markers on the primary column text
+    const rawIndent = getIndent(comp);
+    const manualLevel = manualLevels[comp.id];
+
+    let level: number;
+
+    if (manualLevel !== undefined) {
+      // A person has decided this row's depth explicitly. Pop anything
+      // at the same or deeper level - it's not this node's parent.
+      level = manualLevel;
+      while (stack.length > 0 && stack[stack.length - 1].level >= level) {
+        stack.pop();
+      }
+    } else {
+      // No override: fall back to comparing against whatever is
+      // currently on the stack (which may itself be a manually-placed
+      // row)
+      while (stack.length > 0) {
+        const top = stack[stack.length - 1];
+        const isDeeper = rawIndent > top.indent + INDENT_THRESHOLD;
+        if (isDeeper) {
+          level = top.level + 1;
+          break;
+        }
+        stack.pop();
+      }
+      // @ts-expect-error assigned in the loop above when a parent is found
+      if (typeof level === 'undefined') level = 0;
+    }
+
     const node: TreeNode = {
-      //For each component (row) make a TreeNode representation
       id: comp.id,
       confidence: comp.confidence,
-      indent: getIndent(comp),
-      cells: mapCellsToColumns(comp, keys, positions), //List of cells in that row
+      indent: rawIndent,
+      level,
+      cells,
       children: [],
     };
 
-    // Pop the stack until we find the appropriate parent based on indentation
-    while (stack.length > 0) {
-      const top = stack[stack.length - 1];
-      if (node.indent > top.indent + INDENT_THRESHOLD) {
-        //If a row has greater indentation then parent (must be a child)
-        top.children.push(node);
-        maxDepth = Math.max(maxDepth, stack.length); // stack length acts as depth
-        break;
-      }
-      stack.pop(); //If it isn't a child, the stack's top isn't a parent canadidate anymore (no longer active)
-    }
-
     if (stack.length === 0) {
-      //If there is no parents to be a child of, the row must be parent row
-      roots.push(node);
+      roots.push(node); //If there ni no parent to be a child of, row must be a parent/root node
+    } else {
+      // It must be a child of the top of the stack
+      stack[stack.length - 1].children.push(node);
+      maxDepth = Math.max(maxDepth, stack.length);
     }
 
-    stack.push(node); // Add the new row be the the new current parent
+    stack.push(node);
   }
 
   return { roots, maxDepth };
@@ -231,6 +306,7 @@ function flattenTree(
       _confidence: node.confidence,
       _cellConfidence: {},
       _cellKeyMap: {},
+      _indentLevel: node.level,
     };
 
     // Helper to assign a cell to the ExtractedRow
@@ -276,12 +352,11 @@ function flattenTree(
 /**
  *  Flatten RAW OCR data into flattened ExtractedData
  * @param data RAW OCR data
+ * @param options Options to determine nesting
  * @returns flattened ExtractedData
  */
-export function flatten(data: OCRComponent[]): ExtractedData {
-  const components = data.filter(
-    (c) => c.cells && !['HEADER', 'BODY_TEXT', 'TABLE_COLS'].includes(c.type)
-  );
+export function flatten(data: OCRComponent[], options?: FlattenerOptions): ExtractedData {
+  const components = data.filter((c) => c.cells && c.type !== 'HEADER' && c.type !== 'BODY_TEXT');
 
   // Parse Structure
   const { keys, positions } = extractColumns(data);
@@ -289,7 +364,7 @@ export function flatten(data: OCRComponent[]): ExtractedData {
   const itemColKey = keys[itemColIdx];
 
   // Build Tree
-  const { roots, maxDepth } = buildTree(components, keys, positions);
+  const { roots, maxDepth } = buildTree(components, keys, positions, options);
   const subItemCols = Array.from({ length: maxDepth }, (_, i) => `SUB_${itemColKey}_${i + 1}`); // Build array of column names for nested columns
 
   // Traverse & Generate Rows
@@ -299,4 +374,12 @@ export function flatten(data: OCRComponent[]): ExtractedData {
   const finalCols = keys.flatMap((k, i) => (i === itemColIdx ? [k, ...subItemCols] : [k]));
 
   return { columns: finalCols, rows };
+}
+
+/** Flattens a multi-page OCR response into one ExtractedPage per page. */
+export function flattenPages(pages: OCRComponent[][], options?: FlattenerOptions): ExtractedPage[] {
+  return pages.map((page, pageIndex) => ({
+    ...flatten(page, options),
+    pageIndex,
+  }));
 }

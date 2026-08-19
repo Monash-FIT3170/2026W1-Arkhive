@@ -28,18 +28,20 @@ function DocumentPanel({
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [startY, setStartY] = useState(0);
+  const [scaleX, setScaleX] = useState(1);
+  const [scaleY, setScaleY] = useState(1);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = e.currentTarget;
     if (naturalWidth && naturalHeight) {
-      // If the OCR data coordinates exactly match the original image pixels,
-      // the scale factor should be 1.
-      const scaleFactor = 1;
-      const ocrWidth = naturalWidth / scaleFactor;
-      const ocrHeight = naturalHeight / scaleFactor;
-      setViewBox(`0 0 ${ocrWidth} ${ocrHeight}`);
+      setViewBox(`0 0 ${naturalWidth} ${naturalHeight}`);
+
+      // OCR vertices are in inches; scale them to the image's pixel space.
+      const DPI = 150;
+      setScaleX(DPI);
+      setScaleY(DPI);
     }
   };
   // The dragging and scrolling functions below were done with the help of Goolge Gemini
@@ -129,18 +131,21 @@ function DocumentPanel({
               {/* map all the bounding boxes */}
               {(() => {
                 // Normalize once
-                const normalizedHoverIds = new Set(
-                  hoveredOverlayIds.map((id) => (id.startsWith('comp_') ? id : `comp_${id}`))
-                );
+                // const normalizedHoverIds = new Set(
+                //   hoveredOverlayIds.map((id) => (id.startsWith('comp_') ? id : `comp_${id}`))
+                // );
                 return (ocrData as OCRComponent[]).map((comp) => {
                   if (!comp.boundingBoxes) return null;
 
                   return Object.entries(comp.boundingBoxes).map(([cellKey, box]: [string, any]) => {
                     const id = `${comp.id}:${cellKey}`;
 
-                    const pointsStr = box.vertices.map((v: any) => `${v.x},${v.y}`).join(' ');
+                    const pointsStr = box.vertices
+                      .map((v: any) => `${v.x * scaleX},${v.y * scaleY}`)
+                      .join(' ');
 
-                    const isActive = normalizedHoverIds.has(id) || normalizedHoverIds.has(comp.id);
+                    const isActive =
+                      hoveredOverlayIds.includes(id) || hoveredOverlayIds.includes(comp.id);
 
                     //obtaining the confidence for this component to determine the colour of the bounding box
                     const confidenceInfo = ocrData.find((c) => c.id === comp.id);

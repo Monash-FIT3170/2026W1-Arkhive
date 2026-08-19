@@ -8,6 +8,8 @@ import {
   Edit2,
   ChevronUp,
   ChevronDown,
+  ChevronRight,
+  ChevronLeft,
 } from 'lucide-react'; // NEW: Importing icons for confidence badges and export button
 import { useState, useEffect } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
@@ -57,6 +59,8 @@ function ExtractedDataPanel({
   onCellEdit,
   onRowAdd,
   onRowDelete,
+  onRowIndent,
+  onRowOutdent,
   onColumnAdd,
   onColumnDelete,
   onRowMove,
@@ -71,6 +75,8 @@ function ExtractedDataPanel({
   onCellEdit?: (fieldId: string, newValue: string) => void;
   onRowAdd?: () => void;
   onRowDelete?: (rowId: string | number) => void;
+  onRowIndent?: (rowId: string | number) => void;
+  onRowOutdent?: (rowId: string | number) => void;
   onColumnAdd?: (columnName: string) => void;
   onColumnDelete?: (columnName: string) => void;
   onRowMove?: (rowId: string | number, direction: 'up' | 'down') => void;
@@ -490,9 +496,29 @@ function ExtractedDataPanel({
                       </span>
                     </div>
                   </td>
-                  {isEditMode && (onRowDelete || onRowMove) && (
+                  {isEditMode && (onRowDelete || onRowMove || onRowIndent) && (
                     <td className="p-2 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {(onRowIndent || onRowOutdent) && (
+                          <div className="flex flex-col">
+                            <button
+                              className="btn btn-ghost btn-[0.5rem] min-h-0 h-4 px-1 text-base-content opacity-50 hover:opacity-100"
+                              title="Indent (make child of previous row)"
+                              disabled={(row._indentLevel ?? 0) === 0 && false /* see note below */}
+                              onClick={() => onRowIndent?.(row._id)}
+                            >
+                              <ChevronRight className="w-3 h-3" />
+                            </button>
+                            <button
+                              className="btn btn-ghost btn-[0.5rem] min-h-0 h-4 px-1 text-base-content opacity-50 hover:opacity-100"
+                              title="Outdent"
+                              disabled={(row._indentLevel ?? 0) === 0}
+                              onClick={() => onRowOutdent?.(row._id)}
+                            >
+                              <ChevronLeft className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                         {onRowMove && (
                           <div className="flex flex-col">
                             <button
