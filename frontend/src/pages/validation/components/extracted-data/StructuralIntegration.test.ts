@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { OcrDocumentResponseSchema } from '../../../../models/ocrSchema';
-import { flattenOcrData } from './FlattenOcrData';
+import { flatten } from './flattener';
 import rawOcrSample from '../../../../mock-data/boundingBox.json';
 // Acknowledgement: The development of these tests was done with the help of Google Gemini
 
@@ -34,7 +34,7 @@ describe('OCR JSON Schema Validation', () => {
 describe('OCR Layout Hierarchy Transformation', () => {
   it('should dynamically construct transformed rows with consistent structural keys', () => {
     // Act: Pass raw flat OCR JSON into transformer function
-    const tableModel = flattenOcrData(rawOcrSample as any);
+    const tableModel = flatten(rawOcrSample as any);
 
     // 1. Assert column extraction works generically (at least 1 column is extracted)
     expect(tableModel.columns).toBeDefined();
@@ -56,7 +56,7 @@ describe('OCR Layout Hierarchy Transformation', () => {
   });
 
   it('should appropriately assign varying depths into sub-level columns dynamically', () => {
-    const tableModel = flattenOcrData(rawOcrSample as any);
+    const tableModel = flatten(rawOcrSample as any);
 
     // Find columns that dynamically represent depth (like SUB_ITEM_1, SUB_ITEM_2) based on the dataset
     const levelColumns = tableModel.columns.filter((col) => col.startsWith('SUB_'));
