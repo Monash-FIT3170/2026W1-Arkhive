@@ -23,7 +23,7 @@ export const gettestData = (req: SessionRequest, res: Response) => {
 };
 
 export const gettestImagesUrls = (req: SessionRequest, res: Response) => {
-  const urls = ['/api/test/testImage/0', '/api/test/testImage/testImage/1'];
+  const urls = ['/api/test/testImage/0', '/api/test/testImage/1'];
   res.json(urls);
 };
 
