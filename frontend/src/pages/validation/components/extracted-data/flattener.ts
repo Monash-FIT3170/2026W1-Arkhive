@@ -51,7 +51,7 @@ export function normalizeColKey(col: string): string {
 /** Column-related bounding box keys (`col_0`, `col_1`, ...) in column order. */
 function getColumnBBKeys(component: OCRComponent): string[] {
   return Object.keys(component.boundingBoxes ?? {})
-    .filter((k) => /^col_\d+$/.test(k))
+    .filter((k) => /^cell_\d+$/.test(k))
     .sort((a, b) => Number(a.split('_')[1]) - Number(b.split('_')[1]));
 }
 
@@ -373,7 +373,6 @@ export function flatten(data: OCRComponent[], options?: FlattenerOptions): Extra
   // Final columns schema (injecting sub items directly after the main item column)
   const finalCols = keys.flatMap((k, i) => (i === itemColIdx ? [k, ...subItemCols] : [k]));
 
-  console.log({ columns: finalCols, rows });
   return { columns: finalCols, rows };
 }
 
