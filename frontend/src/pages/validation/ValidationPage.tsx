@@ -572,19 +572,6 @@ function ValidationPage() {
 
   return (
     <>
-      {extractedPages.length > 1 && (
-        <div className="flex items-center justify-center gap-2 p-2">
-          {extractedPages.map((_, i) => (
-            <button
-              key={i}
-              className={`btn btn-sm ${i === currentPageIndex ? 'btn-primary' : 'btn-outline'}`}
-              onClick={() => setCurrentPageIndex(i)}
-            >
-              Page {i + 1}
-            </button>
-          ))}
-        </div>
-      )}
       <div
         ref={containerRef}
         className="flex flex-col lg:flex-row w-full p-3 gap-3 h-auto lg:h-[calc(100vh-72px)] lg:overflow-hidden"
@@ -597,6 +584,9 @@ function ValidationPage() {
             hoveredOverlayIds={hoveredDocumentOverlayIds}
             documentImageUrl={documentImageURL}
             ocrData={ocrData}
+            imageUrls={imageUrls}
+            currentPageIndex={currentPageIndex}
+            onPageChange={setCurrentPageIndex}
           />
         </div>
 
