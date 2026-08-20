@@ -22,6 +22,7 @@ export interface OcrIssue {
   rowId: string | number;
   groupId?: string; //  shared by cells that should be resolved together
   formatRegex?: string; // the detected regex for this column, if any
+  pageIndex?: number;
 }
 
 // The type of slide for review
@@ -34,7 +35,7 @@ interface OcrReviewWidgetProps {
   onAccept: (updates: { fieldId: string; newValue: string }[]) => void;
   onReject: (fieldIds: string[]) => void;
   onManualEdit: (fieldId: string, newValue: string) => void;
-  onSlideChange?: (fieldIds: string[]) => void; // Optional: Emits when slide changes to highlight field in main document
+  onSlideChange?: (fieldIds: string[], pageIndex?: number) => void; // Optional: Emits when slide changes to highlight field in main document
   onFetchSuggestion?: (fieldId: string) => Promise<string | null>;
   onFetchBulkSuggestion?: (
     column: string,
@@ -44,7 +45,7 @@ interface OcrReviewWidgetProps {
 }
 
 // Function that turns each OCR Issue to a equivalent ReviewSlide format
-function buildSlides(issues: OcrIssue[]): ReviewSlide[] {
+export function buildSlides(issues: OcrIssue[]): ReviewSlide[] {
   const slides: ReviewSlide[] = [];
   const seenGroups = new Set<string>();
 
@@ -99,7 +100,11 @@ export default function OcrReviewWidget({
         currentSlide.kind === 'single'
           ? [currentSlide.issue.fieldId]
           : currentSlide.issues.map((i) => i.fieldId);
-      onSlideChange(fieldIds);
+      const pageIndex = 
+        currentSlide.kind === 'single' 
+          ? currentSlide.issue.pageIndex 
+          : currentSlide.issues[0]?.pageIndex;
+      onSlideChange(fieldIds, pageIndex);
     }
   }, [currentIndex, slides.length, onSlideChange, unresolvedIssues]);
 
@@ -262,7 +267,7 @@ export default function OcrReviewWidget({
           <div className="flex-1 flex flex-col min-h-0 animate-in fade-in duration-300">
             {/* Progress Indicator */}
             <div className="text-xs font-semibold text-base-content/50 mb-6 text-center uppercase tracking-widest">
-              Issue {currentIndex + 1} of {unresolvedIssues.length}
+              Issue {currentIndex + 1} of {slides.length}
             </div>
 
             {/* Carousel Slide */}

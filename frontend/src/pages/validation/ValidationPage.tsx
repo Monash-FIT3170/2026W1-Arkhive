@@ -121,94 +121,92 @@ function ValidationPage() {
 
   useEffect(() => {
     async function performFormatDetection() {
-      if (!documentContext || hasStartedRef.current) return;
+      if (extractedPages.length === 0 || hasStartedRef.current) return;
       hasStartedRef.current = true;
-      // Low Confidence Detection
-      const fields = detectReviewFields(documentContext);
-      const confidenceIssues: OcrIssue[] = fields.map((f) => ({
-        fieldId: `${f.rowId}:${f.column}`,
-        fieldName: f.column,
-        ocrValue: String(f.value),
-        confidenceScore: f.confidence,
-        issueType: 'confidence',
-        rowId: f.rowId,
-      }));
+      
+      let allIssues: OcrIssue[] = [];
 
-      // Randomly sample 10–30 non-empty values per column for format detection.
-      // Sample size is based on table size:
-      //   - Minimum: 10 values
-      //   - 10% of rows for medium-sized tables
-      //   - Maximum: 30 values
-      const sampledData: Record<string, string[]> = {};
+      for (let pageIdx = 0; pageIdx < extractedPages.length; pageIdx++) {
+        const pageContext = extractedPages[pageIdx];
 
-      const sampleSize = Math.min(30, Math.max(10, Math.ceil(documentContext.rows.length * 0.1)));
-
-      for (const col of documentContext.columns) {
-        const values: string[] = [];
-
-        // Collect all non-empty values for this column
-        for (const row of documentContext.rows) {
-          const val = row[col];
-
-          if (val !== null && val !== undefined && String(val).trim() !== '') {
-            values.push(String(val).trim());
-          }
-        }
-
-        // Randomly sample up to the calculated sample size
-        const shuffled = values.sort(() => Math.random() - 0.5);
-        const samples = shuffled.slice(0, sampleSize);
-
-        if (samples.length > 0) {
-          sampledData[col] = samples;
-        }
-      }
-
-      let formatIssues: OcrIssue[] = [];
-      let columnRegexMap: Record<string, string> = {};
-      try {
-        columnRegexMap = await requestFormatDetection(sampledData);
-        formatIssues = checkTableFormats(documentContext, columnRegexMap).map((f) => ({
+        // Low Confidence Detection
+        const fields = detectReviewFields(pageContext);
+        const confidenceIssues: OcrIssue[] = fields.map((f) => ({
           fieldId: `${f.rowId}:${f.column}`,
           fieldName: f.column,
           ocrValue: String(f.value),
-          confidenceScore: 0.3, // fallback confidence score for format issues
-          issueType: 'format' as const,
+          confidenceScore: f.confidence,
+          issueType: 'confidence',
           rowId: f.rowId,
+          pageIndex: pageIdx,
         }));
-      } catch (error) {
-        console.error('Failed to detect format issues', error);
+
+        // Randomly sample 10–30 non-empty values per column for format detection.
+        const sampledData: Record<string, string[]> = {};
+        const sampleSize = Math.min(30, Math.max(10, Math.ceil(pageContext.rows.length * 0.1)));
+
+        for (const col of pageContext.columns) {
+          const values: string[] = [];
+          for (const row of pageContext.rows) {
+            const val = row[col];
+            if (val !== null && val !== undefined && String(val).trim() !== '') {
+              values.push(String(val).trim());
+            }
+          }
+          const shuffled = values.sort(() => Math.random() - 0.5);
+          const samples = shuffled.slice(0, sampleSize);
+          if (samples.length > 0) {
+            sampledData[col] = samples;
+          }
+        }
+
+        let formatIssues: OcrIssue[] = [];
+        let columnRegexMap: Record<string, string> = {};
+        try {
+          // If we have no sampled data, no need to request format detection
+          if (Object.keys(sampledData).length > 0) {
+            columnRegexMap = await requestFormatDetection(sampledData);
+            formatIssues = checkTableFormats(pageContext, columnRegexMap).map((f) => ({
+              fieldId: `${f.rowId}:${f.column}`,
+              fieldName: f.column,
+              ocrValue: String(f.value),
+              confidenceScore: 0.3, // fallback confidence score for format issues
+              issueType: 'format' as const,
+              rowId: f.rowId,
+              pageIndex: pageIdx,
+            }));
+          }
+        } catch (error) {
+          console.error('Failed to detect format issues on page ' + pageIdx, error);
+        }
+
+        // Group format issues by column.
+        const byColumn = formatIssues.reduce<Record<string, OcrIssue[]>>((acc, issue) => {
+          (acc[issue.fieldName] ??= []).push(issue);
+          return acc;
+        }, {});
+
+        Object.entries(byColumn).forEach(([column, colIssues]) => {
+          if (colIssues.length > 1) {
+            const groupId = `format:${column}:page${pageIdx}`;
+            colIssues.forEach((issue) => {
+              issue.groupId = groupId;
+              issue.formatRegex = columnRegexMap[column];
+            });
+          }
+        });
+
+        allIssues = allIssues.concat(confidenceIssues, formatIssues);
       }
 
-      // Group format issues by column. Columns with >1 flagged cell become a single bulk-resolvable group.
-      // a lone flagged cell stays single-field.
-      const byColumn = formatIssues.reduce<Record<string, OcrIssue[]>>((acc, issue) => {
-        (acc[issue.fieldName] ??= []).push(issue);
-        return acc;
-      }, {});
-
-      Object.entries(byColumn).forEach(([column, colIssues]) => {
-        // If column has more then 1 issue - make a group and assign to each issue of that group
-        if (colIssues.length > 1) {
-          const groupId = `format:${column}`;
-          colIssues.forEach((issue) => {
-            issue.groupId = groupId;
-            issue.formatRegex = columnRegexMap[column];
-          });
-        }
-      });
-
-      // Merge Issues
-      const issues = confidenceIssues.concat(formatIssues);
-
-      setFlaggedIssues(issues);
-      if (issues.length > 0) {
+      setFlaggedIssues(allIssues);
+      if (allIssues.length > 0) {
         setChatActiveTab('review');
       }
     }
 
     performFormatDetection();
-  }, [documentContext]);
+  }, [extractedPages]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -286,10 +284,16 @@ function ValidationPage() {
   const [hoveredTableFieldIds, setHoveredTableFieldIds] = useState<string[]>([]);
   const [hoveredDocumentOverlayIds, setHoveredDocumentOverlayIds] = useState<string[]>([]);
 
-  const handleSlideChange = useCallback((fieldIds: string[]) => {
+  const handleSlideChange = useCallback((fieldIds: string[], pageIndex?: number) => {
     setHoveredTableFieldIds(fieldIds);
 
-    const currentContext = extractedPagesRef.current[currentPageIndexRef.current];
+    if (pageIndex !== undefined && pageIndex !== currentPageIndexRef.current) {
+      setCurrentPageIndex(pageIndex);
+    }
+
+    const contextPageIndex = pageIndex !== undefined ? pageIndex : currentPageIndexRef.current;
+    const currentContext = extractedPagesRef.current[contextPageIndex];
+    
     if (fieldIds.length === 0 || !currentContext) {
       setHoveredDocumentOverlayIds([]);
       return;
@@ -572,19 +576,6 @@ function ValidationPage() {
 
   return (
     <>
-      {extractedPages.length > 1 && (
-        <div className="flex items-center justify-center gap-2 p-2">
-          {extractedPages.map((_, i) => (
-            <button
-              key={i}
-              className={`btn btn-sm ${i === currentPageIndex ? 'btn-primary' : 'btn-outline'}`}
-              onClick={() => setCurrentPageIndex(i)}
-            >
-              Page {i + 1}
-            </button>
-          ))}
-        </div>
-      )}
       <div
         ref={containerRef}
         className="flex flex-col lg:flex-row w-full p-3 gap-3 h-auto lg:h-[calc(100vh-72px)] lg:overflow-hidden"
@@ -597,6 +588,9 @@ function ValidationPage() {
             hoveredOverlayIds={hoveredDocumentOverlayIds}
             documentImageUrl={documentImageURL}
             ocrData={ocrData}
+            imageUrls={imageUrls}
+            currentPageIndex={currentPageIndex}
+            onPageChange={setCurrentPageIndex}
           />
         </div>
 

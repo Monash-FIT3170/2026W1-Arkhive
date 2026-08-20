@@ -12,10 +12,16 @@ function DocumentPanel({
   hoveredOverlayIds,
   documentImageUrl,
   ocrData,
+  imageUrls = [],
+  currentPageIndex = 0,
+  onPageChange,
 }: {
   hoveredOverlayIds: string[];
   documentImageUrl: string | undefined;
   ocrData: OCRComponent[];
+  imageUrls?: string[];
+  currentPageIndex?: number;
+  onPageChange?: (index: number) => void;
 }) {
   const [zoom, setZoom] = useState(1);
   const [viewBox, setViewBox] = useState('0 0 1000 1000'); // default
@@ -89,98 +95,150 @@ function DocumentPanel({
           </button>
         </div>
         {/* Row 3: Image & Overlay Container */}
-        <div
-          ref={containerRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUpOrLeave}
-          onMouseLeave={handleMouseUpOrLeave}
-          className={`flex-1 min-h-[250px] relative overflow-auto border border-base-300 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-        >
-          <div
-            className="absolute inset-0 w-full h-full origin-center"
-            style={{
-              transform: `scale(${zoom})`,
-              transformOrigin: 'top left',
-              transition: 'transform 0.2s ease',
-            }}
-          >
-            <img
-              src={documentImageUrl}
-              alt="Document"
-              className="w-full h-full object-contain"
-              onLoad={handleImageLoad}
-            />
-            {/* SVG Overlay */}
-            <svg
-              // set the internal canvas coordinates using viewBox
-              viewBox={viewBox}
-              // set invisible SVG canvas on top of the image
-              className="absolute inset-0 w-full h-full"
-              preserveAspectRatio="xMidYMid meet"
+        <div className="flex-1 relative min-h-[250px] border border-base-300 overflow-hidden group">
+          {/* Previous Page Button */}
+          {imageUrls && imageUrls.length > 1 && currentPageIndex > 0 && (
+            <button
+              onClick={() => onPageChange?.(currentPageIndex - 1)}
+              className="absolute left-0 top-0 bottom-0 w-16 z-10 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-gradient-to-r from-black/10 to-transparent"
+              aria-label="Previous Page"
             >
-              <defs>
-                <filter id="highlightGlow" x="-50%" y="-50%" width="200%" height="300%">
-                  <feGaussianBlur stdDeviation="4" result="glow" />
-                  <feMerge>
-                    <feMergeNode in="glow" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-              {/* map all the bounding boxes */}
-              {(() => {
-                // Normalize once
-                // const normalizedHoverIds = new Set(
-                //   hoveredOverlayIds.map((id) => (id.startsWith('comp_') ? id : `comp_${id}`))
-                // );
-                return (ocrData as OCRComponent[]).map((comp) => {
-                  if (!comp.boundingBoxes) return null;
+              <div className="p-2 rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60 shadow-md">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </div>
+            </button>
+          )}
 
-                  return Object.entries(comp.boundingBoxes).map(([cellKey, box]: [string, any]) => {
-                    const id = `${comp.id}:${cellKey}`;
+          {/* Next Page Button */}
+          {imageUrls && imageUrls.length > 1 && currentPageIndex < imageUrls.length - 1 && (
+            <button
+              onClick={() => onPageChange?.(currentPageIndex + 1)}
+              className="absolute right-0 top-0 bottom-0 w-16 z-10 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-gradient-to-l from-black/10 to-transparent"
+              aria-label="Next Page"
+            >
+              <div className="p-2 rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60 shadow-md">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </button>
+          )}
 
-                    const pointsStr = box.vertices
-                      .map((v: any) => `${v.x * scaleX},${v.y * scaleY}`)
-                      .join(' ');
+          <div
+            ref={containerRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUpOrLeave}
+            onMouseLeave={handleMouseUpOrLeave}
+            className={`w-full h-full relative overflow-auto ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          >
+            <div
+              className="absolute inset-0 w-full h-full origin-center"
+              style={{
+                transform: `scale(${zoom})`,
+                transformOrigin: 'top left',
+                transition: 'transform 0.2s ease',
+              }}
+            >
+              <img
+                src={documentImageUrl}
+                alt="Document"
+                className="w-full h-full object-contain"
+                onLoad={handleImageLoad}
+              />
+              {/* SVG Overlay */}
+              <svg
+                // set the internal canvas coordinates using viewBox
+                viewBox={viewBox}
+                // set invisible SVG canvas on top of the image
+                className="absolute inset-0 w-full h-full"
+                preserveAspectRatio="xMidYMid meet"
+              >
+                <defs>
+                  <filter id="highlightGlow" x="-50%" y="-50%" width="200%" height="300%">
+                    <feGaussianBlur stdDeviation="4" result="glow" />
+                    <feMerge>
+                      <feMergeNode in="glow" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                {/* map all the bounding boxes */}
+                {(() => {
+                  // Normalize once
+                  // const normalizedHoverIds = new Set(
+                  //   hoveredOverlayIds.map((id) => (id.startsWith('comp_') ? id : `comp_${id}`))
+                  // );
+                  return (ocrData as OCRComponent[]).map((comp) => {
+                    if (!comp.boundingBoxes) return null;
 
-                    const isActive =
-                      hoveredOverlayIds.includes(id) || hoveredOverlayIds.includes(comp.id);
+                    return Object.entries(comp.boundingBoxes).map(([cellKey, box]: [string, any]) => {
+                      const id = `${comp.id}:${cellKey}`;
 
-                    //obtaining the confidence for this component to determine the colour of the bounding box
-                    const confidenceInfo = ocrData.find((c) => c.id === comp.id);
-                    const confidence = confidenceInfo ? confidenceInfo.confidence || 0 : 0;
+                      const pointsStr = box.vertices
+                        .map((v: any) => `${v.x * scaleX},${v.y * scaleY}`)
+                        .join(' ');
 
-                    return (
-                      <polygon
-                        key={id}
-                        points={pointsStr}
-                        //custom colour based on confidence tier, with low confidence highlighted in red and medium in amber, high confidence is a subtle green
-                        fill={
-                          isActive
-                            ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.15)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 0, 0, 0.15)'}`
-                            : 'transparent'
-                        }
-                        stroke={
-                          isActive
-                            ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.8)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.8)' : 'rgba(255, 0, 0, 0.8)'}`
-                            : 'transparent'
-                        }
-                        strokeWidth={isActive ? 3 : 1}
-                        opacity={isActive ? 1 : 0.75}
-                        filter={isActive ? 'url(#highlightGlow)' : undefined}
-                      />
-                    );
+                      const isActive =
+                        hoveredOverlayIds.includes(id) || hoveredOverlayIds.includes(comp.id);
+
+                      //obtaining the confidence for this component to determine the colour of the bounding box
+                      const confidenceInfo = ocrData.find((c) => c.id === comp.id);
+                      const confidence = confidenceInfo ? confidenceInfo.confidence || 0 : 0;
+
+                      return (
+                        <polygon
+                          key={id}
+                          points={pointsStr}
+                          //custom colour based on confidence tier, with low confidence highlighted in red and medium in amber, high confidence is a subtle green
+                          fill={
+                            isActive
+                              ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.15)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 0, 0, 0.15)'}`
+                              : 'transparent'
+                          }
+                          stroke={
+                            isActive
+                              ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.8)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.8)' : 'rgba(255, 0, 0, 0.8)'}`
+                              : 'transparent'
+                          }
+                          strokeWidth={isActive ? 3 : 1}
+                          opacity={isActive ? 1 : 0.75}
+                          filter={isActive ? 'url(#highlightGlow)' : undefined}
+                        />
+                      );
+                    });
                   });
-                });
-              })()}
-            </svg>
+                })()}
+              </svg>
+            </div>
           </div>
         </div>
 
-        {/* Row 3: Confidence Score, updated to show real score instead of hardcoded value, made the colours a little brighter for the document panel */}
+        {/* Thumbnail Carousel */}
+        {imageUrls && imageUrls.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto py-3 border-t mt-3 shrink-0">
+            {imageUrls.map((url, idx) => (
+              <button
+                key={idx}
+                onClick={() => onPageChange?.(idx)}
+                className={`flex-shrink-0 relative w-16 h-20 rounded border-2 overflow-hidden transition-colors ${
+                  idx === currentPageIndex ? 'border-primary' : 'border-base-300 hover:border-base-content/50'
+                }`}
+              >
+                <img src={url} alt={`Page ${idx + 1}`} className="w-full h-full object-cover" />
+                <div className="absolute bottom-0 w-full bg-black/60 text-white text-[10px] text-center font-medium py-0.5">
+                  Page {idx + 1}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Row 4: Confidence Score, updated to show real score instead of hardcoded value, made the colours a little brighter for the document panel */}
         {/* UPDATED: Replaced plain coloured text with capsule matching the right panel style */}
-        <div className="border-t pt-3 text-sm text-base-content/70 flex items-center gap-2">
+        <div className="border-t pt-3 mt-3 text-sm text-base-content/70 flex items-center gap-2">
           Confidence Score:
           {/* UPDATED: Matching outlined badge style to keep confidence score as secondary info */}
           <span
