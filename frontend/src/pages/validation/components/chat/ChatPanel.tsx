@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { sendMessage } from '../../../../services/llmService';
 import type { ExtractedPage } from '../../../../models/TableData';
 
-import OcrReviewWidget from './OcrReviewWidget';
+import OcrReviewWidget, { buildSlides } from './OcrReviewWidget';
 import type { OcrIssue } from './OcrReviewWidget';
 
 function ChatPanel({
@@ -154,7 +154,7 @@ function ChatPanel({
       {/* AI Button to open and close modal */}
       <div className="fixed bottom-6 right-6 z-50">
         <div className="indicator">
-          {!isOpen && flaggedIssues.length > 0 && (
+          {!isOpen && buildSlides(flaggedIssues).length > 0 && (
             <span className="indicator-item badge badge-error badge-sm w-3.5 h-3.5 p-0 border-2 border-base-100 rounded-full shadow-sm mt-1 mr-1"></span>
           )}
           <button
@@ -199,9 +199,9 @@ function ChatPanel({
                 onClick={() => onTabChange?.('review')}
               >
                 Review
-                {flaggedIssues.length > 0 && (
+                {buildSlides(flaggedIssues).length > 0 && (
                   <span className="badge badge-error badge-sm text-white">
-                    {flaggedIssues.length}
+                    {buildSlides(flaggedIssues).length}
                   </span>
                 )}
               </button>
