@@ -42,6 +42,8 @@ interface OcrReviewWidgetProps {
     fields: { fieldId: string; rowId: string | number; ocrValue: string }[],
     formatRegex?: string
   ) => Promise<Record<string, string> | null>;
+  resolvedIds?: Set<string>;
+  onResolveIds?: (ids: string[]) => void;
 }
 
 // Function that turns each OCR Issue to a equivalent ReviewSlide format
@@ -77,8 +79,9 @@ export default function OcrReviewWidget({
   onSlideChange,
   onFetchSuggestion,
   onFetchBulkSuggestion,
+  resolvedIds,
+  onResolveIds,
 }: OcrReviewWidgetProps) {
-  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [currentIndex, setCurrentIndex] = useState(0);
   const [manualValue, setManualValue] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -87,7 +90,8 @@ export default function OcrReviewWidget({
   const [fetchingId, setFetchingId] = useState<string | null>(null);
 
   // Filter out issues that have already been resolved
-  const unresolvedIssues = issues.filter((issue) => !resolvedIds.has(issue.fieldId));
+  const unresolvedIssues = issues.filter((issue) => !resolvedIds?.has(issue.fieldId));
+
   // Make review slide per ocr issue
   const slides = buildSlides(unresolvedIssues);
   // Current Slide UI is on
@@ -100,9 +104,9 @@ export default function OcrReviewWidget({
         currentSlide.kind === 'single'
           ? [currentSlide.issue.fieldId]
           : currentSlide.issues.map((i) => i.fieldId);
-      const pageIndex = 
-        currentSlide.kind === 'single' 
-          ? currentSlide.issue.pageIndex 
+      const pageIndex =
+        currentSlide.kind === 'single'
+          ? currentSlide.issue.pageIndex
           : currentSlide.issues[0]?.pageIndex;
       onSlideChange(fieldIds, pageIndex);
     }
@@ -196,13 +200,8 @@ export default function OcrReviewWidget({
   };
 
   const markResolved = (fieldIds: string[]) => {
-    setResolvedIds((prev) => {
-      const next = new Set(prev);
-      fieldIds.forEach((id) => next.add(id));
-      return next;
-    });
+    onResolveIds?.(fieldIds);
     resetEditState();
-    // currentIndex clamping is now handled by the useEffect watching slides.length
   };
 
   // Handlers matching requirements

@@ -26,6 +26,8 @@ function ChatPanel({
   onFetchBulkSuggestion,
   activeTab,
   onTabChange,
+  onResolveIssues,
+  resolvedIssueIds,
 }: {
   isOpen: boolean;
   onToggle: () => void;
@@ -48,6 +50,9 @@ function ChatPanel({
   ) => Promise<Record<string, string> | null>;
   activeTab?: 'chat' | 'review';
   onTabChange?: (tab: 'chat' | 'review') => void;
+
+  resolvedIssueIds?: Set<string>;
+  onResolveIssues?: (ids: string[]) => void;
 }) {
   const [input, setInput] = useState('');
   const [isLoading, setLoading] = useState(false);
@@ -218,6 +223,8 @@ function ChatPanel({
                 onSlideChange={onSlideChange}
                 onFetchSuggestion={onFetchSuggestion}
                 onFetchBulkSuggestion={onFetchBulkSuggestion}
+                resolvedIds={resolvedIssueIds}
+                onResolveIds={onResolveIssues}
               />
             </div>
           ) : (
