@@ -57,6 +57,34 @@ function getOcrDataForFile(
   return taggedData.length > 0 ? taggedData : ocrData;
 }
 
+function getOcrDataForPage(
+  ocrData: OCRComponent[],
+  pageIndex: number
+): OCRComponent[] {
+  const hasPageTags = ocrData.some(
+    (component) => component.pageIndex !== undefined
+  );
+  if (!hasPageTags) return ocrData;
+  return ocrData.filter((component) => component.pageIndex === pageIndex);
+}
+
+function getPageOptions(
+  file: UploadedFileGroup | undefined,
+  fileOcrData: OCRComponent[]
+): { pageIndex: number; label: string }[] {
+  const pageIndices = file?.pageIndices ?? [];
+  return pageIndices.map((pageIndex, position) => {
+    const labeled = fileOcrData.find(
+      (component) =>
+        component.pageIndex === pageIndex && Boolean(component.pageLabel)
+    );
+    return {
+      pageIndex,
+      label: labeled?.pageLabel ?? `Page ${position + 1}`
+    };
+  });
+}
+
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(
     window.innerWidth >= 1024
@@ -86,6 +114,9 @@ function ValidationPage() {
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(
     null
   );
+  const [selectedPageIndex, setSelectedPageIndex] = useState<number | null>(
+    null
+  );
   const isLarge = useIsLargeScreen();
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -105,18 +136,22 @@ function ValidationPage() {
         }
 
         const firstFile = groups[0];
+        const firstPageIndex = firstFile.pageIndices[0] ?? 0;
         const firstFileOcrData = getOcrDataForFile(
           ocrData,
           firstFile.fileIndex
+        );
+        const firstPageOcrData = getOcrDataForPage(
+          firstFileOcrData,
+          firstPageIndex
         );
 
         setAllOcrData(ocrData);
         setFileGroups(groups);
         setSelectedFileIndex(firstFile.fileIndex);
-        setDocumentImageURL(
-          getUploadedImageUrl(firstFile.pageIndices[0] ?? 0)
-        );
-        setDocumentContext(flattenOcrData(firstFileOcrData));
+        setSelectedPageIndex(firstPageIndex);
+        setDocumentImageURL(getUploadedImageUrl(firstPageIndex));
+        setDocumentContext(flattenOcrData(firstPageOcrData));
       } catch (error) {
         console.error("Failed to load extraction session", error);
       }
@@ -170,24 +205,32 @@ function ValidationPage() {
     selectedFileIndex === null
       ? allOcrData
       : getOcrDataForFile(allOcrData, selectedFileIndex);
-  const displayedPageIndex = selectedFile?.pageIndices[0];
+  const pageOptions = getPageOptions(selectedFile, selectedFileOcrData);
   const displayedPageOcrData =
-    displayedPageIndex === undefined
+    selectedPageIndex === null
       ? selectedFileOcrData
-      : selectedFileOcrData.filter(
-          (component) => component.pageIndex === displayedPageIndex
-        );
+      : getOcrDataForPage(selectedFileOcrData, selectedPageIndex);
+
+  const showPageView = (fileIndex: number, pageIndex: number) => {
+    const fileOcrData = getOcrDataForFile(allOcrData, fileIndex);
+    const pageOcrData = getOcrDataForPage(fileOcrData, pageIndex);
+    setSelectedFileIndex(fileIndex);
+    setSelectedPageIndex(pageIndex);
+    setDocumentImageURL(getUploadedImageUrl(pageIndex));
+    setDocumentContext(flattenOcrData(pageOcrData));
+    setHoveredOverlayId(null);
+    setOldContext(null);
+  };
 
   const handleFileChange = (fileIndex: number) => {
     const file = fileGroups.find((group) => group.fileIndex === fileIndex);
     if (!file) return;
+    showPageView(fileIndex, file.pageIndices[0] ?? 0);
+  };
 
-    const fileOcrData = getOcrDataForFile(allOcrData, fileIndex);
-    setSelectedFileIndex(fileIndex);
-    setDocumentImageURL(getUploadedImageUrl(file.pageIndices[0] ?? 0));
-    setDocumentContext(flattenOcrData(fileOcrData));
-    setHoveredOverlayId(null);
-    setOldContext(null);
+  const handlePageChange = (pageIndex: number) => {
+    if (selectedFileIndex === null) return;
+    showPageView(selectedFileIndex, pageIndex);
   };
 
   const addMessage = (message: ChatMessage) => {
@@ -268,14 +311,13 @@ function ValidationPage() {
           <DocumentPanel
             hoveredOverlayId={hoveredOverlayId}
             documentImageUrl={documentImageURL}
-            ocrData={
-              displayedPageOcrData.length > 0
-                ? displayedPageOcrData
-                : selectedFileOcrData
-            }
+            ocrData={displayedPageOcrData}
             files={fileGroups}
             selectedFileIndex={selectedFileIndex}
             onFileChange={handleFileChange}
+            pages={pageOptions}
+            selectedPageIndex={selectedPageIndex}
+            onPageChange={handlePageChange}
           />
         </div>
 

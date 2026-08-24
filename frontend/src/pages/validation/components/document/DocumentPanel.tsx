@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import type { OCRComponent } from "../../../../models/OCRComponent";
 import type { UploadedFileGroup } from "../../../../models/UploadedFileGroup";
 import FileSelector from "./FileSelector";
+import PageSelector from "./PageSelector";
 // NEW update: Calculating real average confidence from OCR data
 function calculateAverageConfidence(data: OCRComponent[]): number {
   const componentsWithConfidence = data.filter(
@@ -21,7 +22,10 @@ function DocumentPanel({
   ocrData,
   files,
   selectedFileIndex,
-  onFileChange
+  onFileChange,
+  pages,
+  selectedPageIndex,
+  onPageChange
 }: {
   hoveredOverlayId: string | null;
   documentImageUrl: string | undefined;
@@ -29,6 +33,9 @@ function DocumentPanel({
   files: UploadedFileGroup[];
   selectedFileIndex: number | null;
   onFileChange: (fileIndex: number) => void;
+  pages: { pageIndex: number; label: string }[];
+  selectedPageIndex: number | null;
+  onPageChange: (pageIndex: number) => void;
 }) {
   const [zoom, setZoom] = useState(1);
   const [viewBox, setViewBox] = useState("0 0 1000 1000"); // default
@@ -89,9 +96,9 @@ function DocumentPanel({
         <h2 className="mb-4 text-xl font-semibold text-base-content">
           DOCUMENT PANEL
         </h2>
-        {/* Row 2: Zoom controls and file selector */}
+        {/* Row 2: Zoom, page stepper, and file selector */}
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               className="btn btn-sm"
               onClick={() => setZoom((z) => Math.max(1, z - 0.25))}
@@ -109,6 +116,14 @@ function DocumentPanel({
             <button className="btn btn-sm" onClick={() => setZoom(1)}>
               Reset
             </button>
+
+            <div className="mx-1 hidden h-5 w-px bg-base-300 sm:block" />
+
+            <PageSelector
+              pages={pages}
+              selectedPageIndex={selectedPageIndex}
+              onChange={onPageChange}
+            />
           </div>
           <FileSelector
             files={files}
