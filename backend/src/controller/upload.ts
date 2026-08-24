@@ -1,6 +1,7 @@
 import {Request, Response} from 'express';
 import {parseTableWithRetries} from '../services/ocr/ocr.ts';
 import {DocumentJob} from '../models/Job';
+import { hasValidFileSignature } from '../services/security/fileValidation.ts';
 import 'express-session';
 import 'multer';
 import fs from 'fs';
@@ -92,6 +93,9 @@ export default {
 
                     try {
                         const buffer = fs.readFileSync(file.path);
+                        if (!hasValidFileSignature(buffer, file.mimetype)) {
+                            throw new Error('InvalidFileSignatureError');
+                        }
                         const ocrComponents = await parseTableWithRetries(buffer, (attempt, max) => {
                             res.write(
                                 JSON.stringify({
@@ -133,12 +137,30 @@ export default {
 
                         return job;
                     } catch (e: any) {
-                        console.error(`OCR failed for batch job ${index + 1}/${totalDocuments} (${fileName})`, e);
+                        console.error(
+                            `Processing failed for batch job ${index + 1}/${totalDocuments} (${fileName})`,
+                            e
+                        );                        
                         const errMsg =
-                            e && e.message && e.message.includes('NoTextDetectedError')
-                                ? e.message.replace('NoTextDetectedError: ', '')
-                                : 'OCR failed. Please double check and reupload your document.';
+                            e && e.message === 'InvalidFileSignatureError'
+                                ? 'Invalid or mismatched file contents detected.'
+                                : e && e.message && e.message.includes('NoTextDetectedError')
+                                    ? e.message.replace('NoTextDetectedError: ', '')
+                                    : 'OCR failed. Please double check and reupload your document.';
 
+                        if (e?.message === 'InvalidFileSignatureError') {
+                            try {
+                                if (fs.existsSync(file.path)) {
+                                    fs.unlinkSync(file.path);
+                                }
+
+                                req.session.uploadedFiles = req.session.uploadedFiles?.filter(
+                                    (filename) => filename !== file.filename
+                                );
+                            } catch (deleteErr) {
+                                console.error('Failed to delete rejected upload:', file.path, deleteErr);
+                            }
+                        }
                         res.write(
                             JSON.stringify({
                                 type: 'job_failed',
