@@ -486,6 +486,21 @@ function ValidationPage() {
     const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
     const pageIdx = issue?.pageIndex ?? currentPageIndex;
 
+    const currentRow = extractedPagesRef.current[pageIdx]?.rows.find(
+      (r) => String(r._id) === String(rowId)
+    );
+    const oldValue = currentRow ? String(currentRow[column] ?? '') : '';
+
+    addHistoryEntry({
+      type: 'edit',
+      pageIndex: pageIdx,
+      fieldId,
+      column,
+      oldValue,
+      newValue,
+      description: `Manually corrected "${column}" on page ${pageIdx + 1}: "${oldValue}" to "${newValue}"`,
+    });
+
     setExtractedPages((prev) =>
       prev.map((page, i) => {
         if (i !== pageIdx) return page;
