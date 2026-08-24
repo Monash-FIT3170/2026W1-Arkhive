@@ -4,37 +4,12 @@ import 'express-session';
 import 'multer';
 import fs from 'fs';
 import path from 'path';
-import type {
-  PageMetadata,
-  UploadedFileGroup,
-  UploadedPage
-} from '../types/upload.js';
-
-function parseMetadata(metadataStr: unknown): PageMetadata[] {
-  if (typeof metadataStr !== 'string') return [];
-  try {
-    const parsed = JSON.parse(metadataStr);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.error("Failed to parse metadata", e);
-    return [];
-  }
-}
-
-function buildUploadedPage(
-  filename: string,
-  pageIndex: number,
-  meta: PageMetadata | undefined
-): UploadedPage {
-  return {
-    filename,
-    pageIndex,
-    type: meta?.type ?? 'Other',
-    fileIndex: meta?.fileIndex ?? pageIndex,
-    fileName: meta?.fileName || `Page ${pageIndex + 1}`,
-    pageLabel: meta?.pageLabel
-  };
-}
+import type { UploadedPage } from '../types/upload.js';
+import {
+  buildUploadedPage,
+  groupUploadedPages,
+  parseMetadata,
+} from '../services/upload/fileGroups.ts';
 
 function tagOcrComponents(components: any[], page: UploadedPage) {
   return components.map((comp) => {
@@ -44,30 +19,13 @@ function tagOcrComponents(components: any[], page: UploadedPage) {
       fileIndex: page.fileIndex,
       fileName: page.fileName,
       pageIndex: page.pageIndex,
-      pageLabel: page.pageLabel
+      pageLabel: page.pageLabel,
     };
     if (comp.parentId) {
       tagged.parentId = `p${page.pageIndex}_${comp.parentId}`;
     }
     return tagged;
   });
-}
-
-export function groupUploadedPages(pages: UploadedPage[]): UploadedFileGroup[] {
-  const groups = new Map<number, UploadedFileGroup>();
-  for (const page of pages) {
-    let group = groups.get(page.fileIndex);
-    if (!group) {
-      group = {
-        fileIndex: page.fileIndex,
-        fileName: page.fileName,
-        pageIndices: []
-      };
-      groups.set(page.fileIndex, group);
-    }
-    group.pageIndices.push(page.pageIndex);
-  }
-  return Array.from(groups.values());
 }
 
 function pagesFromSession(req: Request): UploadedPage[] {
@@ -78,7 +36,7 @@ function pagesFromSession(req: Request): UploadedPage[] {
   // Older sessions only stored filenames; treat each page as its own file.
   return (req.session.uploadedFiles ?? []).map((filename, pageIndex) =>
     buildUploadedPage(filename, pageIndex, {
-      type: req.session.uploadedTypes?.[pageIndex]
+      type: req.session.uploadedTypes?.[pageIndex],
     })
   );
 }
@@ -89,8 +47,7 @@ export default {
 
     if (!files || files.length === 0) {
       res.status(400).json({
-        error:
-          'No files received. Send images as multipart/form-data with field name "pages".'
+        error: 'No files received. Send images as multipart/form-data with field name "pages".',
       });
       return;
     }
@@ -131,7 +88,7 @@ export default {
             const text = await parseTableWithRetries(buffer);
             return tagOcrComponents(text ?? [], uploadedPages[pageIndex]);
           } catch (e) {
-            console.error("OCR failed for file", file.originalname, e);
+            console.error('OCR failed for file', file.originalname, e);
             return []; // return empty array on failure so upload still succeeds
           }
         })
@@ -144,20 +101,19 @@ export default {
       req.session.extraction = {
         ocrData,
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
       };
 
       res.json({ success: true, pageCount: files.length, ocrData });
     } catch (error) {
-      console.error("OCR processing error:", error);
+      console.error('OCR processing error:', error);
       res.status(500).json({
-        error:
-          "OCR processing failed. Check that your Google Vision credentials are configured."
+        error: 'OCR processing failed. Check that your Google Vision credentials are configured.',
       });
     }
   },
 
   listFiles: (req: Request, res: Response) => {
     res.json(groupUploadedPages(pagesFromSession(req)));
-  }
+  },
 };

@@ -15,75 +15,13 @@ import {
   getUploadedFileGroups,
   getUploadedImageUrl
 } from "../../services/uploadService";
-
-function buildFallbackFileGroups(
-  ocrData: OCRComponent[]
-): UploadedFileGroup[] {
-  const groups = new Map<number, UploadedFileGroup>();
-
-  for (const component of ocrData) {
-    if (component.fileIndex === undefined) continue;
-
-    const group = groups.get(component.fileIndex) ?? {
-      fileIndex: component.fileIndex,
-      fileName: component.fileName ?? `File ${groups.size + 1}`,
-      pageIndices: []
-    };
-    if (
-      component.pageIndex !== undefined &&
-      !group.pageIndices.includes(component.pageIndex)
-    ) {
-      group.pageIndices.push(component.pageIndex);
-    }
-    groups.set(component.fileIndex, group);
-  }
-
-  if (groups.size > 0) return Array.from(groups.values());
-
-  return [{
-    fileIndex: 0,
-    fileName: "Uploaded document",
-    pageIndices: [0]
-  }];
-}
-
-function getOcrDataForFile(
-  ocrData: OCRComponent[],
-  fileIndex: number
-): OCRComponent[] {
-  const taggedData = ocrData.filter(
-    (component) => component.fileIndex === fileIndex
-  );
-  return taggedData.length > 0 ? taggedData : ocrData;
-}
-
-function getOcrDataForPage(
-  ocrData: OCRComponent[],
-  pageIndex: number
-): OCRComponent[] {
-  const hasPageTags = ocrData.some(
-    (component) => component.pageIndex !== undefined
-  );
-  if (!hasPageTags) return ocrData;
-  return ocrData.filter((component) => component.pageIndex === pageIndex);
-}
-
-function getPageOptions(
-  file: UploadedFileGroup | undefined,
-  fileOcrData: OCRComponent[]
-): { pageIndex: number; label: string }[] {
-  const pageIndices = file?.pageIndices ?? [];
-  return pageIndices.map((pageIndex, position) => {
-    const labeled = fileOcrData.find(
-      (component) =>
-        component.pageIndex === pageIndex && Boolean(component.pageLabel)
-    );
-    return {
-      pageIndex,
-      label: labeled?.pageLabel ?? `Page ${position + 1}`
-    };
-  });
-}
+import {
+  buildFallbackFileGroups,
+  getFirstPageIndex,
+  getOcrDataForFile,
+  getOcrDataForPage,
+  getPageOptions
+} from "./components/document/validationFileHelpers";
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(
@@ -136,7 +74,7 @@ function ValidationPage() {
         }
 
         const firstFile = groups[0];
-        const firstPageIndex = firstFile.pageIndices[0] ?? 0;
+        const firstPageIndex = getFirstPageIndex(firstFile);
         const firstFileOcrData = getOcrDataForFile(
           ocrData,
           firstFile.fileIndex
@@ -225,7 +163,7 @@ function ValidationPage() {
   const handleFileChange = (fileIndex: number) => {
     const file = fileGroups.find((group) => group.fileIndex === fileIndex);
     if (!file) return;
-    showPageView(fileIndex, file.pageIndices[0] ?? 0);
+    showPageView(fileIndex, getFirstPageIndex(file));
   };
 
   const handlePageChange = (pageIndex: number) => {

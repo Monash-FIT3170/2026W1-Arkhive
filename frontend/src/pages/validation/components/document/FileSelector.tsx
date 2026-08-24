@@ -1,4 +1,5 @@
 import type { UploadedFileGroup } from "../../../../models/UploadedFileGroup";
+import { formatFileOptionLabel } from "./validationFileHelpers";
 
 type FileSelectorProps = {
   files: UploadedFileGroup[];
@@ -24,7 +25,7 @@ function FileSelector({
         {files.length === 0 && <option value="">No files available</option>}
         {files.map((file, index) => (
           <option key={file.fileIndex} value={file.fileIndex}>
-            {index + 1}. {file.fileName}
+            {formatFileOptionLabel(file.fileName, index + 1)}
           </option>
         ))}
       </select>
