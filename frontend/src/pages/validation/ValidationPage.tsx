@@ -464,15 +464,17 @@ function ValidationPage() {
   const handleCarouselReject = (fieldIds: string[]) => {
     if (!documentContext) return;
 
-    const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
+    fieldIds.forEach((fieldId) => {
+      const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
 
-    addHistoryEntry({
-      type: 'skip',
-      pageIndex: issue?.pageIndex,
-      fieldId,
-      column: issue?.fieldName,
-      oldValue: issue?.ocrValue,
-      description: `Skipped "${issue?.fieldName}" on page ${(issue?.pageIndex ?? 0) + 1}: "${issue?.ocrValue}"`,
+      addHistoryEntry({
+        type: 'skip',
+        pageIndex: issue?.pageIndex,
+        fieldId,
+        column: issue?.fieldName,
+        oldValue: issue?.ocrValue,
+        description: `Skipped "${issue?.fieldName}" on page ${(issue?.pageIndex ?? 0) + 1}: "${issue?.ocrValue}"`,
+      });
     });
 
     setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
