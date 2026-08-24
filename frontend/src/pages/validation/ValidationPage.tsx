@@ -18,6 +18,7 @@ import type { OcrIssue } from './components/chat/OcrReviewWidget';
 import { flatten } from './components/extracted-data/flattener';
 import { checkTableFormats } from './components/extracted-data/detectFormat';
 import { getTestData, getTestImageUrls } from '../../services/testService';
+import type { HistoryEntry } from '../HistoryEntry';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -77,6 +78,19 @@ function ValidationPage() {
       ids.forEach((id) => next.add(id));
       return next;
     });
+  };
+
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  const addHistoryEntry = (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
+    setHistory((prev) => [
+      {
+        ...entry,
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
   };
 
   useEffect(() => {
@@ -216,6 +230,10 @@ function ValidationPage() {
         saveExtractionSession(previous);
         setEditedCells(new Set());
         setTableKey((k) => k + 1);
+        addHistoryEntry({
+          type: 'undo',
+          description: 'Undid last change',
+        });
       }
 
       if (isRedo) {
@@ -229,6 +247,10 @@ function ValidationPage() {
         saveExtractionSession(next);
         setEditedCells(new Set());
         setTableKey((k) => k + 1);
+        addHistoryEntry({
+          type: 'redo',
+          description: 'Redid last change',
+        });
       }
     };
 
@@ -413,6 +435,27 @@ function ValidationPage() {
       return next;
     });
 
+    updates.forEach(({ fieldId, newValue }) => {
+      const [rowId, column] = fieldId.split(':');
+      const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
+      const pageIdx = issue?.pageIndex ?? currentPageIndex;
+
+      const currentRow = extractedPagesRef.current[pageIdx]?.rows.find(
+        (r) => String(r._id) === String(rowId)
+      );
+      const oldValue = currentRow ? String(currentRow[column] ?? '') : '';
+
+      addHistoryEntry({
+        type: 'accept',
+        pageIndex: pageIdx,
+        fieldId,
+        column,
+        oldValue,
+        newValue,
+        description: `Accepted correction for "${column}" on page ${pageIdx + 1}: "${oldValue}" to "${newValue}"`,
+      });
+    });
+
     saveExtractionSession(extractedPagesRef.current);
     const fieldIds = updates.map(({ fieldId }) => fieldId);
     setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
@@ -421,27 +464,17 @@ function ValidationPage() {
   const handleCarouselReject = (fieldIds: string[]) => {
     if (!documentContext) return;
 
-    // setExtractedPages((prev) =>
-    //   prev.map((page, i) => {
-    //     if (i !== currentPageIndex) return page;
-    //     return {
-    //       ...page,
-    //       rows: page.rows.map((row) => {
-    //         const updatesForRow = fieldIds.filter((fieldId) => {
-    //           const [rowId] = fieldId.split(':');
-    //           return String(row._id) === String(rowId);
-    //         });
-    //         if (updatesForRow.length === 0) return row;
-    //         return updatesForRow.reduce((updatedRow, fieldId) => {
-    //           const [, column] = fieldId.split(':');
-    //           return { ...updatedRow, [column]: '' };
-    //         }, row);
-    //       }),
-    //     };
-    //   })
-    // );
+    const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
 
-    // saveExtractionSession(extractedPages);
+    addHistoryEntry({
+      type: 'skip',
+      pageIndex: issue?.pageIndex,
+      fieldId,
+      column: issue?.fieldName,
+      oldValue: issue?.ocrValue,
+      description: `Skipped "${issue?.fieldName}" on page ${(issue?.pageIndex ?? 0) + 1}: "${issue?.ocrValue}"`,
+    });
+
     setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
   };
 
@@ -635,6 +668,22 @@ function ValidationPage() {
               if (!documentContext) return;
 
               undoStack.current.push(extractedPagesRef.current);
+
+              // get old value for histroy
+              const currentPage = extractedPagesRef.current[currentPageIndex];
+              const currentRow = currentPage?.rows.find((r) => String(r._id) === rowId);
+              const oldValue = currentRow ? String(currentRow[column] ?? '') : '';
+
+              addHistoryEntry({
+                type: 'edit',
+                pageIndex: currentPageIndex,
+                fieldId,
+                column,
+                oldValue,
+                newValue,
+                description: `Edited "${column}" on page ${currentPageIndex + 1}: "${oldValue}" to "${newValue}"`,
+              });
+
               redoStack.current = [];
 
               const [rowId, column] = fieldId.split(':');
@@ -789,6 +838,7 @@ function ValidationPage() {
         onTabChange={setChatActiveTab}
         resolvedIssueIds={resolvedIssueIds}
         onResolveIssues={handleResolveIssues}
+        history={history}
       />
     </>
   );

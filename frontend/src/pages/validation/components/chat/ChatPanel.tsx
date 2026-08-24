@@ -8,6 +8,8 @@ import type { ExtractedPage } from '../../../../models/TableData';
 import OcrReviewWidget, { buildSlides } from './OcrReviewWidget';
 import type { OcrIssue } from './OcrReviewWidget';
 
+import type { HistoryEntry } from '../../../HistoryEntry';
+
 function ChatPanel({
   isOpen,
   onToggle,
@@ -28,6 +30,7 @@ function ChatPanel({
   onTabChange,
   onResolveIssues,
   resolvedIssueIds,
+  history = [],
 }: {
   isOpen: boolean;
   onToggle: () => void;
@@ -48,11 +51,13 @@ function ChatPanel({
     fields: { fieldId: string; rowId: string | number; ocrValue: string }[],
     formatRegex?: string
   ) => Promise<Record<string, string> | null>;
-  activeTab?: 'chat' | 'review';
-  onTabChange?: (tab: 'chat' | 'review') => void;
+  activeTab?: 'chat' | 'review' | 'history';
+  onTabChange?: (tab: 'chat' | 'review' | 'history') => void;
 
   resolvedIssueIds?: Set<string>;
   onResolveIssues?: (ids: string[]) => void;
+
+  history?: HistoryEntry[];
 }) {
   const [input, setInput] = useState('');
   const [isLoading, setLoading] = useState(false);
@@ -210,6 +215,15 @@ function ChatPanel({
                   </span>
                 )}
               </button>
+              <button
+                className={`pb-2 font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'history' ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`}
+                onClick={() => onTabChange?.('history')}
+              >
+                History
+                {history && history.length > 0 && (
+                  <span className="badge badge-neutral badge-sm">{history.length}</span>
+                )}
+              </button>
             </div>
           </div>
 
@@ -227,7 +241,7 @@ function ChatPanel({
                 onResolveIds={onResolveIssues}
               />
             </div>
-          ) : (
+          ) : activeTab === 'chat' ? (
             <>
               {/* messages area */}
               <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
@@ -301,6 +315,50 @@ function ChatPanel({
                 </div>
               </div>
             </>
+          ) : activeTab === 'history' ? (
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+              {!history || history.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-base-content/40 gap-2 mt-20">
+                  <p className="font-semibold">No changes yet</p>
+                  <p className="text-xs">Changes you make will appear here</p>
+                </div>
+              ) : (
+                history.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="bg-base-100 rounded-xl p-3 border border-base-300 flex flex-col gap-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-xs font-bold uppercase tracking-wider ${
+                          entry.type === 'edit'
+                            ? 'text-primary'
+                            : entry.type === 'accept'
+                              ? 'text-success'
+                              : entry.type === 'skip'
+                                ? 'text-warning'
+                                : entry.type === 'undo'
+                                  ? 'text-error'
+                                  : 'text-info'
+                        }`}
+                      >
+                        {entry.type}
+                      </span>
+                      <span className="text-xs text-base-content/40">
+                        {new Date(entry.timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-base-content">{entry.description}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            <></>
           )}
         </div>
       )}
