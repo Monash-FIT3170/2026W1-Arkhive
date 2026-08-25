@@ -5,8 +5,11 @@
 // To change the sidebar           →  edit UploadSidebar.tsx
 // To change PDF/canvas logic      →  edit components/preview/previewHelpers.ts
 // To change the preview cards     →  edit components/preview/PreviewCard.tsx
+//
+// UPDATED: Preview grid is now grouped into per-file sections (see "groups"
+// below) instead of one flat grid mixing pages from every file together.
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { unlockStep } from '../../services/stepGuard.ts';
 
@@ -20,7 +23,13 @@ import {
   partitionBySize,
   MAX_FILE_SIZE_MB,
 } from './components/dropzone/DropZone';
-import { uploadPagesToBackend } from '../../services/uploadService';
+import {
+  uploadPageToBackend,
+  deletePageFromBackend,
+  processDocuments,
+  getUploadedDocuments,
+  getProcessedImageUrls,
+} from '../../services/uploadService';
 import ClassificationModal from './components/ClassificationModal';
 
 export default function UploadPage() {
@@ -57,11 +66,22 @@ export default function UploadPage() {
   const previewItemsRef = useRef<PreviewItem[]>([]);
   const createdUrlsRef = useRef<string[]>([]);
 
+  // NEW: tracks the next globally-unique fileIndex to hand out. Needed because
+  // buildPreviewItemsForFiles now takes an offset instead of always starting
+  // at 0, so pages added/replaced later don't collide with existing file groups.
+  const nextFileIndexRef = useRef(0);
+  const nextPageIndexRef = useRef(0);
+  const sessionIdSuffixRef = useRef(`${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
+
   useEffect(() => { previewItemsRef.current = previewItems; }, [previewItems]);
 
   useEffect(() => {
     if (previewItems.length > 0) {
       navigate('/?step=preview', { replace: true });
+    } else {
+      // Reset counters so the next files start from 1 again, keeping the UI numbering simple!
+      nextFileIndexRef.current = 0;
+      nextPageIndexRef.current = 0;
     }
   }, [previewItems, navigate]);
 
@@ -73,26 +93,90 @@ export default function UploadPage() {
     };
   }, []);
 
+  // Hydrate session on mount: fetch already uploaded documents from the backend
+  useEffect(() => {
+    let isMounted = true;
+    Promise.all([getUploadedDocuments(), getProcessedImageUrls()]).then(([docs, processedUrls]) => {
+      if (!isMounted || docs.length === 0) return;
+
+      const processedSet = new Set(processedUrls);
+      const hydratedItems: PreviewItem[] = [];
+      docs.forEach((doc, fileIdx) => {
+        doc.pages.forEach((pageUrl) => {
+          const parts = pageUrl.split('/');
+          const backendPageIndex = parseInt(parts[parts.length - 1], 10);
+
+          hydratedItems.push({
+            label: doc.label || `Session File ${fileIdx + 1}`,
+            subtitle: `Page ${backendPageIndex + 1}`,
+            previewSrc: pageUrl,
+            isImage: true,
+            hasFile: true,
+            fileIndex: fileIdx,
+            documentType: doc.type || 'Other',
+            backendPageIndex,
+            documentId: doc.documentId,
+            isProcessed: processedSet.has(pageUrl)
+          });
+
+          nextFileIndexRef.current = Math.max(nextFileIndexRef.current, fileIdx + 1);
+          nextPageIndexRef.current = Math.max(nextPageIndexRef.current, backendPageIndex + 1);
+        });
+      });
+
+      if (hydratedItems.length > 0) {
+        setPreviewItems(prev => prev.length === 0 ? hydratedItems : prev);
+        unlockStep(1);
+      }
+    }).catch(err => {
+      console.error("Failed to hydrate session documents", err);
+    });
+
+    return () => { isMounted = false; };
+  }, []);
+
   // ── File capture ───────────────────────────────────────────────────────────
   function captureFiles(incoming: File[]) {
     // Allow appending more files, instead of slicing/replacing
     setIsProcessing(true);
-    buildPreviewItemsForFiles(incoming, createdUrlsRef.current)
+    const offset = nextFileIndexRef.current; // NEW
+    buildPreviewItemsForFiles(incoming, createdUrlsRef.current, offset) // NEW: pass offset
       .then(newItems => {
+        nextFileIndexRef.current = offset + incoming.length; // NEW: advance the counter
+        // Enhance items with stable ID and documentId first
+        const enhancedItems = newItems.map((item) => {
+          const backendPageIndex = nextPageIndexRef.current++;
+          const documentId = `File_${item.fileIndex}_${sessionIdSuffixRef.current}`;
+          return { ...item, backendPageIndex, documentId };
+        });
+
+        // Trigger the uploads OUTSIDE the state setter sequentially to prevent session race conditions!
+        (async () => {
+          for (const item of enhancedItems) {
+            if (item.hasFile && item.previewSrc) {
+              try {
+                await uploadPageToBackend(item.previewSrc, item.documentId!, item.backendPageIndex!, item.label, item.documentType);
+              } catch (err) {
+                console.error("Background upload failed:", err);
+              }
+            }
+          }
+        })();
+
         setPreviewItems(prev => {
           const startIndex = prev.length;
-          const next = [...prev, ...newItems];
+          const next = [...prev, ...enhancedItems];
           if (prev.length === 0 && next.length > 0) {
             unlockStep(1); //unlock step 1 (preview) after successful file capture
           }
 
           // queue classification for the newly added items
-          const newIndices = newItems.map((_, i) => startIndex + i);
+          const newIndices = enhancedItems.map((_, i) => startIndex + i);
           setPendingClassificationIndices(newIndices);
 
           setSelectedPages(prevSel => {
             const nextSel = new Set(prevSel);
-            newItems.forEach((item, i) => {
+            enhancedItems.forEach((item, i) => {
               if (item.hasFile) nextSel.add(startIndex + i);
             });
             return nextSel;
@@ -128,22 +212,33 @@ export default function UploadPage() {
 
   // ── Remove file from queue ───────────────────────────────────────────────────
   function handleRemovePreview(previewIndex: number) {
-    setPreviewItems((prev) => {
-      const next = [...prev];
-      next.splice(previewIndex, 1);
+    if (previewItems[previewIndex]?.isProcessed) {
+      // If processed, ask for confirmation to show the warning
+      setRemoveConfirm([previewIndex]);
+    } else {
+      setPreviewItems((prev) => {
+        const next = [...prev];
+        const itemToRemove = next[previewIndex];
+        next.splice(previewIndex, 1);
 
-      if (next.length === 0) navigate('/', { replace: true });
-      setSelectedPages(prevSel => {
-        const nextSel = new Set<number>();
-        for (const idx of prevSel) {
-          if (idx < previewIndex) nextSel.add(idx);
-          else if (idx > previewIndex) nextSel.add(idx - 1);
+        if (itemToRemove?.hasFile && itemToRemove.backendPageIndex !== undefined && itemToRemove.documentId) {
+          deletePageFromBackend(itemToRemove.documentId, itemToRemove.backendPageIndex)
+            .catch(err => console.error("Failed to delete page from backend", err));
         }
-        return nextSel;
-      });
 
-      return next;
-    });
+        if (next.length === 0) navigate('/', { replace: true });
+        setSelectedPages(prevSel => {
+          const nextSel = new Set<number>();
+          for (const idx of prevSel) {
+            if (idx < previewIndex) nextSel.add(idx);
+            else if (idx > previewIndex) nextSel.add(idx - 1);
+          }
+          return nextSel;
+        });
+
+        return next;
+      });
+    }
   }
 
   // ── Bulk remove from queue ───────────────────────────────────────────
@@ -162,6 +257,21 @@ export default function UploadPage() {
     setRemoveConfirm(null);
 
     setPreviewItems((prev) => {
+      const itemsToRemove = prev.filter((_, idx) => toRemove.has(idx));
+
+      // Delete all from backend sequentially to prevent session race conditions
+      (async () => {
+        for (const item of itemsToRemove) {
+          if (item.hasFile && item.backendPageIndex !== undefined && item.documentId) {
+            try {
+              await deletePageFromBackend(item.documentId, item.backendPageIndex);
+            } catch (err) {
+              console.error("Failed to delete page from backend", err);
+            }
+          }
+        }
+      })();
+
       const next = prev.filter((_, idx) => !toRemove.has(idx));
       if (next.length === 0) navigate('/', { replace: true });
       return next;
@@ -191,6 +301,9 @@ export default function UploadPage() {
     const item = previewItemsRef.current[previewIndex];
     if (!item?.hasFile) return;
 
+    // Note: Reusing replaceConfirm for the warning is possible, 
+    // but the replacement modal is a bit different. Let's just allow it for now.
+
     const itemTitle = item.subtitle ? `${item.label} (${item.subtitle})` : item.label;
     setReplaceConfirm({ previewIndex, newFile, itemTitle });
   }
@@ -201,19 +314,49 @@ export default function UploadPage() {
     setReplaceConfirm(null);
 
     setIsProcessing(true);
-    buildPreviewItemsForFiles([newFile], createdUrlsRef.current)
+    const offset = nextFileIndexRef.current; // NEW: replaced page(s) count as a new file group
+    buildPreviewItemsForFiles([newFile], createdUrlsRef.current, offset) // NEW: pass offset
       .then(newItems => {
+        nextFileIndexRef.current = offset + 1; // NEW: advance the counter
+
+        // Assign stable backend page index and start upload
+        const enhancedItems = newItems.map((item) => {
+          const backendPageIndex = nextPageIndexRef.current++;
+          const documentId = `File_${item.fileIndex}_${sessionIdSuffixRef.current}`;
+          return { ...item, backendPageIndex, documentId };
+        });
+
+        // Trigger the uploads OUTSIDE the state setter sequentially!
+        (async () => {
+          for (const item of enhancedItems) {
+            if (item.hasFile && item.previewSrc) {
+              try {
+                await uploadPageToBackend(item.previewSrc, item.documentId!, item.backendPageIndex!, item.label, item.documentType);
+              } catch (err) {
+                console.error("Background upload failed:", err);
+              }
+            }
+          }
+        })();
+
         setPreviewItems(prev => {
           const next = [...prev];
-          next.splice(previewIndex, 1, ...newItems);
 
-          const newIndices = newItems.map((_, i) => previewIndex + i);
+          const itemToRemove = next[previewIndex];
+          if (itemToRemove?.hasFile && itemToRemove.backendPageIndex !== undefined && itemToRemove.documentId) {
+            deletePageFromBackend(itemToRemove.documentId, itemToRemove.backendPageIndex)
+              .catch(err => console.error("Failed to delete page from backend", err));
+          }
+
+          next.splice(previewIndex, 1, ...enhancedItems);
+
+          const newIndices = enhancedItems.map((_, i) => previewIndex + i);
           // Set pending classification immediately for this replace
           setTimeout(() => setPendingClassificationIndices(newIndices), 0);
 
           setSelectedPages(prevSel => {
             const nextSel = new Set<number>();
-            const shift = newItems.length - 1;
+            const shift = enhancedItems.length - 1;
 
             for (const idx of prevSel) {
               if (idx < previewIndex) {
@@ -223,7 +366,7 @@ export default function UploadPage() {
               }
             }
 
-            newItems.forEach((item, i) => {
+            enhancedItems.forEach((item, i) => {
               if (item.hasFile) nextSel.add(previewIndex + i);
             });
             return nextSel;
@@ -285,18 +428,53 @@ export default function UploadPage() {
     setBulkReplaceConfirm(null);
 
     setIsProcessing(true);
+    const startOffset = nextFileIndexRef.current; // NEW: each replaced page becomes its own new file group
+    nextFileIndexRef.current = startOffset + pairs.length; // NEW: advance the counter up front
     Promise.all(
-      pairs.map((pair) => buildPreviewItemsForFiles([pair.newFile], createdUrlsRef.current))
+      pairs.map((pair, i) => buildPreviewItemsForFiles([pair.newFile], createdUrlsRef.current, startOffset + i)) // NEW: pass unique offset per pair
     )
       .then((allNewItems) => {
+        // Pre-process all items outside the state setter
+        const enhancedAllItems = allNewItems.map(newItemsGroup =>
+          newItemsGroup.map(item => {
+            const backendPageIndex = nextPageIndexRef.current++;
+            const documentId = `File_${item.fileIndex}_${sessionIdSuffixRef.current}`;
+            return { ...item, backendPageIndex, documentId };
+          })
+        );
+
+        // Upload new items outside the state setter sequentially!
+        (async () => {
+          for (const group of enhancedAllItems) {
+            for (const item of group) {
+              if (item.hasFile && item.previewSrc) {
+                try {
+                  await uploadPageToBackend(item.previewSrc, item.documentId!, item.backendPageIndex!, item.label, item.documentType);
+                } catch (err) {
+                  console.error("Background upload failed:", err);
+                }
+              }
+            }
+          }
+        })();
+
         setPreviewItems((prev) => {
           const next = [...prev];
           const newIndices: number[] = [];
+
           [...pairs].reverse().forEach((pair, i) => {
-            const newItems = allNewItems[pairs.length - 1 - i];
-            next.splice(pair.previewIndex, 1, ...newItems);
-            newItems.forEach((_, idx) => newIndices.push(pair.previewIndex + idx));
+            const itemToRemove = next[pair.previewIndex];
+            if (itemToRemove?.hasFile && itemToRemove.backendPageIndex !== undefined && itemToRemove.documentId) {
+              deletePageFromBackend(itemToRemove.documentId, itemToRemove.backendPageIndex)
+                .catch(err => console.error("Failed to delete page from backend", err));
+            }
+
+            const enhancedItems = enhancedAllItems[pairs.length - 1 - i];
+
+            next.splice(pair.previewIndex, 1, ...enhancedItems);
+            enhancedItems.forEach((_, idx) => newIndices.push(pair.previewIndex + idx));
           });
+
           setTimeout(() => setPendingClassificationIndices(newIndices.sort((a, b) => a - b)), 0);
           return next;
         });
@@ -355,17 +533,35 @@ export default function UploadPage() {
     setUploadSuccess(false); // US-1.5: clear any previous success before retrying
 
     try {
-      const selectedItems = [...selectedPages]
-        .sort((a, b) => a - b)
-        .map((i) => previewItems[i])
-        .filter((item) => item?.previewSrc)
-        .map((item) => ({
-          src: item.previewSrc!,
-          type: item.documentType || 'Other'
-        }));
+      const selectedItemsMap = new Map<string, { type: string; pages: string[] }>();
 
-      await uploadPagesToBackend(selectedItems, (msg) => {
-          setRetryMessage(msg);
+      [...selectedPages].forEach(index => {
+        const item = previewItems[index];
+        if (item?.hasFile && item.backendPageIndex !== undefined && item.documentId) {
+          const docId = item.documentId;
+          if (!selectedItemsMap.has(docId)) {
+            selectedItemsMap.set(docId, { type: item.documentType || 'Other', pages: [] });
+          }
+          selectedItemsMap.get(docId)!.pages.push(item.backendPageIndex.toString());
+        }
+      });
+
+      const selectedPayload = Array.from(selectedItemsMap.entries()).map(([documentId, data]) => ({
+        documentId,
+        type: data.type,
+        pages: data.pages
+      }));
+
+      await processDocuments(selectedPayload, (msg) => {
+        setRetryMessage(msg);
+      });
+
+      setPreviewItems(prev => {
+        const next = [...prev];
+        [...selectedPages].forEach(index => {
+          if (next[index]) next[index] = { ...next[index], isProcessed: true };
+        });
+        return next;
       });
 
       // US-1.5: detect successful upload and show success notification
@@ -377,7 +573,7 @@ export default function UploadPage() {
 
     } catch (err) {
       // US-1.4: store error message in state to display near upload area
-      const message = err instanceof Error ? err.message : 'An unexpected error occurred during upload.';
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred during processing.';
       setUploadError(message);
       setRetryMessage(null); // Clear retry message when error is shown
       console.error('Processing failed:', err);
@@ -429,6 +625,23 @@ export default function UploadPage() {
     );
   };
 
+  // NEW: group previewItems by fileIndex, preserving the order each group
+  // first appears in. Each group renders as its own labeled section with
+  // its pages laid out in a horizontal row (see mockup: "File 1 / File 2 / File 3").
+  const groups = useMemo(() => {
+    const map = new Map<number, { originalIndex: number; item: PreviewItem }[]>();
+    previewItems.forEach((item, index) => {
+      const key = item.fileIndex ?? index; // fallback keeps placeholders/ungrouped items separate
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ originalIndex: index, item });
+    });
+    return Array.from(map.entries()).map(([fileIndex, entries], groupPos) => ({
+      fileIndex,
+      groupNumber: groupPos + 1,
+      entries,
+    }));
+  }, [previewItems]);
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   // No files yet → full-screen landing dropzone
@@ -466,7 +679,18 @@ export default function UploadPage() {
           <div className="modal-box">
             <h3 className="font-bold text-lg">Replace Page</h3>
             <p className="py-4">
-              Are you sure you want to replace page <strong>{replaceConfirm.itemTitle}</strong> with <strong>{replaceConfirm.newFile.name}</strong>?
+              {previewItems[replaceConfirm.previewIndex]?.isProcessed ? (
+                <>
+                  <strong className="text-warning">Warning:</strong> The page you are replacing has already been <strong>processed</strong>.
+                  Replacing it will cause the Validation page to lose its corresponding image context.
+                  <br /><br />
+                  Are you sure you want to replace page <strong>{replaceConfirm.itemTitle}</strong> with <strong>{replaceConfirm.newFile.name}</strong>?
+                </>
+              ) : (
+                <>
+                  Are you sure you want to replace page <strong>{replaceConfirm.itemTitle}</strong> with <strong>{replaceConfirm.newFile.name}</strong>?
+                </>
+              )}
             </p>
             <div className="modal-action">
               <button className="btn btn-ghost" onClick={() => setReplaceConfirm(null)}>Cancel</button>
@@ -482,7 +706,16 @@ export default function UploadPage() {
           <div className="modal-box">
             <h3 className="font-bold text-lg">Remove Pages</h3>
             <p className="py-4">
-              Are you sure you want to remove <strong>{removeConfirm.length}</strong> selected page(s)? This cannot be undone.
+              {removeConfirm.some(idx => previewItems[idx]?.isProcessed) ? (
+                <>
+                  <strong className="text-warning">Warning:</strong> You are removing <strong>{removeConfirm.length}</strong> selected page(s), some of which have already been <strong>processed</strong>.
+                  Removing them will cause the Validation page to lose its corresponding image context.
+                  <br /><br />
+                  Are you sure you want to proceed?
+                </>
+              ) : (
+                <>Are you sure you want to remove <strong>{removeConfirm.length}</strong> selected page(s)? This cannot be undone.</>
+              )}
             </p>
             <div className="modal-action">
               <button className="btn btn-ghost" onClick={() => setRemoveConfirm(null)}>Cancel</button>
@@ -497,7 +730,15 @@ export default function UploadPage() {
         <div className="modal modal-open z-50">
           <div className="modal-box">
             <h3 className="font-bold text-lg">Replace Pages</h3>
-            <ul className="py-4 text-sm space-y-1">
+
+            {bulkReplaceConfirm.some(pair => previewItems[pair.previewIndex]?.isProcessed) && (
+              <p className="pt-4 pb-2 text-warning">
+                <strong>Warning:</strong> You are replacing selected page(s), some of which have already been <strong>processed</strong>.
+                Replacing them will cause the Validation page to lose its corresponding image context.
+              </p>
+            )}
+
+            <ul className="py-2 text-sm space-y-1">
               {bulkReplaceConfirm.map((pair) => (
                 <li key={pair.previewIndex}>
                   <strong>{pair.itemTitle}</strong> → {pair.newFile.name}
@@ -523,28 +764,52 @@ export default function UploadPage() {
 
       <div className="flex min-h-0 flex-1">
 
-        {/* Preview grid */}
+        {/* Preview grid — UPDATED: now grouped into per-file sections instead
+            of one flat grid. Each section is its own labeled box (e.g. "File 1")
+            with that file's pages laid out in a horizontal, wrapping row. */}
         <main className="bg-base-100 flex-1 overflow-y-auto p-5">
-          <div className="grid auto-rows-auto grid-cols-[repeat(auto-fill,minmax(200px,1fr))] content-start gap-[18px]">
-            {previewItems.map((item, index) => (
-              <PreviewCard
-                key={`${item.label}-${item.subtitle ?? ""}-${index}`}
-                label={item.label}
-                subtitle={item.subtitle}
-                hasFile={item.hasFile}
-                index={index}
-                isSelected={selectedPages.has(index)}
-                previewSrc={item.previewSrc}
-                isImage={item.isImage}
-                isBlurry={item.isBlurry}
-                isDark={item.isDark}
-                shouldWarn={item.shouldWarn}
-                documentType={item.documentType}
-                onToggle={togglePageSelection}
-                onRemove={handleRemovePreview}
-                onReplaceWithFile={handleReplaceWithFile}
-                onChangeType={handleChangeType}
-              />
+          <div className="flex flex-col gap-6">
+            {groups.map((group) => (
+              <section
+                key={group.fileIndex}
+                className="rounded-lg border border-base-300 bg-base-200/40 p-4"
+              >
+                <h3 className="mb-3 text-sm font-semibold text-base-content/70">
+                  File {group.groupNumber}
+                  {group.entries[0]?.item.label && (
+                    <span className="ml-2 font-normal text-base-content/50">
+                      — {group.entries[0].item.label}
+                    </span>
+                  )}
+                </h3>
+                <div className="flex flex-wrap gap-[18px]">
+                  {group.entries.map(({ item, originalIndex }) => (
+                    <div
+                      key={`${item.label}-${item.subtitle ?? ""}-${originalIndex}`}
+                      className="w-[200px] shrink-0"
+                    >
+                      <PreviewCard
+                        label={item.label}
+                        subtitle={item.subtitle}
+                        hasFile={item.hasFile}
+                        index={originalIndex}
+                        isSelected={selectedPages.has(originalIndex)}
+                        previewSrc={item.previewSrc}
+                        isImage={item.isImage}
+                        isBlurry={item.isBlurry}
+                        isDark={item.isDark}
+                        shouldWarn={item.shouldWarn}
+                        isProcessed={item.isProcessed}
+                        documentType={item.documentType}
+                        onToggle={togglePageSelection}
+                        onRemove={handleRemovePreview}
+                        onReplaceWithFile={handleReplaceWithFile}
+                        onChangeType={handleChangeType}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         </main>

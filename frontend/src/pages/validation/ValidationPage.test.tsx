@@ -8,13 +8,14 @@ import ValidationPage from './ValidationPage';
 // Mock dependencies
 vi.mock('../../services/extractionService', () => ({
   getExtractionSession: vi.fn().mockResolvedValue([
-    { _id: '1', text: 'Item 1' }
+    [{ _id: '1', text: 'Item 1' }]
   ]),
   saveExtractionSession: vi.fn(),
 }));
 
 vi.mock('../../services/uploadService', () => ({
   getUploadedImageUrl: vi.fn().mockResolvedValue('http://localhost/mock-image.png'),
+  getProcessedImageUrls: vi.fn().mockResolvedValue(['http://localhost/mock-processed-image.png']),
 }));
 
 vi.mock('./components/extracted-data/detectReviewFields', () => ({
