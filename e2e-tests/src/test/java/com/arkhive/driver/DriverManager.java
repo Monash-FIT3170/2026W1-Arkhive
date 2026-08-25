@@ -1,15 +1,25 @@
 package com.arkhive.driver;
 
+import com.arkhive.config.TestConfig;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 
 /**
- * Manages the creation and lifecycle of the WebDriver instance.
+ * Manages the creation and lifecycle of the WebDriver instance using configuration from TestConfig.
  */
 public class DriverManager {
 
+    private final TestConfig config;
     private WebDriver driver;
+
+    public DriverManager(TestConfig config) {
+        this.config = config != null ? config : new TestConfig();
+    }
+
+    public DriverManager() {
+        this(new TestConfig());
+    }
 
     public void initializeDriver() {
         System.setProperty("webdriver.chrome.silentOutput", "true");
@@ -17,8 +27,7 @@ public class DriverManager {
 
         ChromeOptions options = new ChromeOptions();
 
-        boolean isHeadless = Boolean.parseBoolean(System.getProperty("headless", "false"));
-        if (isHeadless) {
+        if (config.isHeadless()) {
             options.addArguments("--headless=new");
         }
 

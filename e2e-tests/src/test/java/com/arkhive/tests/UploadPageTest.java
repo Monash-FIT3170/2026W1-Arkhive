@@ -8,12 +8,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.io.File;
-import java.net.URL;
-
 public class UploadPageTest extends BaseTest {
-
-    private static final String APP_URL = "http://localhost:5173";
 
     @Override
     @BeforeMethod
@@ -21,26 +16,10 @@ public class UploadPageTest extends BaseTest {
         super.setUp();
     }
 
-    private String getTestFilePath(String fileName) {
-        try {
-            URL resource = getClass()
-                    .getClassLoader()
-                    .getResource("documents/" + fileName);
-
-            if (resource != null) {
-                return new File(resource.toURI()).getAbsolutePath();
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Could not load test file: " + fileName, e);
-        }
-
-        throw new RuntimeException("Test file not found: " + fileName);
-    }
-
     @Test(description = "Verify that the Upload page loads successfully")
     public void testUploadPageLoads() {
         UploadPage uploadPage = pageObjectManager.getUploadPage();
-        uploadPage.open(APP_URL);
+        uploadPage.open(testConfig.getBaseUrl());
 
         Assert.assertTrue(uploadPage.isDisplayed(), "The upload page dropzone should be visible");
     }
@@ -50,9 +29,9 @@ public class UploadPageTest extends BaseTest {
         UploadPage uploadPage = pageObjectManager.getUploadPage();
         DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
 
-        uploadPage.open(APP_URL);
+        uploadPage.open(testConfig.getBaseUrl());
 
-        String sampleFilePath = getTestFilePath("sample-file.pdf");
+        String sampleFilePath = testFileUtils.getTestFilePath("sample-file.pdf");
         Assert.assertNotNull(sampleFilePath, "sample-file.pdf should be present");
 
         uploadPage.uploadFile(sampleFilePath);
@@ -76,9 +55,9 @@ public class UploadPageTest extends BaseTest {
         DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
         ValidationPage validationPage = pageObjectManager.getValidationPage();
 
-        uploadPage.open(APP_URL);
+        uploadPage.open(testConfig.getBaseUrl());
 
-        String validFilePath = getTestFilePath("valid-sample.pdf");
+        String validFilePath = testFileUtils.getTestFilePath("valid-sample.pdf");
         uploadPage.uploadFile(validFilePath);
 
         Assert.assertTrue(previewPage.isClassificationModalDisplayed(),
@@ -109,9 +88,9 @@ public class UploadPageTest extends BaseTest {
         UploadPage uploadPage = pageObjectManager.getUploadPage();
         DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
 
-        uploadPage.open(APP_URL);
+        uploadPage.open(testConfig.getBaseUrl());
 
-        String validFilePath = getTestFilePath("valid-sample.pdf");
+        String validFilePath = testFileUtils.getTestFilePath("valid-sample.pdf");
         uploadPage.uploadFile(validFilePath);
 
         Assert.assertTrue(previewPage.isClassificationModalDisplayed(),
