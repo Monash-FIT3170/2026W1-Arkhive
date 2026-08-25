@@ -3,10 +3,6 @@ package com.arkhive.tests;
 import com.arkhive.pages.DocumentPreviewPage;
 import com.arkhive.pages.UploadPage;
 import com.arkhive.pages.ValidationPage;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
-import org.openqa.selenium.support.ui.WebDriverWait;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -14,33 +10,15 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.net.URL;
-import java.time.Duration;
 
-public class UploadPageTest {
+public class UploadPageTest extends BaseTest {
 
-    private WebDriver driver;
-    private WebDriverWait wait;
     private static final String APP_URL = "http://localhost:5173";
 
+    @Override
     @BeforeMethod
     public void setUp() {
-        System.setProperty("webdriver.chrome.silentOutput", "true");
-        java.util.logging.Logger.getLogger("org.openqa.selenium").setLevel(java.util.logging.Level.SEVERE);
-
-        ChromeOptions options = new ChromeOptions();
-        
-        boolean isHeadless = Boolean.parseBoolean(System.getProperty("headless", "false"));
-        if (isHeadless) {
-            options.addArguments("--headless=new");
-        }
-
-        options.addArguments("--remote-allow-origins=*");
-        options.addArguments("--no-sandbox");
-        options.addArguments("--disable-dev-shm-usage");
-
-        driver = new ChromeDriver(options);
-        driver.manage().window().maximize();
-        wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        super.setUp();
     }
 
     private void pause() {
@@ -173,10 +151,9 @@ private String getTestFilePath(String fileName) {
         pause();
     }
 
+    @Override
     @AfterMethod
     public void tearDown() {
-        if (driver != null) {
-            driver.quit();
-        }
+        super.tearDown();
     }
 }
