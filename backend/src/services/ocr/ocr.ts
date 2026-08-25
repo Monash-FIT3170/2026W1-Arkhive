@@ -75,7 +75,7 @@ export async function parseTableWithRetries(imageBuffer: Buffer) {
 
 
 // function for getting overall averaged confidence score
-
+/*
 const jsonOut = JSON.stringify(
  await parseTable(fs.readFileSync("sample-file-1_page-0001.jpg")),
  null,
@@ -84,5 +84,5 @@ const jsonOut = JSON.stringify(
 
 fs.writeFileSync("boundingBox1.json", jsonOut, "utf-8");
 
-await parseTableWithRetries(fs.readFileSync("c:/Users/harsh/OneDrive/Pictures/sample-file-1.pdf"))
+await parseTableWithRetries(fs.readFileSync("c:/Users/harsh/OneDrive/Pictures/sample-file-1.pdf")) */
 

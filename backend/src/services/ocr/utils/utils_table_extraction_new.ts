@@ -5,11 +5,11 @@ import { GoogleGenAI } from "@google/genai";
 import { OCRComponent, OCRBoundingBoxes, Vertex, geminiSchemaBBoxPrompt } from "../types/boundingBoxTypes";
 
 const ai = new GoogleGenAI({
-  apiKey: "nope"
+  apiKey: process.env.GEMINI_API_KEY
 });
 
-const endpoint = "https://jonmeraqsadilam.cognitiveservices.azure.com";
-const key = "nope";
+const endpoint = process.env.endpoint!;
+const key = process.env.AZURE_CLOUD_API_KEY!;
 
 /**
  *
@@ -89,7 +89,7 @@ const mapTablesToOCRComponents = (customSchema: any) => async (
 const client: DocumentIntelligenceClient = DocumentIntelligence(endpoint, {key: key}, { apiVersion: "2024-11-30" })
 export async function analyse_result(buffer: Buffer) {
   const request = await client.path("/documentModels/{modelId}:analyze", "prebuilt-layout").post({
-    contentType: "application/pdf",
+    contentType: "application/octet-stream",
     body: buffer
   });
 
@@ -106,5 +106,3 @@ export async function analyse_result(buffer: Buffer) {
   fs.writeFileSync("smthToWorkWithPotentially.json", JSON.stringify(processedOut, null, 2))
   return processedOut
 }
-
-await analyse_result(fs.readFileSync("C:/Users/harsh/OneDrive/Pictures/invoice-template-us-dexter-750px.png"))

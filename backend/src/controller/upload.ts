@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { textExtraction, parseTableWithRetries } from "../services/ocr/ocr.ts";
+import { textExtraction, parseTableWithRetries } from "../services/ocr/ocr.js";
 import { Multer } from "multer";
 import { SessionData } from "express-session";
 import { parse } from "node:path";
