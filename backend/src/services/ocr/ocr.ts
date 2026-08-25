@@ -3,23 +3,7 @@ import vision from '@google-cloud/vision';
 import fs from 'fs';
 import { extractStructuredComponents } from './utils/utils_table_extraction.js';
 import { withRetry } from './utils/utils.js';
-import { convertTable } from './utils/utils_table_extraction_new.js';
-import { analyse_image } from './utils/utils_utils_table_extraction_new.js';
-
-
-const client2 = new LlamaCloud({
-  apiKey: "no key",
-});
-
-/*const result = await client2.extract.create({
-  file_input: fileObj.id,
-  configuration: {
-      data_schema: dataSchemaExtract,
-      extraction_target: 'per_doc',
-      tier: "cost_effective",
-      confidence_scores: true,
-  },
-});*/
+import { analyse_result } from './utils/utils_table_extraction_new.js';
 
 const client = new vision.ImageAnnotatorClient({
   keyFilename: path.resolve(
@@ -36,56 +20,16 @@ const client = new vision.ImageAnnotatorClient({
   }
 });
 
-export async function textExtraction1(buffer: Buffer): Promise<string> {
-  /*const [result] = await client.documentTextDetection({
-  /*const [result] = await client.documentTextDetection({
-    image: { content: buffer.toString("base64") }
-  });*/
-  const readableStream = fs.createReadStream(buffer)
 
-  const fileObj = await client2.files.create({
-  file: readableStream,
-  purpose: "extract",
-});
-
-  const result = await client2.parsing.parse({
-  file_id: fileObj.id,
-  tier: "fast",
-  expand: ["markdown_full", "metadata"],
-  version: "latest",
-  output_options: {
-    granular_bboxes: ["cell"]
-  }})
-
-  client2.files.delete(fileObj.id)
-
-  return result.markdown_full ?? "";
-}
-
+/**
+ * 
+ * THIS NEEDS TO BE REWORKED
+ */
 export async function textExtraction(buffer: Buffer): Promise<string> {
-  /*const [result] = await client.documentTextDetection({
-  /*const [result] = await client.documentTextDetection({
+  const [result] = await client.documentTextDetection({
     image: { content: buffer.toString("base64") }
-  });*/
-  const readableStream = fs.createReadStream(buffer)
-
-  const fileObj = await client2.files.create({
-  file: readableStream,
-  purpose: "extract",
-});
-
-  const result = await client2.parsing.parse({
-  file_id: fileObj.id,
-  tier: "fast",
-  expand: ["markdown_full", "metadata"],
-  version: "latest",
-  output_options: {
-    granular_bboxes: ["cell"]
-  }})
-
-  client2.files.delete(fileObj.id)
-
-  return result.markdown_full ?? "";
+  });
+  return result.fullTextAnnotation?.text ?? "";
 }
 
 
@@ -119,14 +63,14 @@ export async function parseTableWithRetriesLegacy(imageBuffer: Buffer){
  @author Harsha Sharma (33879303)
 */  
 async function parseTable(imageBuffer: Buffer) {
-  return analyse_image(imageBuffer);
+  return analyse_result(imageBuffer);
 }
 
 /*
  @author Harsha Sharma (33879303)
 */  
-async function parseTableWithRetries(imageBuffer: Buffer) {
-  return withRetry(() => analyse_image(imageBuffer));
+export async function parseTableWithRetries(imageBuffer: Buffer) {
+  return withRetry(() => parseTable(imageBuffer));
 }
 
 
@@ -140,4 +84,5 @@ const jsonOut = JSON.stringify(
 
 fs.writeFileSync("boundingBox1.json", jsonOut, "utf-8");
 
-await convertTable(fs.readFileSync("c:/Users/harsh/OneDrive/Pictures/sample-file-1.pdf"), client2)
+await parseTableWithRetries(fs.readFileSync("c:/Users/harsh/OneDrive/Pictures/sample-file-1.pdf"))
+
