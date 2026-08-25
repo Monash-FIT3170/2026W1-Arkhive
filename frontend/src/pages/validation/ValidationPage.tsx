@@ -4,7 +4,7 @@ import ExtractedDataPanel from './components/extracted-data/ExtractedDataPanel';
 import ChatPanel from './components/chat/ChatPanel';
 import type { ChatMessage, ReviewField } from '../../models/Message';
 import type { OCRComponent } from '../../models/OCRComponent';
-import type { ExtractedData } from '../../models/TableData';
+
 import type { ExtractedPage } from '../../models/TableData';
 import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
 import { getProcessedImageUrls, getUploadedImageUrl } from '../../services/uploadService';
@@ -17,7 +17,7 @@ import {
 import type { OcrIssue } from './components/chat/OcrReviewWidget';
 import { flatten } from './components/extracted-data/flattener';
 import { checkTableFormats } from './components/extracted-data/detectFormat';
-import { getTestData, getTestImageUrls } from '../../services/testService';
+
 import type { HistoryEntry } from '../HistoryEntry';
 
 function useIsLargeScreen() {
@@ -56,7 +56,7 @@ function ValidationPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
   const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
-  const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review'>('chat');
+  const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review' | 'history'>('chat');
   const [manualIndentLevels, setManualIndentLevels] = useState<
     Record<number, Record<string, number>>
   >({});
@@ -97,15 +97,14 @@ function ValidationPage() {
     async function loadSession() {
       try {
         let ocrData = await getExtractionSession(); //IMORTANT NOTE, CHANGE API TO NEW ONE
-        setOCRData(ocrData);
+        setOcrPages(ocrData);
         // console.log("SESSION DATA:", sessionData);
         // console.log("OCR DATA:", sessionData?.ocrData);
         // if (!sessionData?.ocrData) {
         //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
         // }
         const processedUrls = await getProcessedImageUrls();
-        setDocumentImageURL(processedUrls.length > 0 ? processedUrls[0] : await getUploadedImageUrl());
-        setDocumentContext(flatten(ocrData as OCRComponent[]));
+        setImageUrls(processedUrls.length > 0 ? processedUrls : [await getUploadedImageUrl()]);
       } catch (error) {
         console.error('Failed to load extraction session', error);
       }
@@ -690,6 +689,8 @@ function ValidationPage() {
 
               undoStack.current.push(extractedPagesRef.current);
 
+              const [rowId, column] = fieldId.split(':');
+
               // get old value for histroy
               const currentPage = extractedPagesRef.current[currentPageIndex];
               const currentRow = currentPage?.rows.find((r) => String(r._id) === rowId);
@@ -707,7 +708,6 @@ function ValidationPage() {
 
               redoStack.current = [];
 
-              const [rowId, column] = fieldId.split(':');
               setExtractedPages((prev) =>
                 prev.map((page, i) =>
                   i !== currentPageIndex

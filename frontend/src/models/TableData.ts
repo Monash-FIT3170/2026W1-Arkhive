@@ -8,7 +8,7 @@ export interface ExtractedRow {
   _cellKeyMap?: Record<string, string>;
   _confidence?: number;
   _cellConfidence: Record<string, number>;
-  _indentLevel: number;
+  _indentLevel?: number;
   [key: string]: any;
 }
 
