@@ -1,7 +1,7 @@
 import path from 'path';
 import vision from '@google-cloud/vision';
 import fs from 'fs';
-import { extractStructuredComponents } from './utils/utils_table_extraction.js';
+import { extractStructuredComponents } from './utils/legacy_utils_table_extraction.js';
 import { withRetry } from './utils/utils.js';
 import { analyse_result } from './utils/utils_table_extraction_new.js';
 
