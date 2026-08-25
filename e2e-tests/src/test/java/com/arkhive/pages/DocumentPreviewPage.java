@@ -1,15 +1,11 @@
 package com.arkhive.pages;
 
-import org.openqa.selenium.By;
+import com.arkhive.pageobjects.DocumentPreviewPageObjects;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.util.List;
-
-import com.arkhive.pageobjects.DocumentPreviewPageObjects;
 
 /**
  * Page Object representing Step 1: Document Preview Page (/?step=preview)
@@ -21,32 +17,24 @@ public class DocumentPreviewPage extends BasePage implements DocumentPreviewPage
     }
 
     public boolean isDisplayed() {
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(previewHeader)).isDisplayed();
-        } catch (TimeoutException e) {
-            return false;
-        }
+        return isDisplayed(previewHeader);
     }
 
     public boolean isClassificationModalDisplayed() {
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(classificationModalTitle)).isDisplayed();
-        } catch (TimeoutException e) {
-            return false;
-        }
+        return isDisplayed(classificationModalTitle);
     }
 
     public void confirmClassification() {
-        wait.until(ExpectedConditions.elementToBeClickable(confirmClassificationButton)).click();
+        click(confirmClassificationButton);
     }
 
     public void cancelClassification() {
-        wait.until(ExpectedConditions.elementToBeClickable(cancelClassificationButton)).click();
+        click(cancelClassificationButton);
     }
 
     public int getPreviewCardCount() {
         try {
-            wait.until(ExpectedConditions.presenceOfElementLocated(gridItems));
+            waitForPresence(gridItems);
             List<WebElement> items = driver.findElements(gridItems);
             return items.size();
         } catch (TimeoutException e) {
@@ -55,19 +43,14 @@ public class DocumentPreviewPage extends BasePage implements DocumentPreviewPage
     }
 
     public void clickProcess() {
-        wait.until(ExpectedConditions.elementToBeClickable(processButton)).click();
+        click(processButton);
     }
 
     public boolean hasErrorMessage() {
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(errorAlert)).isDisplayed();
-        } catch (TimeoutException e) {
-            return false;
-        }
+        return isDisplayed(errorAlert);
     }
 
     public String getErrorMessage() {
-        WebElement alert = wait.until(ExpectedConditions.visibilityOfElementLocated(errorAlert));
-        return alert.getText();
+        return waitForVisible(errorAlert).getText();
     }
 }

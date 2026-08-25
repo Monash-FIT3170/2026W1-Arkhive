@@ -1,13 +1,7 @@
 package com.arkhive.pages;
 
-import org.openqa.selenium.By;
-import org.openqa.selenium.TimeoutException;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
-
 import com.arkhive.pageobjects.UploadPageObjects;
+import org.openqa.selenium.WebDriver;
 
 /**
  * Page Object representing Step 0: Upload Landing Page (/)
@@ -23,28 +17,18 @@ public class UploadPage extends BasePage implements UploadPageObjects {
     }
 
     public boolean isDisplayed() {
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(brandingHeading)).isDisplayed();
-        } catch (TimeoutException e) {
-            return false;
-        }
+        return isDisplayed(brandingHeading);
     }
 
     public void uploadFile(String filePath) {
-        WebElement input = wait.until(ExpectedConditions.presenceOfElementLocated(fileInput));
-        input.sendKeys(filePath);
+        type(fileInput, filePath);
     }
 
     public boolean hasErrorMessage() {
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(errorAlert)).isDisplayed();
-        } catch (TimeoutException e) {
-            return false;
-        }
+        return isDisplayed(errorAlert);
     }
 
     public String getErrorMessage() {
-        WebElement alert = wait.until(ExpectedConditions.visibilityOfElementLocated(errorAlert));
-        return alert.getText();
+        return waitForVisible(errorAlert).getText();
     }
 }
