@@ -9,18 +9,15 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
 
+import com.arkhive.pageobjects.ValidationPageObjects;
+
 /**
  * Page Object representing Step 2: Validation Page (/validation)
  */
-public class ValidationPage {
+public class ValidationPage implements ValidationPageObjects {
 
     private final WebDriver driver;
     private final WebDriverWait wait;
-
-    // Locators for Step 2: Validation Page
-    private final By container = By.cssSelector("div.min-h-screen");
-    private final By documentViewer = By.xpath("//*[contains(@class, 'document') or contains(@class, 'Document') or contains(text(), 'Document')]");
-    private final By extractedDataViewer = By.xpath("//*[contains(@class, 'extracted') or contains(@class, 'Extracted') or contains(text(), 'Extracted Data')]");
 
     public ValidationPage(WebDriver driver) {
         this.driver = driver;

@@ -9,19 +9,15 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
 
+import com.arkhive.pageobjects.UploadPageObjects;
+
 /**
  * Page Object representing Step 0: Upload Landing Page (/)
  */
-public class UploadPage {
+public class UploadPage implements UploadPageObjects {
 
     private final WebDriver driver;
     private final WebDriverWait wait;
-
-    // Locators for Step 0: Upload Landing Page
-    private final By fileInput = By.cssSelector("input[type='file']");
-    private final By brandingHeading = By.xpath("//h1[contains(text(),'ARKHIVE')]");
-    private final By dropzoneText = By.xpath("//p[contains(text(),'Click to select files, or drop them anywhere')]");
-    private final By errorAlert = By.cssSelector(".alert-error");
 
     public UploadPage(WebDriver driver) {
         this.driver = driver;
