@@ -90,7 +90,7 @@ const client: DocumentIntelligenceClient = DocumentIntelligence(endpoint, {key: 
 export async function analyse_result(buffer: Buffer) {
   const request = await client.path("/documentModels/{modelId}:analyze", "prebuilt-layout").post({
     contentType: "application/pdf",
-    body: fs.createReadStream(buffer)
+    body: buffer
   });
 
   if (isUnexpected(request)){

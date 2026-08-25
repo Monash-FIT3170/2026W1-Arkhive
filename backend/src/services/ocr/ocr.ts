@@ -27,7 +27,7 @@ const client = new vision.ImageAnnotatorClient({
  */
 export async function textExtraction(buffer: Buffer): Promise<string> {
   const [result] = await client.documentTextDetection({
-    image: { content: buffer.toString("base64") }
+    image: { content: buffer}
   });
   return result.fullTextAnnotation?.text ?? "";
 }
