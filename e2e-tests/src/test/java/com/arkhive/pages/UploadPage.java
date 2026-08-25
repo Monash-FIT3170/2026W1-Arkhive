@@ -7,21 +7,15 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
-import java.time.Duration;
-
 import com.arkhive.pageobjects.UploadPageObjects;
 
 /**
  * Page Object representing Step 0: Upload Landing Page (/)
  */
-public class UploadPage implements UploadPageObjects {
-
-    private final WebDriver driver;
-    private final WebDriverWait wait;
+public class UploadPage extends BasePage implements UploadPageObjects {
 
     public UploadPage(WebDriver driver) {
-        this.driver = driver;
-        this.wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        super(driver);
     }
 
     public void open(String url) {

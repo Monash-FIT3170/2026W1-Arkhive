@@ -49,7 +49,7 @@ private String getTestFilePath(String fileName) {
 
     @Test(description = "Verify that the Upload page loads successfully")
     public void testUploadPageLoads() {
-        UploadPage uploadPage = new UploadPage(driver);
+        UploadPage uploadPage = pageObjectManager.getUploadPage();
         uploadPage.open(APP_URL);
         pause();
 
@@ -58,8 +58,8 @@ private String getTestFilePath(String fileName) {
 
     @Test(description = "Verify uploading sample-file.pdf from UploadPage")
     public void testUploadSampleFile() {
-        UploadPage uploadPage = new UploadPage(driver);
-        DocumentPreviewPage previewPage = new DocumentPreviewPage(driver);
+        UploadPage uploadPage = pageObjectManager.getUploadPage();
+        DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
 
         uploadPage.open(APP_URL);
         pause();
@@ -89,9 +89,9 @@ private String getTestFilePath(String fileName) {
 
     @Test(description = "Verify complete workflow across UploadPage -> DocumentPreviewPage -> ValidationPage")
     public void testUploadValidFileAndProcess() {
-        UploadPage uploadPage = new UploadPage(driver);
-        DocumentPreviewPage previewPage = new DocumentPreviewPage(driver);
-        ValidationPage validationPage = new ValidationPage(driver);
+        UploadPage uploadPage = pageObjectManager.getUploadPage();
+        DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
+        ValidationPage validationPage = pageObjectManager.getValidationPage();
 
         uploadPage.open(APP_URL);
         pause();
@@ -128,8 +128,8 @@ private String getTestFilePath(String fileName) {
 
     @Test(description = "Verify cancelling classification modal on DocumentPreviewPage")
     public void testUploadClassificationModalCancel() {
-        UploadPage uploadPage = new UploadPage(driver);
-        DocumentPreviewPage previewPage = new DocumentPreviewPage(driver);
+        UploadPage uploadPage = pageObjectManager.getUploadPage();
+        DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
 
         uploadPage.open(APP_URL);
         pause();

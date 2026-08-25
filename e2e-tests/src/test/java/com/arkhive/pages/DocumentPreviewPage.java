@@ -7,7 +7,6 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
-import java.time.Duration;
 import java.util.List;
 
 import com.arkhive.pageobjects.DocumentPreviewPageObjects;
@@ -15,14 +14,10 @@ import com.arkhive.pageobjects.DocumentPreviewPageObjects;
 /**
  * Page Object representing Step 1: Document Preview Page (/?step=preview)
  */
-public class DocumentPreviewPage implements DocumentPreviewPageObjects {
-
-    private final WebDriver driver;
-    private final WebDriverWait wait;
+public class DocumentPreviewPage extends BasePage implements DocumentPreviewPageObjects {
 
     public DocumentPreviewPage(WebDriver driver) {
-        this.driver = driver;
-        this.wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        super(driver);
     }
 
     public boolean isDisplayed() {

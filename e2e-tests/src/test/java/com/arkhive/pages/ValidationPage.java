@@ -7,21 +7,15 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
-import java.time.Duration;
-
 import com.arkhive.pageobjects.ValidationPageObjects;
 
 /**
  * Page Object representing Step 2: Validation Page (/validation)
  */
-public class ValidationPage implements ValidationPageObjects {
-
-    private final WebDriver driver;
-    private final WebDriverWait wait;
+public class ValidationPage extends BasePage implements ValidationPageObjects {
 
     public ValidationPage(WebDriver driver) {
-        this.driver = driver;
-        this.wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        super(driver);
     }
 
     public boolean isDisplayed() {

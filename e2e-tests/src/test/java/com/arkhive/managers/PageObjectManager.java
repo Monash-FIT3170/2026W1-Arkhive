@@ -6,7 +6,8 @@ import com.arkhive.pages.ValidationPage;
 import org.openqa.selenium.WebDriver;
 
 /**
- * Manages the lazy creation and caching of Page Object instances.
+ * PageObjectManager acts as a factory and cache for Page instances (e.g. UploadPage, DocumentPreviewPage, ValidationPage).
+ * It ensures that Page instances are lazily initialized and share the single active WebDriver instance.
  */
 public class PageObjectManager {
 
