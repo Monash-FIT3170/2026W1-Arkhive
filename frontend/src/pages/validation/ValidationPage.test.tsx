@@ -8,7 +8,7 @@ import ValidationPage from './ValidationPage';
 // Mock dependencies
 vi.mock('../../services/extractionService', () => ({
   getExtractionSession: vi.fn().mockResolvedValue([
-    { _id: '1', text: 'Item 1' }
+    [{ _id: '1', text: 'Item 1' }]
   ]),
   saveExtractionSession: vi.fn(),
 }));
