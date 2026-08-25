@@ -1,4 +1,4 @@
-import { Sun, Moon, Upload, LayoutGrid, Columns2, Share2Icon } from 'lucide-react';
+import { Sun, Moon, Upload, LayoutGrid, Columns2, Share2Icon, ChevronLeft } from 'lucide-react';
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { getMaxStep } from "../../../../services/stepGuard";
@@ -25,7 +25,7 @@ export const Navbar = () => {
   const currentStep = getCurrentStep();
 
   function handleStepClick(targetStep: number, path: string) {
-    if (targetStep > maxStep) return; // locked — do nothing
+    if (targetStep > maxStep) return; // locked - do nothing
     navigate(path);
   }
 
@@ -50,10 +50,11 @@ export const Navbar = () => {
     },
   ];
 
+  const isOnValidation = location.pathname === '/validation';
 
-
-
-
+  function handleBack() {
+    navigate("/?step=preview");
+  }
 
   return (
     <div>
@@ -86,14 +87,25 @@ export const Navbar = () => {
                 </li>
               );
             })}
-
-            <label className="swap swap-rotate cursor-pointer mx-2">
-              <input type="checkbox" value="night" className="theme-controller hover:scale-110 transition" />
-              <Sun className="swap-off w-8 h-8 hover:scale-110 transition" />
-              <Moon className="swap-on w-8 h-8 hover:scale-110 transition" />
-              <span className="sr-only">Toggle Theme</span>
-            </label>
           </ul>
+
+          {isOnValidation && (
+            <button
+              type="button"
+              onClick={handleBack}
+              className="btn btn-outline btn-sm"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back
+            </button>
+          )}
+
+          <label className="swap swap-rotate cursor-pointer mx-2">
+            <input type="checkbox" value="night" className="theme-controller hover:scale-110 transition" />
+            <Sun className="swap-off w-8 h-8 hover:scale-110 transition" />
+            <Moon className="swap-on w-8 h-8 hover:scale-110 transition" />
+            <span className="sr-only">Toggle Theme</span>
+          </label>
         </div>
       </div>
     </div>
