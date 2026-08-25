@@ -48,8 +48,11 @@ public class DriverManager {
 
     public void quitDriver() {
         if (driver != null) {
-            driver.quit();
-            driver = null;
+            try {
+                driver.quit();
+            } finally {
+                driver = null;
+            }
         }
     }
 }

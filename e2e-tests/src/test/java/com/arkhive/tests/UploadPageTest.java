@@ -4,17 +4,9 @@ import com.arkhive.pages.DocumentPreviewPage;
 import com.arkhive.pages.UploadPage;
 import com.arkhive.pages.ValidationPage;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 public class UploadPageTest extends BaseTest {
-
-    @Override
-    @BeforeMethod
-    public void setUp() {
-        super.setUp();
-    }
 
     @Test(description = "Verify that the Upload page loads successfully")
     public void testUploadPageLoads() {
@@ -102,11 +94,5 @@ public class UploadPageTest extends BaseTest {
             "DocumentPreviewPage grid should be displayed after cancelling classification modal");
         Assert.assertTrue(previewPage.getPreviewCardCount() > 0,
             "Preview cards should exist on DocumentPreviewPage after classification cancellation");
-    }
-
-    @Override
-    @AfterMethod
-    public void tearDown() {
-        super.tearDown();
     }
 }

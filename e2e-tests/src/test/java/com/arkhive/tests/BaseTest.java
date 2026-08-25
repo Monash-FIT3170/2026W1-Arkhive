@@ -29,10 +29,13 @@ public abstract class BaseTest {
         pageObjectManager = new PageObjectManager(driver);
     }
 
-    @AfterMethod
+    @AfterMethod(alwaysRun = true)
     public void tearDown() {
         if (driverManager != null) {
             driverManager.quitDriver();
+            driverManager = null;
         }
+        driver = null;
+        pageObjectManager = null;
     }
 }
