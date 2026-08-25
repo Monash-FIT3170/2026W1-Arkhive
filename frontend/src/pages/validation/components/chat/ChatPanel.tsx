@@ -1,12 +1,14 @@
-import { Bot, Send, X } from "lucide-react";
-import type { ChatMessage } from "../../../../models/Message";
-import MessageItem from "./MessageItem";
-import { useEffect, useRef, useState } from "react";
-import { sendMessage } from "../../../../services/llmService";
-import type { ExtractedData } from "../../../../models/TableData";
+import { Bot, Send, X } from 'lucide-react';
+import type { ChatMessage } from '../../../../models/Message';
+import MessageItem from './MessageItem';
+import { useEffect, useRef, useState } from 'react';
+import { sendMessage } from '../../../../services/llmService';
+import type { ExtractedPage } from '../../../../models/TableData';
 
-import OcrReviewWidget from "./OcrReviewWidget";
-import type { OcrIssue } from "./OcrReviewWidget";
+import OcrReviewWidget, { buildSlides } from './OcrReviewWidget';
+import type { OcrIssue } from './OcrReviewWidget';
+
+import type { HistoryEntry } from '../../../HistoryEntry';
 
 function ChatPanel({
   isOpen,
@@ -23,34 +25,48 @@ function ChatPanel({
   onCarouselManualEdit,
   onSlideChange,
   onFetchSuggestion,
+  onFetchBulkSuggestion,
   activeTab,
   onTabChange,
+  onResolveIssues,
+  resolvedIssueIds,
+  history = [],
 }: {
   isOpen: boolean;
   onToggle: () => void;
   messages: ChatMessage[];
   onAddMessage: (msg: ChatMessage) => void;
-  documentContext: ExtractedData;
-  onContextUpdate: (updated: ExtractedData) => void; // AI made a change + update table
+  documentContext: ExtractedPage;
+  onContextUpdate: (updated: ExtractedPage) => void;
   onAccept: () => void;
   onReject: () => void;
   flaggedIssues?: OcrIssue[];
-  onCarouselAccept?: (fieldId: string, newValue: string) => void;
-  onCarouselReject?: (fieldId: string) => void;
+  onCarouselAccept?: (updates: { fieldId: string; newValue: string }[]) => void;
+  onCarouselReject?: (fieldIds: string[]) => void;
   onCarouselManualEdit?: (fieldId: string, newValue: string) => void;
-  onSlideChange?: (fieldId: string) => void;
+  onSlideChange?: (fieldIds: string[]) => void;
   onFetchSuggestion?: (fieldId: string) => Promise<string | null>;
-  activeTab?: "chat" | "review";
-  onTabChange?: (tab: "chat" | "review") => void;
+  onFetchBulkSuggestion?: (
+    column: string,
+    fields: { fieldId: string; rowId: string | number; ocrValue: string }[],
+    formatRegex?: string
+  ) => Promise<Record<string, string> | null>;
+  activeTab?: 'chat' | 'review' | 'history';
+  onTabChange?: (tab: 'chat' | 'review' | 'history') => void;
+
+  resolvedIssueIds?: Set<string>;
+  onResolveIssues?: (ids: string[]) => void;
+
+  history?: HistoryEntry[];
 }) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState('');
   const [isLoading, setLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     //whenever messages changes it scrolls to the button of the chat
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = async () => {
@@ -58,16 +74,16 @@ function ChatPanel({
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
-      role: "user",
+      role: 'user',
       content: input.trim(),
       timestamp: new Date().toISOString(),
     };
 
     onAddMessage(userMsg);
-    setInput("");
+    setInput('');
     setLoading(true);
     const allMessages = [...messages, userMsg].map((m) => ({
-      role: m.role === "user" ? ("user" as const) : ("model" as const),
+      role: m.role === 'user' ? ('user' as const) : ('model' as const),
       content: m.content,
     }));
 
@@ -76,12 +92,15 @@ function ChatPanel({
 
       //ai returns updated context
       if (reply.updatedContext) {
-        onContextUpdate(reply.updatedContext);
+        onContextUpdate({
+          ...reply.updatedContext,
+          pageIndex: documentContext.pageIndex,
+        });
       }
 
       onAddMessage({
         id: crypto.randomUUID(),
-        role: "model",
+        role: 'model',
         content: reply.response,
         timestamp: new Date().toISOString(),
         intent: reply.intent ?? undefined, //attacth intent
@@ -89,21 +108,24 @@ function ChatPanel({
     } catch (error) {
       onAddMessage({
         id: crypto.randomUUID(),
-        role: "model",
-        content: "Error: Chatbot service failed. Please double check your Chatbot service credentials",
+        role: 'model',
+        content:
+          'Error: Chatbot service failed. Please double check your Chatbot service credentials',
         timestamp: new Date().toISOString(),
-      })
+      });
       if (isOpen) {
         onToggle();
       }
-      setChatError("Error: Chatbot service failed. Please double check your Chatbot service credentials");
+      setChatError(
+        'Error: Chatbot service failed. Please double check your Chatbot service credentials'
+      );
       // setTimeout(() => setChatError(null), 5000);
     } finally {
       setLoading(false);
     }
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -115,8 +137,17 @@ function ChatPanel({
       {chatError && (
         <div className="fixed bottom-24 right-6 z-50 w-72 animate-in fade-in slide-in-from-bottom-5 duration-300">
           <div className="alert alert-error mb-2 p-3 text-sm rounded-xl flex items-start gap-2 shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="mt-0.5 h-4 w-4 shrink-0"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                clipRule="evenodd"
+              />
             </svg>
             <span className="flex-1">{chatError}</span>
             <button
@@ -133,13 +164,13 @@ function ChatPanel({
       {/* AI Button to open and close modal */}
       <div className="fixed bottom-6 right-6 z-50">
         <div className="indicator">
-          {!isOpen && flaggedIssues.length > 0 && (
+          {!isOpen && buildSlides(flaggedIssues).length > 0 && (
             <span className="indicator-item badge badge-error badge-sm w-3.5 h-3.5 p-0 border-2 border-base-100 rounded-full shadow-sm mt-1 mr-1"></span>
           )}
           <button
             onClick={onToggle}
             className="btn btn-primary btn-circle btn-lg shadow-md"
-            title={isOpen ? "Close AI Assistant" : "Open AI Assistant"}
+            title={isOpen ? 'Close AI Assistant' : 'Open AI Assistant'}
           >
             <Bot className="w-9 h-9" />
           </button>
@@ -164,22 +195,33 @@ function ChatPanel({
                 <X className="w-6 h-6" />
               </button>
             </div>
-            
+
             {/* Tabs */}
             <div className="flex px-4 gap-6 mt-1">
-              <button 
+              <button
                 className={`pb-2 font-medium border-b-2 transition-colors ${activeTab === 'chat' ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`}
                 onClick={() => onTabChange?.('chat')}
               >
                 Chat
               </button>
-              <button 
+              <button
                 className={`pb-2 font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'review' ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`}
                 onClick={() => onTabChange?.('review')}
               >
                 Review
-                {flaggedIssues.length > 0 && (
-                  <span className="badge badge-error badge-sm text-white">{flaggedIssues.length}</span>
+                {buildSlides(flaggedIssues).length > 0 && (
+                  <span className="badge badge-error badge-sm text-white">
+                    {buildSlides(flaggedIssues).length}
+                  </span>
+                )}
+              </button>
+              <button
+                className={`pb-2 font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'history' ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`}
+                onClick={() => onTabChange?.('history')}
+              >
+                History
+                {history && history.length > 0 && (
+                  <span className="badge badge-neutral badge-sm">{history.length}</span>
                 )}
               </button>
             </div>
@@ -187,74 +229,67 @@ function ChatPanel({
 
           {activeTab === 'review' ? (
             <div className="flex-1 overflow-hidden">
-              <OcrReviewWidget 
+              <OcrReviewWidget
                 issues={flaggedIssues}
                 onAccept={onCarouselAccept!}
                 onReject={onCarouselReject!}
                 onManualEdit={onCarouselManualEdit!}
                 onSlideChange={onSlideChange}
                 onFetchSuggestion={onFetchSuggestion}
+                onFetchBulkSuggestion={onFetchBulkSuggestion}
+                resolvedIds={resolvedIssueIds}
+                onResolveIds={onResolveIssues}
               />
             </div>
-          ) : (
+          ) : activeTab === 'chat' ? (
             <>
               {/* messages area */}
               <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-            <div className="chat chat-start">
-              <div className="chat-image avatar">
-                <div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
-                  <Bot className="w-7 h-7 text-primary" />
-                </div>
-              </div>
-              <div className="chat-header text-xs opacity-50 mb-1">
-                AI Assistant
-              </div>
-              <div
-                className="chat-bubble chat-bubble-primary text-primary-content"
-                style={{ boxShadow: "var(--color-secondary)" }}
-              >
-                Hi there, I'm Arkhive's Virtual Assistant. What would you like
-                to do today?
-              </div>
-            </div>
-            {messages.map((msg) => (
-              <MessageItem
-                key={msg.id}
-                msg={msg}
-                onAccept={onAccept}
-                onReject={onReject}
-              />
-            ))}
-            {isLoading && (
-              <div className="chat chat-start">
-                <div className="chat-image avatar">
-                  <div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
-                    <Bot className="w-7 h-7 text-primary" />
+                <div className="chat chat-start">
+                  <div className="chat-image avatar">
+                    <div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
+                      <Bot className="w-7 h-7 text-primary" />
+                    </div>
+                  </div>
+                  <div className="chat-header text-xs opacity-50 mb-1">AI Assistant</div>
+                  <div
+                    className="chat-bubble chat-bubble-primary text-primary-content"
+                    style={{ boxShadow: 'var(--color-secondary)' }}
+                  >
+                    Hi there, I'm Arkhive's Virtual Assistant. What would you like to do today?
                   </div>
                 </div>
-                <div className="chat-header text-xs opacity-50 mb-1">
-                  AI Assistant
-                </div>
-                <div
-                  className="chat-bubble chat-bubble-primary text-primary-content"
-                  style={{
-                    boxShadow: "var(--color-secondary)",
-                  }}
-                >
-                  <span>Just a moment</span>
-                  <span className="loading loading-dots loading-sm ml-1.5"></span>
-                </div>
+                {messages.map((msg) => (
+                  <MessageItem key={msg.id} msg={msg} onAccept={onAccept} onReject={onReject} />
+                ))}
+                {isLoading && (
+                  <div className="chat chat-start">
+                    <div className="chat-image avatar">
+                      <div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
+                        <Bot className="w-7 h-7 text-primary" />
+                      </div>
+                    </div>
+                    <div className="chat-header text-xs opacity-50 mb-1">AI Assistant</div>
+                    <div
+                      className="chat-bubble chat-bubble-primary text-primary-content"
+                      style={{
+                        boxShadow: 'var(--color-secondary)',
+                      }}
+                    >
+                      <span>Just a moment</span>
+                      <span className="loading loading-dots loading-sm ml-1.5"></span>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
               </div>
-            )}
 
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* text input area */}
-          <div className="p-4 border-t border-gray-300 bg-base-300/30">
-            <div className="flex gap-2 items-center">
-              <textarea
-                className="
+              {/* text input area */}
+              <div className="p-4 border-t border-gray-300 bg-base-300/30">
+                <div className="flex gap-2 items-center">
+                  <textarea
+                    className="
 							textarea textarea-bordered w-full resize-none h-12 min-h-[1rem]
 							rounded-xl bg-base-100
 							border border-base-300
@@ -263,23 +298,67 @@ function ChatPanel({
 							focus:outline-none
 							
 						"
-                placeholder="Type your message here"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e)}
-                disabled={isLoading}
-              ></textarea>
-              <button
-                className="btn btn-primary btn-square"
-                title="Send message"
-                onClick={handleSend}
-                disabled={isLoading}
-              >
-                <Send className="w-5 h-5" />
-              </button>
+                    placeholder="Type your message here"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e)}
+                    disabled={isLoading}
+                  ></textarea>
+                  <button
+                    className="btn btn-primary btn-square"
+                    title="Send message"
+                    onClick={handleSend}
+                    disabled={isLoading}
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : activeTab === 'history' ? (
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+              {!history || history.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-base-content/40 gap-2 mt-20">
+                  <p className="font-semibold">No changes yet</p>
+                  <p className="text-xs">Changes you make will appear here</p>
+                </div>
+              ) : (
+                history.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="bg-base-100 rounded-xl p-3 border border-base-300 flex flex-col gap-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-xs font-bold uppercase tracking-wider ${
+                          entry.type === 'edit'
+                            ? 'text-primary'
+                            : entry.type === 'accept'
+                              ? 'text-success'
+                              : entry.type === 'skip'
+                                ? 'text-warning'
+                                : entry.type === 'undo'
+                                  ? 'text-error'
+                                  : 'text-info'
+                        }`}
+                      >
+                        {entry.type}
+                      </span>
+                      <span className="text-xs text-base-content/40">
+                        {new Date(entry.timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-base-content">{entry.description}</p>
+                  </div>
+                ))
+              )}
             </div>
-          </div>
-          </>
+          ) : (
+            <></>
           )}
         </div>
       )}

@@ -57,6 +57,27 @@ function applyIntentToContext(context: ExtractedData, intent: any): ExtractedDat
       return row;
     });
   }
+
+  //apply a batch of cell updates in one go
+  if (intent.type === 'bulk_update' && intent.bulkUpdates) {
+    const rowIdToUpdates = new Map<string, any[]>();
+    intent.bulkUpdates.forEach((u: any) => {
+      const key = String(u.rowId);
+      if (!rowIdToUpdates.has(key)) {
+        rowIdToUpdates.set(key, []);
+      }
+      rowIdToUpdates.get(key)!.push(u);
+    });
+    updated.rows = updated.rows.map((row) => {
+      const rowUpdates = rowIdToUpdates.get(String(row._id));
+      if (!rowUpdates) return row;
+      const newRow = { ...row };
+      rowUpdates.forEach((u) => {
+        newRow[u.column] = u.newValue;
+      });
+      return newRow;
+    });
+  }
   return updated;
 }
 
@@ -87,6 +108,7 @@ const chatResponseSchema: Schema = {
             'column_correction',
             'column_delete',
             'column_header_add',
+            'bulk_update',
           ],
         },
         column: {
@@ -140,11 +162,64 @@ const chatResponseSchema: Schema = {
             type: SchemaType.STRING,
           },
         },
+        bulkUpdates: {
+          type: SchemaType.ARRAY,
+          description:
+            'A list of cell updates to apply in bulk (for bulk_update), e.g. applying the same transformation to every value in a column.',
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              rowId: {
+                type: SchemaType.STRING,
+                description:
+                  "The unique '_id' of the exact row to modify (extracted from the provided document context).",
+              },
+              column: {
+                type: SchemaType.STRING,
+                description: 'The specific column header key from the provided document context.',
+              },
+              newValue: {
+                type: SchemaType.STRING,
+                description: 'The new, transformed value for this cell.',
+              },
+            },
+            required: ['rowId', 'column', 'newValue'],
+          },
+        },
       },
       required: ['type', 'column', 'newValue', 'rowId'],
     },
   },
   required: ['response'],
+};
+
+const formatDetectionSchema: Schema = {
+  type: SchemaType.OBJECT,
+  description:
+    'A map of column names to a regular expression validating their dominant structural format (separators, punctuation, casing, digit/letter layout) -- not limited to Date, Time, or Currency.',
+  properties: {
+    formats: {
+      type: SchemaType.ARRAY,
+      description:
+        'List of columns with a detected dominant structural format, and a regex matching it.',
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          column: {
+            type: SchemaType.STRING,
+            description: 'The name of the column.',
+          },
+          regex: {
+            type: SchemaType.STRING,
+            description:
+              'The regular expression validating the most common structural pattern in this column.',
+          },
+        },
+        required: ['column', 'regex'],
+      },
+    },
+  },
+  required: ['formats'],
 };
 
 export default {
@@ -173,6 +248,7 @@ export default {
             If they confirm the columns look correct, use the 'column_confirm' intent and set 'approved' to true.
             If they want to rename one or more column headers (e.g., 'change column header Supplier to Vendor Name'), use the 'column_correction' intent and populate the 'updates' array.
             If they want to remove or delete one or more columns (e.g., 'delete the tax column'), use the 'column_delete' intent and populate the 'deletedColumns' array.
+            If they want to apply the same change across many cells (e.g., 'add a $ prefix to every value in the PRICE column'), use the 'bulk_update' intent and populate the 'bulkUpdates' array with one entry per affected cell: 'rowId' from the document context, 'column' as the exact column header key, and 'newValue' as the fully transformed value. Never leave a cell out of 'bulkUpdates' that the user asked to change.
             If they approve or reject the document generally, use the 'approval' or 'rejection' intent.
             Always be polite and confirm what you are doing in the 'response' field.
             
@@ -206,7 +282,9 @@ export default {
     const updatedContext =
       parsed.intent &&
       documentContext &&
-      ['correction', 'column_correction', 'column_delete'].includes(parsed.intent.type)
+      ['correction', 'column_correction', 'column_delete', 'bulk_update'].includes(
+        parsed.intent.type
+      )
         ? applyIntentToContext(documentContext, parsed.intent)
         : undefined;
 
@@ -227,13 +305,13 @@ export default {
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
-      systemInstruction: `You are helping verify OCR-extracted table data. One specific cell has low confidence and needs to be checked with the user.
+      systemInstruction: `You are helping verify OCR-extracted table data. One specific cell has been flagged for review.
 
       The cell in question:
       - Row position: index ${rowIndex} in the rows array (0-indexed) — ignore any row ID, use this position
       - Column: "${field.column}" — inferred column type: ${columnType}
       - OCR-read value: "${field.value}"
-      - OCR confidence: ${field.confidence.toFixed(2)}
+      - Flag Reason: ${field.issueType === 'format' ? 'Formatting Inconsistency' : 'Low OCR Confidence'}
 
         Other already-confirmed values in this same row, for context:
         ${JSON.stringify(otherFieldsInRow, null, 2)}
@@ -274,5 +352,161 @@ export default {
         : undefined;
 
     return { ...parsed, updatedContext };
+  },
+  suggestBulkFieldCorrections: async (
+    column: string,
+    fields: ReviewField[],
+    documentContext: ExtractedData,
+    formatRegex?: string
+  ): Promise<any> => {
+    const flaggedIds = new Set(fields.map((f) => String(f.rowId)));
+
+    const rowContexts = fields.map(({ rowId }) => {
+      const row = documentContext.rows.find((r) => String(r._id) === String(rowId));
+      if (!row) return { rowId, otherFields: {} };
+      const { _id, _cellKeyMap, _confidence, _cellConfidence, ...otherFields } = row;
+      return { rowId, otherFields };
+    });
+
+    const referenceValues = documentContext.rows
+      .filter((r) => !flaggedIds.has(String(r._id)))
+      .map((r) => r[column])
+      .filter((v) => v !== null && v !== undefined && String(v).trim() !== '')
+      .slice(0, 20);
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      systemInstruction: `You are helping verify OCR-extracted table data. Multiple cells in the SAME column "${column}" have been flagged as inconsistent with the column's expected format.
+
+    ${
+      formatRegex
+        ? `The column's expected format was detected as this regular expression: ${formatRegex}. Every corrected value MUST match this pattern exactly.`
+        : ''
+    }
+
+    The flagged cells, with the rest of their row for context:
+    ${JSON.stringify(rowContexts, null, 2)}
+
+    Values from OTHER rows in this same column that already look correctly formatted, for reference:
+    ${JSON.stringify(referenceValues, null, 2)}
+
+    Your job:
+    1. For EACH flagged row, clean and normalize its "${column}" value so it matches the expected format. Remove stray punctuation/whitespace/OCR artifacts. Use the row's other fields and the reference values to judge the most plausible correction -- don't just blindly strip characters if that produces a value that doesn't make sense in context.
+    2. Set 'intent.type' to 'bulk_update'.
+    3. Populate 'intent.bulkUpdates' with EXACTLY one entry per flagged row: 'rowId' (the exact id given above), 'column' set to "${column}", and 'newValue' as your corrected value. Do not omit any row.
+    4. Set 'response' to a short, one-sentence summary of what you changed and why.
+    `,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: chatResponseSchema,
+        temperature: 0.2,
+      },
+    });
+
+    const result = await model.generateContent(
+      `Please review and correct the "${column}" field across the ${fields.length} flagged rows.`
+    );
+    const parsed = JSON.parse(result.response.text());
+
+    const updatedContext =
+      parsed.intent && parsed.intent.type === 'bulk_update'
+        ? applyIntentToContext(documentContext, parsed.intent)
+        : undefined;
+
+    return { ...parsed, updatedContext };
+  },
+  //This function was made with the help of Google Gemini
+  detectTableFormats: async (sampledData: Record<string, string[]>): Promise<any> => {
+    const formattedSample = JSON.stringify(sampledData, null, 2);
+
+    // const model = genAI.getGenerativeModel({
+    //   model: 'gemini-2.5-flash',
+    //   systemInstruction: `You are an AI assistant helping validate table data extracted via OCR.
+    //   Your task is to identify which columns represent Dates, Times, or Currencies based on the provided sample data.
+    //   For each column that you identify as Date, Time, or Currency, provide a regular expression that matches the most common format found in the sample for that column.
+    //   Do not include columns that are not Dates, Times, or Currencies (e.g. ignore text, names, generic IDs, statuses, etc.).
+
+    //   Here is the sample of the first few non-empty rows for each column:
+    //   ${formattedSample}
+
+    //   Return the results as a list of { column, regex } objects inside 'formats'.
+    //   Make sure the regex is strict enough to catch formatting inconsistencies, e.g. '\\d{2}-\\d{2}-\\d{4}' or '\\$\\d+\\.\\d{2}'.
+    //   `,
+    //   generationConfig: {
+    //     responseMimeType: 'application/json',
+    //     responseSchema: formatDetectionSchema,
+    //     temperature: 0.1,
+    //   },
+    // });
+
+    // const result = await model.generateContent('Identify Date, Time, and Currency columns and provide validation regexes.');
+    console.log('SENT TO MODEL:\n', formattedSample);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3.5-flash',
+      systemInstruction: `You are an AI assistant helping validate table data extracted via OCR.
+
+        Look at each column's sample values. If most non-empty values share the same structural
+        pattern (separators, punctuation, casing, digit/letter layout -- not just Dates, Times,
+        Currency), return a regex matching that dominant pattern.
+
+        Also use the column's likely MEANING as a signal, inferred from its name and the values
+        that make semantic sense together -- not just raw frequency in the sample:
+        - A column that's clearly numeric/quantity/ID-like by name and mostly-digit values
+        should be treated as a digits-only pattern. A non-digit placeholder (e.g. "-", "N/A")
+        is almost always an OCR error or missing-value marker, not a legitimate alternate
+        format -- exclude it from the regex even if it appears in a large share of the sample.
+        - A leaked, semantically unrelated prefix or suffix stuck onto an otherwise consistent
+        value (e.g. a stray number or character attached to a code/ID on only some rows) is
+        more likely an OCR artifact than part of the actual value. Prefer the pattern for the
+        coherent underlying value over one that includes such leaked tokens, even if the
+        leaked version appears often in the sample.
+
+        When raw frequency and semantic plausibility disagree, prefer semantic plausibility --
+        a small sample can make a formatting bug look common by chance, so don't let sample
+        frequency alone justify treating an implausible variant as the accepted format.
+
+        CRITICAL RULE: DO NOT use optional characters (e.g. "?", "*") or alternations ("|") to 
+        accommodate minority formats or inconsistencies in the sample (e.g. allowing a "$" just 
+        because one row has it, while others don't). The regex MUST strictly define the single 
+        most dominant format. Any deviations from that strict dominant format are supposed to 
+        fail the regex check.
+
+        The regex must match ONLY the dominant, semantically-correct pattern -- outliers and
+        noise are supposed to fail to match, that's what flags them for review.
+
+        Skip a column if: it's genuinely free text (names, addresses, notes), it has no clear
+        majority pattern (roughly evenly mixed structures) AND no semantic reason to prefer one,
+        or the sample has under 3 non-empty values.
+
+        Sample (random rows per column):
+        ${formattedSample}
+
+        Return { column, regex } objects inside 'formats'.
+        Examples: '\\d{2}-\\d{2}-\\d{4}' (date), '\\$\\d+\\.\\d{2}' (currency), '^\\d+$' (small integer column).
+        `,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: formatDetectionSchema,
+        temperature: 0.1,
+      },
+    });
+
+    const result = await model.generateContent(
+      'Identify columns with a consistent format and provide validation regexes for each, following the rules above.'
+    );
+    console.log('RAW RESPONSE:\n', result.response.text());
+    const parsed = JSON.parse(result.response.text());
+
+    // Convert { formats: [{column, regex}] } into Record<string, string>
+    const regexMap: Record<string, string> = {};
+    if (parsed.formats && Array.isArray(parsed.formats)) {
+      parsed.formats.forEach((f: any) => {
+        if (f.column && f.regex) {
+          regexMap[f.column] = f.regex;
+        }
+      });
+    }
+
+    return regexMap;
   },
 };

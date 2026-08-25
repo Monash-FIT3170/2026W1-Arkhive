@@ -4,8 +4,6 @@ import fs from 'fs';
 import { extractStructuredComponents } from './utils/utils_table_extraction.js';
 import { withRetry } from './utils/utils.js';
 
-
-
 /**
  * @author Aryan Cyrus (33114242)
  * Initializes the Google Cloud Vision client with the necessary credentials.
@@ -18,18 +16,15 @@ import { withRetry } from './utils/utils.js';
  */
 const localCredsPath = path.resolve(
   process.cwd(),
-  "../backend/src/credentials/google-vision-key.json"
+  '../backend/src/credentials/google-vision-key.json'
 );
-const tempCredsPath = path.join("/tmp", "google-vision-key.json");
+const tempCredsPath = path.join('/tmp', 'google-vision-key.json');
 
 let credsPath: string;
 
 if (process.env.GOOGLE_CREDENTIALS_BASE64) {
   // Render (or any host with the base64 env var set): decode to /tmp
-  fs.writeFileSync(
-    tempCredsPath,
-    Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, "base64")
-  );
+  fs.writeFileSync(tempCredsPath, Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64'));
   credsPath = tempCredsPath;
 } else {
   // Local dev: use the JSON file already sitting in the repo
@@ -40,12 +35,12 @@ const client = new vision.ImageAnnotatorClient({
   keyFilename: credsPath,
   features: [
     {
-      type: "DOCUMENT_TEXT_DETECTION"
-    }
+      type: 'DOCUMENT_TEXT_DETECTION',
+    },
   ],
   imageContext: {
-    languageHints: ["en"]
-  }
+    languageHints: ['en'],
+  },
 });
 
 const chunk = <T>(arr: T[], size: number): T[][] =>
@@ -55,10 +50,10 @@ const chunk = <T>(arr: T[], size: number): T[][] =>
 
 export async function textExtraction(buffer: Buffer): Promise<string> {
   const [result] = await client.documentTextDetection({
-    image: { content: buffer.toString("base64") }
+    image: { content: buffer.toString('base64') },
   });
 
-  return result.fullTextAnnotation?.text ?? "";
+  return result.fullTextAnnotation?.text ?? '';
 }
 
 // test ocr on 1 png page
@@ -80,8 +75,16 @@ function for getting bounding boxes for all words detected
 async function parseTable(imageBuffer: Buffer) {
   const [response] = await client.documentTextDetection(imageBuffer);
   const fullTextAnnotation = response.fullTextAnnotation;
+  console.log('OCR response:', {
+    hasFullTextAnnotation: !!response.fullTextAnnotation,
+    hasPages: !!response.fullTextAnnotation?.pages,
+    text: response.fullTextAnnotation?.text,
+    pageCount: response.fullTextAnnotation?.pages?.length,
+  });
   if (!fullTextAnnotation || !fullTextAnnotation.pages) {
-    throw new Error("NoTextDetectedError: OCR did not detect any text. Please double check or reupload your document.");
+    throw new Error(
+      'NoTextDetectedError: OCR did not detect any text. Please double check or reupload your document.'
+    );
   }
   return extractStructuredComponents(fullTextAnnotation.pages);
 }
@@ -89,16 +92,16 @@ async function parseTable(imageBuffer: Buffer) {
 export async function parseTableWithRetries(
   imageBuffer: Buffer,
   onRetry?: (attempt: number, maxRetries: number) => void
-){
-  return await withRetry(() => parseTable(imageBuffer), 3, 3000, onRetry)
+) {
+  return await withRetry(() => parseTable(imageBuffer), 3, 3000, onRetry);
 }
 
 // function for getting overall averaged confidence score
 
-const jsonOut = JSON.stringify(
-  await parseTable(fs.readFileSync("assets/sample-page-1.png")),
-  null,
-  2
-);
+// const jsonOut = JSON.stringify(
+//   await parseTable(fs.readFileSync('assets/sample-page-1.png')),
+//   null,
+//   2
+// );
 
-fs.writeFileSync("boundingBox.json", jsonOut, "utf-8");
+// fs.writeFileSync('boundingBox.json', jsonOut, 'utf-8');

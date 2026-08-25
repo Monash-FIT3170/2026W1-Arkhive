@@ -45,6 +45,12 @@ vi.mock('./components/extracted-data/ExtractedDataPanel', () => ({
 vi.mock('./components/chat/ChatPanel', () => ({
   default: () => <div data-testid="chat-panel" />
 }));
+vi.mock('../../services/testService', () => ({
+  getTestData: vi.fn().mockResolvedValue([
+    [{ id: '1', type: 'TABLE_ROW', cells: ['A'], confidence: 0.9, boundingBoxes: {}, indentation: 0, y: 0, layer: 0, text: 'A' }]
+  ]),
+  getTestImageUrls: vi.fn().mockResolvedValue(['http://localhost/mock.png']),
+}));
 
 describe('ValidationPage', () => {
   beforeEach(() => {
@@ -53,7 +59,7 @@ describe('ValidationPage', () => {
 
   it('loads session data on mount and renders panels', async () => {
     render(<ValidationPage />);
-    
+
     // Wait for session data to be loaded (side effect in useEffect)
     await waitFor(() => {
       expect(screen.getByTestId('document-panel')).toBeInTheDocument();

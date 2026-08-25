@@ -120,11 +120,11 @@ describe("getMidX", () => {
 // 3. extractColumns
 // ---------------------------------------------------------------------------
 describe("extractColumns", () => {
-  /** Build a TABLE_COLS component whose cells map to the given labels */
+  /** Build a HEADER component whose cells map to the given labels */
   function makeColComponent(labels: string[]): OCRComponent {
     const boundingBoxes: Record<string, any> = {};
     labels.forEach((label, i) => {
-      boundingBoxes[`cell_${i}`] = {
+      boundingBoxes[`col_${i}`] = {
         ...makeBox(i * 100, i * 100 + 80),
         text: label
       };
@@ -132,7 +132,7 @@ describe("extractColumns", () => {
 
     return makeComponent({
       id: "comp_0",
-      type: "TABLE_COLS",
+      type: "HEADER",
       cells: labels,
       boundingBoxes
     });
@@ -198,12 +198,12 @@ describe("flatten", () => {
   function makeSimpleDataset(): OCRComponent[] {
     const colComp = makeComponent({
       id: "comp_0",
-      type: "TABLE_COLS",
+      type: "HEADER",
       cells: ["Item", "Qty", "Price"],
       boundingBoxes: {
-        cell_0: { ...makeBox(10, 90), text: "Item" },
-        cell_1: { ...makeBox(110, 190), text: "Qty" },
-        cell_2: { ...makeBox(210, 290), text: "Price" }
+        col_0: { ...makeBox(10, 90), text: "Item" },
+        col_1: { ...makeBox(110, 190), text: "Qty" },
+        col_2: { ...makeBox(210, 290), text: "Price" }
       }
     });
 
@@ -212,9 +212,9 @@ describe("flatten", () => {
       type: "TABLE_ROW",
       cells: ["Apples", "10", "5000"],
       boundingBoxes: {
-        cell_0: { ...makeBox(10, 90), text: "Apples" },
-        cell_1: { ...makeBox(110, 190), text: "10" },
-        cell_2: { ...makeBox(210, 290), text: "5000" }
+        col_0: { ...makeBox(10, 90), text: "Apples" },
+        col_1: { ...makeBox(110, 190), text: "10" },
+        col_2: { ...makeBox(210, 290), text: "5000" }
       }
     });
 
@@ -223,9 +223,9 @@ describe("flatten", () => {
       type: "TABLE_ROW",
       cells: ["Bananas", "5", "3000"],
       boundingBoxes: {
-        cell_0: { ...makeBox(10, 90), text: "Bananas" },
-        cell_1: { ...makeBox(110, 190), text: "5" },
-        cell_2: { ...makeBox(210, 290), text: "3000" }
+        col_0: { ...makeBox(10, 90), text: "Bananas" },
+        col_1: { ...makeBox(110, 190), text: "5" },
+        col_2: { ...makeBox(210, 290), text: "3000" }
       }
     });
 
@@ -270,7 +270,7 @@ describe("flatten", () => {
         id: "comp_header",
         type: "HEADER",
         cells: ["INVOICE"],
-        boundingBoxes: { cell_0: { ...makeBox(10, 90), text: "INVOICE" } }
+        boundingBoxes: { col_0: { ...makeBox(10, 90), text: "INVOICE" } }
       })
     );
 
