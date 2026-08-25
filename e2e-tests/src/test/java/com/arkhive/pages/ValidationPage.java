@@ -6,10 +6,13 @@ import org.openqa.selenium.WebDriver;
 /**
  * Page Object representing Step 2: Validation Page (/validation)
  */
-public class ValidationPage extends BasePage implements ValidationPageObjects {
+public class ValidationPage extends BasePage {
+
+    private final ValidationPageObjects pageObjects;
 
     public ValidationPage(WebDriver driver) {
         super(driver);
+        this.pageObjects = new ValidationPageObjects();
     }
 
     public boolean isDisplayed() {
@@ -17,10 +20,10 @@ public class ValidationPage extends BasePage implements ValidationPageObjects {
     }
 
     public boolean isDocumentPanelDisplayed() {
-        return isDisplayed(documentViewer);
+        return isDisplayed(pageObjects.documentViewer);
     }
 
     public boolean isExtractedDataPanelDisplayed() {
-        return isDisplayed(extractedDataViewer);
+        return isDisplayed(pageObjects.extractedDataViewer);
     }
 }

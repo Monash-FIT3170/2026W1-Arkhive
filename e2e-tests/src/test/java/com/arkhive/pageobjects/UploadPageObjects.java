@@ -2,12 +2,13 @@ package com.arkhive.pageobjects;
 
 import org.openqa.selenium.By;
 
-public interface UploadPageObjects {
-    
-    By fileInput = By.cssSelector("input[type='file']");
-    By brandingHeading = By.xpath("//h1[contains(text(),'ARKHIVE')]");
-    By dropzoneText = By.xpath("//p[contains(text(),'Click to select files, or drop them anywhere')]");
-    By errorAlert = By.cssSelector(".alert-error");
-}
-    
+/**
+ * Locator definitions for UploadPage.
+ */
+public class UploadPageObjects {
 
+    public final By fileInput = By.cssSelector("input[type='file']");
+    public final By brandingHeading = By.xpath("//h1[contains(text(),'ARKHIVE')]");
+    public final By dropzoneText = By.xpath("//p[contains(text(),'Click to select files, or drop them anywhere')]");
+    public final By errorAlert = By.cssSelector(".alert-error");
+}

@@ -10,32 +10,35 @@ import java.util.List;
 /**
  * Page Object representing Step 1: Document Preview Page (/?step=preview)
  */
-public class DocumentPreviewPage extends BasePage implements DocumentPreviewPageObjects {
+public class DocumentPreviewPage extends BasePage {
+
+    private final DocumentPreviewPageObjects pageObjects;
 
     public DocumentPreviewPage(WebDriver driver) {
         super(driver);
+        this.pageObjects = new DocumentPreviewPageObjects();
     }
 
     public boolean isDisplayed() {
-        return isDisplayed(previewHeader);
+        return isDisplayed(pageObjects.previewHeader);
     }
 
     public boolean isClassificationModalDisplayed() {
-        return isDisplayed(classificationModalTitle);
+        return isDisplayed(pageObjects.classificationModalTitle);
     }
 
     public void confirmClassification() {
-        click(confirmClassificationButton);
+        click(pageObjects.confirmClassificationButton);
     }
 
     public void cancelClassification() {
-        click(cancelClassificationButton);
+        click(pageObjects.cancelClassificationButton);
     }
 
     public int getPreviewCardCount() {
         try {
-            waitForPresence(gridItems);
-            List<WebElement> items = driver.findElements(gridItems);
+            waitForPresence(pageObjects.gridItems);
+            List<WebElement> items = driver.findElements(pageObjects.gridItems);
             return items.size();
         } catch (TimeoutException e) {
             return 0;
@@ -43,14 +46,14 @@ public class DocumentPreviewPage extends BasePage implements DocumentPreviewPage
     }
 
     public void clickProcess() {
-        click(processButton);
+        click(pageObjects.processButton);
     }
 
     public boolean hasErrorMessage() {
-        return isDisplayed(errorAlert);
+        return isDisplayed(pageObjects.errorAlert);
     }
 
     public String getErrorMessage() {
-        return waitForVisible(errorAlert).getText();
+        return waitForVisible(pageObjects.errorAlert).getText();
     }
 }
