@@ -1,5 +1,10 @@
 import { describe, test, expect } from 'vitest';
-import { filterValidFiles, ALLOWED_MIME_TYPES } from './DropZone';
+import {
+  filterValidFiles,
+  partitionBySize,
+  ALLOWED_MIME_TYPES,
+  MAX_FILE_SIZE_BYTES,
+} from './DropZone';
 
 /**
  * DropZone Logic Verification
@@ -77,6 +82,65 @@ describe('DropZone File Validation Logic', function () {
 
   expect(result.length).toBe(1);
   expect(result[0].name).toBe('valid.pdf');
-});
+  });
+
+  test('should accept a file smaller than the 5MB limit', function () {
+  const smallFile = new File(
+    [new Uint8Array(1024)],
+    'small.pdf',
+    { type: 'application/pdf' }
+  );
+
+  const result = partitionBySize([smallFile]);
+
+  expect(result.accepted.length).toBe(1);
+  expect(result.rejected.length).toBe(0);
+  });
+
+  test('should accept a file exactly at the 5MB limit', function () {
+  const exactLimitFile = new File(
+    [new Uint8Array(MAX_FILE_SIZE_BYTES)],
+    'exact-limit.pdf',
+    { type: 'application/pdf' }
+  );
+
+  const result = partitionBySize([exactLimitFile]);
+
+  expect(result.accepted.length).toBe(1);
+  expect(result.rejected.length).toBe(0);
+  });
+
+  test('should reject a file larger than the 5MB limit', function () {
+  const oversizedFile = new File(
+    [new Uint8Array(MAX_FILE_SIZE_BYTES + 1)],
+    'too-large.pdf',
+    { type: 'application/pdf' }
+  );
+
+  const result = partitionBySize([oversizedFile]);
+
+  expect(result.accepted.length).toBe(0);
+  expect(result.rejected.length).toBe(1);
+  });
+
+  test('should separate valid-size and oversized files', function () {
+  const smallFile = new File(
+    [new Uint8Array(1024)],
+    'small.pdf',
+    { type: 'application/pdf' }
+  );
+
+  const oversizedFile = new File(
+    [new Uint8Array(MAX_FILE_SIZE_BYTES + 1)],
+    'large.pdf',
+    { type: 'application/pdf' }
+  );
+
+  const result = partitionBySize([smallFile, oversizedFile]);
+
+  expect(result.accepted).toContain(smallFile);
+  expect(result.rejected).toContain(oversizedFile);
+  });
+
 
 });

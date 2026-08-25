@@ -4,27 +4,32 @@ import path from 'path';
 import fs from 'fs';
 import uploadController from '../controller/upload.js';
 
-// Store files on disk for scalability, not in memory
+// Store files on disk for scalability
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadPath = path.join(process.cwd(), 'uploads');
-    // Ensure the uploads directory exists
+    // Organize by session ID and document ID
+    const sessionId = req.session.id;
+    const documentId = (req.query.documentId as string) || 'unknown_document';
+    const uploadPath = path.join(process.cwd(), 'uploads', sessionId, documentId);
+    
+    // Ensure the document directory exists
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    // Generate a unique filename
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`);
+    const pageIndex = (req.query.pageIndex as string) || '0';
+    // Generate a predictable but unique filename for the page
+    const ext = path.extname(file.originalname);
+    cb(null, `page-${pageIndex}-${Date.now()}${ext}`);
   },
 });
 
 const upload = multer({
   storage,
   limits: {
-    fileSize: 25 * 1024 * 1024,  // 25 MB per page
-    files: 100,                   // max 100 pages at once
+    fileSize: 25 * 1024 * 1024, // 25 MB per page
   },
   fileFilter: (_req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/tiff', 'image/webp', 'image/heic', 'image/heif'];
@@ -38,53 +43,33 @@ const upload = multer({
 
 const uploadRouter = Router();
 
-uploadRouter.post('/', upload.array('pages'), uploadController.processUpload);
+// Endpoint to upload a single page immediately
+uploadRouter.post('/page', upload.single('page'), uploadController.uploadPage);
 
-uploadRouter.get('/', (req, res) =>{
-  return res.status(204).send(req.session.extraction ?? "")
+// Endpoint to delete a specific page
+uploadRouter.delete('/page/:documentId/:pageIndex', uploadController.deletePage);
+
+// Endpoint to delete an entire document
+uploadRouter.delete('/document/:documentId', uploadController.deleteDocument);
+
+// Endpoint to trigger OCR processing on the uploaded files
+uploadRouter.post('/process', uploadController.processDocuments);
+
+// Endpoint to get the list of uploaded documents and their pages
+uploadRouter.get('/documents', uploadController.getDocuments);
+
+// Endpoint to get the images that were processed in the current session
+uploadRouter.get('/processed-images', uploadController.getProcessedImages);
+
+// Backward compatibility: get extraction result
+uploadRouter.get('/', (req, res) => {
+  return res.status(204).send(req.session.extraction ?? "");
 });
 
-// Returns uploaded pages grouped back into their source files
-// (e.g. a 3-page PDF is one group with pageIndices [0, 1, 2])
-uploadRouter.get('/files', uploadController.listFiles);
+// Returns a specific uploaded image based on documentId and pageIndex
+uploadRouter.get('/image/:documentId/:pageIndex', uploadController.getImage);
 
-// Returns an array of URLs for all uploaded images in the current session
-// This makes it easy for the frontend to know how many images exist and fetch them all
-uploadRouter.get('/images', (req, res) => {
-  const files = req.session.uploadedFiles || [];
-  const urls = files.map((_, index) => `/api/upload/image/${index}`);
-  res.json(urls);
-});
-
-// Returns a specific uploaded image (or the first one if no index is provided)
-// This maintains backward compatibility with the frontend that calls GET /api/upload/image
-uploadRouter.get(['/image', '/image/:index'], (req, res) => {
-  const files = req.session.uploadedFiles;
-  if (!files || files.length === 0) {
-    res.status(404).json({ error: 'No uploaded images found in session.' });
-    return;
-  }
-
-  // Parse the index (defaults to 0 if not provided or invalid)
-  let index = 0;
-  if (req.params.index) {
-    index = parseInt(req.params.index as string, 10);
-    if (isNaN(index) || index < 0 || index >= files.length) {
-      res.status(404).json({ error: 'Invalid image index.' });
-      return;
-    }
-  }
-
-  const filename = files[index];
-  const filePath = path.join(process.cwd(), 'uploads', filename);
-
-  if (!fs.existsSync(filePath)) {
-    res.status(404).json({ error: 'Image file not found on disk.' });
-    return;
-  }
-
-  // Stream the file directly from disk
-  res.sendFile(filePath);
-});
+// Backwards compatibility endpoint for preview images (returns the first image of the first document)
+uploadRouter.get('/image', uploadController.getFirstImage);
 
 export default uploadRouter;

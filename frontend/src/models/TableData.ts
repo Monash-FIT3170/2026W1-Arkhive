@@ -7,5 +7,6 @@ export interface ExtractedRow {
   _id: string | number;
   _cellKeyMap?: Record<string, string>;
   _confidence?: number;
+  _cellConfidence: Record<string, number>;
   [key: string]: any;
 }
