@@ -35,7 +35,8 @@ export interface Intent {
     | 'unclear'
     | 'column_confirm'
     | 'column_correction'
-    | 'column_delete';
+    | 'column_delete'
+    | 'bulk_update'; // New intent type for bulk updates
   rowId?: string; // The unique ID of the row
   column?: string; // <-- Changed from 'field' to 'column'
   oldValue?: string;
@@ -44,6 +45,7 @@ export interface Intent {
   note?: string;
   updates?: Array<{ from: string; to: string }>; // for column renames
   deletedColumns?: string[]; // for column deletes
+  bulkUpdates?: Array<{ rowId: string; column: string; newValue: string }>; // for bulk updates
 }
 
 export interface ReviewField {
@@ -51,9 +53,17 @@ export interface ReviewField {
   column: string;
   value: string;
   confidence: number;
+  issueType?: 'confidence' | 'format';
 }
 
 export interface ReviewFieldRequest {
   field: ReviewField;
+  documentContext: ExtractedData;
+}
+
+export interface BulkReviewFieldRequest {
+  column: string;
+  fields: ReviewField[]; // multiple flagged cells sharing this column
+  formatRegex?: string; // the detected format for the column, if any
   documentContext: ExtractedData;
 }
