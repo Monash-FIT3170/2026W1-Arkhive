@@ -1,3 +1,4 @@
+import { SchemaType, Schema } from '@google/generative-ai';
 export interface Vertex {
   x: number;
   y: number;
@@ -6,10 +7,9 @@ export interface Vertex {
 export interface OCRBoundingBox {
   text: string;
   column?: string;
-  vertices: Vertex[]
-  confidence: number
+  vertices: Vertex[];
+  confidence: number;
 }
-
 
 export interface OCRComponent {
   id: string;
@@ -24,110 +24,104 @@ export interface OCRComponent {
   boundingBoxes?: OCRBoundingBoxes;
 }
 
+export type OCRColumnBox = {
+  text: string;
+  column: string;
+  vertices: Vertex[];
+  confidence: number;
+};
 
-export const geminiSchemaBBoxPrompt = {
-  "type": "OBJECT",
-  "properties": {
-    "components": {
-      "type": "ARRAY",
-      "description": "List of OCR layout components extracted from the document",
-      "items": {
-        "type": "OBJECT",
-        "properties": {
-          "id": {
-            "type": "STRING"
+export type OCRColumnBoundingBoxes = Record<string, OCRColumnBox>;
+
+export const geminiSchemaBBoxPrompt: Schema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    components: {
+      type: SchemaType.ARRAY,
+      description: 'List of OCR layout components extracted from the document',
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          id: {
+            type: SchemaType.STRING,
           },
-          "type": {
-            "type": "STRING",
-            "enum": [
-              "TITLE",
-              "HEADER",
-              "TABLE_ROW",
-              "BODY_TEXT",
-              "TABLE_COLS"
-            ]
+          type: {
+            type: SchemaType.STRING,
+            format: 'enum',
+            enum: ['TITLE', 'HEADER', 'TABLE_ROW', 'BODY_TEXT', 'TABLE_COLS'],
           },
-          "indentation": {
-            "type": "NUMBER"
+          indentation: {
+            type: SchemaType.NUMBER,
           },
-          "y": {
-            "type": "NUMBER"
+          y: {
+            type: SchemaType.NUMBER,
           },
-          "layer": {
-            "type": "INTEGER"
+          layer: {
+            type: SchemaType.INTEGER,
           },
-          "parentId": {
-            "type": "STRING"
+          parentId: {
+            type: SchemaType.STRING,
           },
-          "text": {
-            "type": "STRING"
+          text: {
+            type: SchemaType.STRING,
           },
-          "cells": {
-            "type": "ARRAY",
-            "items": {
-              "type": "STRING"
-            }
+          cells: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.STRING,
+            },
           },
-          "confidence": {
-            "type": "NUMBER"
+          confidence: {
+            type: SchemaType.NUMBER,
           },
-          "boundingBoxes": {
-            "type": "ARRAY",
-            "description": "Array representation of the bounding boxes record for compatibility",
-            "items": {
-              "type": "OBJECT",
-              "properties": {
-                "key": {
-                  "type": "STRING"
+          boundingBoxes: {
+            type: SchemaType.ARRAY,
+            description: 'One entry per table column present in this row',
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                columnKey: {
+                  type: SchemaType.STRING, // e.g. "col_0", "col_1"
                 },
-                "box": {
-                  "type": "OBJECT",
-                  "properties": {
-                    "text": {
-                      "type": "STRING"
+                text: {
+                  type: SchemaType.STRING,
+                },
+                column: {
+                  type: SchemaType.STRING, // e.g. "Column 0"
+                },
+                confidence: {
+                  type: SchemaType.NUMBER,
+                },
+                vertices: {
+                  type: SchemaType.ARRAY,
+                  items: {
+                    type: SchemaType.OBJECT,
+                    properties: {
+                      x: { type: SchemaType.NUMBER },
+                      y: { type: SchemaType.NUMBER },
                     },
-                    "column": {
-                      "type": "STRING"
-                    },
-                    "confidence": {
-                      "type": "NUMBER"
-                    },
-                    "vertices": {
-                      "type": "ARRAY",
-                      "items": {
-                        "type": "OBJECT",
-                        "properties": {
-                          "x": {
-                            "type": "NUMBER"
-                          },
-                          "y": {
-                            "type": "NUMBER"
-                          }
-                        },
-                        "required": ["x", "y"]
-                      }
-                    }
+                    required: ['x', 'y'],
                   },
-                  "required": ["text", "vertices", "confidence"]
-                }
+                },
               },
-              "required": ["key", "box"]
-            }
-          }
+              required: ['columnKey', 'text', 'vertices', 'confidence'],
+            },
+          },
         },
-        "required": [
-          "id",
-          "type",
-          "indentation",
-          "y",
-          "boundingBoxes",
-          "layer",
-          "text",
-          "confidence"
-        ]
-      }
-    }
-  }
-}
+        required: [
+          'id',
+          'type',
+          'indentation',
+          'y',
+          'boundingBoxes',
+          'layer',
+          'text',
+          'confidence',
+        ],
+      },
+    },
+  },
+  required: ['components'],
+};
 
-export type OCRBoundingBoxes = Record<string, OCRBoundingBox>
+export type OCRBoundingBoxes = Record<string, OCRBoundingBox>;

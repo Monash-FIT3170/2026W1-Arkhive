@@ -1,84 +1,67 @@
+// This test file was generated with the assistance of Google Gemini.
+
+//Mocks fetch calls and checks for issues with our own logic
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { uploadPagesToBackend, getUploadedImageUrl, getUploadedImageUrls } from './uploadService';
+import { uploadPageToBackend, getUploadedImageUrl } from './uploadService';
 
 describe('uploadService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    globalThis.fetch = vi.fn();
+    global.fetch = vi.fn();
   });
 
-  describe('uploadPagesToBackend', () => {
-    it('should upload pages successfully and handle progress events', async () => {
+  describe('uploadPageToBackend', () => {
+    it('should upload a single page successfully', async () => {
+      // Mock fetch to simulate downloading blob from previewSrc
       const mockBlob = new Blob(['dummy-image-data'], { type: 'image/png' });
-      (globalThis.fetch as any).mockResolvedValueOnce({
-        blob: vi.fn().mockResolvedValueOnce(mockBlob)
+      (global.fetch as any).mockResolvedValueOnce({
+        blob: vi.fn().mockResolvedValueOnce(mockBlob),
       });
 
-      const streamEvents = [
-        JSON.stringify({ type: 'job_progress', index: 1, total: 1, fileName: 'doc.png' }),
-        JSON.stringify({ type: 'job_completed', index: 1, total: 1, fileName: 'doc.png', confidence: 0.9 }),
-        JSON.stringify({ type: 'success', data: { success: true } }),
-        ''
-      ].join('\n');
-
-      const mockReader = {
-        read: vi
-          .fn()
-          .mockResolvedValueOnce({ done: false, value: new TextEncoder().encode(streamEvents) })
-          .mockResolvedValueOnce({ done: true, value: undefined })
-      };
-
-      (globalThis.fetch as any).mockResolvedValueOnce({
+      // Mock fetch for the API upload
+      (global.fetch as any).mockResolvedValueOnce({
         ok: true,
-        body: {
-          getReader: () => mockReader
-        }
+        json: vi.fn().mockResolvedValueOnce({ success: true }),
       });
 
-      const onProgress = vi.fn();
-      await uploadPagesToBackend(
-        [{ src: 'blob:http://localhost/123', type: 'Other', fileName: 'doc.png' }],
-        undefined,
-        onProgress
-      );
+      await expect(
+        uploadPageToBackend('blob:http://localhost/123', 'doc1', 0, 'test.png', 'Other')
+      ).resolves.toBeUndefined();
 
-      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
-      expect(onProgress).toHaveBeenCalledTimes(3);
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(global.fetch).toHaveBeenNthCalledWith(1, 'blob:http://localhost/123');
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        2,
+        '/api/upload/page?documentId=doc1&pageIndex=0',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          body: expect.any(FormData),
+        })
+      );
     });
 
     it('should throw an error if the upload fails', async () => {
       const mockBlob = new Blob(['dummy'], { type: 'image/png' });
-      (globalThis.fetch as any).mockResolvedValueOnce({
-        blob: vi.fn().mockResolvedValueOnce(mockBlob)
+      (global.fetch as any).mockResolvedValueOnce({
+        blob: vi.fn().mockResolvedValueOnce(mockBlob),
       });
 
-      (globalThis.fetch as any).mockResolvedValueOnce({
+      (global.fetch as any).mockResolvedValueOnce({
         ok: false,
         status: 500,
-        json: vi.fn().mockResolvedValueOnce({ error: 'Server error' })
+        json: vi.fn().mockResolvedValueOnce({ error: 'Server error' }),
       });
 
-      await expect(uploadPagesToBackend([{ src: 'blob:http://localhost/123', type: 'Other' }])).rejects.toThrow('Server error');
+      await expect(
+        uploadPageToBackend('blob:http://localhost/123', 'doc1', 0, 'test.png', 'Other')
+      ).rejects.toThrow('Server error');
     });
   });
 
   describe('getUploadedImageUrl', () => {
-    it('should return the correct image URL for single or indexed requests', () => {
+    it('should return the correct image URL', () => {
       expect(getUploadedImageUrl()).toBe('/api/upload/image');
-      expect(getUploadedImageUrl(0)).toBe('/api/upload/image/0');
-      expect(getUploadedImageUrl(2)).toBe('/api/upload/image/2');
-    });
-  });
-
-  describe('getUploadedImageUrls', () => {
-    it('should return array of image URLs', async () => {
-      (globalThis.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: vi.fn().mockResolvedValueOnce(['/api/upload/image/0', '/api/upload/image/1'])
-      });
-
-      const urls = await getUploadedImageUrls();
-      expect(urls).toEqual(['/api/upload/image/0', '/api/upload/image/1']);
     });
   });
 });

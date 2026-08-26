@@ -16,7 +16,7 @@ const { mockJobs } = vi.hoisted(() => ({
       confidence: 0.95,
       extractedData: { columns: ['ITEM', 'QTY'], rows: [{ _id: '1', ITEM: 'Paper', QTY: '5' }] },
       createdAt: 1000,
-      updatedAt: 1000
+      updatedAt: 1000,
     },
     {
       id: 'job-2',
@@ -28,29 +28,31 @@ const { mockJobs } = vi.hoisted(() => ({
       status: 'completed',
       ocrData: [{ id: 'comp_2', text: 'Receipt #2', confidence: 0.88 } as any],
       confidence: 0.88,
-      extractedData: { columns: ['ITEM', 'PRICE'], rows: [{ _id: '2', ITEM: 'Coffee', PRICE: '$4.50' }] },
+      extractedData: {
+        columns: ['ITEM', 'PRICE'],
+        rows: [{ _id: '2', ITEM: 'Coffee', PRICE: '$4.50' }],
+      },
       createdAt: 1000,
-      updatedAt: 1000
-    }
-  ]
+      updatedAt: 1000,
+    },
+  ],
 }));
 
 // Mock dependencies
 vi.mock('../../services/extractionService', () => ({
-  getExtractionSession: vi.fn().mockResolvedValue([
-    { id: '1', text: 'Item 1' }
-  ]),
+  getExtractionSession: vi.fn().mockResolvedValue([[{ _id: '1', text: 'Item 1' }]]),
   getBatchJobs: vi.fn().mockResolvedValue({
     batchId: 'batch-123',
     activeJobIndex: 0,
-    jobs: mockJobs
+    jobs: mockJobs,
   }),
   saveExtractionSession: vi.fn().mockResolvedValue({ success: true }),
-  setActiveBatchJob: vi.fn().mockResolvedValue({ success: true })
+  setActiveBatchJob: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 vi.mock('../../services/uploadService', () => ({
-  getUploadedImageUrl: vi.fn((index?: number) => (typeof index === 'number' ? `/api/upload/image/${index}` : '/api/upload/image')),
+  getUploadedImageUrl: vi.fn().mockResolvedValue('http://localhost/mock-image.png'),
+  getProcessedImageUrls: vi.fn().mockResolvedValue(['http://localhost/mock-processed-image.png']),
 }));
 
 vi.mock('./components/extracted-data/detectReviewFields', () => ({
@@ -60,7 +62,7 @@ vi.mock('./components/extracted-data/detectReviewFields', () => ({
 vi.mock('./components/extracted-data/flattener', () => ({
   flatten: vi.fn().mockReturnValue({
     columns: ['ITEM', 'QTY'],
-    rows: [{ _id: 'row1', ITEM: 'Paper', QTY: '5' }]
+    rows: [{ _id: 'row1', ITEM: 'Paper', QTY: '5' }],
   }),
 }));
 
@@ -70,21 +72,43 @@ vi.mock('../../services/llmService', () => ({
 
 // Mock child components
 vi.mock('./components/document/DocumentPanel', () => ({
-  default: ({ documentImageUrl }: any) => <div data-testid="document-panel" data-src={documentImageUrl} />
+  default: ({ documentImageUrl }: any) => (
+    <div data-testid="document-panel" data-src={documentImageUrl} />
+  ),
 }));
 
 vi.mock('./components/extracted-data/ExtractedDataPanel', () => ({
   default: ({ extractedData }: any) => (
-      <div data-testid="extracted-data-panel" data-columns={extractedData?.columns?.join(',')}>
-        {extractedData?.rows?.map((r: any) => (
-            <div key={r._id} data-testid={`row-${r._id}`}>{r.ITEM}</div>
-        ))}
-      </div>
-  )
+    <div data-testid="extracted-data-panel" data-columns={extractedData?.columns?.join(',')}>
+      {extractedData?.rows?.map((r: any) => (
+        <div key={r._id} data-testid={`row-${r._id}`}>
+          {r.ITEM}
+        </div>
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock('./components/chat/ChatPanel', () => ({
-  default: () => <div data-testid="chat-panel" />
+  default: () => <div data-testid="chat-panel" />,
+}));
+vi.mock('../../services/testService', () => ({
+  getTestData: vi.fn().mockResolvedValue([
+    [
+      {
+        id: '1',
+        type: 'TABLE_ROW',
+        cells: ['A'],
+        confidence: 0.9,
+        boundingBoxes: {},
+        indentation: 0,
+        y: 0,
+        layer: 0,
+        text: 'A',
+      },
+    ],
+  ]),
+  getTestImageUrls: vi.fn().mockResolvedValue(['http://localhost/mock.png']),
 }));
 
 describe('ValidationPage', () => {
@@ -95,6 +119,7 @@ describe('ValidationPage', () => {
   it('loads batch session data on mount and renders selector and panels', async () => {
     render(<ValidationPage />);
 
+    // Wait for session data to be loaded (side effect in useEffect)
     await waitFor(() => {
       expect(screen.getByTestId('document-panel')).toBeInTheDocument();
       expect(screen.getByTestId('extracted-data-panel')).toBeInTheDocument();
@@ -119,7 +144,10 @@ describe('ValidationPage', () => {
 
     await waitFor(() => {
       // Document panel should update to the second image
-      expect(screen.getByTestId('document-panel')).toHaveAttribute('data-src', '/api/upload/image/1');
+      expect(screen.getByTestId('document-panel')).toHaveAttribute(
+        'data-src',
+        '/api/upload/image/1'
+      );
     });
   });
 });

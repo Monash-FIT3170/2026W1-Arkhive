@@ -1,4 +1,4 @@
-import type { ExtractedData } from '../models/TableData';
+import type { ExtractedData, ExtractedPage } from '../models/TableData';
 import type { OCRComponent } from '../models/OCRComponent';
 import type { DocumentJob } from '../models/Job';
 
@@ -12,7 +12,7 @@ export async function getExtractionSession(jobIdOrIndex?: string | number) {
 
   const response = await fetch(url, {
     method: 'GET',
-    credentials: 'include'
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -29,7 +29,7 @@ export async function getBatchJobs(): Promise<{
 }> {
   const response = await fetch('/api/extraction/jobs', {
     method: 'GET',
-    credentials: 'include'
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -40,7 +40,7 @@ export async function getBatchJobs(): Promise<{
 }
 
 export async function saveExtractionSession(
-  data: ExtractedData | OCRComponent[],
+  data: ExtractedData | OCRComponent[] | ExtractedPage[],
   jobIdOrIndex?: string | number
 ) {
   const payload: any = { ocrData: data };
@@ -54,10 +54,10 @@ export async function saveExtractionSession(
   const response = await fetch('/api/extraction', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
     },
     credentials: 'include',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -82,10 +82,10 @@ export async function setActiveBatchJob(indexOrJobId: number | string): Promise<
   const response = await fetch('/api/extraction/active', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
     },
     credentials: 'include',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {

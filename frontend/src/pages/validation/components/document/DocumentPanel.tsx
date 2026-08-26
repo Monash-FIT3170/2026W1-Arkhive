@@ -1,33 +1,32 @@
-import { useState, useRef } from "react";
-import type { OCRComponent } from "../../../../models/OCRComponent";
+import { useState, useRef } from 'react';
+import type { OCRComponent } from '../../../../models/OCRComponent';
 // NEW update: Calculating real average confidence from OCR data
 function calculateAverageConfidence(data: OCRComponent[]): number {
-  const componentsWithConfidence = data.filter(
-    (comp) => typeof comp.confidence === "number"
-  );
+  const componentsWithConfidence = data.filter((comp) => typeof comp.confidence === 'number');
   if (componentsWithConfidence.length === 0) return 0;
-  const total = componentsWithConfidence.reduce(
-    (sum, comp) => sum + comp.confidence,
-    0
-  );
+  const total = componentsWithConfidence.reduce((sum, comp) => sum + comp.confidence, 0);
   return total / componentsWithConfidence.length;
 }
 
 function DocumentPanel({
-  hoveredOverlayId,
+  hoveredOverlayIds,
   documentImageUrl,
-  ocrData
+  ocrData,
+  imageUrls = [],
+  currentPageIndex = 0,
+  onPageChange,
 }: {
-  hoveredOverlayId: string | null;
+  hoveredOverlayIds: string[];
   documentImageUrl: string | undefined;
   ocrData: OCRComponent[];
+  imageUrls?: string[];
+  currentPageIndex?: number;
+  onPageChange?: (index: number) => void;
 }) {
   const [zoom, setZoom] = useState(1);
-  const [viewBox, setViewBox] = useState("0 0 1000 1000"); // default
+  const [viewBox, setViewBox] = useState('0 0 1000 1000'); // default
   // NEW update: Real average confidence from mock data
-  const averageConfidence = calculateAverageConfidence(
-    ocrData as OCRComponent[]
-  );
+  const averageConfidence = calculateAverageConfidence(ocrData as OCRComponent[]);
   const confidencePercent = Math.round(averageConfidence * 100);
 
   // Panning state
@@ -35,18 +34,19 @@ function DocumentPanel({
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [startY, setStartY] = useState(0);
+  const [scaleX, setScaleX] = useState(1);
+  const [scaleY, setScaleY] = useState(1);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = e.currentTarget;
     if (naturalWidth && naturalHeight) {
-      // If the OCR data coordinates exactly match the original image pixels, 
-      // the scale factor should be 1.
-      const scaleFactor = 1;
-      const ocrWidth = naturalWidth / scaleFactor;
-      const ocrHeight = naturalHeight / scaleFactor;
-      setViewBox(`0 0 ${ocrWidth} ${ocrHeight}`);
+      setViewBox(`0 0 ${naturalWidth} ${naturalHeight}`);
+
+      // OCR vertices are in inches; scale them to the image's pixel space.
+      setScaleX(1);
+      setScaleY(1);
     }
   };
   // The dragging and scrolling functions below were done with the help of Goolge Gemini
@@ -78,22 +78,14 @@ function DocumentPanel({
     <>
       <div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
         {/* Row 1: Title */}
-        <h2 className="mb-4 text-xl font-semibold text-base-content">
-          DOCUMENT PANEL
-        </h2>
+        <h2 className="mb-4 text-xl font-semibold text-base-content">DOCUMENT PANEL</h2>
         {/* Row 2: Zoom buttoms*/}
         <div className="mb-2 flex gap-2">
-          <button
-            className="btn btn-sm"
-            onClick={() => setZoom((z) => Math.max(1, z - 0.25))}
-          >
+          <button className="btn btn-sm" onClick={() => setZoom((z) => Math.max(1, z - 0.25))}>
             −
           </button>
 
-          <button
-            className="btn btn-sm"
-            onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
-          >
+          <button className="btn btn-sm" onClick={() => setZoom((z) => Math.min(4, z + 0.25))}>
             +
           </button>
 
@@ -102,105 +94,175 @@ function DocumentPanel({
           </button>
         </div>
         {/* Row 3: Image & Overlay Container */}
-        <div
-          ref={containerRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUpOrLeave}
-          onMouseLeave={handleMouseUpOrLeave}
-          className={`flex-1 min-h-[250px] relative overflow-auto border border-base-300 ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
-        >
-          <div
-            className="absolute inset-0 w-full h-full origin-center"
-            style={{
-              transform: `scale(${zoom})`,
-              transformOrigin: "top left",
-              transition: "transform 0.2s ease"
-            }}
-          >
-            <img
-              src={documentImageUrl}
-              alt="Document"
-              className="w-full h-full object-contain"
-              onLoad={handleImageLoad}
-            />
-            {/* SVG Overlay */}
-            <svg
-              // set the internal canvas coordinates using viewBox
-              viewBox={viewBox}
-              // set invisible SVG canvas on top of the image
-              className="absolute inset-0 w-full h-full"
-              preserveAspectRatio="xMidYMid meet"
+        <div className="flex-1 relative min-h-[250px] border border-base-300 overflow-hidden group">
+          {/* Previous Page Button */}
+          {imageUrls && imageUrls.length > 1 && currentPageIndex > 0 && (
+            <button
+              onClick={() => onPageChange?.(currentPageIndex - 1)}
+              className="absolute left-0 top-0 bottom-0 w-16 z-10 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-gradient-to-r from-black/10 to-transparent"
+              aria-label="Previous Page"
             >
-              <defs>
-                <filter
-                  id="highlightGlow"
-                  x="-50%"
-                  y="-50%"
-                  width="200%"
-                  height="300%"
-                >
-                  <feGaussianBlur stdDeviation="4" result="glow" />
-                  <feMerge>
-                    <feMergeNode in="glow" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-              {/* map all the bounding boxes */}
-              {(ocrData as OCRComponent[]).map((comp) => {
-                if (!comp.boundingBoxes) return null;
+              <div className="p-2 rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60 shadow-md">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </div>
+            </button>
+          )}
 
-                return Object.entries(comp.boundingBoxes).map(
-                  ([cellKey, box]: [string, any]) => {
-                    const id = `${comp.id}:${cellKey}`;
-                    const normalizedHoverId = hoveredOverlayId && !hoveredOverlayId.startsWith("comp_") ? `comp_${hoveredOverlayId}` : hoveredOverlayId;
+          {/* Next Page Button */}
+          {imageUrls && imageUrls.length > 1 && currentPageIndex < imageUrls.length - 1 && (
+            <button
+              onClick={() => onPageChange?.(currentPageIndex + 1)}
+              className="absolute right-0 top-0 bottom-0 w-16 z-10 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-gradient-to-l from-black/10 to-transparent"
+              aria-label="Next Page"
+            >
+              <div className="p-2 rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60 shadow-md">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </div>
+            </button>
+          )}
 
-                    const pointsStr = box.vertices
-                      .map((v: any) => `${v.x},${v.y}`)
-                      .join(" ");
+          <div
+            ref={containerRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUpOrLeave}
+            onMouseLeave={handleMouseUpOrLeave}
+            className={`w-full h-full relative overflow-auto ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          >
+            <div
+              className="absolute inset-0 w-full h-full origin-center"
+              style={{
+                transform: `scale(${zoom})`,
+                transformOrigin: 'top left',
+                transition: 'transform 0.2s ease',
+              }}
+            >
+              <img
+                src={documentImageUrl}
+                alt="Document"
+                className="w-full h-full object-contain"
+                onLoad={handleImageLoad}
+              />
+              {/* SVG Overlay */}
+              <svg
+                // set the internal canvas coordinates using viewBox
+                viewBox={viewBox}
+                // set invisible SVG canvas on top of the image
+                className="absolute inset-0 w-full h-full"
+                preserveAspectRatio="xMidYMid meet"
+              >
+                <defs>
+                  <filter id="highlightGlow" x="-50%" y="-50%" width="200%" height="300%">
+                    <feGaussianBlur stdDeviation="4" result="glow" />
+                    <feMerge>
+                      <feMergeNode in="glow" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                {/* map all the bounding boxes */}
+                {(() => {
+                  // Normalize once
+                  // const normalizedHoverIds = new Set(
+                  //   hoveredOverlayIds.map((id) => (id.startsWith('comp_') ? id : `comp_${id}`))
+                  // );
+                  return (ocrData as OCRComponent[]).map((comp) => {
+                    if (!comp.boundingBoxes) return null;
 
-                    const isActive =
-                      normalizedHoverId === id || normalizedHoverId === comp.id;
+                    return Object.entries(comp.boundingBoxes).map(
+                      ([cellKey, box]: [string, any]) => {
+                        const id = `${comp.id}:${cellKey}`;
 
-                    //obtaining the confidence for this component to determine the colour of the bounding box
-                    const confidenceInfo = ocrData.find((c) => c.id === comp.id);
-                    const confidence = confidenceInfo
-                      ? confidenceInfo.confidence || 0
-                      : 0;
+                        const pointsStr = box.vertices
+                          .map((v: any) => `${v.x * scaleX},${v.y * scaleY}`)
+                          .join(' ');
 
-                    return (
-                      <polygon
-                        key={id}
-                        points={pointsStr}
-                        //custom colour based on confidence tier, with low confidence highlighted in red and medium in amber, high confidence is a subtle green
-                        fill={
-                          isActive ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.15)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 0, 0, 0.15)'}` : "transparent"
-                        }
+                        const isActive =
+                          hoveredOverlayIds.includes(id) || hoveredOverlayIds.includes(comp.id);
 
+                        //obtaining the confidence for this component to determine the colour of the bounding box
+                        const confidenceInfo = ocrData.find((c) => c.id === comp.id);
+                        const confidence = confidenceInfo ? confidenceInfo.confidence || 0 : 0;
 
-                        stroke={isActive ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.8)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.8)' : 'rgba(255, 0, 0, 0.8)'}` : "transparent"}
-                        strokeWidth={isActive ? 3 : 1}
-                        opacity={isActive ? 1 : 0.75}
-                        filter={isActive ? "url(#highlightGlow)" : undefined}
-                      />
+                        return (
+                          <polygon
+                            key={id}
+                            points={pointsStr}
+                            //custom colour based on confidence tier, with low confidence highlighted in red and medium in amber, high confidence is a subtle green
+                            fill={
+                              isActive
+                                ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.15)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 0, 0, 0.15)'}`
+                                : 'transparent'
+                            }
+                            stroke={
+                              isActive
+                                ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.8)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.8)' : 'rgba(255, 0, 0, 0.8)'}`
+                                : 'transparent'
+                            }
+                            strokeWidth={isActive ? 3 : 1}
+                            opacity={isActive ? 1 : 0.75}
+                            filter={isActive ? 'url(#highlightGlow)' : undefined}
+                          />
+                        );
+                      }
                     );
-                  }
-                );
-              })}
-            </svg>
+                  });
+                })()}
+              </svg>
+            </div>
           </div>
         </div>
 
-        {/* Row 3: Confidence Score, updated to show real score instead of hardcoded value, made the colours a little brighter for the document panel */}
+        {/* Thumbnail Carousel */}
+        {imageUrls && imageUrls.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto py-3 border-t mt-3 shrink-0">
+            {imageUrls.map((url, idx) => (
+              <button
+                key={idx}
+                onClick={() => onPageChange?.(idx)}
+                className={`flex-shrink-0 relative w-16 h-20 rounded border-2 overflow-hidden transition-colors ${
+                  idx === currentPageIndex
+                    ? 'border-primary'
+                    : 'border-base-300 hover:border-base-content/50'
+                }`}
+              >
+                <img src={url} alt={`Page ${idx + 1}`} className="w-full h-full object-cover" />
+                <div className="absolute bottom-0 w-full bg-black/60 text-white text-[10px] text-center font-medium py-0.5">
+                  Page {idx + 1}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Row 4: Confidence Score, updated to show real score instead of hardcoded value, made the colours a little brighter for the document panel */}
         {/* UPDATED: Replaced plain coloured text with capsule matching the right panel style */}
-        <div className="border-t pt-3 text-sm text-base-content/70 flex items-center gap-2">
+        <div className="border-t pt-3 mt-3 text-sm text-base-content/70 flex items-center gap-2">
           Confidence Score:
           {/* UPDATED: Matching outlined badge style to keep confidence score as secondary info */}
-          <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${confidencePercent >= 85 ? "border-success text-success bg-white" :
-            confidencePercent >= 70 ? "border-warning text-warning bg-white" :
-              " border-error text-error bg-white"
-            }`}>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+              confidencePercent >= 85
+                ? 'border-success text-success bg-white'
+                : confidencePercent >= 70
+                  ? 'border-warning text-warning bg-white'
+                  : ' border-error text-error bg-white'
+            }`}
+          >
             {confidencePercent}%
           </span>
         </div>

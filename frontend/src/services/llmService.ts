@@ -1,4 +1,10 @@
-import type { ChatRequest, ChatResponse, Message, ReviewField } from '../models/Message';
+import type {
+  BulkReviewFieldRequest,
+  ChatRequest,
+  ChatResponse,
+  Message,
+  ReviewField,
+} from '../models/Message';
 import type { ExtractedData } from '../models/TableData';
 
 export async function sendMessage(
@@ -38,4 +44,34 @@ export async function requestFieldReview(
   }
   const data = await response.json();
   return data.reply;
+}
+
+export async function requestBulkFieldReview(
+  request: BulkReviewFieldRequest
+): Promise<ChatResponse> {
+  const response = await fetch('/api/llm/chat/review-field-bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to get bulk field review suggestion');
+  }
+  const data = await response.json();
+  return data.reply;
+}
+
+export async function requestFormatDetection(
+  sampledData: Record<string, string[]>
+): Promise<Record<string, string>> {
+  const response = await fetch('/api/llm/chat/detect-format', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sampledData }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to get format detection');
+  }
+  const data = await response.json();
+  return data.regexMap;
 }

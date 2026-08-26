@@ -17,18 +17,15 @@ import { analyse_result } from './utils/utils_table_extraction_new.js';
  */
 const localCredsPath = path.resolve(
   process.cwd(),
-  "../backend/src/credentials/google-vision-key.json"
+  '../backend/src/credentials/google-vision-key.json'
 );
-const tempCredsPath = path.join("/tmp", "google-vision-key.json");
+const tempCredsPath = path.join('/tmp', 'google-vision-key.json');
 
 let credsPath: string;
 
 if (process.env.GOOGLE_CREDENTIALS_BASE64) {
   // Render (or any host with the base64 env var set): decode to /tmp
-  fs.writeFileSync(
-    tempCredsPath,
-    Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, "base64")
-  );
+  fs.writeFileSync(tempCredsPath, Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64'));
   credsPath = tempCredsPath;
 } else {
   // Local dev: use the JSON file already sitting in the repo
@@ -39,26 +36,24 @@ const client = new vision.ImageAnnotatorClient({
   keyFilename: credsPath,
   features: [
     {
-      type: "DOCUMENT_TEXT_DETECTION"
-    }
+      type: 'DOCUMENT_TEXT_DETECTION',
+    },
   ],
   imageContext: {
-    languageHints: ["en"]
-  }
+    languageHints: ['en'],
+  },
 });
 
-
 /**
- * 
+ *
  * THIS NEEDS TO BE REWORKED
  */
 export async function textExtraction(buffer: Buffer): Promise<string> {
   const [result] = await client.documentTextDetection({
-    image: { content: buffer}
+    image: { content: buffer },
   });
-  return result.fullTextAnnotation?.text ?? "";
+  return result.fullTextAnnotation?.text ?? '';
 }
-
 
 // test ocr on 1 png page
 // export async function testOCR() {
@@ -75,34 +70,44 @@ export async function textExtraction(buffer: Buffer): Promise<string> {
 
 function for getting bounding boxes for all words detected
  @author Harsha Sharma (33879303)
-*/  
+*/
 async function parseTableLegacy(imageBuffer: Buffer) {
   const [response] = await client.documentTextDetection(imageBuffer);
   const fullTextAnnotation = response.fullTextAnnotation;
+  console.log('OCR response:', {
+    hasFullTextAnnotation: !!response.fullTextAnnotation,
+    hasPages: !!response.fullTextAnnotation?.pages,
+    text: response.fullTextAnnotation?.text,
+    pageCount: response.fullTextAnnotation?.pages?.length,
+  });
   if (!fullTextAnnotation || !fullTextAnnotation.pages) {
-    throw new Error("NoTextDetectedError: OCR did not detect any text. Please double check or reupload your document.");
+    throw new Error(
+      'NoTextDetectedError: OCR did not detect any text. Please double check or reupload your document.'
+    );
   }
   return extractStructuredComponents(fullTextAnnotation.pages);
 }
 
-export async function parseTableWithRetriesLegacy(imageBuffer: Buffer){
-  return await withRetry(() => parseTable(imageBuffer))
+export async function parseTableWithRetriesLegacy(imageBuffer: Buffer) {
+  return await withRetry(() => parseTable(imageBuffer));
 }
 
 /** 
  @author Harsha Sharma (33879303)
-*/  
+*/
 async function parseTable(imageBuffer: Buffer) {
   return analyse_result(imageBuffer);
 }
 
 /*
  @author Harsha Sharma (33879303)
-*/  
-export async function parseTableWithRetries(imageBuffer: Buffer) {
-  return withRetry(() => parseTable(imageBuffer));
+*/
+export async function parseTableWithRetries(
+  imageBuffer: Buffer,
+  onRetry?: (attempt: number, maxRetries: number) => void
+) {
+  return await withRetry(() => parseTable(imageBuffer), 3, 3000, onRetry);
 }
-
 
 // function for getting overall averaged confidence score
 /*
@@ -115,4 +120,3 @@ const jsonOut = JSON.stringify(
 fs.writeFileSync("boundingBox1.json", jsonOut, "utf-8");
 
 await parseTableWithRetries(fs.readFileSync("c:/Users/harsh/OneDrive/Pictures/sample-file-1.pdf")) */
-
