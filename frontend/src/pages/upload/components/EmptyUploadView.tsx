@@ -2,22 +2,14 @@
 // Has its own local drag state and inputRef — no shared state needed with UploadPage.
 // To update the look of the landing screen, this is the only file to touch.
 
-import { useRef } from 'react';
-import DropZone, { filterValidFiles } from './dropzone/DropZone';
+import DropZone from './dropzone/DropZone';
 
 type Props = {
   onFilesCaptured: (files: File[]) => void;
   onError?: (msg: string | null) => void;
 };
 
-function EmptyUploadView({ onFilesCaptured, onError }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const valid = filterValidFiles(e.target.files);
-    if (valid.length > 0) onFilesCaptured(valid);
-    if (inputRef.current) inputRef.current.value = '';
-  }
+export default function EmptyUploadView({ onFilesCaptured, onError }: Props) {
 
   return (
     <div className="bg-base-100 w-full flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 4rem)' }}>
@@ -30,21 +22,10 @@ function EmptyUploadView({ onFilesCaptured, onError }: Props) {
         </p>
       </div>
 
-      {/*dropzone — drag & drop or click to add more files */}
-      <div>
+      {/* Dropzone for dragging/dropping or selecting files */}
+      <div className="w-full max-w-lg px-4">
         <DropZone onFilesCaptured={onFilesCaptured} onError={onError} />
       </div>
-
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept=".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif"
-        className="hidden"
-        onChange={handleInputChange}
-      />
     </div>
   );
 }
-
-export default EmptyUploadView;
