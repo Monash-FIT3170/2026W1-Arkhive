@@ -125,3 +125,11 @@ export const geminiSchemaBBoxPrompt: Schema = {
 };
 
 export type OCRBoundingBoxes = Record<string, OCRBoundingBox>;
+
+export type Page = {
+  page_num: number, 
+  components: OCRComponent[]
+}
+
+export type Pages = Page[]
+

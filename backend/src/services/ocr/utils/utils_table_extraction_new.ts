@@ -21,6 +21,7 @@ import {
   geminiSchemaBBoxPrompt,
   OCRColumnBoundingBoxes,
 } from '../types/boundingBoxTypes';
+import { mapOCRtoPages } from './experimental';
 
 const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -95,6 +96,16 @@ function toColumnDict(boxes: any[]): OCRColumnBoundingBoxes {
   );
 }
 
+
+function logTablePages(result: AnalyzeOperationOutput) {
+  result.analyzeResult!.tables?.forEach((table, index) => {
+    // Collect all unique 1-based page numbers the table covers
+    const pageNumbers = table.boundingRegions?.map(region => region.pageNumber) || [];
+    
+    console.log(`Table #${index} spans across page(s): ${pageNumbers.join(", ")}`);
+  });
+}
+
 /**
  * @param OCRResponse
  * @returns
@@ -102,6 +113,15 @@ function toColumnDict(boxes: any[]): OCRColumnBoundingBoxes {
 const mapTablesToOCRComponents =
   (customSchema: Schema) =>
   async (OCRResponse: AnalyzeOperationOutput): Promise<OCRComponent[]> => {
+
+    OCRResponse.analyzeResult?.pages.map((page) => {
+      
+    })
+    OCRResponse.analyzeResult!.tables!.filter((table) =>
+      {
+        table.boundingRegions?.filter(region => region.pageNumber == 1)
+      }
+    )
     const model = ai.getGenerativeModel({
       model: 'gemini-3.5-flash-lite',
       generationConfig: {
@@ -154,8 +174,10 @@ export async function analyse_result(buffer: Buffer) {
   const response = await poller.pollUntilDone();
 
   const result = response.body as AnalyzeOperationOutput;
+  const tester = await mapOCRtoPages(geminiSchemaBBoxPrompt)
   const defaultOutputFunc = await mapTablesToOCRComponents(geminiSchemaBBoxPrompt);
-  const processedOut = await defaultOutputFunc(result);
-  fs.writeFileSync('smthToWorkWithPotentially.json', JSON.stringify(processedOut, null, 2));
-  return processedOut;
+  //const processedOut = await defaultOutputFunc(result);
+  const output = await tester(result)
+  fs.writeFileSync('smthPleaseWorkIBegYou.json', JSON.stringify(output, null, 2));
+  return output;
 }
