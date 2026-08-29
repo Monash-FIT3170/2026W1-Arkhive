@@ -1,6 +1,5 @@
 import type { ExtractedData, ExtractedPage, ExtractedRow } from '../../../../models/TableData';
 import type { OCRComponent, Page, Pages } from '../../../../models/OCRComponent';
-import { da } from 'zod/locales';
 
 // ==========================================
 // TYPES & INTERFACES

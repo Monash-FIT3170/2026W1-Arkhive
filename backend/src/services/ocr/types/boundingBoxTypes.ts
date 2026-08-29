@@ -67,6 +67,8 @@ export const geminiSchemaBBoxPrompt: Schema = {
           },
           cells: {
             type: SchemaType.ARRAY,
+            description:
+              'One entry for EVERY column in the table, in column order — use an empty string "" for columns this row does not populate. Never omit an entry or shift values to skip blanks. Must have exactly as many entries as "boundingBoxes", in the same order.',
             items: {
               type: SchemaType.STRING,
             },
@@ -76,7 +78,8 @@ export const geminiSchemaBBoxPrompt: Schema = {
           },
           boundingBoxes: {
             type: SchemaType.ARRAY,
-            description: 'One entry per table column present in this row',
+            description:
+              'One entry for EVERY column in the table, in column order — including columns this row does not populate (use an empty "text" but still provide the correct "column" label and a vertices box for that grid position). Must have exactly as many entries as the "cells" array, in the same order.',
             items: {
               type: SchemaType.OBJECT,
               properties: {
@@ -104,7 +107,7 @@ export const geminiSchemaBBoxPrompt: Schema = {
                   },
                 },
               },
-              required: ['columnKey', 'text', 'vertices', 'confidence'],
+              required: ['columnKey', 'text', 'column', 'vertices', 'confidence'],
             },
           },
         },
@@ -127,9 +130,8 @@ export const geminiSchemaBBoxPrompt: Schema = {
 export type OCRBoundingBoxes = Record<string, OCRBoundingBox>;
 
 export type Page = {
-  page_num: number, 
-  components: OCRComponent[]
-}
+  page_num: number;
+  components: OCRComponent[];
+};
 
-export type Pages = Page[]
-
+export type Pages = Page[];
