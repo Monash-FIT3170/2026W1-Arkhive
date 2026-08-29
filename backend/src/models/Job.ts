@@ -1,4 +1,4 @@
-import { OCRComponent } from '../services/ocr/types/boundingBoxTypes';
+import { OCRComponent, Pages } from '../services/ocr/types/boundingBoxTypes';
 import { ExtractedData } from './TableData';
 
 export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';
@@ -11,7 +11,7 @@ export interface DocumentJob {
   imageIndex: number;
   imageUrl: string;
   status: JobStatus;
-  ocrData: OCRComponent[];
+  ocrData: Pages;
   extractedData?: ExtractedData;
   confidence: number;
   errorMessage?: string;
