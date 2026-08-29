@@ -39,8 +39,18 @@ export default {
                     targetJob = req.session.jobs[parsedIndex];
                 }
             } else {
-                const activeIdx = req.session.activeJobIndex ?? 0;
-                targetJob = req.session.jobs[activeIdx] || req.session.jobs[0];
+                // If no specific job is requested, return the combined extraction (legacy behavior for ValidationPage)
+                if (format === 'job') {
+                    const activeIdx = req.session.activeJobIndex ?? 0;
+                    targetJob = req.session.jobs[activeIdx] || req.session.jobs[0];
+                    res.json(targetJob);
+                    return;
+                }
+                
+                if (req.session.extraction) {
+                    res.json(req.session.extraction.ocrData);
+                    return;
+                }
             }
 
             if (targetJob) {

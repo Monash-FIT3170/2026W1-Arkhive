@@ -120,7 +120,7 @@ describe("getMidX", () => {
 // 3. extractColumns
 // ---------------------------------------------------------------------------
 describe("extractColumns", () => {
-  /** Build a HEADER component whose cells map to the given labels */
+  /** Build a TABLE_COLS component whose cells map to the given labels */
   function makeColComponent(labels: string[]): OCRComponent {
     const boundingBoxes: Record<string, any> = {};
     labels.forEach((label, i) => {
@@ -132,7 +132,7 @@ describe("extractColumns", () => {
 
     return makeComponent({
       id: "comp_0",
-      type: "HEADER",
+      type: "TABLE_COLS",
       cells: labels,
       boundingBoxes
     });
@@ -198,7 +198,7 @@ describe("flatten", () => {
   function makeSimpleDataset(): OCRComponent[] {
     const colComp = makeComponent({
       id: "comp_0",
-      type: "HEADER",
+      type: "TABLE_COLS",
       cells: ["Item", "Qty", "Price"],
       boundingBoxes: {
         col_0: { ...makeBox(10, 90), text: "Item" },
