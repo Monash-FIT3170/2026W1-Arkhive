@@ -1,0 +1,3258 @@
+[
+  {
+    "page_num": 1,
+    "components": [
+      {
+        "id": "comp_0",
+        "type": "TITLE",
+        "indentation": 714,
+        "y": 105,
+        "boundingBoxes": {},
+        "layer": 0,
+        "text": "TOTO ONE PIECE TOILET",
+        "confidence": 0.99
+      },
+      {
+        "id": "comp_1",
+        "type": "HEADER",
+        "indentation": 164,
+        "y": 180,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "NO.",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 165,
+                "y": 181
+              },
+              {
+                "x": 227,
+                "y": 180
+              },
+              {
+                "x": 227,
+                "y": 223
+              },
+              {
+                "x": 164,
+                "y": 223
+              }
+            ],
+            "confidence": 0.993
+          },
+          "col_1": {
+            "text": "ITEM",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 180
+              },
+              {
+                "x": 433,
+                "y": 180
+              },
+              {
+                "x": 433,
+                "y": 223
+              },
+              {
+                "x": 227,
+                "y": 223
+              }
+            ],
+            "confidence": 0.989
+          },
+          "col_2": {
+            "text": "DESCRIPTION",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 180
+              },
+              {
+                "x": 1053,
+                "y": 180
+              },
+              {
+                "x": 1053,
+                "y": 225
+              },
+              {
+                "x": 433,
+                "y": 223
+              }
+            ],
+            "confidence": 0.989
+          },
+          "col_3": {
+            "text": "PRICE LIST (Rp.) WHITE",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 180
+              },
+              {
+                "x": 1209,
+                "y": 180
+              },
+              {
+                "x": 1209,
+                "y": 225
+              },
+              {
+                "x": 1053,
+                "y": 225
+              }
+            ],
+            "confidence": 0.993
+          },
+          "col_4": {
+            "text": "PHOTO",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1209,
+                "y": 180
+              },
+              {
+                "x": 1417,
+                "y": 181
+              },
+              {
+                "x": 1415,
+                "y": 225
+              },
+              {
+                "x": 1209,
+                "y": 225
+              }
+            ],
+            "confidence": 0.998
+          }
+        },
+        "layer": 0,
+        "text": "NO. ITEM DESCRIPTION PRICE LIST (Rp.) WHITE PHOTO",
+        "confidence": 0.99
+      },
+      {
+        "id": "comp_2",
+        "type": "TABLE_COLS",
+        "indentation": 164,
+        "y": 223,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "4",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 164,
+                "y": 223
+              },
+              {
+                "x": 227,
+                "y": 223
+              },
+              {
+                "x": 227,
+                "y": 489
+              },
+              {
+                "x": 164,
+                "y": 488
+              }
+            ],
+            "confidence": 0.997
+          },
+          "col_1": {
+            "text": "CW934J",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 223
+              },
+              {
+                "x": 433,
+                "y": 223
+              },
+              {
+                "x": 433,
+                "y": 268
+              },
+              {
+                "x": 227,
+                "y": 268
+              }
+            ],
+            "confidence": 0.995
+          },
+          "col_2": {
+            "text": "",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 223
+              },
+              {
+                "x": 1053,
+                "y": 225
+              },
+              {
+                "x": 1053,
+                "y": 268
+              },
+              {
+                "x": 433,
+                "y": 268
+              }
+            ],
+            "confidence": 1
+          },
+          "col_3": {
+            "text": "12,460,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 225
+              },
+              {
+                "x": 1209,
+                "y": 225
+              },
+              {
+                "x": 1209,
+                "y": 268
+              },
+              {
+                "x": 1053,
+                "y": 268
+              }
+            ],
+            "confidence": 0.995
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1209,
+                "y": 225
+              },
+              {
+                "x": 1415,
+                "y": 225
+              },
+              {
+                "x": 1415,
+                "y": 336
+              },
+              {
+                "x": 1209,
+                "y": 336
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 0,
+        "text": "4 CW934J 12,460,000",
+        "confidence": 0.99,
+        "cells": [
+          "4",
+          "CW934J",
+          "",
+          "12,460,000",
+          ""
+        ]
+      },
+      {
+        "id": "comp_3",
+        "type": "TABLE_ROW",
+        "indentation": 233,
+        "y": 268,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- CW934IJ",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 268
+              },
+              {
+                "x": 433,
+                "y": 268
+              },
+              {
+                "x": 433,
+                "y": 289
+              },
+              {
+                "x": 227,
+                "y": 289
+              }
+            ],
+            "confidence": 0.92
+          },
+          "col_2": {
+            "text": "\"Wenzal\" One Piece Toilet Bowl Only (S-Trap)",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 268
+              },
+              {
+                "x": 1053,
+                "y": 268
+              },
+              {
+                "x": 1053,
+                "y": 289
+              },
+              {
+                "x": 433,
+                "y": 289
+              }
+            ],
+            "confidence": 0.9
+          },
+          "col_3": {
+            "text": "7,801,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 268
+              },
+              {
+                "x": 1209,
+                "y": 268
+              },
+              {
+                "x": 1209,
+                "y": 289
+              },
+              {
+                "x": 1053,
+                "y": 289
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- CW934IJ \"Wenzal\" One Piece Toilet Bowl Only (S-Trap) 7,801,000",
+        "confidence": 0.93,
+        "cells": [
+          "",
+          "- CW934IJ",
+          "\"Wenzal\" One Piece Toilet Bowl Only (S-Trap)",
+          "7,801,000",
+          ""
+        ],
+        "parentId": "comp_2"
+      },
+      {
+        "id": "comp_4",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 289,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- CW934CRJ",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 289
+              },
+              {
+                "x": 433,
+                "y": 289
+              },
+              {
+                "x": 433,
+                "y": 311
+              },
+              {
+                "x": 227,
+                "y": 311
+              }
+            ],
+            "confidence": 0.98
+          },
+          "col_2": {
+            "text": "\"Wenzal\" Tank Cover for CW934J",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 289
+              },
+              {
+                "x": 1053,
+                "y": 289
+              },
+              {
+                "x": 1053,
+                "y": 311
+              },
+              {
+                "x": 433,
+                "y": 311
+              }
+            ],
+            "confidence": 0.94
+          },
+          "col_3": {
+            "text": "603,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 289
+              },
+              {
+                "x": 1209,
+                "y": 289
+              },
+              {
+                "x": 1209,
+                "y": 311
+              },
+              {
+                "x": 1053,
+                "y": 311
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- CW934CRJ \"Wenzal\" Tank Cover for CW934J 603,000",
+        "confidence": 0.97,
+        "cells": [
+          "",
+          "- CW934CRJ",
+          "\"Wenzal\" Tank Cover for CW934J",
+          "603,000",
+          ""
+        ],
+        "parentId": "comp_2"
+      },
+      {
+        "id": "comp_5",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 311,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TX901CV11Z :",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 311
+              },
+              {
+                "x": 433,
+                "y": 311
+              },
+              {
+                "x": 433,
+                "y": 336
+              },
+              {
+                "x": 227,
+                "y": 336
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Installation Fitting Set for CW934J",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 311
+              },
+              {
+                "x": 1053,
+                "y": 311
+              },
+              {
+                "x": 1053,
+                "y": 336
+              },
+              {
+                "x": 433,
+                "y": 336
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "410,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 311
+              },
+              {
+                "x": 1209,
+                "y": 311
+              },
+              {
+                "x": 1209,
+                "y": 336
+              },
+              {
+                "x": 1053,
+                "y": 336
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TX901CV11Z : Installation Fitting Set for CW934J 410,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TX901CV11Z :",
+          "Installation Fitting Set for CW934J",
+          "410,000",
+          ""
+        ],
+        "parentId": "comp_2"
+      },
+      {
+        "id": "comp_6",
+        "type": "TABLE_ROW",
+        "indentation": 247,
+        "y": 336,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- T53P100",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 336
+              },
+              {
+                "x": 433,
+                "y": 336
+              },
+              {
+                "x": 433,
+                "y": 357
+              },
+              {
+                "x": 227,
+                "y": 357
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Floor Flange w/ Seal Gasket",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 336
+              },
+              {
+                "x": 1053,
+                "y": 336
+              },
+              {
+                "x": 1053,
+                "y": 357
+              },
+              {
+                "x": 433,
+                "y": 357
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "180,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 336
+              },
+              {
+                "x": 1209,
+                "y": 336
+              },
+              {
+                "x": 1209,
+                "y": 357
+              },
+              {
+                "x": 1053,
+                "y": 357
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1209,
+                "y": 336
+              },
+              {
+                "x": 1415,
+                "y": 336
+              },
+              {
+                "x": 1415,
+                "y": 357
+              },
+              {
+                "x": 1209,
+                "y": 357
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- T53P100 Floor Flange w/ Seal Gasket 180,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- T53P100",
+          "Floor Flange w/ Seal Gasket",
+          "180,000",
+          ""
+        ],
+        "parentId": "comp_2"
+      },
+      {
+        "id": "comp_7",
+        "type": "TABLE_ROW",
+        "indentation": 248,
+        "y": 357,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TX277S",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 357
+              },
+              {
+                "x": 433,
+                "y": 357
+              },
+              {
+                "x": 433,
+                "y": 378
+              },
+              {
+                "x": 227,
+                "y": 378
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Stop Valve w/ Flexible Hose",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 357
+              },
+              {
+                "x": 1053,
+                "y": 357
+              },
+              {
+                "x": 1053,
+                "y": 378
+              },
+              {
+                "x": 433,
+                "y": 378
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "230,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 357
+              },
+              {
+                "x": 1209,
+                "y": 357
+              },
+              {
+                "x": 1209,
+                "y": 378
+              },
+              {
+                "x": 1053,
+                "y": 378
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1209,
+                "y": 357
+              },
+              {
+                "x": 1415,
+                "y": 357
+              },
+              {
+                "x": 1415,
+                "y": 378
+              },
+              {
+                "x": 1209,
+                "y": 378
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TX277S Stop Valve w/ Flexible Hose 230,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TX277S",
+          "Stop Valve w/ Flexible Hose",
+          "230,000",
+          ""
+        ],
+        "parentId": "comp_2"
+      },
+      {
+        "id": "comp_8",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 378,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TSU03W.12R",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 378
+              },
+              {
+                "x": 433,
+                "y": 378
+              },
+              {
+                "x": 433,
+                "y": 399
+              },
+              {
+                "x": 227,
+                "y": 399
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Outlet Connector (rough in : 12\")",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 378
+              },
+              {
+                "x": 1053,
+                "y": 378
+              },
+              {
+                "x": 1053,
+                "y": 399
+              },
+              {
+                "x": 433,
+                "y": 399
+              }
+            ],
+            "confidence": 0.97
+          },
+          "col_3": {
+            "text": "406,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 378
+              },
+              {
+                "x": 1209,
+                "y": 378
+              },
+              {
+                "x": 1209,
+                "y": 399
+              },
+              {
+                "x": 1053,
+                "y": 399
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1209,
+                "y": 378
+              },
+              {
+                "x": 1415,
+                "y": 378
+              },
+              {
+                "x": 1415,
+                "y": 423
+              },
+              {
+                "x": 1209,
+                "y": 423
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TSU03W.12R Outlet Connector (rough in : 12\") 406,000",
+        "confidence": 0.98,
+        "cells": [
+          "",
+          "- TSU03W.12R",
+          "Outlet Connector (rough in : 12\")",
+          "406,000",
+          ""
+        ],
+        "parentId": "comp_2"
+      },
+      {
+        "id": "comp_9",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 399,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TX934C12WS",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 399
+              },
+              {
+                "x": 433,
+                "y": 399
+              },
+              {
+                "x": 433,
+                "y": 423
+              },
+              {
+                "x": 227,
+                "y": 423
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Tank Trim w/o Stop Valve for CW934J (4,8 Liters)",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 399
+              },
+              {
+                "x": 1053,
+                "y": 399
+              },
+              {
+                "x": 1053,
+                "y": 423
+              },
+              {
+                "x": 433,
+                "y": 423
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "1,700,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 399
+              },
+              {
+                "x": 1209,
+                "y": 399
+              },
+              {
+                "x": 1209,
+                "y": 423
+              },
+              {
+                "x": 1053,
+                "y": 423
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TX934C12WS Tank Trim w/o Stop Valve for CW934J (4,8 Liters) 1,700,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TX934C12WS",
+          "Tank Trim w/o Stop Valve for CW934J (4,8 Liters)",
+          "1,700,000",
+          ""
+        ],
+        "parentId": "comp_2"
+      },
+      {
+        "id": "comp_10",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 423,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TC934S",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 423
+              },
+              {
+                "x": 433,
+                "y": 423
+              },
+              {
+                "x": 433,
+                "y": 490
+              },
+              {
+                "x": 227,
+                "y": 489
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Duroplast Seat & Cover, Soft Closing (Elongated)",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 423
+              },
+              {
+                "x": 1053,
+                "y": 423
+              },
+              {
+                "x": 1053,
+                "y": 489
+              },
+              {
+                "x": 433,
+                "y": 490
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "1,540,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 423
+              },
+              {
+                "x": 1209,
+                "y": 423
+              },
+              {
+                "x": 1209,
+                "y": 489
+              },
+              {
+                "x": 1053,
+                "y": 489
+              }
+            ],
+            "confidence": 0.95
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1209,
+                "y": 423
+              },
+              {
+                "x": 1415,
+                "y": 423
+              },
+              {
+                "x": 1415,
+                "y": 489
+              },
+              {
+                "x": 1209,
+                "y": 489
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TC934S Duroplast Seat & Cover, Soft Closing (Elongated) 1,540,000",
+        "confidence": 0.98,
+        "cells": [
+          "",
+          "- TC934S",
+          "Duroplast Seat & Cover, Soft Closing (Elongated)",
+          "1,540,000",
+          ""
+        ],
+        "parentId": "comp_2"
+      },
+      {
+        "id": "comp_11",
+        "type": "TABLE_COLS",
+        "indentation": 164,
+        "y": 488,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "5",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 164,
+                "y": 488
+              },
+              {
+                "x": 227,
+                "y": 489
+              },
+              {
+                "x": 227,
+                "y": 776
+              },
+              {
+                "x": 164,
+                "y": 776
+              }
+            ],
+            "confidence": 0.996
+          },
+          "col_1": {
+            "text": "CW840J",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 489
+              },
+              {
+                "x": 433,
+                "y": 490
+              },
+              {
+                "x": 433,
+                "y": 533
+              },
+              {
+                "x": 227,
+                "y": 533
+              }
+            ],
+            "confidence": 0.992
+          },
+          "col_2": {
+            "text": "",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 490
+              },
+              {
+                "x": 1053,
+                "y": 489
+              },
+              {
+                "x": 1053,
+                "y": 533
+              },
+              {
+                "x": 433,
+                "y": 533
+              }
+            ],
+            "confidence": 1
+          },
+          "col_3": {
+            "text": "9,260,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 489
+              },
+              {
+                "x": 1209,
+                "y": 489
+              },
+              {
+                "x": 1209,
+                "y": 533
+              },
+              {
+                "x": 1053,
+                "y": 533
+              }
+            ],
+            "confidence": 0.995
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1209,
+                "y": 489
+              },
+              {
+                "x": 1415,
+                "y": 489
+              },
+              {
+                "x": 1415,
+                "y": 533
+              },
+              {
+                "x": 1209,
+                "y": 533
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 0,
+        "text": "5 CW840J 9,260,000",
+        "confidence": 0.99,
+        "cells": [
+          "5",
+          "CW840J",
+          "",
+          "9,260,000",
+          ""
+        ]
+      },
+      {
+        "id": "comp_12",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 533,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- CW840IJ",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 533
+              },
+              {
+                "x": 433,
+                "y": 533
+              },
+              {
+                "x": 433,
+                "y": 553
+              },
+              {
+                "x": 227,
+                "y": 553
+              }
+            ],
+            "confidence": 0.92
+          },
+          "col_2": {
+            "text": "One Piece Toilet (S-Trap)",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 533
+              },
+              {
+                "x": 1053,
+                "y": 533
+              },
+              {
+                "x": 1053,
+                "y": 553
+              },
+              {
+                "x": 433,
+                "y": 553
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "4,645,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 533
+              },
+              {
+                "x": 1209,
+                "y": 533
+              },
+              {
+                "x": 1209,
+                "y": 553
+              },
+              {
+                "x": 1053,
+                "y": 553
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1209,
+                "y": 533
+              },
+              {
+                "x": 1415,
+                "y": 533
+              },
+              {
+                "x": 1415,
+                "y": 553
+              },
+              {
+                "x": 1209,
+                "y": 553
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- CW840IJ One Piece Toilet (S-Trap) 4,645,000",
+        "confidence": 0.97,
+        "cells": [
+          "",
+          "- CW840IJ",
+          "One Piece Toilet (S-Trap)",
+          "4,645,000",
+          ""
+        ],
+        "parentId": "comp_11"
+      },
+      {
+        "id": "comp_13",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 553,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- CW840CRJ",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 553
+              },
+              {
+                "x": 433,
+                "y": 553
+              },
+              {
+                "x": 433,
+                "y": 579
+              },
+              {
+                "x": 227,
+                "y": 579
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Tank Cover",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 553
+              },
+              {
+                "x": 1053,
+                "y": 553
+              },
+              {
+                "x": 1053,
+                "y": 579
+              },
+              {
+                "x": 433,
+                "y": 579
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "1,372,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 553
+              },
+              {
+                "x": 1209,
+                "y": 553
+              },
+              {
+                "x": 1209,
+                "y": 579
+              },
+              {
+                "x": 1053,
+                "y": 579
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1209,
+                "y": 553
+              },
+              {
+                "x": 1415,
+                "y": 553
+              },
+              {
+                "x": 1415,
+                "y": 579
+              },
+              {
+                "x": 1209,
+                "y": 579
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- CW840CRJ Tank Cover 1,372,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- CW840CRJ",
+          "Tank Cover",
+          "1,372,000",
+          ""
+        ],
+        "parentId": "comp_11"
+      },
+      {
+        "id": "comp_14",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 579,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TX902CZ :",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 579
+              },
+              {
+                "x": 433,
+                "y": 579
+              },
+              {
+                "x": 433,
+                "y": 600
+              },
+              {
+                "x": 227,
+                "y": 600
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Installation Fitting Set for CW840J",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 579
+              },
+              {
+                "x": 1053,
+                "y": 579
+              },
+              {
+                "x": 1053,
+                "y": 600
+              },
+              {
+                "x": 433,
+                "y": 600
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "473,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 579
+              },
+              {
+                "x": 1209,
+                "y": 579
+              },
+              {
+                "x": 1208,
+                "y": 600
+              },
+              {
+                "x": 1053,
+                "y": 600
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1209,
+                "y": 579
+              },
+              {
+                "x": 1415,
+                "y": 579
+              },
+              {
+                "x": 1415,
+                "y": 600
+              },
+              {
+                "x": 1208,
+                "y": 600
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TX902CZ : Installation Fitting Set for CW840J 473,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TX902CZ :",
+          "Installation Fitting Set for CW840J",
+          "473,000",
+          ""
+        ],
+        "parentId": "comp_11"
+      },
+      {
+        "id": "comp_15",
+        "type": "TABLE_ROW",
+        "indentation": 248,
+        "y": 600,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TX277S",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 600
+              },
+              {
+                "x": 433,
+                "y": 600
+              },
+              {
+                "x": 433,
+                "y": 623
+              },
+              {
+                "x": 227,
+                "y": 623
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Stop Valve w/ Flexible Hose",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 600
+              },
+              {
+                "x": 1053,
+                "y": 600
+              },
+              {
+                "x": 1053,
+                "y": 623
+              },
+              {
+                "x": 433,
+                "y": 623
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "230,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 600
+              },
+              {
+                "x": 1208,
+                "y": 600
+              },
+              {
+                "x": 1208,
+                "y": 623
+              },
+              {
+                "x": 1053,
+                "y": 623
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1208,
+                "y": 600
+              },
+              {
+                "x": 1415,
+                "y": 600
+              },
+              {
+                "x": 1415,
+                "y": 623
+              },
+              {
+                "x": 1208,
+                "y": 623
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TX277S Stop Valve w/ Flexible Hose 230,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TX277S",
+          "Stop Valve w/ Flexible Hose",
+          "230,000",
+          ""
+        ],
+        "parentId": "comp_11"
+      },
+      {
+        "id": "comp_16",
+        "type": "TABLE_ROW",
+        "indentation": 248,
+        "y": 623,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TX215C",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 623
+              },
+              {
+                "x": 433,
+                "y": 623
+              },
+              {
+                "x": 433,
+                "y": 645
+              },
+              {
+                "x": 227,
+                "y": 645
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Slip-in Connector",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 623
+              },
+              {
+                "x": 1053,
+                "y": 623
+              },
+              {
+                "x": 1053,
+                "y": 645
+              },
+              {
+                "x": 433,
+                "y": 645
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "110,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 623
+              },
+              {
+                "x": 1208,
+                "y": 623
+              },
+              {
+                "x": 1208,
+                "y": 645
+              },
+              {
+                "x": 1053,
+                "y": 645
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1208,
+                "y": 623
+              },
+              {
+                "x": 1415,
+                "y": 623
+              },
+              {
+                "x": 1415,
+                "y": 645
+              },
+              {
+                "x": 1208,
+                "y": 645
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TX215C Slip-in Connector 110,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TX215C",
+          "Slip-in Connector",
+          "110,000",
+          ""
+        ],
+        "parentId": "comp_11"
+      },
+      {
+        "id": "comp_17",
+        "type": "TABLE_ROW",
+        "indentation": 248,
+        "y": 645,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TX276C",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 645
+              },
+              {
+                "x": 433,
+                "y": 645
+              },
+              {
+                "x": 433,
+                "y": 667
+              },
+              {
+                "x": 227,
+                "y": 667
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Fixing Bracket",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 645
+              },
+              {
+                "x": 1053,
+                "y": 645
+              },
+              {
+                "x": 1053,
+                "y": 667
+              },
+              {
+                "x": 433,
+                "y": 667
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "133,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 645
+              },
+              {
+                "x": 1208,
+                "y": 645
+              },
+              {
+                "x": 1208,
+                "y": 667
+              },
+              {
+                "x": 1053,
+                "y": 667
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1208,
+                "y": 645
+              },
+              {
+                "x": 1415,
+                "y": 645
+              },
+              {
+                "x": 1415,
+                "y": 665
+              },
+              {
+                "x": 1208,
+                "y": 667
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TX276C Fixing Bracket 133,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TX276C",
+          "Fixing Bracket",
+          "133,000",
+          ""
+        ],
+        "parentId": "comp_11"
+      },
+      {
+        "id": "comp_18",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 667,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TX840C81WS",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 667
+              },
+              {
+                "x": 433,
+                "y": 667
+              },
+              {
+                "x": 433,
+                "y": 689
+              },
+              {
+                "x": 227,
+                "y": 689
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Dual Flush Tank Trim w/o Stop Valve for CW840J (4,5 / 3 Liters)",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 667
+              },
+              {
+                "x": 1053,
+                "y": 667
+              },
+              {
+                "x": 1053,
+                "y": 687
+              },
+              {
+                "x": 433,
+                "y": 689
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "1,440,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 667
+              },
+              {
+                "x": 1208,
+                "y": 667
+              },
+              {
+                "x": 1208,
+                "y": 687
+              },
+              {
+                "x": 1053,
+                "y": 687
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1208,
+                "y": 667
+              },
+              {
+                "x": 1415,
+                "y": 665
+              },
+              {
+                "x": 1415,
+                "y": 687
+              },
+              {
+                "x": 1208,
+                "y": 687
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TX840C81WS Dual Flush Tank Trim w/o Stop Valve for CW840J (4,5 / 3 Liters) 1,440,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TX840C81WS",
+          "Dual Flush Tank Trim w/o Stop Valve for CW840J (4,5 / 3 Liters)",
+          "1,440,000",
+          ""
+        ],
+        "parentId": "comp_11"
+      },
+      {
+        "id": "comp_19",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 689,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TC840SJ",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 689
+              },
+              {
+                "x": 433,
+                "y": 689
+              },
+              {
+                "x": 433,
+                "y": 776
+              },
+              {
+                "x": 227,
+                "y": 776
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Duroplast Seat & Cover w/ Metal Hinges, Soft Closing (Elongated)",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 689
+              },
+              {
+                "x": 1053,
+                "y": 687
+              },
+              {
+                "x": 1053,
+                "y": 776
+              },
+              {
+                "x": 433,
+                "y": 776
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "1,330,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 687
+              },
+              {
+                "x": 1208,
+                "y": 687
+              },
+              {
+                "x": 1208,
+                "y": 775
+              },
+              {
+                "x": 1053,
+                "y": 776
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1208,
+                "y": 687
+              },
+              {
+                "x": 1415,
+                "y": 687
+              },
+              {
+                "x": 1415,
+                "y": 775
+              },
+              {
+                "x": 1208,
+                "y": 775
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TC840SJ Duroplast Seat & Cover w/ Metal Hinges, Soft Closing (Elongated) 1,330,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TC840SJ",
+          "Duroplast Seat & Cover w/ Metal Hinges, Soft Closing (Elongated)",
+          "1,330,000",
+          ""
+        ],
+        "parentId": "comp_11"
+      },
+      {
+        "id": "comp_20",
+        "type": "TABLE_COLS",
+        "indentation": 164,
+        "y": 776,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "6",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 164,
+                "y": 776
+              },
+              {
+                "x": 227,
+                "y": 776
+              },
+              {
+                "x": 227,
+                "y": 1064
+              },
+              {
+                "x": 164,
+                "y": 1064
+              }
+            ],
+            "confidence": 0.994
+          },
+          "col_1": {
+            "text": "C436N",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 776
+              },
+              {
+                "x": 433,
+                "y": 776
+              },
+              {
+                "x": 433,
+                "y": 823
+              },
+              {
+                "x": 227,
+                "y": 823
+              }
+            ],
+            "confidence": 0.994
+          },
+          "col_2": {
+            "text": "",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 776
+              },
+              {
+                "x": 1053,
+                "y": 776
+              },
+              {
+                "x": 1053,
+                "y": 823
+              },
+              {
+                "x": 433,
+                "y": 823
+              }
+            ],
+            "confidence": 1
+          },
+          "col_3": {
+            "text": "9,100,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 776
+              },
+              {
+                "x": 1208,
+                "y": 775
+              },
+              {
+                "x": 1208,
+                "y": 823
+              },
+              {
+                "x": 1053,
+                "y": 823
+              }
+            ],
+            "confidence": 0.995
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1208,
+                "y": 775
+              },
+              {
+                "x": 1415,
+                "y": 775
+              },
+              {
+                "x": 1415,
+                "y": 821
+              },
+              {
+                "x": 1208,
+                "y": 823
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 0,
+        "text": "6 C436N 9,100,000",
+        "confidence": 0.99,
+        "cells": [
+          "6",
+          "C436N",
+          "",
+          "9,100,000",
+          ""
+        ]
+      },
+      {
+        "id": "comp_21",
+        "type": "TABLE_ROW",
+        "indentation": 233,
+        "y": 823,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- C436IN",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 823
+              },
+              {
+                "x": 433,
+                "y": 823
+              },
+              {
+                "x": 433,
+                "y": 845
+              },
+              {
+                "x": 227,
+                "y": 845
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "\"Superior\" One Piece Toilet Bowl Only (S-trap)",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 823
+              },
+              {
+                "x": 1053,
+                "y": 823
+              },
+              {
+                "x": 1053,
+                "y": 845
+              },
+              {
+                "x": 433,
+                "y": 845
+              }
+            ],
+            "confidence": 0.92
+          },
+          "col_3": {
+            "text": "4,682,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 823
+              },
+              {
+                "x": 1208,
+                "y": 823
+              },
+              {
+                "x": 1208,
+                "y": 843
+              },
+              {
+                "x": 1053,
+                "y": 845
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1208,
+                "y": 823
+              },
+              {
+                "x": 1415,
+                "y": 821
+              },
+              {
+                "x": 1415,
+                "y": 843
+              },
+              {
+                "x": 1208,
+                "y": 843
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- C436IN \"Superior\" One Piece Toilet Bowl Only (S-trap) 4,682,000",
+        "confidence": 0.97,
+        "cells": [
+          "",
+          "- C436IN",
+          "\"Superior\" One Piece Toilet Bowl Only (S-trap)",
+          "4,682,000",
+          ""
+        ],
+        "parentId": "comp_20"
+      },
+      {
+        "id": "comp_22",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 845,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- C436CR",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 845
+              },
+              {
+                "x": 433,
+                "y": 845
+              },
+              {
+                "x": 433,
+                "y": 865
+              },
+              {
+                "x": 227,
+                "y": 865
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "\"Superior\" Tank Cover for C436N",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 845
+              },
+              {
+                "x": 1053,
+                "y": 845
+              },
+              {
+                "x": 1053,
+                "y": 864
+              },
+              {
+                "x": 433,
+                "y": 865
+              }
+            ],
+            "confidence": 0.93
+          },
+          "col_3": {
+            "text": "1,065,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 845
+              },
+              {
+                "x": 1208,
+                "y": 843
+              },
+              {
+                "x": 1208,
+                "y": 864
+              },
+              {
+                "x": 1053,
+                "y": 864
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1208,
+                "y": 843
+              },
+              {
+                "x": 1415,
+                "y": 843
+              },
+              {
+                "x": 1415,
+                "y": 861
+              },
+              {
+                "x": 1208,
+                "y": 864
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- C436CR \"Superior\" Tank Cover for C436N 1,065,000",
+        "confidence": 0.98,
+        "cells": [
+          "",
+          "- C436CR",
+          "\"Superior\" Tank Cover for C436N",
+          "1,065,000",
+          ""
+        ],
+        "parentId": "comp_20"
+      },
+      {
+        "id": "comp_23",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 865,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TX901CV6 :",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 865
+              },
+              {
+                "x": 433,
+                "y": 865
+              },
+              {
+                "x": 433,
+                "y": 886
+              },
+              {
+                "x": 227,
+                "y": 886
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Installation Fitting Set for C436N",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 865
+              },
+              {
+                "x": 1053,
+                "y": 864
+              },
+              {
+                "x": 1053,
+                "y": 885
+              },
+              {
+                "x": 433,
+                "y": 886
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "446,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 864
+              },
+              {
+                "x": 1208,
+                "y": 864
+              },
+              {
+                "x": 1208,
+                "y": 885
+              },
+              {
+                "x": 1053,
+                "y": 885
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1208,
+                "y": 864
+              },
+              {
+                "x": 1415,
+                "y": 861
+              },
+              {
+                "x": 1415,
+                "y": 909
+              },
+              {
+                "x": 1208,
+                "y": 909
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TX901CV6 : Installation Fitting Set for C436N 446,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TX901CV6 :",
+          "Installation Fitting Set for C436N",
+          "446,000",
+          ""
+        ],
+        "parentId": "comp_20"
+      },
+      {
+        "id": "comp_24",
+        "type": "TABLE_ROW",
+        "indentation": 248,
+        "y": 886,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TX277S",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 886
+              },
+              {
+                "x": 433,
+                "y": 886
+              },
+              {
+                "x": 433,
+                "y": 910
+              },
+              {
+                "x": 227,
+                "y": 910
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Stop Valve w/ Flexible Hose",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 886
+              },
+              {
+                "x": 1053,
+                "y": 885
+              },
+              {
+                "x": 1053,
+                "y": 909
+              },
+              {
+                "x": 433,
+                "y": 910
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "230,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 885
+              },
+              {
+                "x": 1208,
+                "y": 885
+              },
+              {
+                "x": 1208,
+                "y": 909
+              },
+              {
+                "x": 1053,
+                "y": 909
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TX277S Stop Valve w/ Flexible Hose 230,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TX277S",
+          "Stop Valve w/ Flexible Hose",
+          "230,000",
+          ""
+        ],
+        "parentId": "comp_20"
+      },
+      {
+        "id": "comp_25",
+        "type": "TABLE_ROW",
+        "indentation": 248,
+        "y": 910,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- T53P100",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 910
+              },
+              {
+                "x": 433,
+                "y": 910
+              },
+              {
+                "x": 433,
+                "y": 932
+              },
+              {
+                "x": 227,
+                "y": 932
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Floor Flange w/ Seal Gasket",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 910
+              },
+              {
+                "x": 1053,
+                "y": 909
+              },
+              {
+                "x": 1053,
+                "y": 931
+              },
+              {
+                "x": 433,
+                "y": 932
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "180,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 909
+              },
+              {
+                "x": 1208,
+                "y": 909
+              },
+              {
+                "x": 1208,
+                "y": 931
+              },
+              {
+                "x": 1053,
+                "y": 931
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1208,
+                "y": 909
+              },
+              {
+                "x": 1415,
+                "y": 909
+              },
+              {
+                "x": 1415,
+                "y": 931
+              },
+              {
+                "x": 1208,
+                "y": 931
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- T53P100 Floor Flange w/ Seal Gasket 180,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- T53P100",
+          "Floor Flange w/ Seal Gasket",
+          "180,000",
+          ""
+        ],
+        "parentId": "comp_20"
+      },
+      {
+        "id": "comp_26",
+        "type": "TABLE_ROW",
+        "indentation": 248,
+        "y": 932,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- T53DSRN",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 932
+              },
+              {
+                "x": 433,
+                "y": 932
+              },
+              {
+                "x": 433,
+                "y": 953
+              },
+              {
+                "x": 227,
+                "y": 953
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Screws & Caps (4 caps) (Col: #W)",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 932
+              },
+              {
+                "x": 1053,
+                "y": 931
+              },
+              {
+                "x": 1053,
+                "y": 953
+              },
+              {
+                "x": 433,
+                "y": 953
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "36,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 931
+              },
+              {
+                "x": 1208,
+                "y": 931
+              },
+              {
+                "x": 1208,
+                "y": 952
+              },
+              {
+                "x": 1053,
+                "y": 953
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1208,
+                "y": 931
+              },
+              {
+                "x": 1415,
+                "y": 931
+              },
+              {
+                "x": 1415,
+                "y": 952
+              },
+              {
+                "x": 1208,
+                "y": 952
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- T53DSRN Screws & Caps (4 caps) (Col: #W) 36,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- T53DSRN",
+          "Screws & Caps (4 caps) (Col: #W)",
+          "36,000",
+          ""
+        ],
+        "parentId": "comp_20"
+      },
+      {
+        "id": "comp_27",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 953,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TX436C1-2WS",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 953
+              },
+              {
+                "x": 433,
+                "y": 953
+              },
+              {
+                "x": 433,
+                "y": 975
+              },
+              {
+                "x": 227,
+                "y": 975
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Tank Trim w/o Stop Valve for C436N (6 Liters)",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 953
+              },
+              {
+                "x": 1053,
+                "y": 953
+              },
+              {
+                "x": 1053,
+                "y": 975
+              },
+              {
+                "x": 433,
+                "y": 975
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_3": {
+            "text": "2,220,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 953
+              },
+              {
+                "x": 1208,
+                "y": 952
+              },
+              {
+                "x": 1208,
+                "y": 975
+              },
+              {
+                "x": 1053,
+                "y": 975
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [
+              {
+                "x": 1208,
+                "y": 952
+              },
+              {
+                "x": 1415,
+                "y": 952
+              },
+              {
+                "x": 1415,
+                "y": 1063
+              },
+              {
+                "x": 1208,
+                "y": 1063
+              }
+            ],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TX436C1-2WS Tank Trim w/o Stop Valve for C436N (6 Liters) 2,220,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TX436C1-2WS",
+          "Tank Trim w/o Stop Valve for C436N (6 Liters)",
+          "2,220,000",
+          ""
+        ],
+        "parentId": "comp_20"
+      },
+      {
+        "id": "comp_28",
+        "type": "TABLE_ROW",
+        "indentation": 234,
+        "y": 975,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "",
+            "column": "Column 0",
+            "vertices": [],
+            "confidence": 1
+          },
+          "col_1": {
+            "text": "- TC365",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 227,
+                "y": 975
+              },
+              {
+                "x": 433,
+                "y": 975
+              },
+              {
+                "x": 433,
+                "y": 1015
+              },
+              {
+                "x": 227,
+                "y": 1015
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_2": {
+            "text": "Plastic Seat & Cover w/ Plastic Hinges (Elongated)",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 433,
+                "y": 975
+              },
+              {
+                "x": 1053,
+                "y": 975
+              },
+              {
+                "x": 1053,
+                "y": 1063
+              },
+              {
+                "x": 433,
+                "y": 1064
+              }
+            ],
+            "confidence": 0.98
+          },
+          "col_3": {
+            "text": "687,000",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 1053,
+                "y": 975
+              },
+              {
+                "x": 1208,
+                "y": 975
+              },
+              {
+                "x": 1208,
+                "y": 1014
+              },
+              {
+                "x": 1053,
+                "y": 1014
+              }
+            ],
+            "confidence": 0.99
+          },
+          "col_4": {
+            "text": "",
+            "column": "Column 4",
+            "vertices": [],
+            "confidence": 1
+          }
+        },
+        "layer": 1,
+        "text": "- TC365 Plastic Seat & Cover w/ Plastic Hinges (Elongated) 687,000",
+        "confidence": 0.99,
+        "cells": [
+          "",
+          "- TC365",
+          "Plastic Seat & Cover w/ Plastic Hinges (Elongated)",
+          "687,000",
+          ""
+        ],
+        "parentId": "comp_20"
+      },
+      {
+        "id": "comp_29",
+        "type": "BODY_TEXT",
+        "indentation": 108,
+        "y": 1152,
+        "boundingBoxes": {},
+        "layer": 0,
+        "text": "ONE PIECE TOILET 2",
+        "confidence": 0.99
+      }
+    ]
+  }
+]

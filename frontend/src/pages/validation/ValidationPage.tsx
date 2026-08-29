@@ -4,7 +4,7 @@ import ExtractedDataPanel from './components/extracted-data/ExtractedDataPanel';
 import ChatPanel from './components/chat/ChatPanel';
 import BatchDocumentSelector from './components/batch/BatchDocumentSelector';
 import type { ChatMessage, ReviewField } from '../../models/Message';
-import type { OCRComponent } from '../../models/OCRComponent';
+import type { OCRComponent, Pages } from '../../models/OCRComponent';
 import type { ExtractedData, ExtractedPage } from '../../models/TableData';
 import { getProcessedImageUrls, getUploadedImageUrl } from '../../services/uploadService';
 import type { DocumentJob } from '../../models/Job';
@@ -46,12 +46,12 @@ function ValidationPage() {
   const [splitPercent, setSplitPercent] = useState(50);
   const [oldContext, setOldContext] = useState<ExtractedPage | null>(null); //for AI suggesiton
   const [imageUrls, setImageUrls] = useState<string[]>([]); // one image URL per page
-  const [ocrPages, setOcrPages] = useState<OCRComponent[][]>([]); // raw OCR, one array per page
+  const [ocrPages, setOcrPages] = useState<Pages>([]); // raw OCR, one array per page
   const [extractedPages, setExtractedPages] = useState<ExtractedPage[]>([]); // flattened, one per page
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
   const documentContext: ExtractedPage | null = extractedPages[currentPageIndex] ?? null;
-  const ocrData: OCRComponent[] = ocrPages[currentPageIndex] ?? [];
+  const ocrData: OCRComponent[] = ocrPages[currentPageIndex]?.components ?? [];
   const documentImageURL: string | undefined = imageUrls[currentPageIndex];
 
   const isLarge = useIsLargeScreen();
@@ -122,13 +122,14 @@ function ValidationPage() {
         // }
 
         let ocrData = await getExtractionSession(); //IMORTANT NOTE, CHANGE API TO NEW ONE
-        setOcrPages([ocrData]);
+        setOcrPages(ocrData);
         // console.log("SESSION DATA:", sessionData);
         // console.log("OCR DATA:", sessionData?.ocrData);
         // if (!sessionData?.ocrData) {
         //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
         // }
         const processedUrls = await getProcessedImageUrls();
+        console.log(processedUrls);
         setImageUrls(processedUrls.length > 0 ? processedUrls : [await getUploadedImageUrl()]);
       } catch (error) {
         console.error('Failed to load extraction session', error);
@@ -142,12 +143,10 @@ function ValidationPage() {
   // extractedPages — nothing else should call flatten() directly
   useEffect(() => {
     if (ocrPages.length === 0) return;
-    console.log(ocrPages);
     const newExtractedPages: ExtractedPage[] = ocrPages.map((page, pageIndex) => ({
-      ...flatten(page, { manualIndentLevels: manualIndentLevels[pageIndex] ?? {} }),
-      pageIndex,
+      ...flatten(page.components, { manualIndentLevels: manualIndentLevels[pageIndex] ?? {} }),
+      pageIndex: page.page_num - 1,
     }));
-    console.log(newExtractedPages);
     setExtractedPages(newExtractedPages);
   }, [ocrPages, manualIndentLevels]);
 

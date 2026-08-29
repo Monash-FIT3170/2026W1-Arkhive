@@ -29,7 +29,6 @@ const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 const endpoint = process.env.endpoint!;
 const key = process.env.AZURE_CLOUD_API_KEY!;
 
-
 function pruneOCROutput(OCRResponse: AnalyzeOperationOutput): any {
   const result = OCRResponse.analyzeResult;
   if (!result) return {};
@@ -74,10 +73,10 @@ function pruneOCROutput(OCRResponse: AnalyzeOperationOutput): any {
   };
 }
 
-
-
-
-function pruneOCROutput111(OCRResponse: AnalyzeOperationOutput, tablesInPage: DocumentTableOutput[]): any {
+function pruneOCROutput111(
+  OCRResponse: AnalyzeOperationOutput,
+  tablesInPage: DocumentTableOutput[]
+): any {
   const result = OCRResponse.analyzeResult;
   if (!result) return {};
 
@@ -132,13 +131,13 @@ function toColumnDict(boxes: any[]): OCRColumnBoundingBoxes {
 
 const initialiseModel = (customSchema: Schema) => {
   return ai.getGenerativeModel({
-      model: 'gemini-flash-lite-latest',
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: customSchema,
-      },
-    });
-}
+    model: 'gemini-flash-lite-latest',
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: customSchema,
+    },
+  });
+};
 
 const createPrompt = (OCRResponse: AnalyzeOperationOutput) => {
   return `Analyze the following Azure Document Intelligence layout output and convert it into structured components.
@@ -153,15 +152,18 @@ const createPrompt = (OCRResponse: AnalyzeOperationOutput) => {
                - Store bounding boxes per table column, keyed like "col_0", "col_1", etc. (one entry per column present in that row), each with the column's text, a "column" label (e.g. "Column 0"), its vertices, and confidence.
 
 ${JSON.stringify(pruneOCROutput(OCRResponse))}`;
-}
+};
 
-
-const createPrompt11 = (OCRResponse: AnalyzeOperationOutput, tablesInPage: DocumentTableOutput[]) => {
+const createPrompt11 = (
+  OCRResponse: AnalyzeOperationOutput,
+  tablesInPage: DocumentTableOutput[]
+) => {
   return `Analyze the following Azure Document Intelligence layout output and convert it into structured components.
                
                Mapping Guidelines:
                - Map section headings/titles to 'TITLE' or 'HEADER'.
                - Map table rows/cells to 'TABLE_ROW' or 'TABLE_COLS' and populate the 'cells' string array.
+               - Make sure that there is atleast one 'TABLE_COLS' to define the table's columns
                - Map standard paragraphs to 'BODY_TEXT'.
                - Calculate visual 'y' coordinates and 'indentation' based on the bounding region points.
                - IMPORTANT: a cell's own boundingRegions box is coarse and does NOT shrink when its text is nested/indented — Azure draws the same cell-sized box either way. To determine true indentation, use each cell's "words" array instead and take the leftmost x-coordinate of the word polygons. Compare that leftmost x across rows in the same table to decide nesting.
@@ -169,35 +171,37 @@ const createPrompt11 = (OCRResponse: AnalyzeOperationOutput, tablesInPage: Docum
                - Store bounding boxes per table column, keyed like "col_0", "col_1", etc. (one entry per column present in that row), each with the column's text, a "column" label (e.g. "Column 0"), its vertices, and confidence.
 
 ${JSON.stringify(pruneOCROutput111(OCRResponse, tablesInPage))}`;
-}
-
+};
 
 function logTablePages(result: AnalyzeOperationOutput) {
   result.analyzeResult!.tables?.forEach((table, index) => {
     // Collect all unique 1-based page numbers the table covers
-    const pageNumbers = table.boundingRegions?.map(region => region.pageNumber) || [];
-    
-    console.log(`Table #${index} spans across page(s): ${pageNumbers.join(", ")}`);
+    const pageNumbers = table.boundingRegions?.map((region) => region.pageNumber) || [];
+
+    console.log(`Table #${index} spans across page(s): ${pageNumbers.join(', ')}`);
   });
 }
 
-export const mapOCRtoPages = (customSchema: Schema) => async (OCRResponse: AnalyzeOperationOutput): Promise<Pages> => {
-  const smth = await Promise.all(
-  (OCRResponse.analyzeResult?.pages ?? []).map(async (page) => {
-    // Filter tables that belong to the current page
-    const tablesInPage = OCRResponse.analyzeResult?.tables?.filter((table) =>
-      table.boundingRegions?.some((region) => region.pageNumber === page.pageNumber)
-    ) ?? [];
-    const out: Page = {
-      page_num: page.pageNumber,
-      components: await mapTablesToOCRComponents11(customSchema)(OCRResponse, tablesInPage),
-    };
+export const mapOCRtoPages =
+  (customSchema: Schema) =>
+  async (OCRResponse: AnalyzeOperationOutput): Promise<Pages> => {
+    const smth = await Promise.all(
+      (OCRResponse.analyzeResult?.pages ?? []).map(async (page) => {
+        // Filter tables that belong to the current page
+        const tablesInPage =
+          OCRResponse.analyzeResult?.tables?.filter((table) =>
+            table.boundingRegions?.some((region) => region.pageNumber === page.pageNumber)
+          ) ?? [];
+        const out: Page = {
+          page_num: page.pageNumber,
+          components: await mapTablesToOCRComponents11(customSchema)(OCRResponse, tablesInPage),
+        };
 
-    return out;
-  })
-  );
-  return smth
-}
+        return out;
+      })
+    );
+    return smth;
+  };
 
 /**
  * @param OCRResponse
@@ -205,8 +209,11 @@ export const mapOCRtoPages = (customSchema: Schema) => async (OCRResponse: Analy
  */
 const mapTablesToOCRComponents11 =
   (customSchema: Schema) =>
-  async (OCRResponse: AnalyzeOperationOutput, tablesInPage: DocumentTableOutput[]): Promise<OCRComponent[]> => {
-    const model = initialiseModel(customSchema)
+  async (
+    OCRResponse: AnalyzeOperationOutput,
+    tablesInPage: DocumentTableOutput[]
+  ): Promise<OCRComponent[]> => {
+    const model = initialiseModel(customSchema);
 
     const result = await model.generateContent(createPrompt11(OCRResponse, tablesInPage));
     const rawText = result.response.text() ?? '{}';
@@ -226,7 +233,7 @@ const mapTablesToOCRComponents11 =
 const mapTablesToOCRComponents =
   (customSchema: Schema) =>
   async (OCRResponse: AnalyzeOperationOutput): Promise<OCRComponent[]> => {
-    const model = initialiseModel(customSchema)
+    const model = initialiseModel(customSchema);
 
     const result = await model.generateContent(createPrompt(OCRResponse));
     const rawText = result.response.text() ?? '{}';
@@ -245,8 +252,6 @@ const client: DocumentIntelligenceClient = DocumentIntelligence(
   { key: key },
   { apiVersion: '2024-11-30' }
 );
-
-
 
 export async function analyse_result(buffer: Buffer) {
   const request = await client.path('/documentModels/{modelId}:analyze', 'prebuilt-layout').post({

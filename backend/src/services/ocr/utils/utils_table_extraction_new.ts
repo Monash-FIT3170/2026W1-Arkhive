@@ -96,13 +96,12 @@ function toColumnDict(boxes: any[]): OCRColumnBoundingBoxes {
   );
 }
 
-
 function logTablePages(result: AnalyzeOperationOutput) {
   result.analyzeResult!.tables?.forEach((table, index) => {
     // Collect all unique 1-based page numbers the table covers
-    const pageNumbers = table.boundingRegions?.map(region => region.pageNumber) || [];
-    
-    console.log(`Table #${index} spans across page(s): ${pageNumbers.join(", ")}`);
+    const pageNumbers = table.boundingRegions?.map((region) => region.pageNumber) || [];
+
+    console.log(`Table #${index} spans across page(s): ${pageNumbers.join(', ')}`);
   });
 }
 
@@ -113,15 +112,10 @@ function logTablePages(result: AnalyzeOperationOutput) {
 const mapTablesToOCRComponents =
   (customSchema: Schema) =>
   async (OCRResponse: AnalyzeOperationOutput): Promise<OCRComponent[]> => {
-
-    OCRResponse.analyzeResult?.pages.map((page) => {
-      
-    })
-    OCRResponse.analyzeResult!.tables!.filter((table) =>
-      {
-        table.boundingRegions?.filter(region => region.pageNumber == 1)
-      }
-    )
+    OCRResponse.analyzeResult?.pages.map((page) => {});
+    OCRResponse.analyzeResult!.tables!.filter((table) => {
+      table.boundingRegions?.filter((region) => region.pageNumber == 1);
+    });
     const model = ai.getGenerativeModel({
       model: 'gemini-3.5-flash-lite',
       generationConfig: {
@@ -174,10 +168,10 @@ export async function analyse_result(buffer: Buffer) {
   const response = await poller.pollUntilDone();
 
   const result = response.body as AnalyzeOperationOutput;
-  const tester = await mapOCRtoPages(geminiSchemaBBoxPrompt)
+  const tester = await mapOCRtoPages(geminiSchemaBBoxPrompt);
   const defaultOutputFunc = await mapTablesToOCRComponents(geminiSchemaBBoxPrompt);
   //const processedOut = await defaultOutputFunc(result);
-  const output = await tester(result)
-  fs.writeFileSync('smthPleaseWorkIBegYou.json', JSON.stringify(output, null, 2));
+  const output = await tester(result);
+  fs.writeFileSync('smthToWorkWithPotentially.json', JSON.stringify(output, null, 2));
   return output;
 }

@@ -308,12 +308,22 @@ export default {
 
       // Save combined extraction into session for single-doc / backward compatibility
       const combinedOcrData = jobs.flatMap((job) => job.ocrData);
+
+      // Get every single page from all processed documents
+      const allProcessedImages = documentsToProcess.flatMap((doc) =>
+        doc.files.map((file) => `/api/upload/image/${doc.documentId}/${file.pageIndex}`)
+      );
+
       req.session.extraction = {
         ocrData: combinedOcrData,
-        processedImages: jobs.map((job) => job.imageUrl),
+        processedImages: allProcessedImages,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
+
+      const debugPath = path.join(process.cwd(), 'combined-ocr-output.json');
+
+      fs.writeFileSync(debugPath, JSON.stringify(combinedOcrData, null, 2), 'utf8');
 
       res.write(
         JSON.stringify({
