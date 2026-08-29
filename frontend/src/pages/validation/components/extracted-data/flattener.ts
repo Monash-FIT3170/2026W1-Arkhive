@@ -1,5 +1,6 @@
 import type { ExtractedData, ExtractedPage, ExtractedRow } from '../../../../models/TableData';
-import type { OCRComponent } from '../../../../models/OCRComponent';
+import type { OCRComponent, Page, Pages } from '../../../../models/OCRComponent';
+import { da } from 'zod/locales';
 
 // ==========================================
 // TYPES & INTERFACES
@@ -26,11 +27,11 @@ export interface FlattenerOptions {
   /**
    * Manual nesting-depth overrides, keyed by OCRComponent id.
    * 0 = top-level. 1 = nested one level under the nearest preceding row
-   * with a lower resolved level. Always wins over geometric detection for
-   * that specific row. Rows without an entry fall back to geometric
-   * detection, compared against whatever is currently on the stack —
-   * so a manual override can start a fresh nesting scope that later
-   * un-overridden rows still nest into automatically.
+   * with a lower resolved level. Always wins over `parentId` for that
+   * specific row. Rows without an entry fall back to `parentId`,
+   * compared against whatever is currently on the stack — so a manual
+   * override can start a fresh nesting scope that later un-overridden
+   * rows still nest into automatically.
    */
   manualIndentLevels?: Record<string, number>;
 }
@@ -104,8 +105,11 @@ function findClosestIndex(target: number, values: number[], startIndex = 0): num
 }
 
 function getIndent(c: OCRComponent): number {
-  const firstKey = getColumnBBKeys(c)[0];
-  const verts = firstKey ? c.boundingBoxes?.[firstKey]?.vertices : undefined;
+  const bbKeys = getColumnBBKeys(c);
+  const firstPopulatedKey = bbKeys.find((k) => c.boundingBoxes?.[k]?.text?.trim() !== '');
+
+  const verts = firstPopulatedKey ? c.boundingBoxes?.[firstPopulatedKey]?.vertices : undefined;
+
   if (verts?.length) {
     return Math.min(...verts.map((v) => Number(v.x)));
   }
@@ -122,9 +126,13 @@ function getIndent(c: OCRComponent): number {
  * @returns keys - list of column names, positions - the mid x position of each column
  */
 export function extractColumns(data: OCRComponent[]) {
-  const colComp = data.find((c) => c.type === 'HEADER');
-  const rawCols = colComp?.cells ?? [];
+  const colComp = data.find((c) => c.type === 'TABLE_COLS');
+  console.log(colComp);
   const bbKeys = colComp ? getColumnBBKeys(colComp) : [];
+
+  const rawCols = colComp?.cells?.length
+    ? colComp.cells
+    : bbKeys.map((k) => colComp!.boundingBoxes![k].text);
 
   const keys = rawCols.map(normalizeColKey);
   const positions = rawCols.map((_, i) => getMidX(colComp!, bbKeys[i]) ?? i * 100);
@@ -145,7 +153,8 @@ export function detectItemColumn(components: OCRComponent[], colXs: number[]): n
   for (const c of components) {
     const bbKeys = getColumnBBKeys(c);
     //for each component increment the column counter for the first item
-    const startX = bbKeys[0] ? getMidX(c, bbKeys[0]) : null; // x coordinate of the first column in component
+    const firstPopulatedKey = bbKeys.find((k) => c.boundingBoxes?.[k]?.text?.trim() !== '');
+    const startX = firstPopulatedKey ? getMidX(c, firstPopulatedKey) : null; // x coordinate of the first column in component
     if (startX !== null) {
       counts[findClosestIndex(startX, colXs)]++;
     }
@@ -167,31 +176,36 @@ function mapCellsToColumns(
   positions: number[]
 ): Record<string, CellData> {
   const result: Record<string, CellData> = {};
-  const bbKeys = getColumnBBKeys(comp);
-  let lastColIdx = -1;
+  //   const bbKeys = getColumnBBKeys(comp);
+  //   let lastColIdx = -1;
 
   comp.cells?.forEach((value, i) => {
-    const bbKey = bbKeys[i]; //Key of the cell
-    const rawCol = bbKey ? comp.boundingBoxes?.[bbKey]?.column : undefined; //Column assigned to this cell
+    const bbKey = `col_${i}`; // cells[i] IS column i — look the box up directly
+    const box = comp.boundingBoxes?.[bbKey];
+    const rawCol = box?.column;
 
-    let colIdx = resolveColumnIndex(rawCol); //Column index
+    let colIdx = resolveColumnIndex(rawCol); //Column index reported by the box itself
 
-    // Fallback to spatial X coordinate if no explicit column matches
     if (colIdx === null || colIdx < 0 || colIdx >= keys.length) {
-      const midX = (bbKey ? getMidX(comp, bbKey) : null) ?? 0;
-      const safeStart = Math.min(lastColIdx + 1, positions.length - 1); //Only consider columns greater then the previous column
-      colIdx = findClosestIndex(midX, positions, safeStart);
+      // No usable "column" field on the box (or no box at all): trust
+      // the cell's real position in the row.
+      colIdx = i;
+    } else if (box) {
+      // A box exists and reports a column — cross-check it against
+      // geometry in case that field is stale, nudging to the closest
+      // column by x-position rather than blindly trusting either source.
+      const midX = getMidX(comp, bbKey);
+      if (midX !== null) {
+        colIdx = findClosestIndex(midX, positions);
+      }
     }
-
-    lastColIdx = colIdx;
 
     if (keys[colIdx]) {
       result[keys[colIdx]] = {
         //Make the cell data representation
         value,
-        confidence:
-          (bbKey ? comp.boundingBoxes?.[bbKey]?.confidence : undefined) ?? comp.confidence,
-        ref: `${comp.id}:${bbKey ?? i}`,
+        confidence: box?.confidence ?? comp.confidence,
+        ref: `${comp.id}:${bbKey}`,
       };
     }
   });
@@ -221,14 +235,15 @@ function buildTree(
   let maxDepth = 0;
   const INDENT_THRESHOLD = estimateIndentThreshold(positions);
   const manualLevels = options?.manualIndentLevels ?? {};
+  const nodesById = new Map<string, TreeNode>();
 
   for (const comp of components) {
     const cells = mapCellsToColumns(comp, keys, positions);
-    // Check logical markers on the primary column text
     const rawIndent = getIndent(comp);
     const manualLevel = manualLevels[comp.id];
 
     let level: number;
+    let parentNode: TreeNode | undefined;
 
     if (manualLevel !== undefined) {
       // A person has decided this row's depth explicitly. Pop anything
@@ -237,15 +252,28 @@ function buildTree(
       while (stack.length > 0 && stack[stack.length - 1].level >= level) {
         stack.pop();
       }
+      parentNode = stack[stack.length - 1];
+    } else if (comp.parentId && nodesById.has(comp.parentId)) {
+      // Trust the explicit link, but only when it actually resolves.
+      parentNode = nodesById.get(comp.parentId);
+      level = parentNode!.level + 1;
+
+      // Re-sync the geometric stack to this row's real ancestry, so any
+      // later rows that fall back to geometry still nest correctly
+      // relative to it.
+      const idx = stack.indexOf(parentNode!);
+      stack.length = idx >= 0 ? idx + 1 : 0;
+      if (idx < 0) stack.push(parentNode!);
     } else {
-      // No override: fall back to comparing against whatever is
-      // currently on the stack (which may itself be a manually-placed
-      // row)
+      // No override, no (usable) parentId: fall back to comparing
+      // against whatever is currently on the stack (which may itself be
+      // a manually-placed or parentId-placed row).
       while (stack.length > 0) {
         const top = stack[stack.length - 1];
         const isDeeper = rawIndent > top.indent + INDENT_THRESHOLD;
         if (isDeeper) {
           level = top.level + 1;
+          parentNode = top;
           break;
         }
         stack.pop();
@@ -263,14 +291,16 @@ function buildTree(
       children: [],
     };
 
-    if (stack.length === 0) {
-      roots.push(node); //If there ni no parent to be a child of, row must be a parent/root node
+    nodesById.set(comp.id, node);
+
+    if (!parentNode) {
+      roots.push(node); //If there is no parent to be a child of, row must be a parent/root node
     } else {
-      // It must be a child of the top of the stack
-      stack[stack.length - 1].children.push(node);
-      maxDepth = Math.max(maxDepth, stack.length);
+      // It must be a child of the resolved parent
+      parentNode.children.push(node);
     }
 
+    maxDepth = Math.max(maxDepth, node.level);
     stack.push(node);
   }
 
@@ -323,7 +353,10 @@ function flattenTree(
       if (i < itemColIdx) {
         // Columns before the MAIN Column
         // Left Side: Inherit from the closest ancestor that has this column
-        const provider = [...path].reverse().find((n) => n.cells[colKey]);
+        const provider = [...path].reverse().find((n) => {
+          const val = n.cells[colKey]?.value;
+          return val !== undefined && val.trim() !== '';
+        });
         setCell(colKey, provider?.cells[colKey]);
       } else if (i === itemColIdx) {
         // Main Item Column: Always use the absolute root value
@@ -356,7 +389,7 @@ function flattenTree(
  * @returns flattened ExtractedData
  */
 export function flatten(data: OCRComponent[], options?: FlattenerOptions): ExtractedData {
-  const components = data.filter((c) => c.cells && c.type !== 'HEADER' && c.type !== 'BODY_TEXT');
+  const components = data.filter((c) => c.type === 'TABLE_ROW');
 
   // Parse Structure
   const { keys, positions } = extractColumns(data);
@@ -377,9 +410,9 @@ export function flatten(data: OCRComponent[], options?: FlattenerOptions): Extra
 }
 
 /** Flattens a multi-page OCR response into one ExtractedPage per page. */
-export function flattenPages(pages: OCRComponent[][], options?: FlattenerOptions): ExtractedPage[] {
-  return pages.map((page, pageIndex) => ({
-    ...flatten(page, options),
-    pageIndex,
+export function flattenPages(pages: Pages, options?: FlattenerOptions): ExtractedPage[] {
+  return pages.map((page: Page) => ({
+    ...flatten(page.components, options),
+    pageIndex: page.page_num - 1,
   }));
 }

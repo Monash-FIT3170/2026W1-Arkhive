@@ -45,9 +45,8 @@ function DocumentPanel({
       setViewBox(`0 0 ${naturalWidth} ${naturalHeight}`);
 
       // OCR vertices are in inches; scale them to the image's pixel space.
-      const DPI = 150;
-      setScaleX(DPI);
-      setScaleY(DPI);
+      setScaleX(1);
+      setScaleY(1);
     }
   };
   // The dragging and scrolling functions below were done with the help of Goolge Gemini
@@ -105,7 +104,12 @@ function DocumentPanel({
             >
               <div className="p-2 rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60 shadow-md">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
                 </svg>
               </div>
             </button>
@@ -120,7 +124,12 @@ function DocumentPanel({
             >
               <div className="p-2 rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60 shadow-md">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
                 </svg>
               </div>
             </button>
@@ -174,41 +183,43 @@ function DocumentPanel({
                   return (ocrData as OCRComponent[]).map((comp) => {
                     if (!comp.boundingBoxes) return null;
 
-                    return Object.entries(comp.boundingBoxes).map(([cellKey, box]: [string, any]) => {
-                      const id = `${comp.id}:${cellKey}`;
+                    return Object.entries(comp.boundingBoxes).map(
+                      ([cellKey, box]: [string, any]) => {
+                        const id = `${comp.id}:${cellKey}`;
 
-                      const pointsStr = box.vertices
-                        .map((v: any) => `${v.x * scaleX},${v.y * scaleY}`)
-                        .join(' ');
+                        const pointsStr = box.vertices
+                          .map((v: any) => `${v.x * scaleX},${v.y * scaleY}`)
+                          .join(' ');
 
-                      const isActive =
-                        hoveredOverlayIds.includes(id) || hoveredOverlayIds.includes(comp.id);
+                        const isActive =
+                          hoveredOverlayIds.includes(id) || hoveredOverlayIds.includes(comp.id);
 
-                      //obtaining the confidence for this component to determine the colour of the bounding box
-                      const confidenceInfo = ocrData.find((c) => c.id === comp.id);
-                      const confidence = confidenceInfo ? confidenceInfo.confidence || 0 : 0;
+                        //obtaining the confidence for this component to determine the colour of the bounding box
+                        const confidenceInfo = ocrData.find((c) => c.id === comp.id);
+                        const confidence = confidenceInfo ? confidenceInfo.confidence || 0 : 0;
 
-                      return (
-                        <polygon
-                          key={id}
-                          points={pointsStr}
-                          //custom colour based on confidence tier, with low confidence highlighted in red and medium in amber, high confidence is a subtle green
-                          fill={
-                            isActive
-                              ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.15)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 0, 0, 0.15)'}`
-                              : 'transparent'
-                          }
-                          stroke={
-                            isActive
-                              ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.8)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.8)' : 'rgba(255, 0, 0, 0.8)'}`
-                              : 'transparent'
-                          }
-                          strokeWidth={isActive ? 3 : 1}
-                          opacity={isActive ? 1 : 0.75}
-                          filter={isActive ? 'url(#highlightGlow)' : undefined}
-                        />
-                      );
-                    });
+                        return (
+                          <polygon
+                            key={id}
+                            points={pointsStr}
+                            //custom colour based on confidence tier, with low confidence highlighted in red and medium in amber, high confidence is a subtle green
+                            fill={
+                              isActive
+                                ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.15)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 0, 0, 0.15)'}`
+                                : 'transparent'
+                            }
+                            stroke={
+                              isActive
+                                ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.8)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.8)' : 'rgba(255, 0, 0, 0.8)'}`
+                                : 'transparent'
+                            }
+                            strokeWidth={isActive ? 3 : 1}
+                            opacity={isActive ? 1 : 0.75}
+                            filter={isActive ? 'url(#highlightGlow)' : undefined}
+                          />
+                        );
+                      }
+                    );
                   });
                 })()}
               </svg>
@@ -224,7 +235,9 @@ function DocumentPanel({
                 key={idx}
                 onClick={() => onPageChange?.(idx)}
                 className={`flex-shrink-0 relative w-16 h-20 rounded border-2 overflow-hidden transition-colors ${
-                  idx === currentPageIndex ? 'border-primary' : 'border-base-300 hover:border-base-content/50'
+                  idx === currentPageIndex
+                    ? 'border-primary'
+                    : 'border-base-300 hover:border-base-content/50'
                 }`}
               >
                 <img src={url} alt={`Page ${idx + 1}`} className="w-full h-full object-cover" />

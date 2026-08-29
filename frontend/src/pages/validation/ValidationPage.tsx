@@ -2,12 +2,18 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import DocumentPanel from './components/document/DocumentPanel';
 import ExtractedDataPanel from './components/extracted-data/ExtractedDataPanel';
 import ChatPanel from './components/chat/ChatPanel';
+import BatchDocumentSelector from './components/batch/BatchDocumentSelector';
 import type { ChatMessage, ReviewField } from '../../models/Message';
-import type { OCRComponent } from '../../models/OCRComponent';
-
-import type { ExtractedPage } from '../../models/TableData';
-import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
+import type { OCRComponent, Pages } from '../../models/OCRComponent';
+import type { ExtractedData, ExtractedPage } from '../../models/TableData';
 import { getProcessedImageUrls, getUploadedImageUrl } from '../../services/uploadService';
+import type { DocumentJob } from '../../models/Job';
+import {
+  getExtractionSession,
+  saveExtractionSession,
+  getBatchJobs,
+  setActiveBatchJob,
+} from '../../services/extractionService';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
 import {
   requestBulkFieldReview,
@@ -33,17 +39,19 @@ function useIsLargeScreen() {
 }
 
 function ValidationPage() {
+  const [jobs, setJobs] = useState<DocumentJob[]>([]);
+  const [activeJobIndex, setActiveJobIndex] = useState<number>(0);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [splitPercent, setSplitPercent] = useState(50);
   const [oldContext, setOldContext] = useState<ExtractedPage | null>(null); //for AI suggesiton
   const [imageUrls, setImageUrls] = useState<string[]>([]); // one image URL per page
-  const [ocrPages, setOcrPages] = useState<OCRComponent[][]>([]); // raw OCR, one array per page
+  const [ocrPages, setOcrPages] = useState<Pages>([]); // raw OCR, one array per page
   const [extractedPages, setExtractedPages] = useState<ExtractedPage[]>([]); // flattened, one per page
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
   const documentContext: ExtractedPage | null = extractedPages[currentPageIndex] ?? null;
-  const ocrData: OCRComponent[] = ocrPages[currentPageIndex] ?? [];
+  const ocrData: OCRComponent[] = ocrPages[currentPageIndex]?.components ?? [];
   const documentImageURL: string | undefined = imageUrls[currentPageIndex];
 
   const isLarge = useIsLargeScreen();
@@ -96,6 +104,23 @@ function ValidationPage() {
   useEffect(() => {
     async function loadSession() {
       try {
+        // const batchData = await getBatchJobs().catch(() => null);
+
+        // if (batchData && batchData.jobs && batchData.jobs.length > 0) {
+        //   setJobs(batchData.jobs);
+        //   const initialIndex = batchData.activeJobIndex ?? 0;
+        //   setActiveJobIndex(initialIndex);
+
+        //   const activeJob = batchData.jobs[initialIndex] || batchData.jobs[0];
+        //   setOCRData(activeJob.ocrData || []);
+        //   setDocumentImageURL(getUploadedImageUrl(activeJob.imageIndex ?? initialIndex));
+
+        //   const initialTable =
+        //     activeJob.extractedData || flatten(activeJob.ocrData as OCRComponent[]);
+        //   setDocumentContext(initialTable);
+        //   return;
+        // }
+
         let ocrData = await getExtractionSession(); //IMORTANT NOTE, CHANGE API TO NEW ONE
         setOcrPages(ocrData);
         // console.log("SESSION DATA:", sessionData);
@@ -104,6 +129,7 @@ function ValidationPage() {
         //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
         // }
         const processedUrls = await getProcessedImageUrls();
+        console.log(processedUrls);
         setImageUrls(processedUrls.length > 0 ? processedUrls : [await getUploadedImageUrl()]);
       } catch (error) {
         console.error('Failed to load extraction session', error);
@@ -117,12 +143,10 @@ function ValidationPage() {
   // extractedPages — nothing else should call flatten() directly
   useEffect(() => {
     if (ocrPages.length === 0) return;
-
     const newExtractedPages: ExtractedPage[] = ocrPages.map((page, pageIndex) => ({
-      ...flatten(page, { manualIndentLevels: manualIndentLevels[pageIndex] ?? {} }),
-      pageIndex,
+      ...flatten(page.components, { manualIndentLevels: manualIndentLevels[pageIndex] ?? {} }),
+      pageIndex: page.page_num - 1,
     }));
-
     setExtractedPages(newExtractedPages);
   }, [ocrPages, manualIndentLevels]);
 
@@ -656,8 +680,8 @@ function ValidationPage() {
           style={
             isLarge
               ? {
-                width: `${100 - splitPercent}%`,
-              }
+                  width: `${100 - splitPercent}%`,
+                }
               : { width: '100%' }
           }
         >
@@ -713,11 +737,11 @@ function ValidationPage() {
                   i !== currentPageIndex
                     ? page
                     : {
-                      ...page,
-                      rows: page.rows.map((r) =>
-                        String(r._id) === rowId ? { ...r, [column]: newValue } : r
-                      ),
-                    }
+                        ...page,
+                        rows: page.rows.map((r) =>
+                          String(r._id) === rowId ? { ...r, [column]: newValue } : r
+                        ),
+                      }
                 )
               );
 
@@ -768,10 +792,10 @@ function ValidationPage() {
                   i !== currentPageIndex
                     ? page
                     : {
-                      ...page,
-                      columns: [...page.columns, columnName],
-                      rows: page.rows.map((r) => ({ ...r, [columnName]: '' })),
-                    }
+                        ...page,
+                        columns: [...page.columns, columnName],
+                        rows: page.rows.map((r) => ({ ...r, [columnName]: '' })),
+                      }
                 )
               );
               saveExtractionSession(extractedPagesRef.current);

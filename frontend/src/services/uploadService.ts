@@ -1,3 +1,19 @@
+import type { BatchProgressEvent, DocumentJob } from '../models/Job';
+
+export interface UploadPageInput {
+  src: string;
+  type: string;
+  fileName?: string;
+}
+
+export interface BatchUploadResult {
+  success: boolean;
+  batchId?: string;
+  pageCount: number;
+  jobs?: DocumentJob[];
+  ocrData?: any[];
+}
+
 /**
  * Uploads a single page to the backend immediately.
  */
@@ -7,14 +23,14 @@ export async function uploadPageToBackend(
   pageIndex: number,
   originalFilename: string,
   documentType?: string
-): Promise<void> {
+): Promise<BatchUploadResult | void> {
   const formData = new FormData();
-  
+
   const res = await fetch(pageSrc);
   const blob = await res.blob();
-  
+
   // Force .png extension since the frontend generates png blobs for previews
-  const filename = originalFilename.replace(/\.[^/.]+$/, "") + ".png";
+  const filename = originalFilename.replace(/\.[^/.]+$/, '') + '.png';
   formData.append('page', blob, filename);
   if (documentType) {
     formData.append('type', documentType);
@@ -23,11 +39,14 @@ export async function uploadPageToBackend(
     formData.append('label', originalFilename);
   }
 
-  const response = await fetch(`/api/upload/page?documentId=${encodeURIComponent(documentId)}&pageIndex=${pageIndex}`, {
-    method: 'POST',
-    credentials: 'include',
-    body: formData,
-  });
+  const response = await fetch(
+    `/api/upload/page?documentId=${encodeURIComponent(documentId)}&pageIndex=${pageIndex}`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    }
+  );
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -68,8 +87,9 @@ export async function deleteDocumentFromBackend(documentId: string): Promise<voi
  */
 export async function processDocuments(
   selected: { documentId: string; pages: string[]; type: string }[],
-  onRetryMessage?: (msg: string) => void
-): Promise<void> {
+  onRetryMessage?: (msg: string) => void,
+  onProgress?: (event: BatchProgressEvent) => void
+): Promise<BatchUploadResult | void> {
   const response = await fetch('/api/upload/process', {
     method: 'POST',
     headers: {
@@ -82,7 +102,7 @@ export async function processDocuments(
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     if (response.status === 502) {
-      throw new Error("OCR Service failed. Please double check your credentials");
+      throw new Error('OCR Service failed. Please double check your credentials');
     }
     throw new Error(body.error ?? `Processing failed with status ${response.status}`);
   }
@@ -91,6 +111,8 @@ export async function processDocuments(
   if (reader) {
     const decoder = new TextDecoder();
     let buffer = '';
+    let result: BatchUploadResult | undefined;
+
     while (true) {
       const { done, value } = await reader.read();
       if (value) {
@@ -100,18 +122,31 @@ export async function processDocuments(
         for (const line of lines) {
           if (!line.trim()) continue;
           try {
-            const msg = JSON.parse(line);
+            const msg: BatchProgressEvent = JSON.parse(line);
+
+            if (onProgress) {
+              onProgress(msg);
+            }
+
             if (msg.type === 'retry') {
               if (onRetryMessage) {
-                onRetryMessage(`OCR is Retrying Attempt ${msg.attempt} of ${msg.maxRetries} for "${msg.fileName}" File`);
+                onRetryMessage(
+                  `OCR is Retrying Attempt ${msg.attempt} of ${msg.maxRetries} for "${msg.fileName}" File`
+                );
               }
             } else if (msg.type === 'error') {
-              throw new Error(msg.message || 'OCR failed. Please double check and reupload your document.');
+              throw new Error(
+                msg.message || 'OCR failed. Please double check and reupload your document.'
+              );
             } else if (msg.type === 'success') {
-              return;
+              result = msg.data;
             }
           } catch (e) {
-            if (e instanceof Error && e.message !== 'Unexpected end of JSON input' && !e.message.includes('Unexpected token')) {
+            if (
+              e instanceof Error &&
+              e.message !== 'Unexpected end of JSON input' &&
+              !e.message.includes('Unexpected token')
+            ) {
               throw e;
             }
           }
@@ -119,6 +154,8 @@ export async function processDocuments(
       }
       if (done) break;
     }
+
+    return result;
   }
 }
 
@@ -135,7 +172,9 @@ export function getUploadedImageUrl(documentId?: string, pageIndex?: number): st
 /**
  * Returns a list of structured documents from the session.
  */
-export async function getUploadedDocuments(): Promise<{ documentId: string, label?: string, type?: string, pages: string[] }[]> {
+export async function getUploadedDocuments(): Promise<
+  { documentId: string; label?: string; type?: string; pages: string[] }[]
+> {
   const response = await fetch('/api/upload/documents');
   if (!response.ok) {
     throw new Error('Failed to fetch uploaded documents');
@@ -148,7 +187,7 @@ export async function getUploadedDocuments(): Promise<{ documentId: string, labe
  */
 export async function getUploadedImageUrls(): Promise<string[]> {
   const docs = await getUploadedDocuments();
-  return docs.flatMap(doc => doc.pages);
+  return docs.flatMap((doc) => doc.pages);
 }
 
 /**
