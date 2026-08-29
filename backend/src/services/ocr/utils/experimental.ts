@@ -77,6 +77,9 @@ function pruneOCROutput111(
   OCRResponse: AnalyzeOperationOutput,
   tablesInPage: DocumentTableOutput[]
 ): any {
+
+
+function pruneOCROutput111(OCRResponse: AnalyzeOperationOutput, tablesInPage: DocumentTableOutput[]): any {
   const result = OCRResponse.analyzeResult;
   if (!result) return {};
 
@@ -153,6 +156,13 @@ const createPrompt = (OCRResponse: AnalyzeOperationOutput) => {
 
 ${JSON.stringify(pruneOCROutput(OCRResponse))}`;
 };
+      model: 'gemini-flash-lite-latest',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: customSchema,
+      },
+    });
+}
 
 const createPrompt11 = (
   OCRResponse: AnalyzeOperationOutput,
@@ -252,6 +262,8 @@ const client: DocumentIntelligenceClient = DocumentIntelligence(
   { key: key },
   { apiVersion: '2024-11-30' }
 );
+
+
 
 export async function analyse_result(buffer: Buffer) {
   const request = await client.path('/documentModels/{modelId}:analyze', 'prebuilt-layout').post({
