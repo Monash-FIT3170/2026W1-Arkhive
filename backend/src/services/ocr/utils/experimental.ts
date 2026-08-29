@@ -30,53 +30,6 @@ const endpoint = process.env.endpoint!;
 const key = process.env.AZURE_CLOUD_API_KEY!;
 
 
-function pruneOCROutput(OCRResponse: AnalyzeOperationOutput): any {
-  const result = OCRResponse.analyzeResult;
-  if (!result) return {};
-
-  const allWords = result.pages?.flatMap((page) => page.words ?? []) ?? [];
-
-  const wordsInSpan = (span?: { offset: number; length: number }) => {
-    if (!span) return [];
-    return allWords
-      .filter(
-        (w) =>
-          w.span.offset >= span.offset && w.span.offset + w.span.length <= span.offset + span.length
-      )
-      .map((w) => ({ content: w.content, confidence: w.confidence, polygon: w.polygon }));
-  };
-
-  return {
-    content: result.content, // Raw text content
-    tables: result.tables?.map((table) => ({
-      rowCount: table.rowCount,
-      columnCount: table.columnCount,
-      cells: table.cells.map((cell) => ({
-        rowIndex: cell.rowIndex,
-        columnIndex: cell.columnIndex,
-        content: cell.content,
-        kind: cell.kind,
-        boundingRegions: cell.boundingRegions,
-        // NEW: word-level polygons for the text inside this cell —
-        // use these (not boundingRegions above) to judge real indentation.
-        words: wordsInSpan(cell.spans?.[0]),
-      })),
-    })),
-    pages: result.pages?.map((page) => ({
-      pageNumber: page.pageNumber,
-      words: page.words?.map((word) => ({
-        content: word.content,
-        confidence: word.confidence,
-        polygon: word.polygon,
-        span: word.span,
-      })),
-    })),
-  };
-}
-
-
-
-
 function pruneOCROutput111(OCRResponse: AnalyzeOperationOutput, tablesInPage: DocumentTableOutput[]): any {
   const result = OCRResponse.analyzeResult;
   if (!result) return {};
@@ -139,22 +92,6 @@ const initialiseModel = (customSchema: Schema) => {
       },
     });
 }
-
-const createPrompt = (OCRResponse: AnalyzeOperationOutput) => {
-  return `Analyze the following Azure Document Intelligence layout output and convert it into structured components.
-               
-               Mapping Guidelines:
-               - Map section headings/titles to 'TITLE' or 'HEADER'.
-               - Map table rows/cells to 'TABLE_ROW' or 'TABLE_COLS' and populate the 'cells' string array.
-               - Map standard paragraphs to 'BODY_TEXT'.
-               - Calculate visual 'y' coordinates and 'indentation' based on the bounding region points.
-               - IMPORTANT: a cell's own boundingRegions box is coarse and does NOT shrink when its text is nested/indented — Azure draws the same cell-sized box either way. To determine true indentation, use each cell's "words" array instead and take the leftmost x-coordinate of the word polygons. Compare that leftmost x across rows in the same table to decide nesting.
-               - if TABLE_ROW, determine layer by checking indentation (via word polygons, not cell boxes), if layer > 1, find and assign parent row id (the nearest preceding row with smaller indentation).
-               - Store bounding boxes per table column, keyed like "col_0", "col_1", etc. (one entry per column present in that row), each with the column's text, a "column" label (e.g. "Column 0"), its vertices, and confidence.
-
-${JSON.stringify(pruneOCROutput(OCRResponse))}`;
-}
-
 
 const createPrompt11 = (OCRResponse: AnalyzeOperationOutput, tablesInPage: DocumentTableOutput[]) => {
   return `Analyze the following Azure Document Intelligence layout output and convert it into structured components.
@@ -219,32 +156,6 @@ const mapTablesToOCRComponents11 =
     }));
     return transformedComponents;
   };
-/**
- * @param OCRResponse
- * @returns
- */
-const mapTablesToOCRComponents =
-  (customSchema: Schema) =>
-  async (OCRResponse: AnalyzeOperationOutput): Promise<OCRComponent[]> => {
-    const model = initialiseModel(customSchema)
-
-    const result = await model.generateContent(createPrompt(OCRResponse));
-    const rawText = result.response.text() ?? '{}';
-    const parsed = JSON.parse(rawText) as { components: OCRComponent[] };
-
-    const transformedComponents: OCRComponent[] = parsed.components.map((comp) => ({
-      ...comp,
-      // Apply the transformer to the boundingBoxes array
-      boundingBoxes: comp.boundingBoxes ? toColumnDict(comp.boundingBoxes) : {},
-    }));
-    return transformedComponents;
-  };
-
-const client: DocumentIntelligenceClient = DocumentIntelligence(
-  endpoint,
-  { key: key },
-  { apiVersion: '2024-11-30' }
-);
 
 
 
