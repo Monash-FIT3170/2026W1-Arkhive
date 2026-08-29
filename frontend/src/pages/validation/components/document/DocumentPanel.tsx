@@ -257,10 +257,10 @@ function DocumentPanel({
           <span
             className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
               confidencePercent >= 85
-                ? 'border-success text-success bg-white'
+                ? 'border-success text-successbg-[var(--color-base-100)]'
                 : confidencePercent >= 70
-                  ? 'border-warning text-warning bg-white'
-                  : ' border-error text-error bg-white'
+                  ? 'border-warning text-warning bg-[var(--color-base-100)]'
+                  : ' border-error text-error bg-[var(--color-base-100)]'
             }`}
           >
             {confidencePercent}%
