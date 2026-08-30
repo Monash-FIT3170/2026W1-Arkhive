@@ -71,10 +71,13 @@ export const Navbar = () => {
               return (
                 <li
                   key={s}
-                  className={`step ${isActive ? "step-primary" : isUnlocked ? "" : "animate-pulse"} z-${50 - s * 10}`}
+                  className={`step ${isActive ? "step-primary" : isUnlocked ? "" : "animate-pulse"}`}
                   onClick={() => handleStepClick(s, path)}
                   title={!isUnlocked ? `Complete the previous step to unlock ${label}` : undefined}
-                  style={{ cursor: isUnlocked ? "pointer" : "not-allowed" }}
+                  style={{ 
+                    cursor: isUnlocked ? "pointer" : "not-allowed",
+                    zIndex: 50 - s
+                  }}
                 >
                   <span
                     className={`step-icon transition ${isUnlocked ? "hover:scale-130" : "opacity-40"}`}
