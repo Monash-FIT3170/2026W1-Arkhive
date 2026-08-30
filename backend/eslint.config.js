@@ -10,5 +10,15 @@ export default defineConfig([
     languageOptions: {
       globals: globals.node,
     },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          varsIgnorePattern: '^_',
+          argsIgnorePattern: '^_',
+        },
+      ],
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
   },
 ])

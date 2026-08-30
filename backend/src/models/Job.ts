@@ -1,4 +1,4 @@
-import { OCRComponent, Pages } from '../services/ocr/types/boundingBoxTypes';
+import {Pages } from '../services/ocr/types/boundingBoxTypes';
 import { ExtractedData } from './TableData';
 
 export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';
@@ -37,5 +37,6 @@ export interface BatchProgressEvent {
   maxRetries?: number;
   confidence?: number;
   message?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
 }

@@ -23,7 +23,7 @@ const wait = (time: number) => {
 export async function withRetry<T>(
   fn: () => Promise<T>,
   maxRetries: number = 3,
-  delayMs: number = 1000,
+  //delayMs: number = 1000,
   onRetry?: (attempt: number, maxRetries: number) => void
 ): Promise<T> {
   let attempts = 0;

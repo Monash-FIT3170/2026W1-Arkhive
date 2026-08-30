@@ -3,7 +3,8 @@
   "scripts": {
     "dev": "tsx watch app.ts",
     "test": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+     "lint": "eslint ."
     
   },
   "devDependencies": {
@@ -44,6 +45,5 @@
   "main": "index.js",
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "lint": "eslint ."
+  "license": "ISC"
 }

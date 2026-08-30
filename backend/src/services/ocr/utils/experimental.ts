@@ -1,24 +1,21 @@
-import DocumentIntelligence, {
-  type DocumentFieldOutput,
+import {
+  //type DocumentFieldOutput,
   type DocumentPageOutput,
-  type DocumentTableCellKindOutput,
-  type DocumentTableCellOutput,
+  //type DocumentTableCellKindOutput,
+  //type DocumentTableCellOutput,
   type DocumentTableOutput,
-  type DocumentWordOutput,
+  //type DocumentWordOutput,
 } from '@azure-rest/ai-document-intelligence';
 import {
-  getLongRunningPoller,
-  isUnexpected,
-  type DocumentIntelligenceClient,
+  //type DocumentIntelligenceClient,
   type AnalyzeOperationOutput,
 } from '@azure-rest/ai-document-intelligence';
-import fs from 'fs';
 import { GoogleGenerativeAI, Schema } from '@google/generative-ai';
 import {
   OCRComponent,
   OCRBoundingBoxes,
-  Vertex,
-  geminiSchemaBBoxPrompt,
+  //Vertex,
+  //geminiSchemaBBoxPrompt,
   OCRColumnBoundingBoxes,
   Pages,
   Page,
@@ -26,8 +23,8 @@ import {
 
 const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-const endpoint = process.env.endpoint!;
-const key = process.env.AZURE_CLOUD_API_KEY!;
+// const endpoint = process.env.endpoint!;
+// const key = process.env.AZURE_CLOUD_API_KEY!;
 
 // function pruneOCROutput(OCRResponse: AnalyzeOperationOutput, tablesInPage: DocumentTableOutput[]): any {
 //   const result = OCRResponse.analyzeResult;
@@ -178,14 +175,15 @@ const createPrompt = (
 ${JSON.stringify(pruneOCROutput(OCRResponse, tablesInPage, currentPage))}`;
 };
 
-function logTablePages(result: AnalyzeOperationOutput) {
-  result.analyzeResult!.tables?.forEach((table, index) => {
-    // Collect all unique 1-based page numbers the table covers
-    const pageNumbers = table.boundingRegions?.map((region) => region.pageNumber) || [];
+//Seemingly unused func
+// function logTablePages(result: AnalyzeOperationOutput) {
+//   result.analyzeResult!.tables?.forEach((table, index) => {
+//     // Collect all unique 1-based page numbers the table covers
+//     const pageNumbers = table.boundingRegions?.map((region) => region.pageNumber) || [];
 
-    console.log(`Table #${index} spans across page(s): ${pageNumbers.join(', ')}`);
-  });
-}
+//     console.log(`Table #${index} spans across page(s): ${pageNumbers.join(', ')}`);
+//   });
+// }
 
 export const mapOCRtoPages =
   (customSchema: Schema) =>

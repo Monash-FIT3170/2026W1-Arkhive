@@ -237,23 +237,23 @@ const identifyTypeAndCreateComponents  = (y: number, index: number, rowMap: Reco
  */
 const AddColumnsToRows = (comp: OCRComponent, components: OCRComponent[]) => {
   const table_cols = components[components.findIndex(c => c.type === "TABLE_COLS")];
-comp.type == "TABLE_ROW" ? Object.keys(comp.boundingBoxes!).map(
-      (num1, _) => 
-      Object.keys(table_cols.boundingBoxes!).map((num,  _) => {
-        const column = table_cols.boundingBoxes![num.toString()];
-        const cell = comp.boundingBoxes![num1.toString()];
-        const leftMarginOfCol = column.vertices[0].x
-        const widthOfCol = column.vertices[1].x - leftMarginOfCol
+  comp.type == "TABLE_ROW" ? Object.keys(comp.boundingBoxes!).map(
+        (num1, _) => 
+        Object.keys(table_cols.boundingBoxes!).map((num,  _) => {
+          const column = table_cols.boundingBoxes![num.toString()];
+          const cell = comp.boundingBoxes![num1.toString()];
+          const leftMarginOfCol = column.vertices[0].x
+          const widthOfCol = column.vertices[1].x - leftMarginOfCol
 
-        const leftMarginOfCell = cell.vertices[0].x
-        const widthOfCell = cell.vertices[1].x - leftMarginOfCell
+          const leftMarginOfCell = cell.vertices[0].x
+          const widthOfCell = cell.vertices[1].x - leftMarginOfCell
 
-        if (leftMarginOfCol <= leftMarginOfCell + widthOfCell &&
-          leftMarginOfCell <= leftMarginOfCol + widthOfCol 
-        ){
-          cell.column = column.text;
-        }
-      })
-    ) : ""
+          if (leftMarginOfCol <= leftMarginOfCell + widthOfCell &&
+            leftMarginOfCell <= leftMarginOfCol + widthOfCol 
+          ){
+            cell.column = column.text;
+          }
+        })
+      ) : ""
   }
 

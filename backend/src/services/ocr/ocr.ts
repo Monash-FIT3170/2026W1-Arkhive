@@ -1,7 +1,7 @@
 import path from 'path';
 import vision from '@google-cloud/vision';
 import fs from 'fs';
-import { extractStructuredComponents } from './utils/legacy_utils_table_extraction.js';
+//import { extractStructuredComponents } from './utils/legacy_utils_table_extraction.js';
 import { withRetry } from './utils/utils.js';
 import { analyse_result } from './utils/utils_table_extraction_new.js';
 
@@ -77,22 +77,23 @@ export async function testOCR() {
 function for getting bounding boxes for all words detected
  @author Harsha Sharma (33879303)
 */
-async function parseTableLegacy(imageBuffer: Buffer) {
-  const [response] = await client.documentTextDetection(imageBuffer);
-  const fullTextAnnotation = response.fullTextAnnotation;
-  console.log('OCR response:', {
-    hasFullTextAnnotation: !!response.fullTextAnnotation,
-    hasPages: !!response.fullTextAnnotation?.pages,
-    text: response.fullTextAnnotation?.text,
-    pageCount: response.fullTextAnnotation?.pages?.length,
-  });
-  if (!fullTextAnnotation || !fullTextAnnotation.pages) {
-    throw new Error(
-      'NoTextDetectedError: OCR did not detect any text. Please double check or reupload your document.'
-    );
-  }
-  return extractStructuredComponents(fullTextAnnotation.pages);
-}
+//Seemingly unused func
+// async function parseTableLegacy(imageBuffer: Buffer) {
+//   const [response] = await client.documentTextDetection(imageBuffer);
+//   const fullTextAnnotation = response.fullTextAnnotation;
+//   console.log('OCR response:', {
+//     hasFullTextAnnotation: !!response.fullTextAnnotation,
+//     hasPages: !!response.fullTextAnnotation?.pages,
+//     text: response.fullTextAnnotation?.text,
+//     pageCount: response.fullTextAnnotation?.pages?.length,
+//   });
+//   if (!fullTextAnnotation || !fullTextAnnotation.pages) {
+//     throw new Error(
+//       'NoTextDetectedError: OCR did not detect any text. Please double check or reupload your document.'
+//     );
+//   }
+//   return extractStructuredComponents(fullTextAnnotation.pages);
+// }
 
 export async function parseTableWithRetriesLegacy(imageBuffer: Buffer) {
   return await withRetry(() => parseTable(imageBuffer));
