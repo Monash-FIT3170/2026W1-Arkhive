@@ -301,7 +301,6 @@ export default {
   ): Promise<any> => {
     const { rowIndex, otherFieldsInRow, columnValuesFromOtherRows, columnType } =
       buildFocusedContext(documentContext, field);
-    const formattedContext = JSON.stringify(documentContext, null, 2);
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',

@@ -1,16 +1,14 @@
 import {
   BulkReviewFieldRequest,
   ChatRequest,
-  Message,
-  ReviewField,
   ReviewFieldRequest,
 } from '../models/message';
-import { Router, Request, Response } from 'express';
+import { Request, Response } from 'express';
 
 import aiService from '../services/llm/aiService';
 
 export default {
-  chatWithModel: async (req: Request<{}, {}, ChatRequest>, res: Response) => {
+  chatWithModel: async (req: Request<Record<string, never>, Record<string, never>, ChatRequest>, res: Response) => {
     try {
       const { messages, documentContext } = req.body;
 
@@ -30,7 +28,7 @@ export default {
       });
     }
   },
-  reviewField: async (req: Request<{}, {}, ReviewFieldRequest>, res: Response) => {
+  reviewField: async (req: Request<Record<string, never>, Record<string, never>, ReviewFieldRequest>, res: Response) => {
     try {
       const { field, documentContext } = req.body;
       if (!field || !documentContext) {
@@ -47,9 +45,9 @@ export default {
       });
     }
   },
-  reviewBulk: async (req: Request<{}, {}, BulkReviewFieldRequest>, res: Response) => {
+  reviewBulk: async (req: Request<Record<string, never>, Record<string, never>, BulkReviewFieldRequest>, res: Response) => {
     try {
-      const { column, fields, formatRegex, documentContext } = req.body;
+      const { column, fields, documentContext } = req.body;
       if (!fields || !documentContext) {
         return res.status(400).json({ error: 'field and documentContext are required' });
       }

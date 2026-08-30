@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { sendMessage } from '../../../../services/llmService';
 import type { ExtractedPage } from '../../../../models/TableData';
 
-import OcrReviewWidget, { buildSlides } from './OcrReviewWidget';
-import type { OcrIssue } from './OcrReviewWidget';
+import OcrReviewWidget from './OcrReviewWidget';
+import { buildSlides, type OcrIssue } from './ocrReviewUtils';
 
 import type { HistoryEntry } from '../../../HistoryEntry';
 
@@ -105,7 +105,7 @@ function ChatPanel({
         timestamp: new Date().toISOString(),
         intent: reply.intent ?? undefined, //attacth intent
       });
-    } catch (error) {
+    } catch {
       onAddMessage({
         id: crypto.randomUUID(),
         role: 'model',

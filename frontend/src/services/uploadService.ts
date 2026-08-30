@@ -1,4 +1,5 @@
 import type { BatchProgressEvent, DocumentJob } from '../models/Job';
+import { apiUrl } from './apiBase';
 
 export interface UploadPageInput {
   src: string;
@@ -40,7 +41,7 @@ export async function uploadPageToBackend(
   }
 
   const response = await fetch(
-    `/api/upload/page?documentId=${encodeURIComponent(documentId)}&pageIndex=${pageIndex}`,
+    apiUrl(`/api/upload/page?documentId=${encodeURIComponent(documentId)}&pageIndex=${pageIndex}`),
     {
       method: 'POST',
       credentials: 'include',
@@ -58,7 +59,7 @@ export async function uploadPageToBackend(
  * Deletes a single page from the backend.
  */
 export async function deletePageFromBackend(documentId: string, pageIndex: number): Promise<void> {
-  const response = await fetch(`/api/upload/page/${encodeURIComponent(documentId)}/${pageIndex}`, {
+  const response = await fetch(apiUrl(`/api/upload/page/${encodeURIComponent(documentId)}/${pageIndex}`), {
     method: 'DELETE',
     credentials: 'include',
   });
@@ -72,7 +73,7 @@ export async function deletePageFromBackend(documentId: string, pageIndex: numbe
  * Deletes an entire document from the backend.
  */
 export async function deleteDocumentFromBackend(documentId: string): Promise<void> {
-  const response = await fetch(`/api/upload/document/${encodeURIComponent(documentId)}`, {
+  const response = await fetch(apiUrl(`/api/upload/document/${encodeURIComponent(documentId)}`), {
     method: 'DELETE',
     credentials: 'include',
   });
@@ -90,7 +91,7 @@ export async function processDocuments(
   onRetryMessage?: (msg: string) => void,
   onProgress?: (event: BatchProgressEvent) => void
 ): Promise<BatchUploadResult | void> {
-  const response = await fetch('/api/upload/process', {
+  const response = await fetch(apiUrl('/api/upload/process'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -164,9 +165,9 @@ export async function processDocuments(
  */
 export function getUploadedImageUrl(documentId?: string, pageIndex?: number): string {
   if (documentId !== undefined && pageIndex !== undefined) {
-    return `/api/upload/image/${encodeURIComponent(documentId)}/${pageIndex}`;
+    return apiUrl(`/api/upload/image/${encodeURIComponent(documentId)}/${pageIndex}`);
   }
-  return '/api/upload/image';
+  return apiUrl('/api/upload/image');
 }
 
 /**
@@ -175,7 +176,7 @@ export function getUploadedImageUrl(documentId?: string, pageIndex?: number): st
 export async function getUploadedDocuments(): Promise<
   { documentId: string; label?: string; type?: string; pages: string[] }[]
 > {
-  const response = await fetch('/api/upload/documents');
+  const response = await fetch(apiUrl('/api/upload/documents'));
   if (!response.ok) {
     throw new Error('Failed to fetch uploaded documents');
   }
@@ -194,7 +195,7 @@ export async function getUploadedImageUrls(): Promise<string[]> {
  * Returns a list of URLs for the images that were actually processed via OCR.
  */
 export async function getProcessedImageUrls(): Promise<string[]> {
-  const response = await fetch('/api/upload/processed-images');
+  const response = await fetch(apiUrl('/api/upload/processed-images'));
   if (!response.ok) {
     throw new Error('Failed to fetch processed image URLs');
   }

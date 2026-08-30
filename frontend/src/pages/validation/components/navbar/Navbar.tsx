@@ -1,6 +1,5 @@
-import { Sun, Moon, Upload, LayoutGrid, Columns2, Share2Icon, ChevronLeft } from 'lucide-react';
+import { Sun, Moon, Upload, LayoutGrid, Columns2, ChevronLeft } from 'lucide-react';
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
 import { getMaxStep } from "../../../../services/stepGuard";
 
 export const Navbar = () => {
@@ -10,12 +9,7 @@ export const Navbar = () => {
   const step = params.get('step');
 
   // Re-read maxStep on every render so it stays in sync with sessionStorage
-  const [maxStep, setMaxStep] = useState(getMaxStep);
-
-  // Sync maxStep whenever the route changes (user navigated successfully)
-  useEffect(() => {
-    setMaxStep(getMaxStep());
-  }, [location]);
+  const maxStep = getMaxStep();
 
   function getCurrentStep(): number {
     if (location.pathname === '/validation') return 2;

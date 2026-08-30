@@ -5,7 +5,7 @@ import {DocumentJob} from '../models/Job';
 type SessionRequest = Request & {
     session: Session & {
         extraction?: {
-            ocrData: any;
+            ocrData: unknown[];
             createdAt: number;
             updatedAt: number;
         };
@@ -82,7 +82,7 @@ export default {
 
         // Update in batch jobs if present
         if (req.session.jobs && req.session.jobs.length > 0) {
-            let jobIndex = -1;
+            let jobIndex: number;
 
             if (typeof jobId === 'string') {
                 jobIndex = req.session.jobs.findIndex((j) => j.id === jobId);

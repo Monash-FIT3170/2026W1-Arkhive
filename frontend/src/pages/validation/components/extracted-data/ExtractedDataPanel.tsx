@@ -86,12 +86,13 @@ function ExtractedDataPanel({
   editedCells?: Set<string>;
 }) {
   // Currency formatting function (unchanged)
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-    }).format(amount);
-  };
+  //Function never used
+  // const formatCurrency = (amount: number) => {
+  //   return new Intl.NumberFormat('id-ID', {
+  //     style: 'currency',
+  //     currency: 'IDR',
+  //   }).format(amount);
+  // };
 
   // used to check if file exported, and which format was last exported
   // UPDATED: was a plain boolean for CSV only; now tracks which format
@@ -486,10 +487,10 @@ function ExtractedDataPanel({
                       <span
                         className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
                           tier.badgeClass === 'badge-success'
-                            ? 'border-success text-success bg-white'
+                            ? 'border-success text-success bg-[var(--color-base-100)]'
                             : tier.badgeClass === 'badge-warning'
-                              ? 'border-warning text-warning bg-white'
-                              : ' border-error text-error bg-white'
+                              ? 'border-warning text-warning bg-[var(--color-base-100)]'
+                              : ' border-error text-error bg-[var(--color-base-100)]'
                         }`}
                       >
                         {tier.label}

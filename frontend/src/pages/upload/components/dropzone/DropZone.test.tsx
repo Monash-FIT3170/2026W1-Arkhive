@@ -4,7 +4,7 @@ import {
   partitionBySize,
   ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,
-} from './DropZone';
+} from './dropZoneUtils';
 
 /**
  * DropZone Logic Verification

@@ -6,8 +6,8 @@ export interface OCRBoundingBox {
 }
 
 export interface Vertex {
-  x: Number;
-  y: Number;
+  x: number;
+  y: number;
 }
 
 export interface OCRBoundingBoxes {

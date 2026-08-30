@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { parseTableWithRetries } from '../services/ocr/ocr.ts';
+import { parseTableWithRetries } from '../services/ocr/ocr';
 import { DocumentJob } from '../models/Job';
 import 'express-session';
 import 'multer';
@@ -9,6 +9,7 @@ import path from 'path';
 declare module 'express-session' {
   interface SessionData {
     extraction?: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ocrData: any[];
       processedImages?: string[];
       createdAt: number;
