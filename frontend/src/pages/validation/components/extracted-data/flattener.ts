@@ -405,7 +405,7 @@ export function flatten(data: OCRComponent[], options?: FlattenerOptions): Extra
   // Final columns schema (injecting sub items directly after the main item column)
   const finalCols = keys.flatMap((k, i) => (i === itemColIdx ? [k, ...subItemCols] : [k]));
 
-  return { columns: finalCols, rows };
+  return { columns: finalCols, rows, itemColumnKey: itemColKey };
 }
 
 /** Flattens a multi-page OCR response into one ExtractedPage per page. */
