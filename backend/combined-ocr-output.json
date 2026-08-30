@@ -10,7 +10,7 @@
         "boundingBoxes": {},
         "layer": 0,
         "text": "TOTO ONE PIECE TOILET NO. ITEM DESCRIPTION PRICE LIST (Rp.) PHOTO WHITE",
-        "confidence": 0.99
+        "confidence": 0.989
       },
       {
         "id": "table_cols_0",
@@ -136,7 +136,7 @@
         },
         "layer": 0,
         "text": "NO. ITEM DESCRIPTION PRICE LIST (Rp.) WHITE PHOTO",
-        "confidence": 0.99,
+        "confidence": 0.985,
         "cells": [
           "NO.",
           "ITEM",
@@ -267,9 +267,9 @@
             "confidence": 1
           }
         },
-        "layer": 1,
+        "layer": 0,
         "text": "1 CW823REJ 38,230,000",
-        "confidence": 0.99,
+        "confidence": 0.994,
         "cells": [
           "1",
           "CW823REJ",
@@ -400,22 +400,21 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "A. CW823REJW/F-V2 : 10,430,000",
-        "confidence": 0.96,
+        "confidence": 0.967,
         "cells": [
           "A.",
           "CW823REJW/F-V2 :",
           "",
           "10,430,000",
           ""
-        ],
-        "parentId": "table_row_1"
+        ]
       },
       {
         "id": "table_row_3",
         "type": "TABLE_ROW",
-        "indentation": 70,
+        "indentation": 65,
         "y": 136,
         "boundingBoxes": {
           "col_0": {
@@ -424,19 +423,19 @@
             "vertices": [
               {
                 "x": 30,
-                "y": 112
+                "y": 136
               },
               {
                 "x": 61,
-                "y": 112
+                "y": 136
               },
               {
-                "x": 62,
-                "y": 231
+                "x": 61,
+                "y": 148
               },
               {
                 "x": 30,
-                "y": 231
+                "y": 148
               }
             ],
             "confidence": 1
@@ -462,7 +461,7 @@
                 "y": 148
               }
             ],
-            "confidence": 0.949
+            "confidence": 0.796
           },
           "col_2": {
             "text": "\"Avante\" Rimless W CCT One Plece Tollet Bowl Only (S-Trap)",
@@ -485,7 +484,7 @@
                 "y": 148
               }
             ],
-            "confidence": 0.909
+            "confidence": 0.914
           },
           "col_3": {
             "text": "6,018,000",
@@ -534,9 +533,9 @@
             "confidence": 1
           }
         },
-        "layer": 3,
+        "layer": 2,
         "text": "CW823 REJ \"Avante\" Rimless W CCT One Plece Tollet Bowl Only (S-Trap) 6,018,000",
-        "confidence": 0.96,
+        "confidence": 0.9,
         "cells": [
           "",
           "CW823 REJ",
@@ -558,19 +557,19 @@
             "vertices": [
               {
                 "x": 30,
-                "y": 112
+                "y": 148
               },
               {
                 "x": 61,
-                "y": 112
+                "y": 148
               },
               {
-                "x": 62,
-                "y": 231
+                "x": 61,
+                "y": 160
               },
               {
                 "x": 30,
-                "y": 231
+                "y": 160
               }
             ],
             "confidence": 1
@@ -596,7 +595,7 @@
                 "y": 160
               }
             ],
-            "confidence": 0.312
+            "confidence": 0.621
           },
           "col_2": {
             "text": "\"Avante\" Tank Cover for CW823REJ",
@@ -619,7 +618,7 @@
                 "y": 160
               }
             ],
-            "confidence": 0.847
+            "confidence": 0.916
           },
           "col_3": {
             "text": "1,788,000",
@@ -650,27 +649,27 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 136
+                "y": 148
               },
               {
                 "x": 705,
-                "y": 136
+                "y": 148
               },
               {
                 "x": 705,
-                "y": 172
+                "y": 160
               },
               {
                 "x": 594,
-                "y": 172
+                "y": 160
               }
             ],
             "confidence": 1
           }
         },
-        "layer": 3,
+        "layer": 2,
         "text": "- CW823CREJP \"Avante\" Tank Cover for CW823REJ 1,788,000",
-        "confidence": 0.78,
+        "confidence": 0.88,
         "cells": [
           "",
           "- CW823CREJP",
@@ -692,19 +691,19 @@
             "vertices": [
               {
                 "x": 30,
-                "y": 112
+                "y": 160
               },
               {
                 "x": 61,
-                "y": 112
+                "y": 160
               },
               {
-                "x": 62,
-                "y": 231
+                "x": 61,
+                "y": 172
               },
               {
                 "x": 30,
-                "y": 231
+                "y": 172
               }
             ],
             "confidence": 1
@@ -730,7 +729,7 @@
                 "y": 172
               }
             ],
-            "confidence": 0.992
+            "confidence": 0.898
           },
           "col_2": {
             "text": "Installation Fitting Set for CW823REJ, CW823RJ",
@@ -753,7 +752,7 @@
                 "y": 172
               }
             ],
-            "confidence": 0.691
+            "confidence": 0.88
           },
           "col_3": {
             "text": "533,000",
@@ -784,11 +783,11 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 136
+                "y": 160
               },
               {
                 "x": 705,
-                "y": 136
+                "y": 160
               },
               {
                 "x": 705,
@@ -802,9 +801,9 @@
             "confidence": 1
           }
         },
-        "layer": 3,
+        "layer": 2,
         "text": "TX902CV25 : Installation Fitting Set for CW823REJ, CW823RJ 533,000",
-        "confidence": 0.92,
+        "confidence": 0.943,
         "cells": [
           "",
           "TX902CV25 :",
@@ -825,20 +824,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 112
+                "x": 61,
+                "y": 172
+              },
+              {
+                "x": 175,
+                "y": 172
+              },
+              {
+                "x": 175,
+                "y": 184
               },
               {
                 "x": 61,
-                "y": 112
-              },
-              {
-                "x": 62,
-                "y": 231
-              },
-              {
-                "x": 30,
-                "y": 231
+                "y": 184
               }
             ],
             "confidence": 1
@@ -864,7 +863,7 @@
                 "y": 184
               }
             ],
-            "confidence": 0.932
+            "confidence": 0.803
           },
           "col_2": {
             "text": "Stop Velve w Flexible Hose",
@@ -887,7 +886,7 @@
                 "y": 184
               }
             ],
-            "confidence": 0.601
+            "confidence": 0.686
           },
           "col_3": {
             "text": "230,000",
@@ -936,9 +935,9 @@
             "confidence": 1
           }
         },
-        "layer": 3,
+        "layer": 2,
         "text": "- IX2775 Stop Velve w Flexible Hose 230,000",
-        "confidence": 0.76,
+        "confidence": 0.793,
         "cells": [
           "",
           "- IX2775",
@@ -959,20 +958,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 112
-              },
-              {
                 "x": 61,
-                "y": 112
+                "y": 184
               },
               {
                 "x": 62,
-                "y": 231
+                "y": 197
               },
               {
-                "x": 30,
-                "y": 231
+                "x": 175,
+                "y": 197
+              },
+              {
+                "x": 175,
+                "y": 184
               }
             ],
             "confidence": 1
@@ -986,19 +985,19 @@
                 "y": 184
               },
               {
-                "x": 175,
-                "y": 184
-              },
-              {
-                "x": 175,
-                "y": 197
-              },
-              {
                 "x": 62,
                 "y": 197
+              },
+              {
+                "x": 175,
+                "y": 197
+              },
+              {
+                "x": 175,
+                "y": 184
               }
             ],
-            "confidence": 0.984
+            "confidence": 0.83
           },
           "col_2": {
             "text": "Fixing Bracke!",
@@ -1021,7 +1020,7 @@
                 "y": 197
               }
             ],
-            "confidence": 0.612
+            "confidence": 0.708
           },
           "col_3": {
             "text": "180,000",
@@ -1070,9 +1069,9 @@
             "confidence": 1
           }
         },
-        "layer": 3,
+        "layer": 2,
         "text": "- IX276CV2 Fixing Bracke! 180,000",
-        "confidence": 0.85,
+        "confidence": 0.865,
         "cells": [
           "",
           "- IX276CV2",
@@ -1086,27 +1085,27 @@
         "id": "table_row_8",
         "type": "TABLE_ROW",
         "indentation": 76,
-        "y": 197,
+        "y": 196,
         "boundingBoxes": {
           "col_0": {
             "text": "",
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 112
+                "x": 62,
+                "y": 197
               },
               {
-                "x": 61,
-                "y": 112
+                "x": 175,
+                "y": 197
+              },
+              {
+                "x": 175,
+                "y": 207
               },
               {
                 "x": 62,
-                "y": 231
-              },
-              {
-                "x": 30,
-                "y": 231
+                "y": 207
               }
             ],
             "confidence": 1
@@ -1132,7 +1131,7 @@
                 "y": 207
               }
             ],
-            "confidence": 0.668
+            "confidence": 0.631
           },
           "col_2": {
             "text": "Floor Flange w/ Seal Gasket",
@@ -1155,7 +1154,7 @@
                 "y": 207
               }
             ],
-            "confidence": 0.857
+            "confidence": 0.749
           },
           "col_3": {
             "text": "123,000",
@@ -1204,9 +1203,9 @@
             "confidence": 1
           }
         },
-        "layer": 3,
+        "layer": 2,
         "text": "- TSEP100V5 Floor Flange w/ Seal Gasket 123,000",
-        "confidence": 0.86,
+        "confidence": 0.829,
         "cells": [
           "",
           "- TSEP100V5",
@@ -1227,20 +1226,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 112
+                "x": 62,
+                "y": 207
               },
               {
-                "x": 61,
-                "y": 112
+                "x": 175,
+                "y": 207
+              },
+              {
+                "x": 175,
+                "y": 220
               },
               {
                 "x": 62,
-                "y": 231
-              },
-              {
-                "x": 30,
-                "y": 231
+                "y": 220
               }
             ],
             "confidence": 1
@@ -1289,7 +1288,7 @@
                 "y": 220
               }
             ],
-            "confidence": 0.989
+            "confidence": 0.932
           },
           "col_3": {
             "text": "1,710,000",
@@ -1320,27 +1319,27 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 196
+                "y": 207
               },
               {
                 "x": 705,
-                "y": 196
+                "y": 207
               },
               {
                 "x": 705,
-                "y": 256
+                "y": 220
               },
               {
                 "x": 594,
-                "y": 256
+                "y": 220
               }
             ],
             "confidence": 1
           }
         },
-        "layer": 3,
+        "layer": 2,
         "text": "TX823C8WS Dual Flush Tank Trim wo Stop Valve for CW823REJ (4,5 / 3 Liters) 1,710,000",
-        "confidence": 0.96,
+        "confidence": 0.969,
         "cells": [
           "",
           "TX823C8WS",
@@ -1361,19 +1360,19 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 112
-              },
-              {
-                "x": 61,
-                "y": 112
-              },
-              {
                 "x": 62,
+                "y": 220
+              },
+              {
+                "x": 175,
+                "y": 220
+              },
+              {
+                "x": 175,
                 "y": 231
               },
               {
-                "x": 30,
+                "x": 62,
                 "y": 231
               }
             ],
@@ -1400,7 +1399,7 @@
                 "y": 231
               }
             ],
-            "confidence": 0.304
+            "confidence": 0.535
           },
           "col_2": {
             "text": "Outlet Connector",
@@ -1423,7 +1422,7 @@
                 "y": 231
               }
             ],
-            "confidence": 0.983
+            "confidence": 0.984
           },
           "col_3": {
             "text": "381,000",
@@ -1454,27 +1453,27 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 196
+                "y": 220
               },
               {
                 "x": 705,
-                "y": 196
+                "y": 220
               },
               {
                 "x": 705,
-                "y": 256
+                "y": 231
               },
               {
                 "x": 594,
-                "y": 256
+                "y": 231
               }
             ],
             "confidence": 1
           }
         },
-        "layer": 3,
+        "layer": 2,
         "text": "- CKH6557U Outlet Connector 381,000",
-        "confidence": 0.81,
+        "confidence": 0.871,
         "cells": [
           "",
           "- CKH6557U",
@@ -1557,7 +1556,7 @@
                 "y": 255
               }
             ],
-            "confidence": 0.95
+            "confidence": 0.923
           },
           "col_3": {
             "text": "27,800,000",
@@ -1588,11 +1587,11 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 196
+                "y": 231
               },
               {
                 "x": 705,
-                "y": 196
+                "y": 231
               },
               {
                 "x": 705,
@@ -1606,17 +1605,16 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "B. TCF4911EZ Apricot Washlet, Elongated, for CCT Installation 27,800,000",
-        "confidence": 0.95,
+        "confidence": 0.948,
         "cells": [
           "B.",
           "TCF4911EZ",
           "Apricot Washlet, Elongated, for CCT Installation",
           "27,800,000",
           ""
-        ],
-        "parentId": "table_row_1"
+        ]
       },
       {
         "id": "table_row_12",
@@ -1740,9 +1738,9 @@
             "confidence": 1
           }
         },
-        "layer": 1,
+        "layer": 0,
         "text": "2 CW823RJ 11,940,000",
-        "confidence": 0.99,
+        "confidence": 0.995,
         "cells": [
           "2",
           "CW823RJ",
@@ -1762,20 +1760,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 255
+                "x": 62,
+                "y": 279
+              },
+              {
+                "x": 175,
+                "y": 280
+              },
+              {
+                "x": 175,
+                "y": 291
               },
               {
                 "x": 62,
-                "y": 255
-              },
-              {
-                "x": 62,
-                "y": 386
-              },
-              {
-                "x": 30,
-                "y": 386
+                "y": 291
               }
             ],
             "confidence": 1
@@ -1824,7 +1822,7 @@
                 "y": 291
               }
             ],
-            "confidence": 0.884
+            "confidence": 0.871
           },
           "col_3": {
             "text": "6,018,000",
@@ -1855,27 +1853,27 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 256
+                "y": 279
               },
               {
                 "x": 705,
-                "y": 255
+                "y": 279
               },
               {
                 "x": 705,
-                "y": 315
+                "y": 291
               },
               {
                 "x": 594,
-                "y": 315
+                "y": 291
               }
             ],
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "-CW823IRJ \"Avante\" Rimless One Plece Tollet Bowl Only (S-Trap) 6,018,000",
-        "confidence": 0.89,
+        "confidence": 0.915,
         "cells": [
           "",
           "-CW823IRJ",
@@ -1896,20 +1894,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 255
+                "x": 62,
+                "y": 291
+              },
+              {
+                "x": 175,
+                "y": 291
+              },
+              {
+                "x": 175,
+                "y": 303
               },
               {
                 "x": 62,
-                "y": 255
-              },
-              {
-                "x": 62,
-                "y": 386
-              },
-              {
-                "x": 30,
-                "y": 386
+                "y": 303
               }
             ],
             "confidence": 1
@@ -1958,7 +1956,7 @@
                 "y": 303
               }
             ],
-            "confidence": 0.885
+            "confidence": 0.935
           },
           "col_3": {
             "text": "1,788,000",
@@ -1989,27 +1987,27 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 256
+                "y": 291
               },
               {
                 "x": 705,
-                "y": 255
+                "y": 291
               },
               {
                 "x": 705,
-                "y": 315
+                "y": 303
               },
               {
                 "x": 594,
-                "y": 315
+                "y": 303
               }
             ],
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "CW823CREJP \"Avante\" Tank Cover for CW823RJ 1,788,000",
-        "confidence": 0.95,
+        "confidence": 0.964,
         "cells": [
           "",
           "CW823CREJP",
@@ -2030,20 +2028,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 255
+                "x": 62,
+                "y": 303
+              },
+              {
+                "x": 175,
+                "y": 303
+              },
+              {
+                "x": 175,
+                "y": 316
               },
               {
                 "x": 62,
-                "y": 255
-              },
-              {
-                "x": 62,
-                "y": 386
-              },
-              {
-                "x": 30,
-                "y": 386
+                "y": 316
               }
             ],
             "confidence": 1
@@ -2069,7 +2067,7 @@
                 "y": 316
               }
             ],
-            "confidence": 0.511
+            "confidence": 0.786
           },
           "col_2": {
             "text": "Installation Fitting Set for CW823REJ, CW823RJ",
@@ -2092,7 +2090,7 @@
                 "y": 316
               }
             ],
-            "confidence": 0.848
+            "confidence": 0.908
           },
           "col_3": {
             "text": "533,000",
@@ -2123,11 +2121,11 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 256
+                "y": 303
               },
               {
                 "x": 705,
-                "y": 255
+                "y": 303
               },
               {
                 "x": 705,
@@ -2141,9 +2139,9 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- TX902CV25 : Installation Fitting Set for CW823REJ, CW823RJ 533,000",
-        "confidence": 0.79,
+        "confidence": 0.911,
         "cells": [
           "",
           "- TX902CV25 :",
@@ -2164,20 +2162,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 255
+                "x": 62,
+                "y": 316
+              },
+              {
+                "x": 175,
+                "y": 316
+              },
+              {
+                "x": 175,
+                "y": 327
               },
               {
                 "x": 62,
-                "y": 255
-              },
-              {
-                "x": 62,
-                "y": 386
-              },
-              {
-                "x": 30,
-                "y": 386
+                "y": 327
               }
             ],
             "confidence": 1
@@ -2203,7 +2201,7 @@
                 "y": 327
               }
             ],
-            "confidence": 0.963
+            "confidence": 0.814
           },
           "col_2": {
             "text": "Stop Velve w Flexible Hose",
@@ -2226,7 +2224,7 @@
                 "y": 327
               }
             ],
-            "confidence": 0.574
+            "confidence": 0.665
           },
           "col_3": {
             "text": "230.000",
@@ -2275,9 +2273,9 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- TX2775 Stop Velve w Flexible Hose 230.000",
-        "confidence": 0.73,
+        "confidence": 0.812,
         "cells": [
           "",
           "- TX2775",
@@ -2298,20 +2296,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 255
+                "x": 62,
+                "y": 327
+              },
+              {
+                "x": 175,
+                "y": 327
+              },
+              {
+                "x": 175,
+                "y": 339
               },
               {
                 "x": 62,
-                "y": 255
-              },
-              {
-                "x": 62,
-                "y": 386
-              },
-              {
-                "x": 30,
-                "y": 386
+                "y": 339
               }
             ],
             "confidence": 1
@@ -2337,7 +2335,7 @@
                 "y": 339
               }
             ],
-            "confidence": 0.963
+            "confidence": 0.858
           },
           "col_2": {
             "text": "Fixing Bracke!",
@@ -2360,7 +2358,7 @@
                 "y": 339
               }
             ],
-            "confidence": 0.644
+            "confidence": 0.775
           },
           "col_3": {
             "text": "180,000",
@@ -2409,9 +2407,9 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- IX276CV2 Fixing Bracke! 180,000",
-        "confidence": 0.79,
+        "confidence": 0.86,
         "cells": [
           "",
           "- IX276CV2",
@@ -2432,20 +2430,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 255
+                "x": 62,
+                "y": 339
+              },
+              {
+                "x": 175,
+                "y": 339
+              },
+              {
+                "x": 175,
+                "y": 351
               },
               {
                 "x": 62,
-                "y": 255
-              },
-              {
-                "x": 62,
-                "y": 386
-              },
-              {
-                "x": 30,
-                "y": 386
+                "y": 351
               }
             ],
             "confidence": 1
@@ -2471,7 +2469,7 @@
                 "y": 351
               }
             ],
-            "confidence": 0.823
+            "confidence": 0.682
           },
           "col_2": {
             "text": "Floor Flange w/ Seal Gaske!",
@@ -2494,7 +2492,7 @@
                 "y": 351
               }
             ],
-            "confidence": 0.854
+            "confidence": 0.814
           },
           "col_3": {
             "text": "123.000",
@@ -2543,9 +2541,9 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- TIEPIDOV5 Floor Flange w/ Seal Gaske! 123.000",
-        "confidence": 0.79,
+        "confidence": 0.796,
         "cells": [
           "",
           "- TIEPIDOV5",
@@ -2566,20 +2564,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 255
+                "x": 62,
+                "y": 351
+              },
+              {
+                "x": 175,
+                "y": 351
+              },
+              {
+                "x": 175,
+                "y": 363
               },
               {
                 "x": 62,
-                "y": 255
-              },
-              {
-                "x": 62,
-                "y": 386
-              },
-              {
-                "x": 30,
-                "y": 386
+                "y": 363
               }
             ],
             "confidence": 1
@@ -2605,7 +2603,7 @@
                 "y": 363
               }
             ],
-            "confidence": 0.291
+            "confidence": 0.634
           },
           "col_2": {
             "text": "Dual Flush Tank Trim wo Stop Valve for CW823RJ (4,5 / 3 Liters)",
@@ -2628,7 +2626,7 @@
                 "y": 363
               }
             ],
-            "confidence": 0.989
+            "confidence": 0.932
           },
           "col_3": {
             "text": "1,710,000",
@@ -2677,9 +2675,9 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- TX823C8WS Dual Flush Tank Trim wo Stop Valve for CW823RJ (4,5 / 3 Liters) 1,710,000",
-        "confidence": 0.79,
+        "confidence": 0.863,
         "cells": [
           "",
           "- TX823C8WS",
@@ -2700,20 +2698,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 255
+                "x": 62,
+                "y": 363
+              },
+              {
+                "x": 175,
+                "y": 363
+              },
+              {
+                "x": 175,
+                "y": 374
               },
               {
                 "x": 62,
-                "y": 255
-              },
-              {
-                "x": 62,
-                "y": 386
-              },
-              {
-                "x": 30,
-                "y": 386
+                "y": 374
               }
             ],
             "confidence": 1
@@ -2739,7 +2737,7 @@
                 "y": 374
               }
             ],
-            "confidence": 0.352
+            "confidence": 0.67
           },
           "col_2": {
             "text": "Outlet Connector",
@@ -2762,7 +2760,7 @@
                 "y": 374
               }
             ],
-            "confidence": 0.977
+            "confidence": 0.982
           },
           "col_3": {
             "text": "381,000",
@@ -2793,27 +2791,27 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 351
+                "y": 363
               },
               {
                 "x": 705,
-                "y": 350
+                "y": 363
               },
               {
                 "x": 705,
-                "y": 385
+                "y": 374
               },
               {
                 "x": 594,
-                "y": 385
+                "y": 374
               }
             ],
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- CKH6657U Outlet Connector 381,000",
-        "confidence": 0.81,
+        "confidence": 0.88,
         "cells": [
           "",
           "- CKH6657U",
@@ -2834,19 +2832,19 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 255
+                "x": 62,
+                "y": 374
               },
               {
-                "x": 62,
-                "y": 255
+                "x": 175,
+                "y": 374
               },
               {
-                "x": 62,
+                "x": 175,
                 "y": 386
               },
               {
-                "x": 30,
+                "x": 62,
                 "y": 386
               }
             ],
@@ -2873,7 +2871,7 @@
                 "y": 386
               }
             ],
-            "confidence": 0.269
+            "confidence": 0.614
           },
           "col_2": {
             "text": "Duroplast Seat & Cover w/ Metal Hinges, Soft Closing (Elongated)",
@@ -2896,7 +2894,7 @@
                 "y": 386
               }
             ],
-            "confidence": 0.963
+            "confidence": 0.941
           },
           "col_3": {
             "text": "1,510,000",
@@ -2927,11 +2925,11 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 351
+                "y": 374
               },
               {
                 "x": 705,
-                "y": 350
+                "y": 374
               },
               {
                 "x": 705,
@@ -2945,9 +2943,9 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- TC281SJ Duroplast Seat & Cover w/ Metal Hinges, Soft Closing (Elongated) 1,510,000",
-        "confidence": 0.79,
+        "confidence": 0.872,
         "cells": [
           "",
           "- TC281SJ",
@@ -3079,9 +3077,9 @@
             "confidence": 1
           }
         },
-        "layer": 1,
+        "layer": 0,
         "text": "3 CW823PJ 11,030,000",
-        "confidence": 0.99,
+        "confidence": 0.995,
         "cells": [
           "3",
           "CW823PJ",
@@ -3101,20 +3099,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 386
+                "x": 62,
+                "y": 410
               },
               {
-                "x": 62,
-                "y": 386
+                "x": 175,
+                "y": 410
+              },
+              {
+                "x": 175,
+                "y": 422
               },
               {
                 "x": 63,
-                "y": 542
-              },
-              {
-                "x": 30,
-                "y": 542
+                "y": 422
               }
             ],
             "confidence": 1
@@ -3140,7 +3138,7 @@
                 "y": 422
               }
             ],
-            "confidence": 0.992
+            "confidence": 0.901
           },
           "col_2": {
             "text": "\"Avante\" One Plece Tollet Bowl Only (P-Trap)",
@@ -3163,7 +3161,7 @@
                 "y": 422
               }
             ],
-            "confidence": 0.791
+            "confidence": 0.907
           },
           "col_3": {
             "text": "5,549,000",
@@ -3194,27 +3192,27 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 385
+                "y": 410
               },
               {
                 "x": 705,
-                "y": 385
+                "y": 410
               },
               {
                 "x": 705,
-                "y": 458
+                "y": 422
               },
               {
                 "x": 594,
-                "y": 458
+                "y": 422
               }
             ],
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- CW823IPJ \"Avante\" One Plece Tollet Bowl Only (P-Trap) 5,549,000",
-        "confidence": 0.93,
+        "confidence": 0.944,
         "cells": [
           "",
           "- CW823IPJ",
@@ -3235,20 +3233,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 386
+                "x": 63,
+                "y": 422
               },
               {
-                "x": 62,
-                "y": 386
+                "x": 175,
+                "y": 422
+              },
+              {
+                "x": 175,
+                "y": 434
               },
               {
                 "x": 63,
-                "y": 542
-              },
-              {
-                "x": 30,
-                "y": 542
+                "y": 434
               }
             ],
             "confidence": 1
@@ -3297,7 +3295,7 @@
                 "y": 434
               }
             ],
-            "confidence": 0.895
+            "confidence": 0.927
           },
           "col_3": {
             "text": "1,788,000",
@@ -3328,27 +3326,27 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 385
+                "y": 422
               },
               {
                 "x": 705,
-                "y": 385
+                "y": 422
               },
               {
                 "x": 705,
-                "y": 458
+                "y": 434
               },
               {
                 "x": 594,
-                "y": 458
+                "y": 434
               }
             ],
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- CW823CRJP \"Avante\" Tank Cover for CW823NJN, CW823PJ 1,788,000",
-        "confidence": 0.95,
+        "confidence": 0.964,
         "cells": [
           "",
           "- CW823CRJP",
@@ -3369,20 +3367,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 386
+                "x": 63,
+                "y": 434
               },
               {
-                "x": 62,
-                "y": 386
+                "x": 175,
+                "y": 434
+              },
+              {
+                "x": 175,
+                "y": 446
               },
               {
                 "x": 63,
-                "y": 542
-              },
-              {
-                "x": 30,
-                "y": 542
+                "y": 446
               }
             ],
             "confidence": 1
@@ -3408,7 +3406,7 @@
                 "y": 446
               }
             ],
-            "confidence": 0.993
+            "confidence": 0.992
           },
           "col_2": {
             "text": "Installation Fitting Set for CW823PJ",
@@ -3431,7 +3429,7 @@
                 "y": 446
               }
             ],
-            "confidence": 0.93
+            "confidence": 0.963
           },
           "col_3": {
             "text": "473,000",
@@ -3462,27 +3460,27 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 385
+                "y": 434
               },
               {
                 "x": 705,
-                "y": 385
+                "y": 434
               },
               {
                 "x": 705,
-                "y": 458
+                "y": 446
               },
               {
                 "x": 594,
-                "y": 458
+                "y": 446
               }
             ],
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- TX902CZ : Installation Fitting Set for CW823PJ 473,000",
-        "confidence": 0.95,
+        "confidence": 0.964,
         "cells": [
           "",
           "- TX902CZ :",
@@ -3503,20 +3501,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 386
+                "x": 63,
+                "y": 446
               },
               {
-                "x": 62,
-                "y": 386
+                "x": 175,
+                "y": 446
+              },
+              {
+                "x": 176,
+                "y": 459
               },
               {
                 "x": 63,
-                "y": 542
-              },
-              {
-                "x": 30,
-                "y": 542
+                "y": 459
               }
             ],
             "confidence": 1
@@ -3542,7 +3540,7 @@
                 "y": 459
               }
             ],
-            "confidence": 0.977
+            "confidence": 0.822
           },
           "col_2": {
             "text": "Stop Velve w Flexible Hose",
@@ -3565,7 +3563,7 @@
                 "y": 459
               }
             ],
-            "confidence": 0.6
+            "confidence": 0.671
           },
           "col_3": {
             "text": "230,000",
@@ -3596,11 +3594,11 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 385
+                "y": 447
               },
               {
                 "x": 705,
-                "y": 385
+                "y": 447
               },
               {
                 "x": 705,
@@ -3614,9 +3612,9 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- TX2775 Stop Velve w Flexible Hose 230,000",
-        "confidence": 0.76,
+        "confidence": 0.82,
         "cells": [
           "",
           "- TX2775",
@@ -3637,20 +3635,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 386
+                "x": 63,
+                "y": 459
               },
               {
-                "x": 62,
-                "y": 386
+                "x": 176,
+                "y": 459
+              },
+              {
+                "x": 176,
+                "y": 471
               },
               {
                 "x": 63,
-                "y": 542
-              },
-              {
-                "x": 30,
-                "y": 542
+                "y": 471
               }
             ],
             "confidence": 1
@@ -3676,7 +3674,7 @@
                 "y": 471
               }
             ],
-            "confidence": 0.965
+            "confidence": 0.808
           },
           "col_2": {
             "text": "Slip-in Connecter",
@@ -3699,7 +3697,7 @@
                 "y": 471
               }
             ],
-            "confidence": 0.814
+            "confidence": 0.681
           },
           "col_3": {
             "text": "110,000",
@@ -3748,9 +3746,9 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- IX215C Slip-in Connecter 110,000",
-        "confidence": 0.93,
+        "confidence": 0.862,
         "cells": [
           "",
           "- IX215C",
@@ -3771,20 +3769,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 386
+                "x": 63,
+                "y": 471
               },
               {
-                "x": 62,
-                "y": 386
+                "x": 176,
+                "y": 471
+              },
+              {
+                "x": 176,
+                "y": 482
               },
               {
                 "x": 63,
-                "y": 542
-              },
-              {
-                "x": 30,
-                "y": 542
+                "y": 482
               }
             ],
             "confidence": 1
@@ -3810,7 +3808,7 @@
                 "y": 482
               }
             ],
-            "confidence": 0.963
+            "confidence": 0.8
           },
           "col_2": {
             "text": "Fixing Bracke!",
@@ -3833,7 +3831,7 @@
                 "y": 482
               }
             ],
-            "confidence": 0.584
+            "confidence": 0.712
           },
           "col_3": {
             "text": "133,000",
@@ -3882,9 +3880,9 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- TX276C Fixing Bracke! 133,000",
-        "confidence": 0.86,
+        "confidence": 0.864,
         "cells": [
           "",
           "- TX276C",
@@ -3905,20 +3903,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 386
+                "x": 63,
+                "y": 482
               },
               {
-                "x": 62,
-                "y": 386
+                "x": 176,
+                "y": 482
+              },
+              {
+                "x": 176,
+                "y": 494
               },
               {
                 "x": 63,
-                "y": 542
-              },
-              {
-                "x": 30,
-                "y": 542
+                "y": 494
               }
             ],
             "confidence": 1
@@ -3944,7 +3942,7 @@
                 "y": 494
               }
             ],
-            "confidence": 0.994
+            "confidence": 0.992
           },
           "col_2": {
             "text": "Tank Trim wio Stop Valve for CW823PJ (6 LiterE)",
@@ -3967,7 +3965,7 @@
                 "y": 494
               }
             ],
-            "confidence": 0.992
+            "confidence": 0.871
           },
           "col_3": {
             "text": "1,710,000",
@@ -4016,9 +4014,9 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- TX823C1WSF1 Tank Trim wio Stop Valve for CW823PJ (6 LiterE) 1,710,000",
-        "confidence": 0.96,
+        "confidence": 0.956,
         "cells": [
           "",
           "- TX823C1WSF1",
@@ -4039,20 +4037,20 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 386
+                "x": 63,
+                "y": 494
               },
               {
-                "x": 62,
-                "y": 386
+                "x": 176,
+                "y": 494
+              },
+              {
+                "x": 176,
+                "y": 506
               },
               {
                 "x": 63,
-                "y": 542
-              },
-              {
-                "x": 30,
-                "y": 542
+                "y": 506
               }
             ],
             "confidence": 1
@@ -4078,7 +4076,7 @@
                 "y": 506
               }
             ],
-            "confidence": 0.995
+            "confidence": 0.988
           },
           "col_2": {
             "text": "Duroplast Seat & Cover w/ Metal Hinges, Soft Closing (Elongated)",
@@ -4101,7 +4099,7 @@
                 "y": 506
               }
             ],
-            "confidence": 0.982
+            "confidence": 0.95
           },
           "col_3": {
             "text": "1,510,000",
@@ -4150,9 +4148,9 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "- TC281 SJ Duroplast Seat & Cover w/ Metal Hinges, Soft Closing (Elongated) 1,510,000",
-        "confidence": 0.96,
+        "confidence": 0.961,
         "cells": [
           "",
           "- TC281 SJ",
@@ -4165,7 +4163,7 @@
       {
         "id": "table_row_31",
         "type": "TABLE_ROW",
-        "indentation": 176,
+        "indentation": 63,
         "y": 506,
         "boundingBoxes": {
           "col_0": {
@@ -4173,19 +4171,19 @@
             "column": "Column 0",
             "vertices": [
               {
-                "x": 30,
-                "y": 386
-              },
-              {
-                "x": 62,
-                "y": 386
-              },
-              {
                 "x": 63,
+                "y": 506
+              },
+              {
+                "x": 176,
+                "y": 506
+              },
+              {
+                "x": 176,
                 "y": 542
               },
               {
-                "x": 30,
+                "x": 63,
                 "y": 542
               }
             ],
@@ -4235,7 +4233,7 @@
                 "y": 542
               }
             ],
-            "confidence": 0.992
+            "confidence": 0.963
           },
           "col_3": {
             "text": "",
@@ -4266,11 +4264,11 @@
             "vertices": [
               {
                 "x": 594,
-                "y": 494
+                "y": 506
               },
               {
                 "x": 705,
-                "y": 494
+                "y": 506
               },
               {
                 "x": 705,
@@ -4284,9 +4282,9 @@
             "confidence": 1
           }
         },
-        "layer": 2,
+        "layer": 1,
         "text": "NOTE : FOR P - TRAP INSTALLATION",
-        "confidence": 0.99,
+        "confidence": 0.981,
         "cells": [
           "",
           "",
@@ -4295,1033 +4293,6 @@
           ""
         ],
         "parentId": "table_row_22"
-      }
-    ],
-    "documentType": "Other"
-  },
-  {
-    "page_num": 1,
-    "components": [
-      {
-        "id": "comp_0",
-        "type": "TITLE",
-        "indentation": 416,
-        "y": 75,
-        "boundingBoxes": {},
-        "layer": 1,
-        "text": "INVOICE #1024",
-        "confidence": 0.992
-      },
-      {
-        "id": "comp_1",
-        "type": "TABLE_COLS",
-        "indentation": 62,
-        "y": 420,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "DESCRIPTION",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 62,
-                "y": 420
-              },
-              {
-                "x": 319,
-                "y": 420
-              },
-              {
-                "x": 318,
-                "y": 466
-              },
-              {
-                "x": 62,
-                "y": 466
-              }
-            ],
-            "confidence": 0.992
-          },
-          "col_1": {
-            "text": "RATE",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 319,
-                "y": 420
-              },
-              {
-                "x": 448,
-                "y": 419
-              },
-              {
-                "x": 448,
-                "y": 466
-              },
-              {
-                "x": 318,
-                "y": 466
-              }
-            ],
-            "confidence": 0.991
-          },
-          "col_2": {
-            "text": "HOURS",
-            "column": "Column 2",
-            "vertices": [
-              {
-                "x": 448,
-                "y": 419
-              },
-              {
-                "x": 556,
-                "y": 419
-              },
-              {
-                "x": 556,
-                "y": 466
-              },
-              {
-                "x": 448,
-                "y": 466
-              }
-            ],
-            "confidence": 0.997
-          },
-          "col_3": {
-            "text": "AMOUNT",
-            "column": "Column 3",
-            "vertices": [
-              {
-                "x": 556,
-                "y": 419
-              },
-              {
-                "x": 672,
-                "y": 420
-              },
-              {
-                "x": 672,
-                "y": 466
-              },
-              {
-                "x": 556,
-                "y": 466
-              }
-            ],
-            "confidence": 0.995
-          }
-        },
-        "layer": 1,
-        "text": "DESCRIPTION RATE HOURS AMOUNT",
-        "confidence": 0.993,
-        "cells": [
-          "DESCRIPTION",
-          "RATE",
-          "HOURS",
-          "AMOUNT"
-        ]
-      },
-      {
-        "id": "comp_2",
-        "type": "TABLE_ROW",
-        "indentation": 62,
-        "y": 466,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "Content Plan",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 62,
-                "y": 466
-              },
-              {
-                "x": 318,
-                "y": 466
-              },
-              {
-                "x": 318,
-                "y": 511
-              },
-              {
-                "x": 62,
-                "y": 511
-              }
-            ],
-            "confidence": 0.992
-          },
-          "col_1": {
-            "text": "$50/hr",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 318,
-                "y": 466
-              },
-              {
-                "x": 448,
-                "y": 466
-              },
-              {
-                "x": 448,
-                "y": 512
-              },
-              {
-                "x": 318,
-                "y": 511
-              }
-            ],
-            "confidence": 0.989
-          },
-          "col_2": {
-            "text": "4",
-            "column": "Column 2",
-            "vertices": [
-              {
-                "x": 448,
-                "y": 466
-              },
-              {
-                "x": 556,
-                "y": 466
-              },
-              {
-                "x": 556,
-                "y": 511
-              },
-              {
-                "x": 448,
-                "y": 512
-              }
-            ],
-            "confidence": 0.995
-          },
-          "col_3": {
-            "text": "$200.00",
-            "column": "Column 3",
-            "vertices": [
-              {
-                "x": 556,
-                "y": 466
-              },
-              {
-                "x": 672,
-                "y": 466
-              },
-              {
-                "x": 672,
-                "y": 512
-              },
-              {
-                "x": 556,
-                "y": 511
-              }
-            ],
-            "confidence": 0.992
-          }
-        },
-        "layer": 1,
-        "text": "Content Plan $50/hr 4 $200.00",
-        "confidence": 0.992,
-        "cells": [
-          "Content Plan",
-          "$50/hr",
-          "4",
-          "$200.00"
-        ]
-      },
-      {
-        "id": "comp_3",
-        "type": "TABLE_ROW",
-        "indentation": 62,
-        "y": 511,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "Copy Writing",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 62,
-                "y": 511
-              },
-              {
-                "x": 318,
-                "y": 511
-              },
-              {
-                "x": 318,
-                "y": 554
-              },
-              {
-                "x": 62,
-                "y": 554
-              }
-            ],
-            "confidence": 0.991
-          },
-          "col_1": {
-            "text": "$50/hr",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 318,
-                "y": 511
-              },
-              {
-                "x": 448,
-                "y": 512
-              },
-              {
-                "x": 448,
-                "y": 554
-              },
-              {
-                "x": 318,
-                "y": 554
-              }
-            ],
-            "confidence": 0.989
-          },
-          "col_2": {
-            "text": "2",
-            "column": "Column 2",
-            "vertices": [
-              {
-                "x": 448,
-                "y": 512
-              },
-              {
-                "x": 556,
-                "y": 511
-              },
-              {
-                "x": 556,
-                "y": 554
-              },
-              {
-                "x": 448,
-                "y": 554
-              }
-            ],
-            "confidence": 0.995
-          },
-          "col_3": {
-            "text": "$100.00",
-            "column": "Column 3",
-            "vertices": [
-              {
-                "x": 556,
-                "y": 511
-              },
-              {
-                "x": 672,
-                "y": 512
-              },
-              {
-                "x": 672,
-                "y": 554
-              },
-              {
-                "x": 556,
-                "y": 554
-              }
-            ],
-            "confidence": 0.993
-          }
-        },
-        "layer": 1,
-        "text": "Copy Writing $50/hr 2 $100.00",
-        "confidence": 0.992,
-        "cells": [
-          "Copy Writing",
-          "$50/hr",
-          "2",
-          "$100.00"
-        ]
-      },
-      {
-        "id": "comp_4",
-        "type": "TABLE_ROW",
-        "indentation": 61,
-        "y": 554,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "Website Design",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 62,
-                "y": 554
-              },
-              {
-                "x": 318,
-                "y": 554
-              },
-              {
-                "x": 318,
-                "y": 598
-              },
-              {
-                "x": 61,
-                "y": 597
-              }
-            ],
-            "confidence": 0.993
-          },
-          "col_1": {
-            "text": "$50/hr",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 318,
-                "y": 554
-              },
-              {
-                "x": 448,
-                "y": 554
-              },
-              {
-                "x": 448,
-                "y": 598
-              },
-              {
-                "x": 318,
-                "y": 598
-              }
-            ],
-            "confidence": 0.992
-          },
-          "col_2": {
-            "text": "5",
-            "column": "Column 2",
-            "vertices": [
-              {
-                "x": 448,
-                "y": 554
-              },
-              {
-                "x": 556,
-                "y": 554
-              },
-              {
-                "x": 556,
-                "y": 598
-              },
-              {
-                "x": 448,
-                "y": 598
-              }
-            ],
-            "confidence": 0.992
-          },
-          "col_3": {
-            "text": "$250.00",
-            "column": "Column 3",
-            "vertices": [
-              {
-                "x": 556,
-                "y": 554
-              },
-              {
-                "x": 672,
-                "y": 554
-              },
-              {
-                "x": 672,
-                "y": 597
-              },
-              {
-                "x": 556,
-                "y": 598
-              }
-            ],
-            "confidence": 0.994
-          }
-        },
-        "layer": 1,
-        "text": "Website Design $50/hr 5 $250.00",
-        "confidence": 0.993,
-        "cells": [
-          "Website Design",
-          "$50/hr",
-          "5",
-          "$250.00"
-        ]
-      },
-      {
-        "id": "comp_5",
-        "type": "TABLE_ROW",
-        "indentation": 61,
-        "y": 597,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "Website Development",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 61,
-                "y": 597
-              },
-              {
-                "x": 318,
-                "y": 598
-              },
-              {
-                "x": 318,
-                "y": 641
-              },
-              {
-                "x": 61,
-                "y": 641
-              }
-            ],
-            "confidence": 0.993
-          },
-          "col_1": {
-            "text": "$100/hr",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 318,
-                "y": 598
-              },
-              {
-                "x": 448,
-                "y": 598
-              },
-              {
-                "x": 448,
-                "y": 641
-              },
-              {
-                "x": 318,
-                "y": 641
-              }
-            ],
-            "confidence": 0.974
-          },
-          "col_2": {
-            "text": "5",
-            "column": "Column 2",
-            "vertices": [
-              {
-                "x": 448,
-                "y": 598
-              },
-              {
-                "x": 556,
-                "y": 598
-              },
-              {
-                "x": 556,
-                "y": 641
-              },
-              {
-                "x": 448,
-                "y": 641
-              }
-            ],
-            "confidence": 0.993
-          },
-          "col_3": {
-            "text": "$500.00",
-            "column": "Column 3",
-            "vertices": [
-              {
-                "x": 556,
-                "y": 598
-              },
-              {
-                "x": 672,
-                "y": 597
-              },
-              {
-                "x": 672,
-                "y": 641
-              },
-              {
-                "x": 556,
-                "y": 641
-              }
-            ],
-            "confidence": 0.994
-          }
-        },
-        "layer": 1,
-        "text": "Website Development $100/hr 5 $500.00",
-        "confidence": 0.988,
-        "cells": [
-          "Website Development",
-          "$100/hr",
-          "5",
-          "$500.00"
-        ]
-      },
-      {
-        "id": "comp_6",
-        "type": "TABLE_ROW",
-        "indentation": 61,
-        "y": 641,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "SEO",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 61,
-                "y": 641
-              },
-              {
-                "x": 318,
-                "y": 641
-              },
-              {
-                "x": 318,
-                "y": 685
-              },
-              {
-                "x": 61,
-                "y": 684
-              }
-            ],
-            "confidence": 0.995
-          },
-          "col_1": {
-            "text": "$50/hr",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 318,
-                "y": 641
-              },
-              {
-                "x": 448,
-                "y": 641
-              },
-              {
-                "x": 448,
-                "y": 685
-              },
-              {
-                "x": 318,
-                "y": 685
-              }
-            ],
-            "confidence": 0.993
-          },
-          "col_2": {
-            "text": "4",
-            "column": "Column 2",
-            "vertices": [
-              {
-                "x": 448,
-                "y": 641
-              },
-              {
-                "x": 556,
-                "y": 641
-              },
-              {
-                "x": 556,
-                "y": 685
-              },
-              {
-                "x": 448,
-                "y": 685
-              }
-            ],
-            "confidence": 0.995
-          },
-          "col_3": {
-            "text": "$200.00",
-            "column": "Column 3",
-            "vertices": [
-              {
-                "x": 556,
-                "y": 641
-              },
-              {
-                "x": 672,
-                "y": 641
-              },
-              {
-                "x": 672,
-                "y": 685
-              },
-              {
-                "x": 556,
-                "y": 685
-              }
-            ],
-            "confidence": 0.994
-          }
-        },
-        "layer": 1,
-        "text": "SEO $50/hr 4 $200.00",
-        "confidence": 0.994,
-        "cells": [
-          "SEO",
-          "$50/hr",
-          "4",
-          "$200.00"
-        ]
-      },
-      {
-        "id": "comp_7",
-        "type": "TABLE_ROW",
-        "indentation": 61,
-        "y": 684,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "Sub-Total",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 61,
-                "y": 684
-              },
-              {
-                "x": 318,
-                "y": 685
-              },
-              {
-                "x": 318,
-                "y": 723
-              },
-              {
-                "x": 61,
-                "y": 721
-              }
-            ],
-            "confidence": 0.947
-          },
-          "col_1": {
-            "text": "",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 318,
-                "y": 685
-              },
-              {
-                "x": 448,
-                "y": 685
-              },
-              {
-                "x": 448,
-                "y": 723
-              },
-              {
-                "x": 318,
-                "y": 723
-              }
-            ],
-            "confidence": 1
-          },
-          "col_2": {
-            "text": "",
-            "column": "Column 2",
-            "vertices": [
-              {
-                "x": 448,
-                "y": 685
-              },
-              {
-                "x": 556,
-                "y": 685
-              },
-              {
-                "x": 556,
-                "y": 723
-              },
-              {
-                "x": 448,
-                "y": 723
-              }
-            ],
-            "confidence": 1
-          },
-          "col_3": {
-            "text": "$1,250.00",
-            "column": "Column 3",
-            "vertices": [
-              {
-                "x": 556,
-                "y": 685
-              },
-              {
-                "x": 672,
-                "y": 685
-              },
-              {
-                "x": 672,
-                "y": 723
-              },
-              {
-                "x": 556,
-                "y": 723
-              }
-            ],
-            "confidence": 0.976
-          }
-        },
-        "layer": 1,
-        "text": "Sub-Total $1,250.00",
-        "confidence": 0.974,
-        "cells": [
-          "Sub-Total",
-          "",
-          "",
-          "$1,250.00"
-        ]
-      },
-      {
-        "id": "comp_8",
-        "type": "TABLE_ROW",
-        "indentation": 61,
-        "y": 721,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "Package Discount (30%)",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 61,
-                "y": 721
-              },
-              {
-                "x": 318,
-                "y": 723
-              },
-              {
-                "x": 318,
-                "y": 758
-              },
-              {
-                "x": 61,
-                "y": 757
-              }
-            ],
-            "confidence": 0.994
-          },
-          "col_1": {
-            "text": "",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 318,
-                "y": 723
-              },
-              {
-                "x": 448,
-                "y": 723
-              },
-              {
-                "x": 448,
-                "y": 758
-              },
-              {
-                "x": 318,
-                "y": 758
-              }
-            ],
-            "confidence": 1
-          },
-          "col_2": {
-            "text": "",
-            "column": "Column 2",
-            "vertices": [
-              {
-                "x": 448,
-                "y": 723
-              },
-              {
-                "x": 556,
-                "y": 723
-              },
-              {
-                "x": 556,
-                "y": 758
-              },
-              {
-                "x": 448,
-                "y": 758
-              }
-            ],
-            "confidence": 1
-          },
-          "col_3": {
-            "text": "$375.00",
-            "column": "Column 3",
-            "vertices": [
-              {
-                "x": 556,
-                "y": 723
-              },
-              {
-                "x": 672,
-                "y": 723
-              },
-              {
-                "x": 672,
-                "y": 758
-              },
-              {
-                "x": 556,
-                "y": 758
-              }
-            ],
-            "confidence": 0.983
-          }
-        },
-        "layer": 1,
-        "text": "Package Discount (30%) $375.00",
-        "confidence": 0.993,
-        "cells": [
-          "Package Discount (30%)",
-          "",
-          "",
-          "$375.00"
-        ]
-      },
-      {
-        "id": "comp_9",
-        "type": "TABLE_ROW",
-        "indentation": 60,
-        "y": 757,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "TOTAL",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 61,
-                "y": 757
-              },
-              {
-                "x": 318,
-                "y": 758
-              },
-              {
-                "x": 318,
-                "y": 804
-              },
-              {
-                "x": 60,
-                "y": 802
-              }
-            ],
-            "confidence": 0.995
-          },
-          "col_1": {
-            "text": "",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 318,
-                "y": 758
-              },
-              {
-                "x": 448,
-                "y": 758
-              },
-              {
-                "x": 448,
-                "y": 804
-              },
-              {
-                "x": 318,
-                "y": 804
-              }
-            ],
-            "confidence": 1
-          },
-          "col_2": {
-            "text": "",
-            "column": "Column 2",
-            "vertices": [
-              {
-                "x": 448,
-                "y": 758
-              },
-              {
-                "x": 556,
-                "y": 758
-              },
-              {
-                "x": 556,
-                "y": 805
-              },
-              {
-                "x": 448,
-                "y": 804
-              }
-            ],
-            "confidence": 1
-          },
-          "col_3": {
-            "text": "$875.00",
-            "column": "Column 3",
-            "vertices": [
-              {
-                "x": 556,
-                "y": 758
-              },
-              {
-                "x": 672,
-                "y": 758
-              },
-              {
-                "x": 673,
-                "y": 805
-              },
-              {
-                "x": 556,
-                "y": 805
-              }
-            ],
-            "confidence": 0.995
-          }
-        },
-        "layer": 1,
-        "text": "TOTAL $875.00",
-        "confidence": 0.996,
-        "cells": [
-          "TOTAL",
-          "",
-          "",
-          "$875.00"
-        ]
-      },
-      {
-        "id": "comp_10",
-        "type": "BODY_TEXT",
-        "indentation": 72,
-        "y": 859,
-        "boundingBoxes": {},
-        "layer": 1,
-        "text": "Payment is required within 14 business days of invoice date.",
-        "confidence": 0.988
-      },
-      {
-        "id": "comp_11",
-        "type": "BODY_TEXT",
-        "indentation": 552,
-        "y": 858,
-        "boundingBoxes": {},
-        "layer": 1,
-        "text": "Please send remittance to hello@reallygreatsite.com.",
-        "confidence": 0.982
-      },
-      {
-        "id": "comp_12",
-        "type": "BODY_TEXT",
-        "indentation": 71,
-        "y": 920,
-        "boundingBoxes": {},
-        "layer": 1,
-        "text": "Thank you for your business.",
-        "confidence": 0.994
       }
     ],
     "documentType": "Other"
