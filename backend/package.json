@@ -2,9 +2,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch app.ts",
-    "test": "vitest",
     "typecheck": "tsc --noEmit",
-     "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
     
   },
   "devDependencies": {
