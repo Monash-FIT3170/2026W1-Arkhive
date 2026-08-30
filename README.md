@@ -15,7 +15,7 @@ Ensure the following software components are installed on your environment befor
 * **Node.js:** `v20.19.0` or higher
 * **Package Manager:** `npm` (v10.0.0+)
 * **Cloud Credentials:** 
-  * Google Cloud Account with **Google Cloud Vision API** enabled
+  * Microsoft Azure Account with **Azure Document Intelligence** enabled
   * Google AI Studio **Gemini API Key**
 
 ---
@@ -24,7 +24,7 @@ Ensure the following software components are installed on your environment befor
 
 * **Frontend:** React.js, Tailwind CSS
 * **Backend:** Node.js, TypeScript
-* **OCR Engine:** Google Cloud Vision API
+* **OCR Engine:** Azure Document Intelligence
 * **LLM Engine:** Google Gemini API
 * **Testing:** Vitest
 * **Storage / Persistence:** Memory-only (Session-based, no persistent database)
@@ -66,12 +66,13 @@ cd backend
 npm install
 ```
 3. Configure environment variables:
-Create a `.env` file in the `backend` directory and add your API keys:
+Create a `.env` file in the `backend` directory and add your API keys and endpoints:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/gcp-service-account-key.json
+AZURE_CLOUD_API_KEY=your_azure_api_key_here
+endpoint=your_azure_endpoint_url_here
 ```
-*(Note: Google Cloud Vision API requires setting the path to your service account JSON key).*
+*(Note: Azure Document Intelligence requires setting your specific API key and endpoint URL).*
 
 ### 3. Frontend Setup
 1. Open a new terminal and navigate to the frontend directory from the project root:

@@ -246,8 +246,8 @@ export default function OcrReviewWidget({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-base-200/30 overflow-hidden font-sans">
-      <div className="p-6 h-full flex flex-col relative">
+    <div className="flex-1 flex flex-col h-full bg-base-200/30 overflow-hidden font-sans min-w-0">
+      <div className="p-4 h-full flex flex-col relative min-w-0">
         {unresolvedIssues.length === 0 ? (
           // Success State
           <div className="flex-1 flex flex-col items-center justify-center text-success gap-4 animate-in fade-in zoom-in duration-500">
@@ -263,15 +263,15 @@ export default function OcrReviewWidget({
           </div>
         ) : (
           // Carousel Interface
-          <div className="flex-1 flex flex-col min-h-0 animate-in fade-in duration-300">
+          <div className="flex-1 flex flex-col min-h-0 min-w-0 animate-in fade-in duration-300">
             {/* Progress Indicator */}
             <div className="text-xs font-semibold text-base-content/50 mb-6 text-center uppercase tracking-widest">
               Issue {currentIndex + 1} of {slides.length}
             </div>
 
             {/* Carousel Slide */}
-            <div className="flex-1 flex flex-col justify-center items-center text-center space-y-5 transition-all w-full">
-              <div className="bg-base-100 px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider text-primary shadow-sm border border-primary/20">
+            <div className="flex-1 flex flex-col justify-center items-center text-center space-y-4 transition-all w-full min-w-0 overflow-y-auto p-1">
+              <div className="bg-base-100 px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider text-primary shadow-sm border border-primary/20 shrink-0">
                 {currentSlide?.kind === 'single'
                   ? currentSlide.issue.fieldName
                   : currentSlide?.fieldName}
@@ -283,7 +283,7 @@ export default function OcrReviewWidget({
               </div>
 
               {currentSlide?.kind === 'single' ? (
-                <div className="w-full relative group space-y-4 text-left">
+                <div className="w-full relative group space-y-4 text-left min-w-0">
                   {/* SLIDE FOR SINGLE ISSUES */}
                   {/* Detected Value */}
                   <div>
@@ -341,7 +341,7 @@ export default function OcrReviewWidget({
                   </div>
                 </div>
               ) : currentSlide?.kind === 'group' ? (
-                <div className="w-full text-left space-y-3">
+                <div className="w-full text-left space-y-3 min-w-0">
                   {/* SLIDE FOR GROUP ISSUES */}
                   <p className="text-xs text-base-content/60 font-semibold uppercase tracking-wider ml-1">
                     Format Inconsistency · {currentSlide.issues.length} cells flagged in this column
@@ -386,7 +386,7 @@ export default function OcrReviewWidget({
             </div>
 
             {/* Resolution Actions */}
-            <div className="mt-8 h-14 flex items-center justify-center w-full">
+            <div className="mt-auto pt-4 h-14 flex items-center justify-center w-full shrink-0">
               {isEditing && currentSlide?.kind === 'single' ? (
                 <div className="flex gap-2 w-full animate-in slide-in-from-bottom-2 duration-200">
                   <input
@@ -453,7 +453,7 @@ export default function OcrReviewWidget({
             </div>
 
             {/* Carousel Navigation */}
-            <div className="flex justify-between items-center mt-8 w-full px-2">
+            <div className="flex justify-between items-center mt-4 w-full px-2 shrink-0">
               <button
                 className="btn btn-ghost btn-circle hover:bg-base-200 text-base-content/60 hover:text-base-content transition-colors flex-shrink-0"
                 onClick={handlePrev}
@@ -462,8 +462,8 @@ export default function OcrReviewWidget({
                 <ChevronLeft size={24} />
               </button>
 
-              <div className="flex gap-2.5 flex-1 justify-center items-center px-4 overflow-hidden">
-                {slides.length <= 15 ? (
+              <div className="flex gap-1.5 flex-1 justify-center items-center px-2 overflow-hidden">
+                {slides.length <= 10 ? (
                   unresolvedIssues.map((_, idx) => (
                     <div
                       key={idx}

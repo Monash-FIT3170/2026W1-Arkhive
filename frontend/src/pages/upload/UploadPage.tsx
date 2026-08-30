@@ -585,7 +585,9 @@ export default function UploadPage() {
     try {
       const selectedItemsMap = new Map<string, { type: string; pages: string[] }>();
 
-      [...selectedPages].forEach((index) => {
+      const sortedSelectedIndices = [...selectedPages].sort((a, b) => a - b);
+
+      sortedSelectedIndices.forEach((index) => {
         const item = previewItems[index];
         if (item?.hasFile && item.backendPageIndex !== undefined && item.documentId) {
           const docId = item.documentId;
