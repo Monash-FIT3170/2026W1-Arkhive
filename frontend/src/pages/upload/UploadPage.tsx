@@ -39,12 +39,12 @@ export default function UploadPage() {
   const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<{
-    current: number;
-    total: number;
-    fileName: string;
-    status: string;
-  } | null>(null);
+  // const [batchProgress, setBatchProgress] = useState<{
+  //   current: number;
+  //   total: number;
+  //   fileName: string;
+  //   status: string;
+  // } | null>(null);
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
@@ -79,8 +79,7 @@ export default function UploadPage() {
   // at 0, so pages added/replaced later don't collide with existing file groups.
   const nextFileIndexRef = useRef(0);
   const nextPageIndexRef = useRef(0);
-  const sessionIdSuffixRef = useRef(`${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
-
+   const [sessionIdSuffix] = useState(() => `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
   useEffect(() => {
     previewItemsRef.current = previewItems;
   }, [previewItems]);
@@ -159,7 +158,7 @@ export default function UploadPage() {
         // Enhance items with stable ID and documentId first
         const enhancedItems = newItems.map((item) => {
           const backendPageIndex = nextPageIndexRef.current++;
-          const documentId = `File_${item.fileIndex}_${sessionIdSuffixRef.current}`;
+          const documentId = `File_${item.fileIndex}_${sessionIdSuffix}`;
           return { ...item, backendPageIndex, documentId };
         });
 
@@ -210,13 +209,17 @@ export default function UploadPage() {
   }
 
   // ── Page selection ─────────────────────────────────────────────────────────
-  function togglePageSelection(index: number) {
-    setSelectedPages((prev) => {
-      const next = new Set(prev);
-      next.has(index) ? next.delete(index) : next.add(index);
-      return next;
-    });
-  }
+function togglePageSelection(index: number) {
+  setSelectedPages((prev) => {
+    const next = new Set(prev);
+    if (next.has(index)) {
+      next.delete(index);
+    } else {
+      next.add(index);
+    }
+    return next;
+  });
+}
 
   function selectAllPages() {
     setSelectedPages(
@@ -343,7 +346,7 @@ export default function UploadPage() {
         // Assign stable backend page index and start upload
         const enhancedItems = newItems.map((item) => {
           const backendPageIndex = nextPageIndexRef.current++;
-          const documentId = `File_${item.fileIndex}_${sessionIdSuffixRef.current}`;
+          const documentId = `File_${item.fileIndex}_${sessionIdSuffix}`;
           return { ...item, backendPageIndex, documentId };
         });
 
@@ -476,7 +479,7 @@ export default function UploadPage() {
         const enhancedAllItems = allNewItems.map((newItemsGroup) =>
           newItemsGroup.map((item) => {
             const backendPageIndex = nextPageIndexRef.current++;
-            const documentId = `File_${item.fileIndex}_${sessionIdSuffixRef.current}`;
+            const documentId = `File_${item.fileIndex}_${sessionIdSuffix}`;
             return { ...item, backendPageIndex, documentId };
           })
         );
@@ -579,7 +582,7 @@ export default function UploadPage() {
     setIsProcessing(true);
     setUploadError(null); // US-1.4: clear any previous error before retrying
     setRetryMessage(null);
-    setBatchProgress(null);
+    //setBatchProgress(null);
     setUploadSuccess(false); // US-1.5: clear any previous success before retrying
 
     try {

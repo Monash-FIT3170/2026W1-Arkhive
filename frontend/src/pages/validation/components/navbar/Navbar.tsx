@@ -1,4 +1,4 @@
-import { Sun, Moon, Upload, LayoutGrid, Columns2, Share2Icon, ChevronLeft } from 'lucide-react';
+import { Sun, Moon, Upload, LayoutGrid, Columns2, ChevronLeft } from 'lucide-react';
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { getMaxStep } from "../../../../services/stepGuard";

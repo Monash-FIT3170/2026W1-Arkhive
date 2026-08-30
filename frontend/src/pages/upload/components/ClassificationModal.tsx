@@ -11,16 +11,17 @@ type Props = {
 const DOCUMENT_TYPES = ['Receipt', 'Invoice', 'Form', 'Record', 'Other'];
 
 export default function ClassificationModal({ items, onComplete, onCancel }: Props) {
-  // state for the types being selected
   const [selections, setSelections] = useState<Record<number, string>>({});
 
-  // Initialize selections with existing types if any
-  useEffect(() => {
+  // Adjust selections during render whenever `items` changes, instead of
+  // syncing it via an effect.
+  const [prevItems, setPrevItems] = useState(items);
+  if (items !== prevItems) {
+    setPrevItems(items);
     const initial: Record<number, string> = {};
     items.forEach(({ index, item }) => {
-      // Default to existing type, otherwise leave blank to show "Select type..." placeholder
       initial[index] = item.documentType || '';
-      /**
+            /**
        * TODO (AI Integration):
        * Here we could call an AI service (e.g. vision model) to predict the document type
        * based on `item.previewSrc` (image data URL) or actual file contents.
@@ -29,7 +30,7 @@ export default function ClassificationModal({ items, onComplete, onCancel }: Pro
        */
     });
     setSelections(initial);
-  }, [items]);
+  }
 
   const handleSelect = (index: number, type: string) => {
     setSelections(prev => ({ ...prev, [index]: type }));

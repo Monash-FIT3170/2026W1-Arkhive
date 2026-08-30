@@ -2,17 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import DocumentPanel from './components/document/DocumentPanel';
 import ExtractedDataPanel from './components/extracted-data/ExtractedDataPanel';
 import ChatPanel from './components/chat/ChatPanel';
-import BatchDocumentSelector from './components/batch/BatchDocumentSelector';
 import type { ChatMessage, ReviewField } from '../../models/Message';
 import type { OCRComponent, Pages } from '../../models/OCRComponent';
-import type { ExtractedData, ExtractedPage } from '../../models/TableData';
+import type {ExtractedPage } from '../../models/TableData';
 import { getProcessedImageUrls, getUploadedImageUrl } from '../../services/uploadService';
 import type { DocumentJob } from '../../models/Job';
 import {
   getExtractionSession,
   saveExtractionSession,
-  getBatchJobs,
-  setActiveBatchJob,
 } from '../../services/extractionService';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
 import {
@@ -39,8 +36,8 @@ function useIsLargeScreen() {
 }
 
 function ValidationPage() {
-  const [jobs, setJobs] = useState<DocumentJob[]>([]);
-  const [activeJobIndex, setActiveJobIndex] = useState<number>(0);
+  //const [jobs, setJobs] = useState<DocumentJob[]>([]);
+  //const [activeJobIndex, setActiveJobIndex] = useState<number>(0);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [splitPercent, setSplitPercent] = useState(50);
@@ -121,7 +118,7 @@ function ValidationPage() {
         //   return;
         // }
 
-        let ocrData = await getExtractionSession(); //IMORTANT NOTE, CHANGE API TO NEW ONE
+        const ocrData = await getExtractionSession(); //IMORTANT NOTE, CHANGE API TO NEW ONE
         setOcrPages(ocrData);
         // console.log("SESSION DATA:", sessionData);
         // console.log("OCR DATA:", sessionData?.ocrData);

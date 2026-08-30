@@ -261,3 +261,4 @@ const AddColumnsToRows = (comp: OCRComponent, components: OCRComponent[]) => {
   }
 };
 
+

@@ -86,12 +86,13 @@ function ExtractedDataPanel({
   editedCells?: Set<string>;
 }) {
   // Currency formatting function (unchanged)
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-    }).format(amount);
-  };
+  //Function never used
+  // const formatCurrency = (amount: number) => {
+  //   return new Intl.NumberFormat('id-ID', {
+  //     style: 'currency',
+  //     currency: 'IDR',
+  //   }).format(amount);
+  // };
 
   // used to check if file exported, and which format was last exported
   // UPDATED: was a plain boolean for CSV only; now tracks which format

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { OcrDocumentResponseSchema } from '../../../../models/ocrSchema';
-import { flatten } from './flattener';
 import rawOcrSample from '../../../../mock-data/boundingBox.json';
 // Acknowledgement: The development of these tests was done with the help of Google Gemini
 
