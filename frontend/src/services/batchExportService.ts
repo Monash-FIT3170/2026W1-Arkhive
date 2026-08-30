@@ -202,7 +202,7 @@ function getJobExtractedData(job: DocumentJob): ExtractedData {
   if (job.ocrData && job.ocrData.length > 0) {
     return flatten(job.ocrData);
   }
-  return { columns: ['Document', 'Status'], rows: [{ _id: '1', Document: job.fileName, Status: job.status, _cellConfidence: {} }] };
+  return { columns: ['Document', 'Status'], itemColumnKey: 'Document', rows: [{ _id: '1', Document: job.fileName, Status: job.status, _cellConfidence: {} }] };
 }
 
 /**

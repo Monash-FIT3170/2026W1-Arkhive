@@ -23,6 +23,7 @@ describe('batchExportService', () => {
       confidence: 0.95,
       extractedData: {
         columns: ['ITEM', 'QTY', 'PRICE'],
+        itemColumnKey: 'ITEM',
         rows: [{ _id: '1', ITEM: 'Laptop', QTY: '1', PRICE: '$1200', _cellConfidence: {} }]
       },
       createdAt: 1000,
@@ -40,6 +41,7 @@ describe('batchExportService', () => {
       confidence: 0.88,
       extractedData: {
         columns: ['ITEM', 'PRICE'],
+        itemColumnKey: 'ITEM',
         rows: [{ _id: '2', ITEM: 'Coffee', PRICE: '$4.50', _cellConfidence: {} }]
       },
       createdAt: 1000,

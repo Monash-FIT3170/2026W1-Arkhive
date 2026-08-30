@@ -17,7 +17,7 @@ function row(partial: { _id: string | number; [key: string]: any }): ExtractedRo
 /** Small helper to avoid repeating `{ columns, rows }` boilerplate in every test. */
 function makeData(rows: ExtractedRow[]): ExtractedData {
   const columns = rows.length > 0 ? Object.keys(rows[0]).filter((k) => !k.startsWith('_')) : [];
-  return { columns, rows };
+  return { columns, rows, itemColumnKey: columns[0] ?? '' };
 }
 
 describe('checkColumnFormat', () => {

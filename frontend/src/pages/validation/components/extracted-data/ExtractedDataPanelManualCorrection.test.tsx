@@ -42,6 +42,7 @@ function ReorderPanel(props: PanelProps) {
 
 const mockExtractedData: ExtractedData = {
   columns: ['Field1', 'Field2'],
+  itemColumnKey: 'Field1',
   rows: [
     {
       _id: 'row1',

@@ -10,7 +10,7 @@ function buildRow(overrides: Partial<ExtractedRow> & { _id: string | number }): 
 }
 
 function buildData(columns: string[], rows: ExtractedRow[]): ExtractedData {
-  return { columns, rows };
+  return { columns, rows, itemColumnKey: columns[0] ?? '' };
 }
 
 describe('detectReviewFields', () => {
