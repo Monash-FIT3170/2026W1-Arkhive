@@ -6,7 +6,7 @@ import type { ChatMessage, ReviewField } from '../../models/Message';
 import type { OCRComponent, Pages } from '../../models/OCRComponent';
 import type {ExtractedPage } from '../../models/TableData';
 import { getProcessedImageUrls, getUploadedImageUrl } from '../../services/uploadService';
-import type { DocumentJob } from '../../models/Job';
+//import type { DocumentJob } from '../../models/Job';
 import {
   getExtractionSession,
   saveExtractionSession,
@@ -144,6 +144,7 @@ function ValidationPage() {
       ...flatten(page.components, { manualIndentLevels: manualIndentLevels[pageIndex] ?? {} }),
       pageIndex: page.page_num - 1,
     }));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setExtractedPages(newExtractedPages);
   }, [ocrPages, manualIndentLevels]);
 

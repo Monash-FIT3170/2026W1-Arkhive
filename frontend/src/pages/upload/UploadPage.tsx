@@ -9,7 +9,7 @@
 // UPDATED: Preview grid is now grouped into per-file sections (see "groups"
 // below) instead of one flat grid mixing pages from every file together.
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { unlockStep } from '../../services/stepGuard.ts';
 
@@ -22,7 +22,7 @@ import {
   filterValidFiles,
   partitionBySize,
   MAX_FILE_SIZE_MB,
-} from './components/dropzone/DropZone';
+} from '../../pages/upload/components/dropzone/dropZoneUtils';
 import {
   uploadPageToBackend,
   deletePageFromBackend,
