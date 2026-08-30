@@ -6,12 +6,13 @@ import type {
   ReviewField,
 } from '../models/Message';
 import type { ExtractedData } from '../models/TableData';
+import { apiUrl } from './apiBase';
 
 export async function sendMessage(
   messages: Message[],
   documentContext?: ExtractedData
 ): Promise<ChatResponse> {
-  const response = await fetch('/api/llm/chat', {
+  const response = await fetch(apiUrl('/api/llm/chat'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -34,7 +35,7 @@ export async function requestFieldReview(
   field: ReviewField,
   documentContext: ExtractedData
 ): Promise<ChatResponse> {
-  const response = await fetch('/api/llm/chat/review-field', {
+  const response = await fetch(apiUrl('/api/llm/chat/review-field'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ field, documentContext }),
@@ -49,7 +50,7 @@ export async function requestFieldReview(
 export async function requestBulkFieldReview(
   request: BulkReviewFieldRequest
 ): Promise<ChatResponse> {
-  const response = await fetch('/api/llm/chat/review-field-bulk', {
+  const response = await fetch(apiUrl('/api/llm/chat/review-field-bulk'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -64,7 +65,7 @@ export async function requestBulkFieldReview(
 export async function requestFormatDetection(
   sampledData: Record<string, string[]>
 ): Promise<Record<string, string>> {
-  const response = await fetch('/api/llm/chat/detect-format', {
+  const response = await fetch(apiUrl('/api/llm/chat/detect-format'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sampledData }),

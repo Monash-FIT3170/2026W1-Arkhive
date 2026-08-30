@@ -1,9 +1,11 @@
+import { apiUrl } from './apiBase';
+
 /**
  * Fetches the mock OCR test data.
  * Mirrors GET /api/extraction/testData
  */
 export async function getTestData(): Promise<any> {
-  const response = await fetch('/api/test/testData', {
+  const response = await fetch(apiUrl('/api/test/testData'), {
     credentials: 'include',
   });
 
@@ -20,7 +22,7 @@ export async function getTestData(): Promise<any> {
  * Mirrors GET /api/extraction/testImageUrls
  */
 export async function getTestImageUrls(): Promise<string[]> {
-  const response = await fetch('/api/test/testImageUrls', {
+  const response = await fetch(apiUrl('/api/test/testImageUrls'), {
     credentials: 'include',
   });
 
@@ -37,5 +39,5 @@ export async function getTestImageUrls(): Promise<string[]> {
  * GET /api/extraction/testImage/:index which streams the file from disk.
  */
 export function getTestImageUrl(index: number = 0): string {
-  return `/api/test/testImage/${index}`;
+  return apiUrl(`/api/test/testImage/${index}`);
 }
