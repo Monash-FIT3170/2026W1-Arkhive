@@ -93,7 +93,7 @@ describe('aiService', () => {
 
   describe('sendMessageToGemini', () => {
     it('should correctly apply a correction intent to the document context', async () => {
-      const messages = [{ role: 'user', content: 'Change Apple price to 12.00' }];
+      const messages = [{ role: 'user' as const, content: 'Change Apple price to 12.00' }];
       
       const result = await aiService.sendMessageToGemini(messages, dummyContext);
       
@@ -107,7 +107,7 @@ describe('aiService', () => {
     });
 
     it('should not throw when document context is undefined', async () => {
-      const messages = [{ role: 'user', content: 'Hello' }];
+      const messages = [{ role: 'user' as const, content: 'Hello' }];
       const result = await aiService.sendMessageToGemini(messages, undefined);
       
       expect(result.updatedContext).toBeUndefined();

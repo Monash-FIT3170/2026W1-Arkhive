@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { parseTableWithRetries } from '../services/ocr/ocr.ts';
+import { parseTableWithRetries } from '../services/ocr/ocr';
 import { DocumentJob } from '../models/Job';
 import 'express-session';
 import 'multer';

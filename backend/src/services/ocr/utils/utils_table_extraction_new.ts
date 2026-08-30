@@ -144,7 +144,7 @@ ${JSON.stringify(pruneOCROutput(OCRResponse))}`;
     const transformedComponents: OCRComponent[] = parsed.components.map((comp) => ({
       ...comp,
       // Apply the transformer to the boundingBoxes array
-      boundingBoxes: comp.boundingBoxes ? toColumnDict(comp.boundingBoxes) : {},
+      boundingBoxes: comp.boundingBoxes && Array.isArray(comp.boundingBoxes) ? toColumnDict(comp.boundingBoxes) : {},
     }));
     return transformedComponents;
   };

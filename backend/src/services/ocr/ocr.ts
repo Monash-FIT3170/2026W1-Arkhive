@@ -5,6 +5,10 @@ import { extractStructuredComponents } from './utils/legacy_utils_table_extracti
 import { withRetry } from './utils/utils.js';
 import { analyse_result } from './utils/utils_table_extraction_new.js';
 
+const sampleImage = 'assets/sample-page-1.png';
+
+
+
 /**
  * @author Aryan Cyrus (33114242)
  * Initializes the Google Cloud Vision client with the necessary credentials.
@@ -55,15 +59,17 @@ export async function textExtraction(buffer: Buffer): Promise<string> {
   return result.fullTextAnnotation?.text ?? '';
 }
 
-// test ocr on 1 png page
-// export async function testOCR() {
-//   const text = await textExtraction("assets/sample-page-1.png");
+//test ocr on 1 png page
+export async function testOCR() {
+  const sampleImagePath = path.resolve(process.cwd(), sampleImage);
+  const imageBuffer = fs.readFileSync(sampleImagePath);
+  const text = await textExtraction(imageBuffer);
 
-//   return {
-//     success: true,
-//     text
-//   };
-// }
+  return {
+    success: true,
+    text
+  };
+}
 
 /**
 

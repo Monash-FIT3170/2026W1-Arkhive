@@ -1,14 +1,14 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2023",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["node"],
+    "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "strict": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "types": ["node"]
   },
-  "include": ["src"]
-
+  "include": ["app.ts", "src"]
 }

@@ -122,11 +122,27 @@ function pruneOCROutput(
   };
 }
 
-function toColumnDict(boxes: any[]): OCRColumnBoundingBoxes {
+function toColumnDict(boxes: OCRBoundingBoxes | any[]): OCRColumnBoundingBoxes {
+  if (!boxes) return {};
+
+  if (Array.isArray(boxes)) {
+    return Object.fromEntries(
+      boxes.map((b) => [
+        b.columnKey,
+        { text: b.text, column: b.column, vertices: b.vertices, confidence: b.confidence },
+      ])
+    );
+  }
+
   return Object.fromEntries(
-    boxes.map((b) => [
-      b.columnKey,
-      { text: b.text, column: b.column, vertices: b.vertices, confidence: b.confidence },
+    Object.entries(boxes).map(([key, value]) => [
+      key,
+      {
+        text: value.text,
+        column: value.column ?? key,
+        vertices: value.vertices,
+        confidence: value.confidence,
+      },
     ])
   );
 }
