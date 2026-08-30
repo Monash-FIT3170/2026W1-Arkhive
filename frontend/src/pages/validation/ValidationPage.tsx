@@ -138,7 +138,7 @@ function ValidationPage() {
   // extractedPages — nothing else should call flatten() directly
   useEffect(() => {
     if (ocrPages.length === 0) return;
-    const newExtractedPages: ExtractedPage[] = ocrPages.map((page, pageIndex) => ({
+    const newExtractedPages: ExtractedPage[] = ocrPages.map((page, _pageIndex) => ({
       ...flatten(page.components),
       pageIndex: page.page_num - 1,
     }));
