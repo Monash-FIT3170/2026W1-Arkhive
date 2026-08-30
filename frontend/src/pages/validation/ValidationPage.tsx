@@ -11,6 +11,7 @@ import {
   getExtractionSession,
   saveExtractionSession,
 } from '../../services/extractionService';
+import { reindentRow, type IndentDirection } from './components/extracted-data/indentEditor';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
 import {
   requestBulkFieldReview,
@@ -62,9 +63,6 @@ function ValidationPage() {
   const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
   const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
   const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review' | 'history'>('chat');
-  const [manualIndentLevels, setManualIndentLevels] = useState<
-    Record<number, Record<string, number>>
-  >({});
 
   const extractedPagesRef = useRef<ExtractedPage[]>([]);
   const currentPageIndexRef = useRef(0);
@@ -141,12 +139,12 @@ function ValidationPage() {
   useEffect(() => {
     if (ocrPages.length === 0) return;
     const newExtractedPages: ExtractedPage[] = ocrPages.map((page, pageIndex) => ({
-      ...flatten(page.components, { manualIndentLevels: manualIndentLevels[pageIndex] ?? {} }),
+      ...flatten(page.components),
       pageIndex: page.page_num - 1,
     }));
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setExtractedPages(newExtractedPages);
-  }, [ocrPages, manualIndentLevels]);
+  }, [ocrPages]);
 
   const hasStartedRef = useRef(false);
 
@@ -402,41 +400,44 @@ function ValidationPage() {
   };
 
   //Handle Row Indent
-  const handleRowIndent = useCallback((rowId: string | number) => {
+  // Shared by indent + outdent: transforms the current page's rows in
+  // place via reindentRow (see indentEditor.ts) instead of reflattening
+  // from OCR, so no other edits on the page get lost.
+  const applyReindent = useCallback((rowId: string | number, direction: IndentDirection) => {
     const pageIndex = currentPageIndexRef.current;
-    const currentContext = extractedPagesRef.current[pageIndex];
-    if (!currentContext) return;
+    const currentPage = extractedPagesRef.current[pageIndex];
+    if (!currentPage) return;
 
-    const idx = currentContext.rows.findIndex((r) => r._id === rowId);
-    if (idx === -1) return;
+    const reindented = reindentRow(currentPage, rowId, direction);
+    if (reindented === currentPage) return; // already at min/max depth, nothing changed
 
-    const currentLevel = currentContext.rows[idx]._indentLevel ?? 0;
-    const prevLevel = idx > 0 ? (currentContext.rows[idx - 1]._indentLevel ?? 0) : 0;
-    const nextLevel = Math.min(currentLevel + 1, prevLevel + 1);
+    undoStack.current.push(extractedPagesRef.current);
+    redoStack.current = [];
 
-    setManualIndentLevels((prev) => ({
-      ...prev,
-      [pageIndex]: { ...(prev[pageIndex] ?? {}), [String(rowId)]: nextLevel },
-    }));
+    addHistoryEntry({
+      type: 'edit',
+      pageIndex,
+      fieldId: String(rowId),
+      column: '_indentLevel',
+      oldValue: '',
+      newValue: direction,
+      description: `${direction === 'in' ? 'Indented' : 'Outdented'} row on page ${pageIndex + 1}`,
+    });
+
+    setExtractedPages((prev) => prev.map((page, i) => (i === pageIndex ? reindented : page)));
+    saveExtractionSession(extractedPagesRef.current);
   }, []);
+
+  const handleRowIndent = useCallback(
+    (rowId: string | number) => applyReindent(rowId, 'in'),
+    [applyReindent]
+  );
 
   //Handle Row Outdent
-  const handleRowOutdent = useCallback((rowId: string | number) => {
-    const pageIndex = currentPageIndexRef.current;
-    const currentContext = extractedPagesRef.current[pageIndex];
-    if (!currentContext) return;
-
-    const row = currentContext.rows.find((r) => r._id === rowId);
-    if (!row) return;
-
-    const currentLevel = row._indentLevel ?? 0;
-    const nextLevel = Math.max(0, currentLevel - 1);
-
-    setManualIndentLevels((prev) => ({
-      ...prev,
-      [pageIndex]: { ...(prev[pageIndex] ?? {}), [String(rowId)]: nextLevel },
-    }));
-  }, []);
+  const handleRowOutdent = useCallback(
+    (rowId: string | number) => applyReindent(rowId, 'out'),
+    [applyReindent]
+  );
 
   const handleCarouselAccept = (updates: { fieldId: string; newValue: string }[]) => {
     if (!documentContext) return;

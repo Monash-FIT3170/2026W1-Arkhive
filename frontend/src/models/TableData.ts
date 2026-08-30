@@ -1,6 +1,7 @@
 export interface ExtractedData {
   columns: string[];
   rows: ExtractedRow[];
+  itemColumnKey: string;
 }
 
 export interface ExtractedRow {
