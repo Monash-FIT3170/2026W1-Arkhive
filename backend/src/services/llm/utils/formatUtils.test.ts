@@ -4,7 +4,7 @@ import { profileColumnLocally, maskToRegex } from './formatUtils';
 describe('formatUtils', () => {
   describe('profileColumnLocally', () => {
     it('should detect ISO_DATE format when >= 80% match', () => {
-      const samples = ['2026-08-31', '2026-01-15', '2025-12-01', 'invalid_date'];
+      const samples = ['2026-08-31', '2026-01-15', '2025-12-01', '2026-05-10', 'invalid'];
       const result = profileColumnLocally(samples);
       expect(result).toBe('^\\d{4}-\\d{2}-\\d{2}$');
     });
@@ -57,7 +57,7 @@ describe('formatUtils', () => {
       const mask = '$9,999.99';
       const regexStr = maskToRegex(mask, false);
 
-      expect(regexStr).toBe('^\\$\\d{1},\\d{4}\\.\\d{2}$');
+      expect(regexStr).toBe('^\\$\\d{1},\\d{3}\\.\\d{2}$');
 
       const regex = new RegExp(regexStr);
       expect(regex.test('$1,234.56')).toBe(true);

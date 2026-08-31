@@ -172,15 +172,6 @@ function ExtractedDataPanel({
     setEditingCellId(null);
   };
 
-  function handleAddColumnConfirm() {
-    const trimmed = newColumnName.trim();
-    if (trimmed !== '') {
-      onColumnAdd?.(trimmed);
-    }
-    setShowAddColumnModal(false);
-    setNewColumnName('');
-  }
-
   const handleCellKeyDown = (e: React.KeyboardEvent, fieldId: string) => {
     if (e.key === 'Enter') {
       handleCellBlur(fieldId);

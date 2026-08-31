@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 function TextInputModal({
   open,
@@ -20,10 +20,13 @@ function TextInputModal({
   onCancel: () => void;
 }) {
   const [value, setValue] = useState(initialValue);
+  const [prevInitialValue, setPrevInitialValue] = useState(initialValue);
 
-  useEffect(() => {
-    if (open) setValue(initialValue);
-  }, [open, initialValue]);
+  // Sync state during render when initialValue changes instead of triggering a post-render effect
+  if (initialValue !== prevInitialValue) {
+    setPrevInitialValue(initialValue);
+    setValue(initialValue);
+  }
 
   if (!open) return null;
 
