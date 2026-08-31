@@ -105,7 +105,6 @@ function ExtractedDataPanel({
   const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
   const [showDiscardMessage, setShowDiscardMessage] = useState<boolean>(false);
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
-  const [newColumnName, setNewColumnName] = useState('');
   const [columnDeleteToast, setColumnDeleteToast] = useState<string | null>(null);
   const [rowDeleteToast, setRowDeleteToast] = useState(false);
 
