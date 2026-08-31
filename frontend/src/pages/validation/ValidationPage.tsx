@@ -4,13 +4,10 @@ import ExtractedDataPanel from './components/extracted-data/ExtractedDataPanel';
 import ChatPanel from './components/chat/ChatPanel';
 import type { ChatMessage, ReviewField } from '../../models/Message';
 import type { OCRComponent, Pages } from '../../models/OCRComponent';
-import type {ExtractedPage } from '../../models/TableData';
+import type { ExtractedPage } from '../../models/TableData';
 import { getProcessedImageUrls, getUploadedImageUrl } from '../../services/uploadService';
 //import type { DocumentJob } from '../../models/Job';
-import {
-  getExtractionSession,
-  saveExtractionSession,
-} from '../../services/extractionService';
+import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
 import { reindentRow, type IndentDirection } from './components/extracted-data/indentEditor';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
 import {
@@ -170,22 +167,28 @@ function ValidationPage() {
           pageIndex: pageIdx,
         }));
 
-        // Randomly sample 10–30 non-empty values per column for format detection.
         const sampledData: Record<string, string[]> = {};
-        const sampleSize = Math.min(30, Math.max(10, Math.ceil(pageContext.rows.length * 0.1)));
+        const maxSamples = 20;
 
         for (const col of pageContext.columns) {
-          const values: string[] = [];
-          for (const row of pageContext.rows) {
-            const val = row[col];
-            if (val !== null && val !== undefined && String(val).trim() !== '') {
-              values.push(String(val).trim());
+          // Filter out empty/null values
+          const cleanValues = pageContext.rows
+            .map((row) => row[col])
+            .filter(
+              (val): val is string => val !== null && val !== undefined && String(val).trim() !== ''
+            )
+            .map((val) => String(val).trim());
+
+          if (cleanValues.length > 0) {
+            // Evenly sample across top, middle, and bottom rows rather than pure random
+            if (cleanValues.length <= maxSamples) {
+              sampledData[col] = cleanValues;
+            } else {
+              const step = Math.floor(cleanValues.length / maxSamples);
+              sampledData[col] = cleanValues
+                .filter((_, idx) => idx % step === 0)
+                .slice(0, maxSamples);
             }
-          }
-          const shuffled = values.sort(() => Math.random() - 0.5);
-          const samples = shuffled.slice(0, sampleSize);
-          if (samples.length > 0) {
-            sampledData[col] = samples;
           }
         }
 
