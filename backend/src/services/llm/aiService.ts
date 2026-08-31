@@ -9,7 +9,8 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 // applies the users intent to the current document context and returns updated context
 function applyIntentToContext(context: ExtractedData, intent: any): ExtractedData {
-  const updated = {
+  const updated: ExtractedData = {
+    ...context,
     columns: [...context.columns],
     rows: context.rows.map((row) => ({ ...row })),
   };

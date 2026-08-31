@@ -14,62 +14,61 @@ vi.mock('@google/generative-ai', () => {
           startChat: vi.fn().mockReturnValue({
             sendMessage: vi.fn().mockResolvedValue({
               response: {
-                text: () => JSON.stringify({
-                  response: "I've made the requested changes.",
-                  intent: {
-                    type: "correction",
-                    column: "PRICE",
-                    rowId: "row_1",
-                    newValue: "12.00"
-                  }
-                })
-              }
-            })
+                text: () =>
+                  JSON.stringify({
+                    response: "I've made the requested changes.",
+                    intent: {
+                      type: 'correction',
+                      column: 'PRICE',
+                      rowId: 'row_1',
+                      newValue: '12.00',
+                    },
+                  }),
+              },
+            }),
           }),
           generateContent: vi.fn().mockImplementation((prompt: string) => {
-            let responseText = "";
+            let responseText = '';
 
-            if (prompt.includes("Identify columns with a consistent format")) {
+            if (prompt.includes('Identify columns with a consistent format')) {
               // Mock response for detectTableFormats
               responseText = JSON.stringify({
-                formats: [
-                  { column: "PRICE", regex: "^\\d{1,3}(,\\d{3})*$" }
-                ]
+                formats: [{ column: 'PRICE', regex: '^\\d{1,3}(,\\d{3})*$' }],
               });
-            } else if (prompt.includes("review the \"PRICE\" field")) {
+            } else if (prompt.includes('review the "PRICE" field')) {
               // Mock response for suggestFieldCorrection (formatting issue)
               responseText = JSON.stringify({
-                response: "Corrected format to match the rest of the column.",
+                response: 'Corrected format to match the rest of the column.',
                 intent: {
-                  type: "correction",
-                  column: "PRICE",
-                  rowId: "row_2",
-                  newValue: "500",
-                  oldValue: "$500",
-                  note: "Removed formatting artifact"
-                }
+                  type: 'correction',
+                  column: 'PRICE',
+                  rowId: 'row_2',
+                  newValue: '500',
+                  oldValue: '$500',
+                  note: 'Removed formatting artifact',
+                },
               });
             } else {
               // Mock response for suggestFieldCorrection (low confidence)
               responseText = JSON.stringify({
-                response: "Is this meant to be 10?",
+                response: 'Is this meant to be 10?',
                 intent: {
-                  type: "correction",
-                  column: "QTY",
-                  rowId: "row_1",
-                  newValue: "10",
-                  oldValue: "1O",
-                  note: "Cleaned OCR artifact"
-                }
+                  type: 'correction',
+                  column: 'QTY',
+                  rowId: 'row_1',
+                  newValue: '10',
+                  oldValue: '1O',
+                  note: 'Cleaned OCR artifact',
+                },
               });
             }
 
             return Promise.resolve({
               response: {
-                text: () => responseText
-              }
+                text: () => responseText,
+              },
             });
-          })
+          }),
         };
       }
     },
@@ -77,30 +76,31 @@ vi.mock('@google/generative-ai', () => {
       OBJECT: 'OBJECT',
       STRING: 'STRING',
       BOOLEAN: 'BOOLEAN',
-      ARRAY: 'ARRAY'
-    }
+      ARRAY: 'ARRAY',
+    },
   };
 });
 
 describe('aiService', () => {
   const dummyContext = {
     columns: ['ITEM', 'QTY', 'PRICE'],
+    itemColumnKey: 'ITEM',
     rows: [
-      { _id: 'row_1', ITEM: 'Apple', QTY: '1O', PRICE: '10.00' },
-      { _id: 'row_2', ITEM: 'Banana', QTY: '5', PRICE: '2.50' }
-    ]
+      { _id: 'row_1', ITEM: 'Apple', QTY: '1O', PRICE: '10.00', _cellConfidence: {} },
+      { _id: 'row_2', ITEM: 'Banana', QTY: '5', PRICE: '2.50', _cellConfidence: {} },
+    ],
   };
 
   describe('sendMessageToGemini', () => {
     it('should correctly apply a correction intent to the document context', async () => {
       const messages = [{ role: 'user' as const, content: 'Change Apple price to 12.00' }];
-      
+
       const result = await aiService.sendMessageToGemini(messages, dummyContext);
-      
+
       expect(result).toHaveProperty('response');
       expect(result).toHaveProperty('intent');
       expect(result.updatedContext).toBeDefined();
-      
+
       // Check if context was actually updated based on our mocked Gemini response
       const updatedRow = result.updatedContext.rows.find((r: any) => r._id === 'row_1');
       expect(updatedRow?.PRICE).toBe('12.00');
@@ -109,7 +109,7 @@ describe('aiService', () => {
     it('should not throw when document context is undefined', async () => {
       const messages = [{ role: 'user' as const, content: 'Hello' }];
       const result = await aiService.sendMessageToGemini(messages, undefined);
-      
+
       expect(result.updatedContext).toBeUndefined();
     });
   });
@@ -120,11 +120,11 @@ describe('aiService', () => {
         column: 'QTY',
         rowId: 'row_1',
         value: '1O',
-        confidence: 0.4
+        confidence: 0.4,
       };
-      
+
       const result = await aiService.suggestFieldCorrection(fieldToCorrect, dummyContext);
-      
+
       expect(result.intent.newValue).toBe('10');
       const updatedRow = result.updatedContext.rows.find((r: any) => r._id === 'row_1');
       expect(updatedRow?.QTY).toBe('10');
@@ -136,11 +136,11 @@ describe('aiService', () => {
         rowId: 'row_2',
         value: '$500',
         confidence: 0.9,
-        issueType: 'format' as const
+        issueType: 'format' as const,
       };
-      
+
       const result = await aiService.suggestFieldCorrection(fieldToCorrect, dummyContext);
-      
+
       expect(result.intent.newValue).toBe('500');
       const updatedRow = result.updatedContext.rows.find((r: any) => r._id === 'row_2');
       expect(updatedRow?.PRICE).toBe('500');
@@ -150,7 +150,7 @@ describe('aiService', () => {
   describe('detectTableFormats', () => {
     it('should correctly identify and return formatting regexes for valid columns', async () => {
       const sampledData = {
-        'PRICE': ['10.00', '2.50', '5.00', '100.00']
+        PRICE: ['10.00', '2.50', '5.00', '100.00'],
       };
 
       const result = await aiService.detectTableFormats(sampledData);
