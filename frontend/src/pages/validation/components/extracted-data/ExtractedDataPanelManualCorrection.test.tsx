@@ -7,20 +7,14 @@ import ExtractedDataPanel from './ExtractedDataPanel';
 import type { ExtractedData } from '../../../../models/TableData';
 
 // Unit test for ExtractedDataPanel
-// Acknowledgment: The generation of these tests was done with the 
+// Acknowledgment: The generation of these tests was done with the
 // assistance of Google Gemini
 
 type PanelProps = ComponentProps<typeof ExtractedDataPanel>;
 
 function ControlledPanel(props: PanelProps) {
   const [isEditMode, setIsEditMode] = useState(false);
-  return (
-    <ExtractedDataPanel
-      {...props}
-      isEditMode={isEditMode}
-      onEditModeChange={setIsEditMode}
-    />
-  );
+  return <ExtractedDataPanel {...props} isEditMode={isEditMode} onEditModeChange={setIsEditMode} />;
 }
 
 function ReorderPanel(props: PanelProps) {
@@ -62,12 +56,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
   });
 
   it('renders the table data correctly', () => {
-    render(
-      <ControlledPanel
-        onHover={onHoverMock}
-        extractedData={mockExtractedData}
-      />
-    );
+    render(<ControlledPanel onHover={onHoverMock} extractedData={mockExtractedData} />);
     expect(screen.getByText('EXTRACTED DATA')).toBeDefined();
     expect(screen.getByText('Field1')).toBeDefined();
     expect(screen.getByText('Field2')).toBeDefined();
@@ -76,12 +65,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
   });
 
   it('turns a cell into an input field when clicked in edit mode', async () => {
-    render(
-      <ControlledPanel
-        onHover={onHoverMock}
-        extractedData={mockExtractedData}
-      />
-    );
+    render(<ControlledPanel onHover={onHoverMock} extractedData={mockExtractedData} />);
 
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
@@ -208,9 +192,6 @@ describe('ExtractedDataPanel - Manual Correction', () => {
   it('triggers onColumnAdd when Add Column is clicked and a name is provided', () => {
     const onColumnAddMock = vi.fn();
 
-    // Mock the prompt
-    vi.spyOn(window, 'prompt').mockReturnValue('New_Field');
-
     render(
       <ControlledPanel
         onHover={onHoverMock}
@@ -222,15 +203,23 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
 
-    fireEvent.click(screen.getByText('Add Column'));
-    expect(onColumnAddMock).toHaveBeenCalledWith('New_Field');
+    // Click the "Add Column" button in the panel to open the modal
+    fireEvent.click(screen.getByTitle('Add Column'));
 
-    vi.restoreAllMocks();
+    // Type the new column name into the modal input field
+    const input = screen.getByPlaceholderText('Column name');
+    fireEvent.change(input, { target: { value: 'New_Field' } });
+
+    // Click the "Add Column" confirm button inside the modal
+    const confirmButtons = screen.getAllByText('Add Column');
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+
+    // Verify the mock callback
+    expect(onColumnAddMock).toHaveBeenCalledWith('New_Field');
   });
 
   it('does not trigger onColumnAdd when prompt is cancelled', () => {
     const onColumnAddMock = vi.fn();
-    vi.spyOn(window, 'prompt').mockReturnValue(null);
 
     render(
       <ControlledPanel
@@ -243,10 +232,18 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     // Enable edit mode
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
 
-    fireEvent.click(screen.getByText('Add Column'));
-    expect(onColumnAddMock).not.toHaveBeenCalled();
+    // Click panel button to open modal
+    fireEvent.click(screen.getByTitle('Add Column'));
 
-    vi.restoreAllMocks();
+    // Type a name
+    const input = screen.getByPlaceholderText('Column name');
+    fireEvent.change(input, { target: { value: 'WillBeCancelled' } });
+
+    // Click the Cancel button inside the modal
+    fireEvent.click(screen.getByText('Cancel'));
+
+    // Verify callback was not called
+    expect(onColumnAddMock).not.toHaveBeenCalled();
   });
 
   it('triggers onColumnDelete when column trash icon is clicked', () => {
