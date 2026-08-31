@@ -240,49 +240,62 @@ function ValidationPage() {
     performFormatDetection();
   }, [extractedPages]);
 
+  // UNDO/REDO PIPELINE
+  const isModifierPressed = (e: KeyboardEvent) => e.metaKey || e.ctrlKey;
+
+  const handleUndo = useCallback(() => {
+    if (undoStack.current.length === 0) return;
+
+    const previous = undoStack.current.pop()!;
+    redoStack.current.push(extractedPagesRef.current);
+
+    setExtractedPages(previous);
+    saveExtractionSession(previous);
+    setEditedCells(new Set());
+    setTableKey((k) => k + 1);
+    addHistoryEntry({
+      type: 'undo',
+      description: 'Undid last change',
+    });
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    if (redoStack.current.length === 0) return;
+
+    const next = redoStack.current.pop()!;
+    undoStack.current.push(extractedPagesRef.current);
+
+    setExtractedPages(next);
+    saveExtractionSession(next);
+    setEditedCells(new Set());
+    setTableKey((k) => k + 1);
+    addHistoryEntry({
+      type: 'redo',
+      description: 'Redid last change',
+    });
+  }, [saveExtractionSession, addHistoryEntry]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isUndo = e.metaKey && e.key === 'z' && !e.shiftKey;
-      const isRedo = e.metaKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey));
+      const key = e.key.toLowerCase();
+      const hasModifier = isModifierPressed(e);
+      const isUndo = hasModifier && key === 'z' && !e.shiftKey;
+      const isRedo = hasModifier && (key === 'y' || (key === 'z' && e.shiftKey));
 
       if (isUndo) {
         e.preventDefault();
-        if (undoStack.current.length === 0) return;
-
-        const previous = undoStack.current.pop()!;
-        redoStack.current.push(extractedPagesRef.current);
-
-        setExtractedPages(previous);
-        saveExtractionSession(previous);
-        setEditedCells(new Set());
-        setTableKey((k) => k + 1);
-        addHistoryEntry({
-          type: 'undo',
-          description: 'Undid last change',
-        });
+        handleUndo();
       }
 
       if (isRedo) {
         e.preventDefault();
-        if (redoStack.current.length === 0) return;
-
-        const next = redoStack.current.pop()!;
-        undoStack.current.push(extractedPagesRef.current);
-
-        setExtractedPages(next);
-        saveExtractionSession(next);
-        setEditedCells(new Set());
-        setTableKey((k) => k + 1);
-        addHistoryEntry({
-          type: 'redo',
-          description: 'Redid last change',
-        });
+        handleRedo();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [handleUndo, handleRedo]);
 
   //Resizing Functions
   //Set dragging to be true
@@ -356,12 +369,13 @@ function ValidationPage() {
 
   // called when AI returns updatedContext after accepting suggestion
   const handleContextUpdate = (updatedData: ExtractedPage) => {
+    undoStack.current.push(extractedPagesRef.current);
+    redoStack.current = [];
     setOldContext(documentContext);
     setExtractedPages((prev) =>
       prev.map((page, i) => (i === currentPageIndex ? updatedData : page))
     );
   };
-
   const resolveLastMessage = () => {
     setMessages((prev) =>
       prev.map((msg, i) => (i === prev.length - 1 ? { ...msg, resolved: true } : msg))
@@ -444,7 +458,8 @@ function ValidationPage() {
 
   const handleCarouselAccept = (updates: { fieldId: string; newValue: string }[]) => {
     if (!documentContext) return;
-
+    undoStack.current.push(extractedPagesRef.current);
+    redoStack.current = [];
     setExtractedPages((prev) => {
       const next = [...prev];
       updates.forEach(({ fieldId, newValue }) => {
@@ -511,6 +526,9 @@ function ValidationPage() {
 
   const handleCarouselManualEdit = (fieldId: string, newValue: string) => {
     if (!documentContext) return;
+
+    undoStack.current.push(extractedPagesRef.current);
+    redoStack.current = [];
     const [rowId, column] = fieldId.split(':');
 
     // find what page the issue is in
@@ -688,6 +706,7 @@ function ValidationPage() {
           }
         >
           <ExtractedDataPanel
+            onUndoLast={handleUndo}
             key={tableKey}
             isEditMode={isEditMode}
             onEditModeChange={setIsEditMode}
@@ -785,9 +804,9 @@ function ValidationPage() {
             }}
             onColumnAdd={(columnName) => {
               if (!documentContext) return;
+              if (documentContext.columns.includes(columnName)) return;
               undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
-              if (documentContext.columns.includes(columnName)) return;
 
               setExtractedPages((prev) =>
                 prev.map((page, i) =>
@@ -825,6 +844,14 @@ function ValidationPage() {
             }}
             onRowMove={(rowId, direction) => {
               if (!documentContext) return;
+              const rows = documentContext.rows;
+              const idx = rows.findIndex((r) => r._id === rowId);
+              const canMove =
+                idx !== -1 &&
+                ((direction === 'up' && idx > 0) ||
+                  (direction === 'down' && idx < rows.length - 1));
+              if (!canMove) return;
+
               undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
 
@@ -833,16 +860,8 @@ function ValidationPage() {
                   if (i !== currentPageIndex) return page;
                   const rows = [...page.rows];
                   const idx = rows.findIndex((r) => r._id === rowId);
-                  if (idx === -1) return page;
-
-                  if (direction === 'up' && idx > 0) {
-                    [rows[idx - 1], rows[idx]] = [rows[idx], rows[idx - 1]];
-                  } else if (direction === 'down' && idx < rows.length - 1) {
-                    [rows[idx], rows[idx + 1]] = [rows[idx + 1], rows[idx]];
-                  } else {
-                    return page;
-                  }
-
+                  if (direction === 'up') [rows[idx - 1], rows[idx]] = [rows[idx], rows[idx - 1]];
+                  else [rows[idx], rows[idx + 1]] = [rows[idx + 1], rows[idx]];
                   return { ...page, rows };
                 })
               );
