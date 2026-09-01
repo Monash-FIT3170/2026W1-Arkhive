@@ -12,10 +12,20 @@ export interface FlaggedCell {
   value: any;
 }
 
-//Turns a string into a regex
+/** Converts regex string safely into RegExp objects */
 function toRegex(source: string): RegExp {
-  const pattern = source.startsWith('^') ? source : '^' + source;
-  return new RegExp(pattern.endsWith('$') ? pattern : pattern + '$');
+  let pattern = source;
+
+  // Add anchors if missing
+  if (!pattern.startsWith('^')) pattern = '^' + pattern;
+  if (!pattern.endsWith('$')) pattern = pattern + '$';
+
+  try {
+    return new RegExp(pattern);
+  } catch (err) {
+    console.error(`Invalid regex string passed to checkColumnFormat: "${source}"`, err);
+    return /^.*$/; // Safe fallback so invalid regexes don't crash the validation loop
+  }
 }
 
 /** Matches the auto-generated nested sub-item columns from flatten.ts (SUB_<ITEMCOL>_<depth>). */

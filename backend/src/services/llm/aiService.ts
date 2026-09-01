@@ -3,6 +3,7 @@ import type { Message, ReviewField } from '../../models/message';
 import dotenv from 'dotenv';
 import { ExtractedData } from '../../models/TableData';
 import { buildFocusedContext } from './utils/contextMaker';
+import { maskToRegex, profileColumnLocally } from './utils/formatUtils';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -196,31 +197,28 @@ const chatResponseSchema: Schema = {
 
 const formatDetectionSchema: Schema = {
   type: SchemaType.OBJECT,
-  description:
-    'A map of column names to a regular expression validating their dominant structural format (separators, punctuation, casing, digit/letter layout) -- not limited to Date, Time, or Currency.',
   properties: {
     formats: {
       type: SchemaType.ARRAY,
-      description:
-        'List of columns with a detected dominant structural format, and a regex matching it.',
       items: {
         type: SchemaType.OBJECT,
         properties: {
-          column: {
-            type: SchemaType.STRING,
-            description: 'The name of the column.',
-          },
-          regex: {
+          column: { type: SchemaType.STRING },
+          structuralMask: {
             type: SchemaType.STRING,
             description:
-              'The regular expression validating the most common structural pattern in this column.',
+              "Template string: '9' for digit, 'A' for uppercase, 'a' for lowercase, 'X' for alphanumeric. Punctuation as-is (e.g. 'AAA-99-999', '$9,999.99').",
+          },
+          isVariableLength: {
+            type: SchemaType.BOOLEAN,
+            description:
+              'True if values have dynamic length (e.g., quantities, standard floats), False for fixed-length codes.',
           },
         },
-        required: ['column', 'regex'],
+        required: ['column', 'structuralMask', 'isVariableLength'],
       },
     },
   },
-  required: ['formats'],
 };
 
 export default {
@@ -417,73 +415,46 @@ export default {
   },
   //This function was made with the help of Google Gemini
   detectTableFormats: async (sampledData: Record<string, string[]>): Promise<any> => {
-    const formattedSample = JSON.stringify(sampledData, null, 2);
+    const finalRegexMap: Record<string, string> = {};
+    const unresolvedSamples: Record<string, string[]> = {};
 
-    // const model = genAI.getGenerativeModel({
-    //   model: 'gemini-2.5-flash',
-    //   systemInstruction: `You are an AI assistant helping validate table data extracted via OCR.
-    //   Your task is to identify which columns represent Dates, Times, or Currencies based on the provided sample data.
-    //   For each column that you identify as Date, Time, or Currency, provide a regular expression that matches the most common format found in the sample for that column.
-    //   Do not include columns that are not Dates, Times, or Currencies (e.g. ignore text, names, generic IDs, statuses, etc.).
+    // 1. Run local profiler first (Fast Path - ~1ms)
+    for (const [col, samples] of Object.entries(sampledData)) {
+      const localRegex = profileColumnLocally(samples);
+      if (localRegex) {
+        finalRegexMap[col] = localRegex;
+      } else {
+        unresolvedSamples[col] = samples;
+      }
+    }
 
-    //   Here is the sample of the first few non-empty rows for each column:
-    //   ${formattedSample}
+    // If local rules resolved all columns, skip Gemini call entirely!
+    if (Object.keys(unresolvedSamples).length === 0) {
+      return finalRegexMap;
+    }
 
-    //   Return the results as a list of { column, regex } objects inside 'formats'.
-    //   Make sure the regex is strict enough to catch formatting inconsistencies, e.g. '\\d{2}-\\d{2}-\\d{4}' or '\\$\\d+\\.\\d{2}'.
-    //   `,
-    //   generationConfig: {
-    //     responseMimeType: 'application/json',
-    //     responseSchema: formatDetectionSchema,
-    //     temperature: 0.1,
-    //   },
-    // });
-
-    // const result = await model.generateContent('Identify Date, Time, and Currency columns and provide validation regexes.');
-    console.log('SENT TO MODEL:\n', formattedSample);
+    // 2. Query Gemini only for unresolved/custom formats
+    const formattedSample = JSON.stringify(unresolvedSamples, null, 2);
+    console.log(formattedSample);
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.5-flash',
-      systemInstruction: `You are an AI assistant helping validate table data extracted via OCR.
+      systemInstruction: `You are an AI assistant validating OCR tables.
+        Look at each column's sample values and identify the dominant structural character skeleton.
 
-        Look at each column's sample values. If most non-empty values share the same structural
-        pattern (separators, punctuation, casing, digit/letter layout -- not just Dates, Times,
-        Currency), return a regex matching that dominant pattern.
+        Return a structuralMask using these placeholders:
+        - '9' = Digit
+        - 'A' = Uppercase letter
+        - 'a' = Lowercase letter
+        - 'X' = Any letter or digit
+        - Punctuation, dashes, spaces stay as literal characters.
 
-        Also use the column's likely MEANING as a signal, inferred from its name and the values
-        that make semantic sense together -- not just raw frequency in the sample:
-        - A column that's clearly numeric/quantity/ID-like by name and mostly-digit values
-        should be treated as a digits-only pattern. A non-digit placeholder (e.g. "-", "N/A")
-        is almost always an OCR error or missing-value marker, not a legitimate alternate
-        format -- exclude it from the regex even if it appears in a large share of the sample.
-        - A leaked, semantically unrelated prefix or suffix stuck onto an otherwise consistent
-        value (e.g. a stray number or character attached to a code/ID on only some rows) is
-        more likely an OCR artifact than part of the actual value. Prefer the pattern for the
-        coherent underlying value over one that includes such leaked tokens, even if the
-        leaked version appears often in the sample.
+        Ignore occasional OCR noise/errors and find the dominant underlying format.
+        Set isVariableLength to true if the column represents arbitrary numbers or free text.
 
-        When raw frequency and semantic plausibility disagree, prefer semantic plausibility --
-        a small sample can make a formatting bug look common by chance, so don't let sample
-        frequency alone justify treating an implausible variant as the accepted format.
+        Skip free text columns (names, addresses, comments).
 
-        CRITICAL RULE: DO NOT use optional characters (e.g. "?", "*") or alternations ("|") to 
-        accommodate minority formats or inconsistencies in the sample (e.g. allowing a "$" just 
-        because one row has it, while others don't). The regex MUST strictly define the single 
-        most dominant format. Any deviations from that strict dominant format are supposed to 
-        fail the regex check.
-
-        The regex must match ONLY the dominant, semantically-correct pattern -- outliers and
-        noise are supposed to fail to match, that's what flags them for review.
-
-        Skip a column if: it's genuinely free text (names, addresses, notes), it has no clear
-        majority pattern (roughly evenly mixed structures) AND no semantic reason to prefer one,
-        or the sample has under 3 non-empty values.
-
-        Sample (random rows per column):
-        ${formattedSample}
-
-        Return { column, regex } objects inside 'formats'.
-        Examples: '\\d{2}-\\d{2}-\\d{4}' (date), '\\$\\d+\\.\\d{2}' (currency), '^\\d+$' (small integer column).
-        `,
+        Sample data:
+        ${formattedSample}`,
       generationConfig: {
         responseMimeType: 'application/json',
         responseSchema: formatDetectionSchema,
@@ -491,22 +462,24 @@ export default {
       },
     });
 
-    const result = await model.generateContent(
-      'Identify columns with a consistent format and provide validation regexes for each, following the rules above.'
-    );
-    console.log('RAW RESPONSE:\n', result.response.text());
-    const parsed = JSON.parse(result.response.text());
+    try {
+      const result = await model.generateContent(
+        'Identify structural format masks for the provided columns.'
+      );
+      const parsed = JSON.parse(result.response.text());
 
-    // Convert { formats: [{column, regex}] } into Record<string, string>
-    const regexMap: Record<string, string> = {};
-    if (parsed.formats && Array.isArray(parsed.formats)) {
-      parsed.formats.forEach((f: any) => {
-        if (f.column && f.regex) {
-          regexMap[f.column] = f.regex;
-        }
-      });
+      if (parsed.formats && Array.isArray(parsed.formats)) {
+        parsed.formats.forEach((f: any) => {
+          if (f.column && f.structuralMask) {
+            // Convert Gemini mask to safe JS regex locally
+            finalRegexMap[f.column] = maskToRegex(f.structuralMask, Boolean(f.isVariableLength));
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error during LLM format detection fallback:', error);
     }
 
-    return regexMap;
+    return finalRegexMap;
   },
 };

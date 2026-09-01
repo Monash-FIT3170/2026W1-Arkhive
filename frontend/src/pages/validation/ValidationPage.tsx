@@ -4,13 +4,10 @@ import ExtractedDataPanel from './components/extracted-data/ExtractedDataPanel';
 import ChatPanel from './components/chat/ChatPanel';
 import type { ChatMessage, ReviewField } from '../../models/Message';
 import type { OCRComponent, Pages } from '../../models/OCRComponent';
-import type {ExtractedPage } from '../../models/TableData';
+import type { ExtractedPage } from '../../models/TableData';
 import { getProcessedImageUrls, getUploadedImageUrl } from '../../services/uploadService';
 //import type { DocumentJob } from '../../models/Job';
-import {
-  getExtractionSession,
-  saveExtractionSession,
-} from '../../services/extractionService';
+import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
 import { reindentRow, type IndentDirection } from './components/extracted-data/indentEditor';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
 import {
@@ -170,22 +167,28 @@ function ValidationPage() {
           pageIndex: pageIdx,
         }));
 
-        // Randomly sample 10–30 non-empty values per column for format detection.
         const sampledData: Record<string, string[]> = {};
-        const sampleSize = Math.min(30, Math.max(10, Math.ceil(pageContext.rows.length * 0.1)));
+        const maxSamples = 20;
 
         for (const col of pageContext.columns) {
-          const values: string[] = [];
-          for (const row of pageContext.rows) {
-            const val = row[col];
-            if (val !== null && val !== undefined && String(val).trim() !== '') {
-              values.push(String(val).trim());
+          // Filter out empty/null values
+          const cleanValues = pageContext.rows
+            .map((row) => row[col])
+            .filter(
+              (val): val is string => val !== null && val !== undefined && String(val).trim() !== ''
+            )
+            .map((val) => String(val).trim());
+
+          if (cleanValues.length > 0) {
+            // Evenly sample across top, middle, and bottom rows rather than pure random
+            if (cleanValues.length <= maxSamples) {
+              sampledData[col] = cleanValues;
+            } else {
+              const step = Math.floor(cleanValues.length / maxSamples);
+              sampledData[col] = cleanValues
+                .filter((_, idx) => idx % step === 0)
+                .slice(0, maxSamples);
             }
-          }
-          const shuffled = values.sort(() => Math.random() - 0.5);
-          const samples = shuffled.slice(0, sampleSize);
-          if (samples.length > 0) {
-            sampledData[col] = samples;
           }
         }
 
@@ -237,49 +240,62 @@ function ValidationPage() {
     performFormatDetection();
   }, [extractedPages]);
 
+  // UNDO/REDO PIPELINE
+  const isModifierPressed = (e: KeyboardEvent) => e.metaKey || e.ctrlKey;
+
+  const handleUndo = useCallback(() => {
+    if (undoStack.current.length === 0) return;
+
+    const previous = undoStack.current.pop()!;
+    redoStack.current.push(extractedPagesRef.current);
+
+    setExtractedPages(previous);
+    saveExtractionSession(previous);
+    setEditedCells(new Set());
+    setTableKey((k) => k + 1);
+    addHistoryEntry({
+      type: 'undo',
+      description: 'Undid last change',
+    });
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    if (redoStack.current.length === 0) return;
+
+    const next = redoStack.current.pop()!;
+    undoStack.current.push(extractedPagesRef.current);
+
+    setExtractedPages(next);
+    saveExtractionSession(next);
+    setEditedCells(new Set());
+    setTableKey((k) => k + 1);
+    addHistoryEntry({
+      type: 'redo',
+      description: 'Redid last change',
+    });
+  }, [saveExtractionSession, addHistoryEntry]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isUndo = e.metaKey && e.key === 'z' && !e.shiftKey;
-      const isRedo = e.metaKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey));
+      const key = e.key.toLowerCase();
+      const hasModifier = isModifierPressed(e);
+      const isUndo = hasModifier && key === 'z' && !e.shiftKey;
+      const isRedo = hasModifier && (key === 'y' || (key === 'z' && e.shiftKey));
 
       if (isUndo) {
         e.preventDefault();
-        if (undoStack.current.length === 0) return;
-
-        const previous = undoStack.current.pop()!;
-        redoStack.current.push(extractedPagesRef.current);
-
-        setExtractedPages(previous);
-        saveExtractionSession(previous);
-        setEditedCells(new Set());
-        setTableKey((k) => k + 1);
-        addHistoryEntry({
-          type: 'undo',
-          description: 'Undid last change',
-        });
+        handleUndo();
       }
 
       if (isRedo) {
         e.preventDefault();
-        if (redoStack.current.length === 0) return;
-
-        const next = redoStack.current.pop()!;
-        undoStack.current.push(extractedPagesRef.current);
-
-        setExtractedPages(next);
-        saveExtractionSession(next);
-        setEditedCells(new Set());
-        setTableKey((k) => k + 1);
-        addHistoryEntry({
-          type: 'redo',
-          description: 'Redid last change',
-        });
+        handleRedo();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [handleUndo, handleRedo]);
 
   //Resizing Functions
   //Set dragging to be true
@@ -353,12 +369,13 @@ function ValidationPage() {
 
   // called when AI returns updatedContext after accepting suggestion
   const handleContextUpdate = (updatedData: ExtractedPage) => {
+    undoStack.current.push(extractedPagesRef.current);
+    redoStack.current = [];
     setOldContext(documentContext);
     setExtractedPages((prev) =>
       prev.map((page, i) => (i === currentPageIndex ? updatedData : page))
     );
   };
-
   const resolveLastMessage = () => {
     setMessages((prev) =>
       prev.map((msg, i) => (i === prev.length - 1 ? { ...msg, resolved: true } : msg))
@@ -441,7 +458,8 @@ function ValidationPage() {
 
   const handleCarouselAccept = (updates: { fieldId: string; newValue: string }[]) => {
     if (!documentContext) return;
-
+    undoStack.current.push(extractedPagesRef.current);
+    redoStack.current = [];
     setExtractedPages((prev) => {
       const next = [...prev];
       updates.forEach(({ fieldId, newValue }) => {
@@ -508,6 +526,9 @@ function ValidationPage() {
 
   const handleCarouselManualEdit = (fieldId: string, newValue: string) => {
     if (!documentContext) return;
+
+    undoStack.current.push(extractedPagesRef.current);
+    redoStack.current = [];
     const [rowId, column] = fieldId.split(':');
 
     // find what page the issue is in
@@ -685,6 +706,7 @@ function ValidationPage() {
           }
         >
           <ExtractedDataPanel
+            onUndoLast={handleUndo}
             key={tableKey}
             isEditMode={isEditMode}
             onEditModeChange={setIsEditMode}
@@ -782,9 +804,9 @@ function ValidationPage() {
             }}
             onColumnAdd={(columnName) => {
               if (!documentContext) return;
+              if (documentContext.columns.includes(columnName)) return;
               undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
-              if (documentContext.columns.includes(columnName)) return;
 
               setExtractedPages((prev) =>
                 prev.map((page, i) =>
@@ -822,6 +844,14 @@ function ValidationPage() {
             }}
             onRowMove={(rowId, direction) => {
               if (!documentContext) return;
+              const rows = documentContext.rows;
+              const idx = rows.findIndex((r) => r._id === rowId);
+              const canMove =
+                idx !== -1 &&
+                ((direction === 'up' && idx > 0) ||
+                  (direction === 'down' && idx < rows.length - 1));
+              if (!canMove) return;
+
               undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
 
@@ -830,16 +860,8 @@ function ValidationPage() {
                   if (i !== currentPageIndex) return page;
                   const rows = [...page.rows];
                   const idx = rows.findIndex((r) => r._id === rowId);
-                  if (idx === -1) return page;
-
-                  if (direction === 'up' && idx > 0) {
-                    [rows[idx - 1], rows[idx]] = [rows[idx], rows[idx - 1]];
-                  } else if (direction === 'down' && idx < rows.length - 1) {
-                    [rows[idx], rows[idx + 1]] = [rows[idx + 1], rows[idx]];
-                  } else {
-                    return page;
-                  }
-
+                  if (direction === 'up') [rows[idx - 1], rows[idx]] = [rows[idx], rows[idx - 1]];
+                  else [rows[idx], rows[idx + 1]] = [rows[idx + 1], rows[idx]];
                   return { ...page, rows };
                 })
               );

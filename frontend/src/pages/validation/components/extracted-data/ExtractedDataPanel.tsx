@@ -17,6 +17,8 @@ import { exportExtractedDataAsCSV } from '../../../../services/csvDownloadServic
 import { exportExtractedDataAsJSON } from '../../../../services/jsonDownloadService';
 import { exportExtractedDataAsTXT } from '../../../../services/txtDownloadService'; // NEW: TXT export service
 import { exportExtractedDataAsXLSX } from '../../../../services/xlsxDownloadService'; // NEW: Excel export service (US-4.5)
+import TextInputModal from '../modals/TextInputModal';
+import Toast from '../modals/Toast';
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
@@ -68,6 +70,7 @@ function ExtractedDataPanel({
   isEditMode,
   onEditModeChange,
   editedCells,
+  onUndoLast,
 }: {
   onHover: (id: string | null) => void;
   extractedData: ExtractedData;
@@ -84,16 +87,8 @@ function ExtractedDataPanel({
   isEditMode?: boolean;
   onEditModeChange?: (value: boolean) => void;
   editedCells?: Set<string>;
+  onUndoLast?: () => void;
 }) {
-  // Currency formatting function (unchanged)
-  //Function never used
-  // const formatCurrency = (amount: number) => {
-  //   return new Intl.NumberFormat('id-ID', {
-  //     style: 'currency',
-  //     currency: 'IDR',
-  //   }).format(amount);
-  // };
-
   // used to check if file exported, and which format was last exported
   // UPDATED: was a plain boolean for CSV only; now tracks which format
   // (csv/txt/xlsx) was exported so a single button/dropdown can serve all three
@@ -109,7 +104,9 @@ function ExtractedDataPanel({
   const [localEdits, setLocalEdits] = useState<Record<string, string>>({});
   const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
   const [showDiscardMessage, setShowDiscardMessage] = useState<boolean>(false);
-  // const [isEditMode, setIsEditMode] = useState<boolean>(false);
+  const [showAddColumnModal, setShowAddColumnModal] = useState(false);
+  const [columnDeleteToast, setColumnDeleteToast] = useState<string | null>(null);
+  const [rowDeleteToast, setRowDeleteToast] = useState(false);
 
   // Column re-ordering
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
@@ -262,12 +259,7 @@ function ExtractedDataPanel({
           </button>
           {isEditMode && onColumnAdd && (
             <button
-              onClick={() => {
-                const newColName = prompt('Enter the name of the new column:');
-                if (newColName && newColName.trim() !== '') {
-                  onColumnAdd(newColName.trim());
-                }
-              }}
+              onClick={() => setShowAddColumnModal(true)}
               className="btn btn-sm gap-2 text-xs transition-all rounded-xl btn-outline"
               title="Add Column"
             >
@@ -376,15 +368,17 @@ function ExtractedDataPanel({
 
                     {isEditMode && onColumnDelete && (
                       <div className="flex items-center justify-center gap-1 w-full bg-base-300/30 rounded px-1 py-0.5">
-                        {onColumnDelete && (
-                          <button
-                            className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-error opacity-60 hover:opacity-100 hover:bg-error/20"
-                            title="Delete Column"
-                            onClick={() => onColumnDelete(column)}
-                          >
-                            <Trash className="w-3 h-3" />
-                          </button>
-                        )}
+                        <button
+                          className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-error opacity-60 hover:opacity-100 hover:bg-error/20"
+                          title="Delete Column"
+                          onClick={() => {
+                            onColumnDelete(column);
+                            setRowDeleteToast(false);
+                            setColumnDeleteToast(column);
+                          }}
+                        >
+                          <Trash className="w-3 h-3" />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -497,7 +491,7 @@ function ExtractedDataPanel({
                       </span>
                     </div>
                   </td>
-                  {isEditMode && (onRowDelete || onRowMove || onRowIndent) && (
+                  {isEditMode && (onRowDelete || onRowMove || onRowIndent || onRowOutdent) && (
                     <td className="p-2 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {(onRowIndent || onRowOutdent) && (
@@ -542,7 +536,11 @@ function ExtractedDataPanel({
                           <button
                             className="btn btn-ghost btn-xs btn-square text-error opacity-50 hover:opacity-100"
                             title="Delete Row"
-                            onClick={() => onRowDelete(row._id)}
+                            onClick={() => {
+                              onRowDelete(row._id);
+                              setColumnDeleteToast(null);
+                              setRowDeleteToast(true);
+                            }}
                           >
                             <Trash className="w-3 h-3" />
                           </button>
@@ -569,6 +567,40 @@ function ExtractedDataPanel({
           </button>
         </div>
       )}
+
+      {/* Add Column Modal */}
+      <TextInputModal
+        open={showAddColumnModal}
+        title="Add New Column"
+        description="Enter a name for the new column."
+        placeholder="Column name"
+        confirmLabel="Add Column"
+        onConfirm={(name) => {
+          onColumnAdd?.(name);
+          setShowAddColumnModal(false);
+        }}
+        onCancel={() => setShowAddColumnModal(false)}
+      />
+
+      {/* Row Delete Toast */}
+      <Toast
+        open={rowDeleteToast}
+        message="Row deleted"
+        actionLabel="Undo"
+        onAction={onUndoLast}
+        onDismiss={() => setRowDeleteToast(false)}
+      />
+
+      {/* Column Delete Toast */}
+      <Toast
+        open={columnDeleteToast !== null}
+        message={
+          columnDeleteToast ? `Column "${columnDeleteToast.replace(/_/g, ' ')}" deleted` : ''
+        }
+        actionLabel="Undo"
+        onAction={onUndoLast}
+        onDismiss={() => setColumnDeleteToast(null)}
+      />
     </div>
   );
 }

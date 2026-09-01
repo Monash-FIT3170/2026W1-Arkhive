@@ -14,13 +14,11 @@ function buildData(columns: string[], rows: ExtractedRow[]): ExtractedData {
 }
 
 describe('detectReviewFields', () => {
-  //Empty rows
   it('returns an empty array when there are no rows', () => {
     const data = buildData(['name', 'amount'], []);
     expect(detectReviewFields(data)).toEqual([]);
   });
 
-  //No confidence values
   it('returns an empty array when no cells have confidence values', () => {
     const data = buildData(
       ['name', 'amount'],
@@ -29,9 +27,10 @@ describe('detectReviewFields', () => {
     expect(detectReviewFields(data)).toEqual([]);
   });
 
-  //flags outlier below stddev threshold
-  it('flags fields below the relative stddev threshold', () => {
-    // confidences: 0.95, 0.96, 0.94, 0.4 -> 0.4 is a clear outlier
+  it('flags fields below the dynamic MAD outlier threshold', () => {
+    // Confidences: 0.95, 0.96, 0.94, 0.40
+    // Median = 0.945, MAD ≈ 0.0125. Dynamic threshold ≈ 0.92, bounded by HIGH_CONFIDENCE_PASS.
+    // 0.40 falls well below the threshold.
     const data = buildData(
       ['name', 'amount'],
       [
@@ -55,9 +54,10 @@ describe('detectReviewFields', () => {
     expect(result[0]).toEqual({ rowId: '2', column: 'amount', value: '20', confidence: 0.4 });
   });
 
-  // falls back to 85% confidence if under 85%
-  it('uses the document quality floor when the mean confidence is low', () => {
-    // all confidences below 0.85, so threshold pins at 0.85 instead of mean - 1.5*stddev
+  it('enforces the critical safety floor (0.60) on low-quality documents', () => {
+    // Confidences: 0.50, 0.55, 0.60, 0.70
+    // Median = 0.575. Dynamic threshold is ~0.45, but CRITICAL_FLOOR forces cutoff to 0.60.
+    // Cells with confidence < 0.60 (0.50 and 0.55) are flagged.
     const data = buildData(
       ['name', 'amount'],
       [
@@ -77,8 +77,32 @@ describe('detectReviewFields', () => {
     );
 
     const result = detectReviewFields(data);
-    // every value sits below the 0.85 floor, so every field should be flagged
-    expect(result).toHaveLength(4);
+    expect(result).toHaveLength(2);
+    expect(result.map((r) => r.confidence)).toEqual([0.5, 0.55]);
+  });
+
+  it('never flags cells with confidence above HIGH_CONFIDENCE_PASS (0.95)', () => {
+    // Pristine document: 0.999, 0.999, 0.999, 0.960
+    // Even though 0.960 is a statistical relative outlier, it exceeds 0.95 so it shouldn't be flagged.
+    const data = buildData(
+      ['name', 'amount'],
+      [
+        buildRow({
+          _id: '1',
+          name: 'Alice',
+          amount: '10',
+          _cellConfidence: { name: 0.999, amount: 0.999 },
+        }),
+        buildRow({
+          _id: '2',
+          name: 'Bob',
+          amount: '20',
+          _cellConfidence: { name: 0.999, amount: 0.96 },
+        }),
+      ]
+    );
+
+    expect(detectReviewFields(data)).toEqual([]);
   });
 
   it('skips cells with undefined confidence', () => {
@@ -89,7 +113,7 @@ describe('detectReviewFields', () => {
           _id: '1',
           name: 'Alice',
           amount: '10',
-          _cellConfidence: { name: 0.95 }, // amount has no confidence entry
+          _cellConfidence: { name: 0.95 },
         }),
       ]
     );
@@ -105,14 +129,13 @@ describe('detectReviewFields', () => {
         buildRow({
           _id: '1',
           name: 'Alice',
-          amount: 10, // number, not string
+          amount: 10, // Non-string
           _cellConfidence: { name: 0.95, amount: 0.1 },
         }),
       ]
     );
 
     const result = detectReviewFields(data);
-    // amount confidence is low but the value isn't a string, so it must be skipped
     expect(result.find((f) => f.column === 'amount')).toBeUndefined();
   });
 
@@ -140,7 +163,7 @@ describe('detectReviewFields', () => {
     expect(confidences).toEqual([...confidences].sort((a, b) => a - b));
   });
 
-  it('handles a single uniform confidence value without flagging anything (stddev = 0)', () => {
+  it('handles uniform confidence without false positives when MAD = 0', () => {
     const data = buildData(
       ['name', 'amount'],
       [
@@ -153,7 +176,6 @@ describe('detectReviewFields', () => {
       ]
     );
 
-    // mean = 0.95 (>= floor), stddev = 0, threshold = mean; nothing is strictly below it
     expect(detectReviewFields(data)).toEqual([]);
   });
 
@@ -166,4 +188,4 @@ describe('detectReviewFields', () => {
     const result = detectReviewFields(data);
     expect(result[0].rowId).toBe(42);
   });
-}); 
+});
