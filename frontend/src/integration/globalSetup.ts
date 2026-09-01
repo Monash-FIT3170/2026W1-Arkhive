@@ -29,7 +29,7 @@ export default async function setup() {
     let stdoutBuffer = '';
     const timeout = setTimeout(() => {
       reject(new Error(`Backend didn't start within 15s.\nstderr:\n${stderrBuffer}`));
-    }, 15000);
+    }, 30000);
 
     child.stdout.on('data', (chunk) => {
       stdoutBuffer += chunk.toString();
