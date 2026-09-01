@@ -1,0 +1,50 @@
+{
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch app.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+    
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.5",
+    "@types/supertest": "^7.2.1",
+    "eslint": "^10.9.1",
+    "globals": "^17.11.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@azure-rest/ai-document-intelligence": "^1.1.0",
+    "@google-cloud/vision": "^5.3.5",
+    "@google/generative-ai": "^0.24.1",
+    "@types/express-session": "^1.19.0",
+    "@types/multer": "^2.1.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "fs": "^0.0.1-security",
+    "multer": "^2.1.1",
+    "pdf-to-img": "^5.0.0",
+    "pdf2img": "^0.5.0"
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.8"
+  },
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

@@ -1,0 +1,155 @@
+[33mfe33b56[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mteam3[m[33m, [m[1;31morigin/team3[m[33m, [m[1;31morigin/t3-intent-fe[m[33m, [m[1;32mt3-intent-fe[m[33m)[m pulling from team3
+[33mbb3430b[m pulled from dev
+[33m46148d1[m Big Fix: Validation page unknown variables fixed
+[33m5f3f3ed[m feat: [86d2mq704] Added loading to AI chat
+[33m2987f2a[m Merge pull request #12 from Monash-FIT3170/team3-column-intent-backend
+[33mcd7f979[m feat: [86d2mq6k4] Added ability to delete columns - New column_delete enum - New deletedColumns property in schema to handle column objects to delete
+[33m0b5a3ea[m feat: [86d2mq6k4] updated schema to handle column changes - Has new column confirm and correction enums - approve property to show if user confirmed columns are correct or not - update property to outline a column name changed - Updated AI model instruction to include new intents
+[33me0501de[m feat: [86d2mq6k4] updated intent interface. - Now has column confirm and correct types - Also has approved and updates properties to handle column changes
+[33ma13fd32[m feat: [86d2wj0m7] updated styling of extracted data table. - Added table icon - Rounded borders - Changed table headers to be uppercase - Updated table hover colour - Updated rows to be zebra colours - Removed unnecessary spacing
+[33m0bc9e4c[m fix: updated standard typography fonts to be used (from design system)
+[33m35a60c9[m[33m ([m[1;31morigin/dev[m[33m)[m Merge pull request #10 from Monash-FIT3170/team1
+[33m98072a0[m added support for the ocr to add the column data for each cell
+[33mca31e21[m feat: [86d2vkfzw] improved flattening code to take into account column header and reduced code duplication
+[33m4a39ccc[m fix: Merge branch 'team3' of https://github.com/Monash-FIT3170/2026W1-Arkhive into team3 and also moved data models out of the component folders.
+[33m3cf3cb3[m feature: [86d2vkfzw] improved flattening to make it more dynamic.
+[33m49774b0[m[33m ([m[1;31morigin/team3-boundingbox-overlay[m[33m, [m[1;32mteam3-boundingbox-overlay[m[33m)[m test
+[33m9076d08[m Merge branch 'main' of https://github.com/Monash-FIT3170/2026W1-Arkhive into team3-boundingbox-overlay
+[33mfd37517[m pulled from team3
+[33m4c14684[m[33m ([m[1;31morigin/team1[m[33m)[m fixed some issues with the branch
+[33ma7bc760[m Merge pull request #9 from Monash-FIT3170/team2-upload-logic
+[33mfbb1b81[m[33m ([m[1;31morigin/team2-upload-logic[m[33m)[m Merge branch 'team1' into team2-upload-logic
+[33m89e9396[m feat(update): improved image preview layout and upload logic
+[33md2fc211[m feat(preview): Implement convert uploads from PDF to PNG for preview
+[33m1701258[m feat(preview): Implement selection and deselection of documents in Preview Page
+[33m134d52e[m feat(preview): Implement Preview Page with file upload functionality and allow image preview - Implemented file preview after uploading from upload page - Implemented file handling logic, including upload input and document processing buttons (Non-Functional so far).
+[33m0f8aa63[m[33m ([m[1;31morigin/synching_again_team1_2_mub[m[33m)[m pushed package.json to keep dependencies
+[33m888a17f[m[33m ([m[1;31morigin/team1-session-extraction-storage[m[33m)[m feat(frontend): 86d2n3295 integrate session-based extraction storage
+[33m636d5b9[m feat(backend): 86d2n3295 add session-based extraction API endpoints
+[33m7e1347b[m feat(backend): 86d2n3295 configure express-session and augment session types
+[33mab691c0[m[33m ([m[1;31morigin/Synchiing_team_1_2[m[33m)[m fix: Add missing genarative-ai and dotenv dependencies to package files
+[33m3d8ecf5[m feat: [US-2.4, subatsk-2,3] replace hardcoded confidence score with real calculated average in DocumentPanel
+[33m10e3f57[m feat: [US-2.4, subtask-3] displaying confidence score badges per row with colour-coded tiers in ExtractedDataPanel
+[33m05214c1[m feat: [US-2.4, subtask-2] add confidence score field to ExtractedRow interface and pass OCR confidence through flattenOcrData
+[33m2bfa23c[m feat(preview): Added Preview Screen File Template
+[33mea0d37d[m Bounding box highlighting, first draft
+[33m5af9469[m fixed issue so that  it doesnt just route to preview
+[33mf34f932[m merged with team 3 synching with them
+[33m57e7229[m Merge remote-tracking branch 'origin/team3' into Synchiing_team_1_2
+[33m6cfcc7e[m Merge branch 'team2-upload-logic' into Synchiing_team_1_2
+[33m6fbf6ed[m implemented function to deconstruct a table into its parts with layers support. Updated utils with the function for deconstructing a table using OCR
+[33m41f7a19[m Merge branch 'team-3-intention-extraction' into team3
+[33m6e4b6e9[m[33m ([m[1;31morigin/team-3-intention-extraction[m[33m)[m feat: [86d2mquuy] added document context for the llm intention extraction.
+[33m738bda7[m fix: map data columns by position instead of name matching
+[33m416c8c3[m fix: Organised models into the model folder, and put correct types for ocrcomponent
+[33m294f34a[m Merge pull request #8 from Monash-FIT3170/team3-boundingbox-overlay
+[33mb5e9079[m feat: [86d2mwy9h] added frontend overlay on image using bounding boxes
+[33m339851b[m Merge pull request #7 from Monash-FIT3170/team3-side-by-side-view
+[33m1caf161[m fix: updated flattenOcrData to use new json file
+[33m5738c61[m fix: deletion of aiService
+[33m241c2c3[m Merge branch 'team3-side-by-side-view' of https://github.com/Monash-FIT3170/2026W1-Arkhive into team3-side-by-side-view
+[33m963c2d8[m fix: used updated json file to display flattened data onto table
+[33m0801280[m test(upload): mixed file validation (valid + non valid file) test for dropzone
+[33m3190818[m test(upload): edge case test for unsupported file type in dropzone
+[33mb0ce6cb[m feat(upload): Added navigation to preview flow to process button
+[33mb8db9a8[m feat(upload): implement drag and drop interaction with Upload button
+[33m024caac[m Merge branch 'team1' of https://github.com/Monash-FIT3170/2026W1-Arkhive into team1
+[33m1fb6451[m added multer middleware for support for file uploads. The routes are not implemented
+[33m9aeba9d[m added multer middleware for support for file uploads
+[33mf00a2f4[m Merge branch 'team1' of https://github.com/Monash-FIT3170/2026W1-Arkhive into team1
+[33mc969a0b[m Merge branch 'team1' of https://github.com/Monash-FIT3170/2026W1-Arkhive into team1 added some fixes to the ocr and app.ts backend
+[33m13534e6[m Merge branch 'team1' of https://github.com/Monash-FIT3170/2026W1-Arkhive into team1
+[33mc9b0365[m updated gitignore
+[33m6fc44ea[m added util function to parse a table, it currently doesnt support parsing pdfs and specific indented layers
+[33m7cc44fc[m feat: [86d2mquuy] updated schema for intent so it captures the row and the column and schema for flatten data
+[33mb8c551b[m feat: [86d2mquuy] added intention extraction, but still needs document context
+[33m7f2b6c9[m feat: [86d2mquuy] Set up frontend talking to the backend
+[33m4d9bf33[m fix: set up file structure of backend and moved api call to backend
+[33m8e724bd[m fix: converted ui theme from night to nord
+[33mad62b87[m added a session handler from express-session, moved jasper's api call to the api files
+[33m99725d2[m merged chatAPI with Team3
+[33mcd74c34[m merged chatAPI with Team3
+[33mac99361[m[33m ([m[1;31morigin/team3-chatAPI[m[33m, [m[1;32mteam3-chatAPI[m[33m, [m[1;32mremote[m[33m)[m visual change: Chat send button now vertically centred; textarea transition working
+[33m5c59fde[m Added hardcoded greeting message + timestamps for text bubbles
+[33m758f64d[m removed hardcoded Messages
+[33m91db4a8[m Altered MessageItem to render bot messages automaticalyy
+[33m9d1d0b0[m fix: making chat a pop-up modal not collapse window
+[33mc0385a4[m setting up aiServices backend
+[33mdf5281b[m installed dotenv
+[33m92dad6d[m added the backend skeleton code
+[33m6230308[m added skeleton for basic api routes
+[33m83eaeb1[m renamed some functions and attempted to implement pdf to png conversion using pdf2pic but did not find success. need to follow up on that and ultimatly ended up with little to no changes.
+[33mcca5246[m test(upload): add unit tests for calculateNewFilesStore logic
+[33mc71c7c6[m feat(upload): implement UploadPage orchestrator and file state management
+[33mcc994ce[m refactor(test): simplify ProcessButton tests and enhance clarity
+[33m2fee306[m test(upload): add unit tests for ProcessButton logic and utility classes
+[33mddbab83[m feat(upload): add ProcessButton component for file workflow
+[33m447fe2f[m test(upload): add Vitest logic suite and configure test script
+[33m6f74e50[m feat(upload): implement upload file validation and DropZone shell
+[33m512370b[m[33m ([m[1;31morigin/team3-side-by-side-view[m[33m, [m[1;32mteam3-side-by-side-view[m[33m)[m fix: modified data panel to display hierarchical json structure
+[33mb152771[m Merge branch 'team1' of https://github.com/Monash-FIT3170/2026W1-Arkhive into team1
+[33m4b22baa[m Polished a bit to make the functionality more universal except for just one sample image. There are testing code there and a ocr test endpoint to see if it worked. The text extraction works, but need to discuss whether ive missed anything or any improvements i could make. So far its a basic raw text extraction function.
+[33m31e8733[m layout fix: fixed issue with document panel; outer children stack vertically, removed intermediate div, removed mt-auto
+[33m41e96a5[m refactored the boundingbox code so that it detects bounding boxes via google vision api instead of using gemini 3 flash, improving speed.
+[33m4a75baa[m fix: modified data panel to use new json and added outer padding
+[33m50b2b18[m Merge pull request #6 from Monash-FIT3170/OCR-text-extraction
+[33me2337d5[m layout fix: Document pannel mobile view image no longer obscured, mmay need to consolidate for responsiveness
+[33m47c7017[m feat: [86d2mwzyr]: On mobile collapsed chat is horizontal (and stacked), desktop it is vertical (and aligned).
+[33m878b12c[m feat: [86d2mwzyr] Added custom styling for each panel. On desktop (lg) it is horizontal, on mobile (default), it stacks
+[33m2bdbf19[m[33m ([m[1;31morigin/OCR-text-extraction[m[33m)[m implemented an ocr text extraction on the first page of the sample file. need to make it more dynamic next step. reused my credentials from the tutorial tech spike.
+[33m0001139[m refactored bounding boxes to give more reliable output based on a schema
+[33mb0d8199[m refactored bounding boxes to use schema and send a more reliable json output
+[33m9363d99[m Implemented the bounding box logic for ocr service. REQUESTING REVIEW.
+[33maa106d8[m fix: added confidence scoring and adjusted image formatting
+[33m478f4f3[m feat: [86d2bz0fn] Added extracted data in document panel
+[33mff7a225[m feat: [86d2bz0fn] Added image display component
+[33mefadcf2[m[33m ([m[1;31morigin/team3-ai-chat-interface[m[33m)[m feat: [86d2qagbp] Added chat message rendering. Upon user writing message and pressing enter/send, it add message to message state and scrolls to bottom.
+[33mffd2f98[m feat: [86d2qagbp] Added chat message item, which turns chat message to jxs equivalent for chat rendering.
+[33m9efa913[m Merge branch 'team3-ai-chat-interface' into team3
+[33m127b8b9[m Merge pull request #5 from Monash-FIT3170/team3-chatUI
+[33mff17e2b[m fix: change bg of document and extracted data panel to match AI assistant panel
+[33mf2cd907[m feat: [86d2mqutw] Added in the styling of the chat when the window is expanded
+[33m5692c44[m feat: [86d2mqutw] added styling of chat window when it is collapsed
+[33m68510d4[m feat: [86d2mqutw] added Lucide react component for icons
+[33m1b9cf3f[m added the very basic backend structure for this project, so far only focusing on the ocr files and very basic server/client structure (a lot of other files are missing). If any changes are suggested, confirm it asap
+[33me3d070c[m Merge pull request #3 from Monash-FIT3170/main
+[33mf8b738d[m feat: [86d2qagbp] Added validation page's chat state and ability to add message to state.
+[33m796f62b[m feat: [86d2qagbp] Made basic types that model the objects for chat messaages, api request and response, and extracted table data.
+[33m39593c7[m fix: added daisyUI plugin which works with tailwindcss
+[33ma6d1c9e[m Merge pull request #4 from Monash-FIT3170/team3-side-by-side-view
+[33m498daeb[m feat: [86d2mwzx5] Added borders to the layouts
+[33m0e8523d[m feat: [86d2mwzx5] added basic layout for the 3 panels (document, data, chat) and collapasble chat component.
+[33mf7925be[m feat: [86d2mwzx5] added file structure for 3 panel and validation page
+[33m65e745e[m[33m ([m[1;31morigin/team2[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #1 from Monash-FIT3170/team3
+[33md4d07cc[m[33m ([m[1;32mmain[m[33m, [m[1;32mdev[m[33m)[m Initialising file structure
+[33mf50b25f[m Merge branch 'main' of https://github.com/Monash-FIT3170/2026W1-Arkhive
+[33m1827989[m[33m ([m[1;32mteam2[m[33m, [m[1;32mteam1[m[33m)[m minor format and spelling change to readme
+[33md7a6b7c[m minor format and spelling change to readme
+[33md8676b5[m update readme with standard details and formatting
+[33mc049b6f[m Update README.md
+[33m499dfb1[m Added name and email to README.md
+[33me3cd28d[m Added name and email
+[33m84adb8d[m Update README.md
+[33mbac60bb[m Added name and email - Ray
+[33mb516e21[m Merge branch 'main' of https://github.com/Monash-FIT3170/2026W1-Arkhive
+[33m23af6e5[m update: Add Lii's name and email to README
+[33mb37e529[m Adding Jasper info to the repo
+[33mf9b3d16[m README formating
+[33me9a099c[m README formating
+[33m6a0667a[m Merge branch 'main' of https://github.com/Monash-FIT3170/2026W1-Arkhive
+[33m9c567c3[m Aryan README
+[33med3a4b8[m Merge branch 'main' of https://github.com/Monash-FIT3170/2026W1-Arkhive
+[33m9c06dbd[m Added git email into the readme.
+[33m88ca098[m Merge branch 'main' of https://github.com/Monash-FIT3170/2026W1-Arkhive
+[33m13301ce[m Aryan Cyrus added to README
+[33m5e092a5[m Update README.md
+[33m8573931[m Add Simon Katsiamakis to the contributors list
+[33m1e11ad5[m Aryan Cyrus added to README
+[33m79d5997[m Update README.md
+[33m8df06ab[m Update README.md
+[33m49c7e33[m Update README.md
+[33m2132e9f[m Aryan Cyrus added to README
+[33m98d841f[m Add Muhammad Mubashir Shah to README contributors
+[33mc9f32b3[m Update README.md
+[33mda785d1[m Add Mubashar's name and email
+[33mc8c0efd[m Initial commit
