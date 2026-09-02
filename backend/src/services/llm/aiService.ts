@@ -446,7 +446,7 @@ export default {
         - 'A' = Uppercase letter
         - 'a' = Lowercase letter
         - 'X' = Any letter or digit
-        - Punctuation, dashes, spaces stay as literal characters.
+        - Punctuation, dashes, spaces and currency symbols (e.g. $, €, £, ¥) stay as literal characters.
 
         Ignore occasional OCR noise/errors and find the dominant underlying format.
         Set isVariableLength to true if the column represents arbitrary numbers or free text.
