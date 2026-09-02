@@ -3,7 +3,7 @@ import type { Message, ReviewField } from '../../models/message';
 import dotenv from 'dotenv';
 import { ExtractedData } from '../../models/TableData';
 import { buildFocusedContext } from './utils/contextMaker';
-import { maskToRegex, profileColumnLocally } from './utils/formatUtils';
+import { maskToRegex, profileColumnLocally, validateMaskRegex } from './utils/formatUtils';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -446,6 +446,12 @@ export default {
         - 'A' = Uppercase letter
         - 'a' = Lowercase letter
         - 'X' = Any letter or digit
+
+        Do not use any other letters as placeholders, and never pad the mask with
+        repeated characters like 'xxxxxx' to indicate "more of the same" — use the
+        correct placeholder character repeated the appropriate number of times instead,
+        or set isVariableLength to true if the length varies.
+
         - Punctuation, dashes, spaces and currency symbols (e.g. $, €, £, ¥) stay as literal characters.
 
         Ignore occasional OCR noise/errors and find the dominant underlying format.
@@ -472,7 +478,11 @@ export default {
         parsed.formats.forEach((f: any) => {
           if (f.column && f.structuralMask) {
             // Convert Gemini mask to safe JS regex locally
-            finalRegexMap[f.column] = maskToRegex(f.structuralMask, Boolean(f.isVariableLength));
+            const candidateRegex = maskToRegex(f.structuralMask, Boolean(f.isVariableLength));
+            const samplesForColumn = unresolvedSamples[f.column] ?? [];
+            finalRegexMap[f.column] = validateMaskRegex(candidateRegex, samplesForColumn)
+              ? candidateRegex
+              : '.*';
           }
         });
       }

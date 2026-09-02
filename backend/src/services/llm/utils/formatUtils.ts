@@ -118,3 +118,21 @@ function detectRepeatingGroup(
     isNumericGrouping: tokenChar === '9' && sepChar === ',',
   };
 }
+
+/**
+ * Sanity-checks a mask-derived regex against the samples it was supposedly
+ * derived from. If Gemini's mask doesn't conform to its own source data
+ * (e.g. due to a malformed or non-schema-conforming mask), we can't trust
+ * the regex to be meaningful, so callers should fall back to a permissive
+ * pattern rather than incorrectly flagging every value in the column.
+ */
+export function validateMaskRegex(regexStr: string, samples: string[]): boolean {
+  if (samples.length === 0) return true;
+  try {
+    const regex = new RegExp(regexStr);
+    const matchCount = samples.filter((s) => regex.test(s.trim())).length;
+    return matchCount / samples.length >= 0.15;
+  } catch {
+    return false; // malformed regex string — definitely don't trust it
+  }
+}

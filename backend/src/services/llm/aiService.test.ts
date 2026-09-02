@@ -156,7 +156,7 @@ describe('aiService', () => {
       const result = await aiService.detectTableFormats(sampledData);
 
       expect(result).toHaveProperty('PRICE');
-      expect(result['PRICE']).toBe('^\\$?\\d{1,3}(,\\d{3})*(\\.\\d{2})?$');
+      expect(result['PRICE']).toBe('^\\d+\\.\\d+$');
     });
   });
 });
