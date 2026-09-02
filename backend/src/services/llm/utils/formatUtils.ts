@@ -41,19 +41,58 @@ const MASK_TOKEN_PATTERNS: Record<string, string> = {
 export function maskToRegex(mask: string, isVariableLength: boolean): string {
   if (!mask || mask.trim() === '') return '.*';
 
-  // Try to detect a repeating "[token-run][literal separator]" structure
   if (isVariableLength) {
-    const repeating = detectRepeatingGroup(mask);
-    if (repeating) {
-      const { tokenChar, sep, isNumericGrouping } = repeating;
-      const pattern = MASK_TOKEN_PATTERNS[tokenChar];
-      const escSep = sep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return isNumericGrouping
-        ? `^${pattern}{1,3}(${escSep}${pattern}{3})*$`
-        : `^${pattern}+(${escSep}${pattern}+)*$`;
-    }
+    const group = detectRepeatingGroup(mask);
+    if (group) return buildRepeatingGroupRegex(group);
   }
 
+  const body = walkMask(mask, isVariableLength);
+  return isVariableLength ? allowOptionalSign(mask, body) : body;
+}
+
+/**
+ * Detects a mask that is a run of the same mask-token type, repeated and
+ * joined by a single literal separator character (e.g. '9,999,999',
+ * 'AAA-AAA-AAA'). Returns null if the mask isn't shaped that way.
+ */
+function detectRepeatingGroup(mask: string): RepeatingGroup | null {
+  let separator: string | null = null;
+  const segments: string[] = [];
+  let current = '';
+
+  for (const char of mask) {
+    if (MASK_TOKEN_PATTERNS[char]) {
+      current += char;
+      continue;
+    }
+    if (char === '.') return null;
+    if (separator === null) separator = char;
+    if (char !== separator) return null;
+    segments.push(current);
+    current = '';
+  }
+  segments.push(current);
+
+  if (!separator || segments.length < 2 || segments.some((s) => s.length === 0)) return null;
+
+  const tokenChar = segments[0][0];
+  const sameTokenThroughout = segments.every((s) => [...s].every((c) => c === tokenChar));
+  return sameTokenThroughout ? { tokenChar, separator } : null;
+}
+
+/** Builds a regex for a repeating group, letting the number of groups vary. */
+function buildRepeatingGroupRegex({ tokenChar, separator }: RepeatingGroup): string {
+  const pattern = MASK_TOKEN_PATTERNS[tokenChar];
+  const escSeparator = separator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const isThousandsSeparator = tokenChar === '9' && separator === ',';
+
+  return isThousandsSeparator
+    ? `^-?${pattern}{1,3}(${escSeparator}${pattern}{3})*$`
+    : `^${pattern}+(${escSeparator}${pattern}+)*$`;
+}
+
+/** Walks the mask character-by-character, expanding token runs into regex classes. */
+function walkMask(mask: string, isVariableLength: boolean): string {
   let regexStr = '^';
   let i = 0;
 
@@ -74,49 +113,19 @@ export function maskToRegex(mask: string, isVariableLength: boolean): string {
     }
   }
 
-  regexStr += '$';
-  return regexStr;
+  return regexStr + '$';
 }
 
-/**
- * Detects a mask that is a run of the same mask-token type, repeated and
- * joined by a single literal separator character (e.g. '9,999,999',
- * 'AAA-AAA-AAA'). Returns null if the mask isn't shaped that way.
- */
-function detectRepeatingGroup(
-  mask: string
-): { tokenChar: string; sep: string; isNumericGrouping: boolean } | null {
-  // Split on the first non-token character we find, then verify every
-  // other segment uses that same separator and every segment is made of
-  // the same token character.
-  let sepChar: string | null = null;
-  const segments: string[] = [];
-  let current = '';
+interface RepeatingGroup {
+  tokenChar: string;
+  separator: string;
+}
 
-  for (const char of mask) {
-    if (MASK_TOKEN_PATTERNS[char]) {
-      current += char;
-    } else {
-      if (sepChar === null) sepChar = char;
-      if (char !== sepChar) return null; // mixed separators, bail
-      segments.push(current);
-      current = '';
-    }
-  }
-  segments.push(current);
-
-  if (!sepChar || segments.length < 2) return null;
-  if (segments.some((s) => s.length === 0)) return null;
-
-  const tokenChar = segments[0][0];
-  const allSameToken = segments.every((s) => [...s].every((c) => c === tokenChar));
-  if (!allSameToken) return null;
-
-  return {
-    tokenChar,
-    sep: sepChar,
-    isNumericGrouping: tokenChar === '9' && sepChar === ',',
-  };
+/** Adds an optional leading '-' to purely numeric patterns that don't already have one. */
+function allowOptionalSign(mask: string, regexStr: string): string {
+  const isPurelyNumeric = /^[9,.\s-]+$/.test(mask) && mask.includes('9');
+  if (!isPurelyNumeric || regexStr.startsWith('^-')) return regexStr;
+  return regexStr.replace(/^\^/, '^-?');
 }
 
 /**
@@ -126,7 +135,11 @@ function detectRepeatingGroup(
  * the regex to be meaningful, so callers should fall back to a permissive
  * pattern rather than incorrectly flagging every value in the column.
  */
-export function validateMaskRegex(regexStr: string, samples: string[]): boolean {
+export function validateMaskRegex(mask: string, regexStr: string, samples: string[]): boolean {
+  const allowedTokens = new Set(['A', 'a', 'X']);
+  const hasInvalidLetter = [...mask].some((ch) => /[a-zA-Z]/.test(ch) && !allowedTokens.has(ch));
+  if (hasInvalidLetter) return false;
+
   if (samples.length === 0) return true;
   try {
     const regex = new RegExp(regexStr);
