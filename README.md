@@ -163,9 +163,3 @@ This project is licensed under the [MIT License](https://opensource.org/license/
 ## 🙌 Acknowledgements
 
 _This README was developed with assistance from Google Gemini._
-
----
-
-## 🙌 Acknowledgements
-
-_This README was developed with assistance from Google Gemini._
