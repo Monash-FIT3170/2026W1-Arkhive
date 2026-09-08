@@ -116,7 +116,6 @@ export default function UploadPage() {
               isImage: true,
               hasFile: true,
               fileIndex: fileIdx,
-              documentType: doc.type || 'Other',
               backendPageIndex,
               documentId: doc.documentId,
               isProcessed: processedSet.has(pageUrl),
@@ -839,7 +838,6 @@ export default function UploadPage() {
                         isDark={item.isDark}
                         shouldWarn={item.shouldWarn}
                         isProcessed={item.isProcessed}
-                        documentType={item.documentType}
                         onToggle={togglePageSelection}
                         onRemove={handleRemovePreview}
                         onReplaceWithFile={handleReplaceWithFile}
