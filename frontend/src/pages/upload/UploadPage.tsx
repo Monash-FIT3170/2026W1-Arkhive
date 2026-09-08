@@ -30,7 +30,6 @@ import {
   getUploadedDocuments,
   getProcessedImageUrls,
 } from '../../services/uploadService';
-import ClassificationModal from './components/ClassificationModal';
 
 export default function UploadPage() {
   const navigate = useNavigate();
@@ -65,11 +64,6 @@ export default function UploadPage() {
     { previewIndex: number; newFile: File; itemTitle: string }[] | null
   >(null);
 
-  // tracks indices of previewItems that need their type assigned
-  const [pendingClassificationIndices, setPendingClassificationIndices] = useState<number[] | null>(
-    null
-  );
-
   // Refs
   const previewItemsRef = useRef<PreviewItem[]>([]);
   const createdUrlsRef = useRef<string[]>([]);
@@ -79,7 +73,7 @@ export default function UploadPage() {
   // at 0, so pages added/replaced later don't collide with existing file groups.
   const nextFileIndexRef = useRef(0);
   const nextPageIndexRef = useRef(0);
-   const [sessionIdSuffix] = useState(() => `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
+  const [sessionIdSuffix] = useState(() => `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
   useEffect(() => {
     previewItemsRef.current = previewItems;
   }, [previewItems]);
@@ -159,7 +153,7 @@ export default function UploadPage() {
         const enhancedItems = newItems.map((item) => {
           const backendPageIndex = nextPageIndexRef.current++;
           const documentId = `File_${item.fileIndex}_${sessionIdSuffix}`;
-          return { ...item, backendPageIndex, documentId };
+          return { ...item, backendPageIndex, documentId, documentType: 'Other' };
         });
 
         // Trigger the uploads OUTSIDE the state setter sequentially to prevent session race conditions!
@@ -188,10 +182,6 @@ export default function UploadPage() {
             unlockStep(1); //unlock step 1 (preview) after successful file capture
           }
 
-          // queue classification for the newly added items
-          const newIndices = enhancedItems.map((_, i) => startIndex + i);
-          setPendingClassificationIndices(newIndices);
-
           setSelectedPages((prevSel) => {
             const nextSel = new Set(prevSel);
             enhancedItems.forEach((item, i) => {
@@ -209,17 +199,17 @@ export default function UploadPage() {
   }
 
   // ── Page selection ─────────────────────────────────────────────────────────
-function togglePageSelection(index: number) {
-  setSelectedPages((prev) => {
-    const next = new Set(prev);
-    if (next.has(index)) {
-      next.delete(index);
-    } else {
-      next.add(index);
-    }
-    return next;
-  });
-}
+  function togglePageSelection(index: number) {
+    setSelectedPages((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  }
 
   function selectAllPages() {
     setSelectedPages(
@@ -347,7 +337,7 @@ function togglePageSelection(index: number) {
         const enhancedItems = newItems.map((item) => {
           const backendPageIndex = nextPageIndexRef.current++;
           const documentId = `File_${item.fileIndex}_${sessionIdSuffix}`;
-          return { ...item, backendPageIndex, documentId };
+          return { ...item, backendPageIndex, documentId, documentType: 'Other' };
         });
 
         // Trigger the uploads OUTSIDE the state setter sequentially!
@@ -384,10 +374,6 @@ function togglePageSelection(index: number) {
           }
 
           next.splice(previewIndex, 1, ...enhancedItems);
-
-          const newIndices = enhancedItems.map((_, i) => previewIndex + i);
-          // Set pending classification immediately for this replace
-          setTimeout(() => setPendingClassificationIndices(newIndices), 0);
 
           setSelectedPages((prevSel) => {
             const nextSel = new Set<number>();
@@ -480,7 +466,7 @@ function togglePageSelection(index: number) {
           newItemsGroup.map((item) => {
             const backendPageIndex = nextPageIndexRef.current++;
             const documentId = `File_${item.fileIndex}_${sessionIdSuffix}`;
-            return { ...item, backendPageIndex, documentId };
+            return { ...item, backendPageIndex, documentId, documentType: 'Other' };
           })
         );
 
@@ -524,10 +510,8 @@ function togglePageSelection(index: number) {
             const enhancedItems = enhancedAllItems[pairs.length - 1 - i];
 
             next.splice(pair.previewIndex, 1, ...enhancedItems);
-            enhancedItems.forEach((_, idx) => newIndices.push(pair.previewIndex + idx));
           });
 
-          setTimeout(() => setPendingClassificationIndices(newIndices.sort((a, b) => a - b)), 0);
           return next;
         });
         setSelectedPages(new Set());
@@ -537,44 +521,7 @@ function togglePageSelection(index: number) {
       });
   }
 
-  // ── Change Type ────────────────────────────────────────────────────────────
-  function requestBulkChangeType() {
-    if (selectedPages.size === 0) return;
-    setPendingClassificationIndices([...selectedPages].sort((a, b) => a - b));
-  }
 
-  function handleChangeType(index: number) {
-    setPendingClassificationIndices([index]);
-  }
-
-  function handleClassificationComplete(updates: { index: number; documentType: string }[]) {
-    setPreviewItems((prev) => {
-      const next = [...prev];
-      updates.forEach(({ index, documentType }) => {
-        if (next[index]) {
-          next[index] = { ...next[index], documentType };
-        }
-      });
-      return next;
-    });
-    setPendingClassificationIndices(null);
-  }
-
-  function handleClassificationCancel() {
-    if (!pendingClassificationIndices) return;
-
-    setPreviewItems((prev) => {
-      const next = [...prev];
-      pendingClassificationIndices.forEach((index) => {
-        // If a document doesn't have a type yet, default to 'Other'
-        if (next[index] && !next[index].documentType) {
-          next[index] = { ...next[index], documentType: 'Other' };
-        }
-      });
-      return next;
-    });
-    setPendingClassificationIndices(null);
-  }
 
   // ── Process: send selected pages to OCR backend in batch, then navigate ────
   async function handleProcess() {
@@ -739,16 +686,6 @@ function togglePageSelection(index: number) {
     return (
       <>
         {renderNotification()}
-        {pendingClassificationIndices && pendingClassificationIndices.length > 0 && (
-          <ClassificationModal
-            items={pendingClassificationIndices.map((index) => ({
-              index,
-              item: previewItems[index],
-            }))}
-            onComplete={handleClassificationComplete}
-            onCancel={handleClassificationCancel}
-          />
-        )}
         <EmptyUploadView onFilesCaptured={captureFiles} onError={setUploadError} />
       </>
     );
@@ -869,18 +806,6 @@ function togglePageSelection(index: number) {
         </div>
       )}
 
-      {/* Classification Modal */}
-      {pendingClassificationIndices && pendingClassificationIndices.length > 0 && (
-        <ClassificationModal
-          items={pendingClassificationIndices.map((index) => ({
-            index,
-            item: previewItems[index],
-          }))}
-          onComplete={handleClassificationComplete}
-          onCancel={handleClassificationCancel}
-        />
-      )}
-
       <div className="flex min-h-0 flex-1">
         {/* Preview grid — UPDATED: now grouped into per-file sections instead
             of one flat grid. Each section is its own labeled box (e.g. "File 1")
@@ -922,7 +847,6 @@ function togglePageSelection(index: number) {
                         onToggle={togglePageSelection}
                         onRemove={handleRemovePreview}
                         onReplaceWithFile={handleReplaceWithFile}
-                        onChangeType={handleChangeType}
                       />
                     </div>
                   ))}
@@ -944,7 +868,6 @@ function togglePageSelection(index: number) {
           onError={setUploadError}
           onBulkRemove={requestBulkRemove}
           onBulkReplaceFiles={handleBulkReplaceFiles}
-          onBulkChangeType={requestBulkChangeType}
         />
       </div>
     </div>
