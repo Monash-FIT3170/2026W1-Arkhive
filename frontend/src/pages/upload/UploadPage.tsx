@@ -90,8 +90,9 @@ export default function UploadPage() {
 
   // Clean up object URLs when leaving the page
   useEffect(() => {
+    const urlsToRevoke = createdUrlsRef.current;
     return () => {
-      createdUrlsRef.current.forEach(URL.revokeObjectURL);
+      urlsToRevoke.forEach(URL.revokeObjectURL);
     };
   }, []);
 
@@ -489,7 +490,6 @@ export default function UploadPage() {
 
         setPreviewItems((prev) => {
           const next = [...prev];
-          const newIndices: number[] = [];
 
           [...pairs].reverse().forEach((pair, i) => {
             const itemToRemove = next[pair.previewIndex];
