@@ -3,7 +3,12 @@ import projectsController from './projects';
 import { supabase } from '../services/supabaseClient';
 import * as r2Client from '../services/r2Client';
 
-function createMockReqRes(userId: string | null = 'test-user-123', body = {}, params = {}, query = {}) {
+function createMockReqRes(
+  userId: string | null = 'test-user-123',
+  body = {},
+  params = {},
+  query = {}
+) {
   const req: any = {
     userId: userId ?? undefined,
     body,
@@ -107,7 +112,6 @@ describe('Projects Controller', () => {
       const mockProject = { id: 'proj-1', name: 'P1', owner_id: 'test-user-123' };
       const mockDocs = [{ id: 'doc-1', filename: 'invoice.pdf', project_id: 'proj-1' }];
 
-      let callCount = 0;
       vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
         if (table === 'projects') {
           return {
@@ -132,7 +136,11 @@ describe('Projects Controller', () => {
         return {} as any;
       });
 
-      const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {}, { id: 'proj-1' });
+      const { req, res, getStatus, getJson } = createMockReqRes(
+        'test-user-123',
+        {},
+        { id: 'proj-1' }
+      );
 
       await projectsController.getProject(req, res);
 
@@ -198,7 +206,11 @@ describe('Projects Controller', () => {
         return {} as any;
       });
 
-      const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {}, { id: 'proj-1' });
+      const { req, res, getStatus, getJson } = createMockReqRes(
+        'test-user-123',
+        {},
+        { id: 'proj-1' }
+      );
 
       await projectsController.deleteProject(req, res);
 
