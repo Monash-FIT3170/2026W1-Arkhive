@@ -10,6 +10,7 @@ vi.mock('../services/supabaseClient', () => ({
   },
   isSupabaseConfigured: false,
 }));
+import { supabase } from '../services/supabaseClient';
 import * as r2Client from '../services/r2Client';
 import * as ocrService from '../services/ocr/ocr';
 
