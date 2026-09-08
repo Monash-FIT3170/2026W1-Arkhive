@@ -9,9 +9,6 @@ import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../services/supabaseClient';
 import { AuthContext } from './AuthContext';
 
-/**
- * Developed with the assistance of Google Gemini.
- */
 const GUEST_STORAGE_KEY = 'arkhive_guest_mode';
 
 interface AuthProviderProps {
@@ -19,8 +16,9 @@ interface AuthProviderProps {
 }
 
 /**
- * AuthProvider component handles authentication state for the application.
- * It provides user authentication state, guest mode functionality, and authentication actions.
+ * AuthProvider component manages global authentication state,
+ * handles Supabase login, registration (with password hashing), Google OAuth,
+ * and isolated guest session state.
  */
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
@@ -89,6 +87,66 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
   }, []);
 
+  /**
+   * Signs in an existing user with email and password.
+   * Returns human-readable error messages for UI display.
+   */
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          return { error: 'Invalid email or password. Please try again.' };
+        }
+        if (error.message.includes('Email not confirmed')) {
+          return { error: 'Please check your inbox to verify your email before logging in.' };
+        }
+        return { error: error.message };
+      }
+
+      return { error: null };
+    } catch (err: any) {
+      return { error: err?.message || 'An unexpected error occurred during login.' };
+    }
+  }, []);
+
+  /**
+   * Registers a new user with email and password.
+   * Password hashing (bcrypt) is handled automatically on Supabase's secure Auth server.
+   */
+  const signUp = useCallback(async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        if (error.message.includes('User already registered')) {
+          return { error: 'An account with this email already exists.' };
+        }
+        if (error.message.includes('Password should be at least')) {
+          return { error: 'Password must be at least 6 characters long.' };
+        }
+        return { error: error.message };
+      }
+
+      // If Supabase has email confirmations enabled, data.session will be null until verified
+      const needsEmailConfirmation = !data.session && Boolean(data.user);
+
+      return { error: null, needsEmailConfirmation };
+    } catch (err: any) {
+      return { error: err?.message || 'An unexpected error occurred during registration.' };
+    }
+  }, []);
+
+  /**
+   * Initiates Google OAuth with PKCE flow.
+   */
   const signInWithGoogle = useCallback(async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -97,12 +155,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           redirectTo: `${window.location.origin}/`,
         },
       });
-      return { error };
-    } catch (err) {
-      return { error: err as Error };
+      return { error: error?.message ?? null };
+    } catch (err: any) {
+      return { error: err?.message || 'Failed to initiate Google sign-in.' };
     }
   }, []);
 
+  /**
+   * Activates guest mode for ephemeral, unsaved sessions.
+   */
   const continueAsGuest = useCallback(() => {
     try {
       sessionStorage.setItem(GUEST_STORAGE_KEY, 'true');
@@ -112,6 +173,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setIsGuest(true);
   }, []);
 
+  /**
+   * Signs out of Supabase and clears any guest flag.
+   */
   const signOut = useCallback(async () => {
     try {
       sessionStorage.removeItem(GUEST_STORAGE_KEY);
@@ -124,9 +188,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     try {
       const { error } = await supabase.auth.signOut();
-      return { error };
-    } catch (err) {
-      return { error: err as Error };
+      return { error: error?.message ?? null };
+    } catch (err: any) {
+      return { error: err?.message || 'An unexpected error occurred during sign out.' };
+    }
+  }, []);
+
+  /**
+   * Helper to retrieve the current JWT access token for backend requests.
+   */
+  const getAccessToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      return data.session?.access_token ?? null;
+    } catch {
+      return null;
     }
   }, []);
 
@@ -137,10 +213,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       isGuest,
       isLoading,
       signInWithGoogle,
+      signInWithPassword,
+      signUp,
       continueAsGuest,
       signOut,
+      getAccessToken,
     }),
-    [user, session, isGuest, isLoading, signInWithGoogle, continueAsGuest, signOut]
+    [
+      user,
+      session,
+      isGuest,
+      isLoading,
+      signInWithGoogle,
+      signInWithPassword,
+      signUp,
+      continueAsGuest,
+      signOut,
+      getAccessToken,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
