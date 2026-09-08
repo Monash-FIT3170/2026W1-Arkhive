@@ -3,13 +3,15 @@ import type { Message, ReviewField } from '../../models/message';
 import dotenv from 'dotenv';
 import { ExtractedData } from '../../models/TableData';
 import { buildFocusedContext } from './utils/contextMaker';
+import { maskToRegex, profileColumnLocally } from './utils/formatUtils';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 // applies the users intent to the current document context and returns updated context
 function applyIntentToContext(context: ExtractedData, intent: any): ExtractedData {
-  const updated = {
+  const updated: ExtractedData = {
+    ...context,
     columns: [...context.columns],
     rows: context.rows.map((row) => ({ ...row })),
   };
@@ -57,6 +59,27 @@ function applyIntentToContext(context: ExtractedData, intent: any): ExtractedDat
       return row;
     });
   }
+
+  //apply a batch of cell updates in one go
+  if (intent.type === 'bulk_update' && intent.bulkUpdates) {
+    const rowIdToUpdates = new Map<string, any[]>();
+    intent.bulkUpdates.forEach((u: any) => {
+      const key = String(u.rowId);
+      if (!rowIdToUpdates.has(key)) {
+        rowIdToUpdates.set(key, []);
+      }
+      rowIdToUpdates.get(key)!.push(u);
+    });
+    updated.rows = updated.rows.map((row) => {
+      const rowUpdates = rowIdToUpdates.get(String(row._id));
+      if (!rowUpdates) return row;
+      const newRow = { ...row };
+      rowUpdates.forEach((u) => {
+        newRow[u.column] = u.newValue;
+      });
+      return newRow;
+    });
+  }
   return updated;
 }
 
@@ -87,6 +110,7 @@ const chatResponseSchema: Schema = {
             'column_correction',
             'column_delete',
             'column_header_add',
+            'bulk_update',
           ],
         },
         column: {
@@ -140,11 +164,61 @@ const chatResponseSchema: Schema = {
             type: SchemaType.STRING,
           },
         },
+        bulkUpdates: {
+          type: SchemaType.ARRAY,
+          description:
+            'A list of cell updates to apply in bulk (for bulk_update), e.g. applying the same transformation to every value in a column.',
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              rowId: {
+                type: SchemaType.STRING,
+                description:
+                  "The unique '_id' of the exact row to modify (extracted from the provided document context).",
+              },
+              column: {
+                type: SchemaType.STRING,
+                description: 'The specific column header key from the provided document context.',
+              },
+              newValue: {
+                type: SchemaType.STRING,
+                description: 'The new, transformed value for this cell.',
+              },
+            },
+            required: ['rowId', 'column', 'newValue'],
+          },
+        },
       },
       required: ['type', 'column', 'newValue', 'rowId'],
     },
   },
   required: ['response'],
+};
+
+const formatDetectionSchema: Schema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    formats: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          column: { type: SchemaType.STRING },
+          structuralMask: {
+            type: SchemaType.STRING,
+            description:
+              "Template string: '9' for digit, 'A' for uppercase, 'a' for lowercase, 'X' for alphanumeric. Punctuation as-is (e.g. 'AAA-99-999', '$9,999.99').",
+          },
+          isVariableLength: {
+            type: SchemaType.BOOLEAN,
+            description:
+              'True if values have dynamic length (e.g., quantities, standard floats), False for fixed-length codes.',
+          },
+        },
+        required: ['column', 'structuralMask', 'isVariableLength'],
+      },
+    },
+  },
 };
 
 export default {
@@ -173,6 +247,7 @@ export default {
             If they confirm the columns look correct, use the 'column_confirm' intent and set 'approved' to true.
             If they want to rename one or more column headers (e.g., 'change column header Supplier to Vendor Name'), use the 'column_correction' intent and populate the 'updates' array.
             If they want to remove or delete one or more columns (e.g., 'delete the tax column'), use the 'column_delete' intent and populate the 'deletedColumns' array.
+            If they want to apply the same change across many cells (e.g., 'add a $ prefix to every value in the PRICE column'), use the 'bulk_update' intent and populate the 'bulkUpdates' array with one entry per affected cell: 'rowId' from the document context, 'column' as the exact column header key, and 'newValue' as the fully transformed value. Never leave a cell out of 'bulkUpdates' that the user asked to change.
             If they approve or reject the document generally, use the 'approval' or 'rejection' intent.
             Always be polite and confirm what you are doing in the 'response' field.
             
@@ -206,7 +281,9 @@ export default {
     const updatedContext =
       parsed.intent &&
       documentContext &&
-      ['correction', 'column_correction', 'column_delete'].includes(parsed.intent.type)
+      ['correction', 'column_correction', 'column_delete', 'bulk_update'].includes(
+        parsed.intent.type
+      )
         ? applyIntentToContext(documentContext, parsed.intent)
         : undefined;
 
@@ -223,17 +300,16 @@ export default {
   ): Promise<any> => {
     const { rowIndex, otherFieldsInRow, columnValuesFromOtherRows, columnType } =
       buildFocusedContext(documentContext, field);
-    const formattedContext = JSON.stringify(documentContext, null, 2);
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
-      systemInstruction: `You are helping verify OCR-extracted table data. One specific cell has low confidence and needs to be checked with the user.
+      systemInstruction: `You are helping verify OCR-extracted table data. One specific cell has been flagged for review.
 
       The cell in question:
       - Row position: index ${rowIndex} in the rows array (0-indexed) — ignore any row ID, use this position
       - Column: "${field.column}" — inferred column type: ${columnType}
       - OCR-read value: "${field.value}"
-      - OCR confidence: ${field.confidence.toFixed(2)}
+      - Flag Reason: ${field.issueType === 'format' ? 'Formatting Inconsistency' : 'Low OCR Confidence'}
 
         Other already-confirmed values in this same row, for context:
         ${JSON.stringify(otherFieldsInRow, null, 2)}
@@ -274,5 +350,136 @@ export default {
         : undefined;
 
     return { ...parsed, updatedContext };
+  },
+  suggestBulkFieldCorrections: async (
+    column: string,
+    fields: ReviewField[],
+    documentContext: ExtractedData,
+    formatRegex?: string
+  ): Promise<any> => {
+    const flaggedIds = new Set(fields.map((f) => String(f.rowId)));
+
+    const rowContexts = fields.map(({ rowId }) => {
+      const row = documentContext.rows.find((r) => String(r._id) === String(rowId));
+      if (!row) return { rowId, otherFields: {} };
+      const { _id, _cellKeyMap, _confidence, _cellConfidence, ...otherFields } = row;
+      return { rowId, otherFields };
+    });
+
+    const referenceValues = documentContext.rows
+      .filter((r) => !flaggedIds.has(String(r._id)))
+      .map((r) => r[column])
+      .filter((v) => v !== null && v !== undefined && String(v).trim() !== '')
+      .slice(0, 20);
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      systemInstruction: `You are helping verify OCR-extracted table data. Multiple cells in the SAME column "${column}" have been flagged as inconsistent with the column's expected format.
+
+    ${
+      formatRegex
+        ? `The column's expected format was detected as this regular expression: ${formatRegex}. Every corrected value MUST match this pattern exactly.`
+        : ''
+    }
+
+    The flagged cells, with the rest of their row for context:
+    ${JSON.stringify(rowContexts, null, 2)}
+
+    Values from OTHER rows in this same column that already look correctly formatted, for reference:
+    ${JSON.stringify(referenceValues, null, 2)}
+
+    Your job:
+    1. For EACH flagged row, clean and normalize its "${column}" value so it matches the expected format. Remove stray punctuation/whitespace/OCR artifacts. Use the row's other fields and the reference values to judge the most plausible correction -- don't just blindly strip characters if that produces a value that doesn't make sense in context.
+    2. Set 'intent.type' to 'bulk_update'.
+    3. Populate 'intent.bulkUpdates' with EXACTLY one entry per flagged row: 'rowId' (the exact id given above), 'column' set to "${column}", and 'newValue' as your corrected value. Do not omit any row.
+    4. Set 'response' to a short, one-sentence summary of what you changed and why.
+    `,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: chatResponseSchema,
+        temperature: 0.2,
+      },
+    });
+
+    const result = await model.generateContent(
+      `Please review and correct the "${column}" field across the ${fields.length} flagged rows.`
+    );
+    const parsed = JSON.parse(result.response.text());
+
+    const updatedContext =
+      parsed.intent && parsed.intent.type === 'bulk_update'
+        ? applyIntentToContext(documentContext, parsed.intent)
+        : undefined;
+
+    return { ...parsed, updatedContext };
+  },
+  //This function was made with the help of Google Gemini
+  detectTableFormats: async (sampledData: Record<string, string[]>): Promise<any> => {
+    const finalRegexMap: Record<string, string> = {};
+    const unresolvedSamples: Record<string, string[]> = {};
+
+    // 1. Run local profiler first (Fast Path - ~1ms)
+    for (const [col, samples] of Object.entries(sampledData)) {
+      const localRegex = profileColumnLocally(samples);
+      if (localRegex) {
+        finalRegexMap[col] = localRegex;
+      } else {
+        unresolvedSamples[col] = samples;
+      }
+    }
+
+    // If local rules resolved all columns, skip Gemini call entirely!
+    if (Object.keys(unresolvedSamples).length === 0) {
+      return finalRegexMap;
+    }
+
+    // 2. Query Gemini only for unresolved/custom formats
+    const formattedSample = JSON.stringify(unresolvedSamples, null, 2);
+    console.log(formattedSample);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3.5-flash',
+      systemInstruction: `You are an AI assistant validating OCR tables.
+        Look at each column's sample values and identify the dominant structural character skeleton.
+
+        Return a structuralMask using these placeholders:
+        - '9' = Digit
+        - 'A' = Uppercase letter
+        - 'a' = Lowercase letter
+        - 'X' = Any letter or digit
+        - Punctuation, dashes, spaces stay as literal characters.
+
+        Ignore occasional OCR noise/errors and find the dominant underlying format.
+        Set isVariableLength to true if the column represents arbitrary numbers or free text.
+
+        Skip free text columns (names, addresses, comments).
+
+        Sample data:
+        ${formattedSample}`,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: formatDetectionSchema,
+        temperature: 0.1,
+      },
+    });
+
+    try {
+      const result = await model.generateContent(
+        'Identify structural format masks for the provided columns.'
+      );
+      const parsed = JSON.parse(result.response.text());
+
+      if (parsed.formats && Array.isArray(parsed.formats)) {
+        parsed.formats.forEach((f: any) => {
+          if (f.column && f.structuralMask) {
+            // Convert Gemini mask to safe JS regex locally
+            finalRegexMap[f.column] = maskToRegex(f.structuralMask, Boolean(f.isVariableLength));
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error during LLM format detection fallback:', error);
+    }
+
+    return finalRegexMap;
   },
 };

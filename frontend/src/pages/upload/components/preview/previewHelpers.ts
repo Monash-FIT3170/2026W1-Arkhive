@@ -29,12 +29,14 @@ export function revokeObjectUrlsFromPreviewItems(items: PreviewItem[]) {
 
 export async function buildPreviewItemsForFiles(
   filesToProcess: File[],
-  createdObjectUrls: string[]
+  createdObjectUrls: string[],
+  fileIndexOffset: number =0 // lets callers continue numbering across multiple calls 
 ): Promise<PreviewItem[]> {
   const nextItems: PreviewItem[] = [];
 
-  for (let fileIndex = 0; fileIndex < filesToProcess.length; fileIndex += 1) {
-    const file = filesToProcess[fileIndex];
+  for (let i = 0; i< filesToProcess.length; i += 1) {
+    const file = filesToProcess[i];
+    const fileIndex = fileIndexOffset + i; // new globally unique fileindex 
     if (isPdfFile(file)) {
       let pdf: Awaited<ReturnType<typeof getDocument>["promise"]>;
       try {

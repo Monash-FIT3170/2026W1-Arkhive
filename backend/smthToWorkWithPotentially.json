@@ -1,0 +1,1394 @@
+[
+  {
+    "page_num": 1,
+    "components": [
+      {
+        "id": "title_0",
+        "type": "TITLE",
+        "indentation": 416,
+        "y": 75,
+        "boundingBoxes": {},
+        "layer": 0,
+        "text": "INVOICE #1024",
+        "confidence": 0.992
+      },
+      {
+        "id": "table_0_row_0",
+        "type": "TABLE_ROW",
+        "indentation": 62,
+        "y": 190,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "BILLED TO:",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 62,
+                "y": 189
+              },
+              {
+                "x": 214,
+                "y": 190
+              },
+              {
+                "x": 214,
+                "y": 226
+              },
+              {
+                "x": 62,
+                "y": 227
+              }
+            ],
+            "confidence": 0.994
+          },
+          "col_1": {
+            "text": "Really Great Company",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 214,
+                "y": 190
+              },
+              {
+                "x": 442,
+                "y": 190
+              },
+              {
+                "x": 441,
+                "y": 226
+              },
+              {
+                "x": 214,
+                "y": 226
+              }
+            ],
+            "confidence": 0.994
+          }
+        },
+        "layer": 1,
+        "text": "BILLED TO: Really Great Company",
+        "confidence": 0.994,
+        "cells": [
+          "BILLED TO:",
+          "Really Great Company"
+        ]
+      },
+      {
+        "id": "table_0_row_1",
+        "type": "TABLE_ROW",
+        "indentation": 62,
+        "y": 226,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "PAY TO:",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 62,
+                "y": 227
+              },
+              {
+                "x": 214,
+                "y": 226
+              },
+              {
+                "x": 214,
+                "y": 299
+              },
+              {
+                "x": 62,
+                "y": 299
+              }
+            ],
+            "confidence": 0.994
+          },
+          "col_1": {
+            "text": "Avery Davis 123 Anywhere St., Any City 123-456-7890",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 214,
+                "y": 226
+              },
+              {
+                "x": 441,
+                "y": 226
+              },
+              {
+                "x": 441,
+                "y": 299
+              },
+              {
+                "x": 214,
+                "y": 299
+              }
+            ],
+            "confidence": 0.988
+          }
+        },
+        "layer": 1,
+        "text": "PAY TO: Avery Davis 123 Anywhere St., Any City 123-456-7890",
+        "confidence": 0.988,
+        "cells": [
+          "PAY TO:",
+          "Avery Davis 123 Anywhere St., Any City 123-456-7890"
+        ]
+      },
+      {
+        "id": "table_0_row_2",
+        "type": "TABLE_ROW",
+        "indentation": 62,
+        "y": 299,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "Bank",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 62,
+                "y": 299
+              },
+              {
+                "x": 214,
+                "y": 299
+              },
+              {
+                "x": 214,
+                "y": 326
+              },
+              {
+                "x": 62,
+                "y": 326
+              }
+            ],
+            "confidence": 0.988
+          },
+          "col_1": {
+            "text": "Really Great Bank",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 214,
+                "y": 299
+              },
+              {
+                "x": 441,
+                "y": 299
+              },
+              {
+                "x": 440,
+                "y": 325
+              },
+              {
+                "x": 214,
+                "y": 326
+              }
+            ],
+            "confidence": 0.991
+          }
+        },
+        "layer": 1,
+        "text": "Bank Really Great Bank",
+        "confidence": 0.989,
+        "cells": [
+          "Bank",
+          "Really Great Bank"
+        ]
+      },
+      {
+        "id": "table_0_row_3",
+        "type": "TABLE_ROW",
+        "indentation": 62,
+        "y": 326,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "Account Name",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 62,
+                "y": 326
+              },
+              {
+                "x": 214,
+                "y": 326
+              },
+              {
+                "x": 214,
+                "y": 346
+              },
+              {
+                "x": 62,
+                "y": 346
+              }
+            ],
+            "confidence": 0.993
+          },
+          "col_1": {
+            "text": "John Smith",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 214,
+                "y": 326
+              },
+              {
+                "x": 440,
+                "y": 325
+              },
+              {
+                "x": 440,
+                "y": 346
+              },
+              {
+                "x": 214,
+                "y": 346
+              }
+            ],
+            "confidence": 0.992
+          }
+        },
+        "layer": 1,
+        "text": "Account Name John Smith",
+        "confidence": 0.992,
+        "cells": [
+          "Account Name",
+          "John Smith"
+        ]
+      },
+      {
+        "id": "table_0_row_4",
+        "type": "TABLE_ROW",
+        "indentation": 61,
+        "y": 346,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "BSB",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 62,
+                "y": 346
+              },
+              {
+                "x": 214,
+                "y": 346
+              },
+              {
+                "x": 214,
+                "y": 366
+              },
+              {
+                "x": 61,
+                "y": 367
+              }
+            ],
+            "confidence": 0.996
+          },
+          "col_1": {
+            "text": "000-000",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 214,
+                "y": 346
+              },
+              {
+                "x": 440,
+                "y": 346
+              },
+              {
+                "x": 440,
+                "y": 365
+              },
+              {
+                "x": 214,
+                "y": 366
+              }
+            ],
+            "confidence": 0.984
+          }
+        },
+        "layer": 1,
+        "text": "BSB 000-000",
+        "confidence": 0.99,
+        "cells": [
+          "BSB",
+          "000-000"
+        ]
+      },
+      {
+        "id": "table_0_row_5",
+        "type": "TABLE_ROW",
+        "indentation": 61,
+        "y": 366,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "Account Number",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 61,
+                "y": 367
+              },
+              {
+                "x": 214,
+                "y": 366
+              },
+              {
+                "x": 214,
+                "y": 392
+              },
+              {
+                "x": 61,
+                "y": 393
+              }
+            ],
+            "confidence": 0.994
+          },
+          "col_1": {
+            "text": "0000 0000",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 214,
+                "y": 366
+              },
+              {
+                "x": 440,
+                "y": 365
+              },
+              {
+                "x": 440,
+                "y": 391
+              },
+              {
+                "x": 214,
+                "y": 392
+              }
+            ],
+            "confidence": 0.987
+          }
+        },
+        "layer": 1,
+        "text": "Account Number 0000 0000",
+        "confidence": 0.99,
+        "cells": [
+          "Account Number",
+          "0000 0000"
+        ]
+      },
+      {
+        "id": "table_1_cols_0",
+        "type": "TABLE_COLS",
+        "indentation": 62,
+        "y": 420,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "DESCRIPTION",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 62,
+                "y": 420
+              },
+              {
+                "x": 319,
+                "y": 420
+              },
+              {
+                "x": 318,
+                "y": 466
+              },
+              {
+                "x": 62,
+                "y": 466
+              }
+            ],
+            "confidence": 0.992
+          },
+          "col_1": {
+            "text": "RATE",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 319,
+                "y": 420
+              },
+              {
+                "x": 448,
+                "y": 419
+              },
+              {
+                "x": 448,
+                "y": 466
+              },
+              {
+                "x": 318,
+                "y": 466
+              }
+            ],
+            "confidence": 0.991
+          },
+          "col_2": {
+            "text": "HOURS",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 448,
+                "y": 419
+              },
+              {
+                "x": 556,
+                "y": 419
+              },
+              {
+                "x": 556,
+                "y": 466
+              },
+              {
+                "x": 448,
+                "y": 466
+              }
+            ],
+            "confidence": 0.997
+          },
+          "col_3": {
+            "text": "AMOUNT",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 556,
+                "y": 419
+              },
+              {
+                "x": 672,
+                "y": 420
+              },
+              {
+                "x": 672,
+                "y": 466
+              },
+              {
+                "x": 556,
+                "y": 466
+              }
+            ],
+            "confidence": 0.995
+          }
+        },
+        "layer": 1,
+        "text": "DESCRIPTION RATE HOURS AMOUNT",
+        "confidence": 0.99375,
+        "cells": [
+          "DESCRIPTION",
+          "RATE",
+          "HOURS",
+          "AMOUNT"
+        ]
+      },
+      {
+        "id": "table_1_row_1",
+        "type": "TABLE_ROW",
+        "indentation": 62,
+        "y": 466,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "Content Plan",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 62,
+                "y": 466
+              },
+              {
+                "x": 318,
+                "y": 466
+              },
+              {
+                "x": 318,
+                "y": 511
+              },
+              {
+                "x": 62,
+                "y": 511
+              }
+            ],
+            "confidence": 0.992
+          },
+          "col_1": {
+            "text": "$50/hr",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 318,
+                "y": 466
+              },
+              {
+                "x": 448,
+                "y": 466
+              },
+              {
+                "x": 448,
+                "y": 512
+              },
+              {
+                "x": 318,
+                "y": 511
+              }
+            ],
+            "confidence": 0.989
+          },
+          "col_2": {
+            "text": "4",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 448,
+                "y": 466
+              },
+              {
+                "x": 556,
+                "y": 466
+              },
+              {
+                "x": 556,
+                "y": 511
+              },
+              {
+                "x": 448,
+                "y": 512
+              }
+            ],
+            "confidence": 0.995
+          },
+          "col_3": {
+            "text": "$200.00",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 556,
+                "y": 466
+              },
+              {
+                "x": 672,
+                "y": 466
+              },
+              {
+                "x": 672,
+                "y": 512
+              },
+              {
+                "x": 556,
+                "y": 511
+              }
+            ],
+            "confidence": 0.992
+          }
+        },
+        "layer": 1,
+        "text": "Content Plan $50/hr 4 $200.00",
+        "confidence": 0.992,
+        "cells": [
+          "Content Plan",
+          "$50/hr",
+          "4",
+          "$200.00"
+        ]
+      },
+      {
+        "id": "table_1_row_2",
+        "type": "TABLE_ROW",
+        "indentation": 62,
+        "y": 511,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "Copy Writing",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 62,
+                "y": 511
+              },
+              {
+                "x": 318,
+                "y": 511
+              },
+              {
+                "x": 318,
+                "y": 554
+              },
+              {
+                "x": 62,
+                "y": 554
+              }
+            ],
+            "confidence": 0.991
+          },
+          "col_1": {
+            "text": "$50/hr",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 318,
+                "y": 511
+              },
+              {
+                "x": 448,
+                "y": 512
+              },
+              {
+                "x": 448,
+                "y": 554
+              },
+              {
+                "x": 318,
+                "y": 554
+              }
+            ],
+            "confidence": 0.989
+          },
+          "col_2": {
+            "text": "2",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 448,
+                "y": 512
+              },
+              {
+                "x": 556,
+                "y": 511
+              },
+              {
+                "x": 556,
+                "y": 554
+              },
+              {
+                "x": 448,
+                "y": 554
+              }
+            ],
+            "confidence": 0.995
+          },
+          "col_3": {
+            "text": "$100.00",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 556,
+                "y": 511
+              },
+              {
+                "x": 672,
+                "y": 512
+              },
+              {
+                "x": 672,
+                "y": 554
+              },
+              {
+                "x": 556,
+                "y": 554
+              }
+            ],
+            "confidence": 0.993
+          }
+        },
+        "layer": 1,
+        "text": "Copy Writing $50/hr 2 $100.00",
+        "confidence": 0.992,
+        "cells": [
+          "Copy Writing",
+          "$50/hr",
+          "2",
+          "$100.00"
+        ]
+      },
+      {
+        "id": "table_1_row_3",
+        "type": "TABLE_ROW",
+        "indentation": 61,
+        "y": 554,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "Website Design",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 62,
+                "y": 554
+              },
+              {
+                "x": 318,
+                "y": 554
+              },
+              {
+                "x": 318,
+                "y": 598
+              },
+              {
+                "x": 61,
+                "y": 597
+              }
+            ],
+            "confidence": 0.993
+          },
+          "col_1": {
+            "text": "$50/hr",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 318,
+                "y": 554
+              },
+              {
+                "x": 448,
+                "y": 554
+              },
+              {
+                "x": 448,
+                "y": 598
+              },
+              {
+                "x": 318,
+                "y": 598
+              }
+            ],
+            "confidence": 0.992
+          },
+          "col_2": {
+            "text": "5",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 448,
+                "y": 554
+              },
+              {
+                "x": 556,
+                "y": 554
+              },
+              {
+                "x": 556,
+                "y": 598
+              },
+              {
+                "x": 448,
+                "y": 598
+              }
+            ],
+            "confidence": 0.992
+          },
+          "col_3": {
+            "text": "$250.00",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 556,
+                "y": 554
+              },
+              {
+                "x": 672,
+                "y": 554
+              },
+              {
+                "x": 672,
+                "y": 597
+              },
+              {
+                "x": 556,
+                "y": 598
+              }
+            ],
+            "confidence": 0.994
+          }
+        },
+        "layer": 1,
+        "text": "Website Design $50/hr 5 $250.00",
+        "confidence": 0.99275,
+        "cells": [
+          "Website Design",
+          "$50/hr",
+          "5",
+          "$250.00"
+        ]
+      },
+      {
+        "id": "table_1_row_4",
+        "type": "TABLE_ROW",
+        "indentation": 61,
+        "y": 597,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "Website Development",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 61,
+                "y": 597
+              },
+              {
+                "x": 318,
+                "y": 598
+              },
+              {
+                "x": 318,
+                "y": 641
+              },
+              {
+                "x": 61,
+                "y": 641
+              }
+            ],
+            "confidence": 0.9925
+          },
+          "col_1": {
+            "text": "$100/hr",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 318,
+                "y": 598
+              },
+              {
+                "x": 448,
+                "y": 598
+              },
+              {
+                "x": 448,
+                "y": 641
+              },
+              {
+                "x": 318,
+                "y": 641
+              }
+            ],
+            "confidence": 0.974
+          },
+          "col_2": {
+            "text": "5",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 448,
+                "y": 598
+              },
+              {
+                "x": 556,
+                "y": 598
+              },
+              {
+                "x": 556,
+                "y": 641
+              },
+              {
+                "x": 448,
+                "y": 641
+              }
+            ],
+            "confidence": 0.993
+          },
+          "col_3": {
+            "text": "$500.00",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 556,
+                "y": 598
+              },
+              {
+                "x": 672,
+                "y": 597
+              },
+              {
+                "x": 672,
+                "y": 641
+              },
+              {
+                "x": 556,
+                "y": 641
+              }
+            ],
+            "confidence": 0.994
+          }
+        },
+        "layer": 1,
+        "text": "Website Development $100/hr 5 $500.00",
+        "confidence": 0.988375,
+        "cells": [
+          "Website Development",
+          "$100/hr",
+          "5",
+          "$500.00"
+        ]
+      },
+      {
+        "id": "table_1_row_5",
+        "type": "TABLE_ROW",
+        "indentation": 61,
+        "y": 641,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "SEO",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 61,
+                "y": 641
+              },
+              {
+                "x": 318,
+                "y": 641
+              },
+              {
+                "x": 318,
+                "y": 685
+              },
+              {
+                "x": 61,
+                "y": 684
+              }
+            ],
+            "confidence": 0.995
+          },
+          "col_1": {
+            "text": "$50/hr",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 318,
+                "y": 641
+              },
+              {
+                "x": 448,
+                "y": 641
+              },
+              {
+                "x": 448,
+                "y": 685
+              },
+              {
+                "x": 318,
+                "y": 685
+              }
+            ],
+            "confidence": 0.993
+          },
+          "col_2": {
+            "text": "4",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 448,
+                "y": 641
+              },
+              {
+                "x": 556,
+                "y": 641
+              },
+              {
+                "x": 556,
+                "y": 685
+              },
+              {
+                "x": 448,
+                "y": 685
+              }
+            ],
+            "confidence": 0.995
+          },
+          "col_3": {
+            "text": "$200.00",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 556,
+                "y": 641
+              },
+              {
+                "x": 672,
+                "y": 641
+              },
+              {
+                "x": 672,
+                "y": 685
+              },
+              {
+                "x": 556,
+                "y": 685
+              }
+            ],
+            "confidence": 0.994
+          }
+        },
+        "layer": 1,
+        "text": "SEO $50/hr 4 $200.00",
+        "confidence": 0.99425,
+        "cells": [
+          "SEO",
+          "$50/hr",
+          "4",
+          "$200.00"
+        ]
+      },
+      {
+        "id": "table_1_row_6",
+        "type": "TABLE_ROW",
+        "indentation": 61,
+        "y": 684,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "Sub-Total",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 61,
+                "y": 684
+              },
+              {
+                "x": 318,
+                "y": 685
+              },
+              {
+                "x": 318,
+                "y": 723
+              },
+              {
+                "x": 61,
+                "y": 721
+              }
+            ],
+            "confidence": 0.947
+          },
+          "col_1": {
+            "text": "",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 318,
+                "y": 685
+              },
+              {
+                "x": 448,
+                "y": 685
+              },
+              {
+                "x": 448,
+                "y": 723
+              },
+              {
+                "x": 318,
+                "y": 723
+              }
+            ],
+            "confidence": 1
+          },
+          "col_2": {
+            "text": "",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 448,
+                "y": 685
+              },
+              {
+                "x": 556,
+                "y": 685
+              },
+              {
+                "x": 556,
+                "y": 723
+              },
+              {
+                "x": 448,
+                "y": 723
+              }
+            ],
+            "confidence": 1
+          },
+          "col_3": {
+            "text": "$1,250.00",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 556,
+                "y": 685
+              },
+              {
+                "x": 672,
+                "y": 685
+              },
+              {
+                "x": 672,
+                "y": 723
+              },
+              {
+                "x": 556,
+                "y": 723
+              }
+            ],
+            "confidence": 0.976
+          }
+        },
+        "layer": 1,
+        "text": "Sub-Total $1,250.00",
+        "confidence": 0.98075,
+        "cells": [
+          "Sub-Total",
+          "",
+          "",
+          "$1,250.00"
+        ]
+      },
+      {
+        "id": "table_1_row_7",
+        "type": "TABLE_ROW",
+        "indentation": 61,
+        "y": 721,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "Package Discount (30%)",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 61,
+                "y": 721
+              },
+              {
+                "x": 318,
+                "y": 723
+              },
+              {
+                "x": 318,
+                "y": 758
+              },
+              {
+                "x": 61,
+                "y": 757
+              }
+            ],
+            "confidence": 0.994
+          },
+          "col_1": {
+            "text": "",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 318,
+                "y": 723
+              },
+              {
+                "x": 448,
+                "y": 723
+              },
+              {
+                "x": 448,
+                "y": 758
+              },
+              {
+                "x": 318,
+                "y": 758
+              }
+            ],
+            "confidence": 1
+          },
+          "col_2": {
+            "text": "",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 448,
+                "y": 723
+              },
+              {
+                "x": 556,
+                "y": 723
+              },
+              {
+                "x": 556,
+                "y": 758
+              },
+              {
+                "x": 448,
+                "y": 758
+              }
+            ],
+            "confidence": 1
+          },
+          "col_3": {
+            "text": "$375.00",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 556,
+                "y": 723
+              },
+              {
+                "x": 672,
+                "y": 723
+              },
+              {
+                "x": 672,
+                "y": 758
+              },
+              {
+                "x": 556,
+                "y": 758
+              }
+            ],
+            "confidence": 0.983
+          }
+        },
+        "layer": 1,
+        "text": "Package Discount (30%) $375.00",
+        "confidence": 0.99425,
+        "cells": [
+          "Package Discount (30%)",
+          "",
+          "",
+          "$375.00"
+        ]
+      },
+      {
+        "id": "table_1_row_8",
+        "type": "TABLE_ROW",
+        "indentation": 60,
+        "y": 757,
+        "boundingBoxes": {
+          "col_0": {
+            "text": "TOTAL",
+            "column": "Column 0",
+            "vertices": [
+              {
+                "x": 61,
+                "y": 757
+              },
+              {
+                "x": 318,
+                "y": 758
+              },
+              {
+                "x": 318,
+                "y": 804
+              },
+              {
+                "x": 60,
+                "y": 802
+              }
+            ],
+            "confidence": 0.995
+          },
+          "col_1": {
+            "text": "",
+            "column": "Column 1",
+            "vertices": [
+              {
+                "x": 318,
+                "y": 758
+              },
+              {
+                "x": 448,
+                "y": 758
+              },
+              {
+                "x": 448,
+                "y": 804
+              },
+              {
+                "x": 318,
+                "y": 804
+              }
+            ],
+            "confidence": 1
+          },
+          "col_2": {
+            "text": "",
+            "column": "Column 2",
+            "vertices": [
+              {
+                "x": 448,
+                "y": 758
+              },
+              {
+                "x": 556,
+                "y": 758
+              },
+              {
+                "x": 556,
+                "y": 805
+              },
+              {
+                "x": 448,
+                "y": 804
+              }
+            ],
+            "confidence": 1
+          },
+          "col_3": {
+            "text": "$875.00",
+            "column": "Column 3",
+            "vertices": [
+              {
+                "x": 556,
+                "y": 758
+              },
+              {
+                "x": 672,
+                "y": 758
+              },
+              {
+                "x": 673,
+                "y": 805
+              },
+              {
+                "x": 556,
+                "y": 805
+              }
+            ],
+            "confidence": 0.995
+          }
+        },
+        "layer": 1,
+        "text": "TOTAL $875.00",
+        "confidence": 0.99625,
+        "cells": [
+          "TOTAL",
+          "",
+          "",
+          "$875.00"
+        ]
+      },
+      {
+        "id": "body_text_0",
+        "type": "BODY_TEXT",
+        "indentation": 72,
+        "y": 859,
+        "boundingBoxes": {},
+        "layer": 0,
+        "text": "Payment is required within 14 business days of invoice date.",
+        "confidence": 0.988
+      },
+      {
+        "id": "body_text_1",
+        "type": "BODY_TEXT",
+        "indentation": 72,
+        "y": 879,
+        "boundingBoxes": {},
+        "layer": 0,
+        "text": "Please send remittance to hello@reallygreatsite.com.",
+        "confidence": 0.986
+      },
+      {
+        "id": "body_text_2",
+        "type": "BODY_TEXT",
+        "indentation": 71,
+        "y": 920,
+        "boundingBoxes": {},
+        "layer": 0,
+        "text": "Thank you for your business.",
+        "confidence": 0.993
+      }
+    ]
+  }
+]

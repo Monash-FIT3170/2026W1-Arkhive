@@ -1,0 +1,11 @@
+node_modules
+**/node_modules
+**/dist
+.git
+backend/uploads
+backend/*.json
+!backend/package.json
+!backend/package-lock.json
+*.md
+.env
+**/.env

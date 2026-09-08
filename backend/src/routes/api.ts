@@ -1,4 +1,4 @@
-import express, {Request ,Response, Router } from "express"
+import {Request ,Response, Router } from "express"
 import { testOCR } from "../services/ocr/ocr";
 
 const apiRouter = Router();

@@ -26,7 +26,11 @@ vi.mock('./components/preview/previewHelpers', () => ({
 }));
 
 vi.mock('../../services/uploadService', () => ({
-  uploadPagesToBackend: vi.fn().mockResolvedValue(undefined),
+  uploadPageToBackend: vi.fn().mockResolvedValue(undefined),
+  deletePageFromBackend: vi.fn().mockResolvedValue(undefined),
+  processDocuments: vi.fn().mockResolvedValue(undefined),
+  getUploadedDocuments: vi.fn().mockResolvedValue([]),
+  getProcessedImageUrls: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock the child components to simplify testing the UploadPage logic

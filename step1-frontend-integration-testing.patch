@@ -1,0 +1,305 @@
+diff --git a/.env.example b/.env.example
+index f5c2aab..c80c6b2 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1,3 +1,8 @@
+ GEMINI_API_KEY = your_gemini_api_key_here
+ endpoint = your_azure_endpoint_url_here
+-AZURE_CLOUD_API_KEY = your_azure_api_key_here
+\ No newline at end of file
++AZURE_CLOUD_API_KEY = your_azure_api_key_here
++
++# Set to "mock" to skip real Azure/Gemini OCR calls and return a fixed
++# fixture instead. Used by CI and integration tests; also handy for local
++# dev without real Azure/Gemini keys.
++OCR_MODE = 
+\ No newline at end of file
+diff --git a/backend/src/services/ocr/mockOcrFixture.ts b/backend/src/services/ocr/mockOcrFixture.ts
+new file mode 100644
+index 0000000..2f70912
+--- /dev/null
++++ b/backend/src/services/ocr/mockOcrFixture.ts
+@@ -0,0 +1,24 @@
++import { OCRComponent } from './types/boundingBoxTypes';
++
++/**
++ * Fixed OCR output returned when OCR_MODE=mock, instead of calling
++ * Azure Document Intelligence + Gemini (analyse_result / mapOCRtoPages).
++ *
++ * Used by CI and frontend/backend integration tests, where real
++ * Azure/Gemini credentials aren't available and a real network call
++ * would be flaky, slow, and cost money on every run.
++ */
++export function getMockOcrResult(): OCRComponent[] {
++  return [
++    {
++      id: 'comp_1',
++      type: 'TABLE_ROW',
++      indentation: 0,
++      y: 0,
++      layer: 0,
++      text: 'Invoice total',
++      cells: ['Invoice total', '$42.00'],
++      confidence: 0.97,
++    },
++  ];
++}
+diff --git a/backend/src/services/ocr/ocr.ts b/backend/src/services/ocr/ocr.ts
+index 57e5b3c..e44427c 100644
+--- a/backend/src/services/ocr/ocr.ts
++++ b/backend/src/services/ocr/ocr.ts
+@@ -4,6 +4,7 @@ import fs from 'fs';
+ //import { extractStructuredComponents } from './utils/legacy_utils_table_extraction.js';
+ import { withRetry } from './utils/utils.js';
+ import { analyse_result } from './utils/utils_table_extraction_new.js';
++import { getMockOcrResult } from './mockOcrFixture.js';
+ 
+ const sampleImage = 'assets/sample-page-1.png';
+ 
+@@ -103,6 +104,11 @@ export async function parseTableWithRetriesLegacy(imageBuffer: Buffer) {
+  @author Harsha Sharma (33879303)
+ */
+ async function parseTable(imageBuffer: Buffer) {
++  // Skips the real Azure Document Intelligence + Gemini calls entirely.
++  // See mockOcrFixture.ts for why: no CI/test secrets, no flaky network dependency.
++  if (process.env.OCR_MODE === 'mock') {
++    return getMockOcrResult();
++  }
+   return analyse_result(imageBuffer);
+ }
+ 
+diff --git a/frontend/src/services/apiBase.ts b/frontend/src/services/apiBase.ts
+new file mode 100644
+index 0000000..afb721e
+--- /dev/null
++++ b/frontend/src/services/apiBase.ts
+@@ -0,0 +1,16 @@
++/**
++ * Base URL prefixed to every backend API call.
++ *
++ * - Dev / prod builds leave VITE_API_URL unset, so this resolves to '' and
++ *   every call stays exactly the relative path it always was — Vite's dev
++ *   proxy and the Express static server handle routing as before. No
++ *   behaviour change for the app itself.
++ * - Frontend integration tests set VITE_API_URL to the ephemeral port the
++ *   real backend subprocess is listening on, since there's no dev server or
++ *   same-origin document to resolve a relative path against in that context.
++ */
++export const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
++
++export function apiUrl(path: string): string {
++  return `${API_BASE_URL}${path}`;
++}
+diff --git a/frontend/src/services/extractionService.ts b/frontend/src/services/extractionService.ts
+index 13b8f25..7b60bd6 100644
+--- a/frontend/src/services/extractionService.ts
++++ b/frontend/src/services/extractionService.ts
+@@ -1,9 +1,10 @@
+ import type { ExtractedData, ExtractedPage } from '../models/TableData';
+ import type { OCRComponent } from '../models/OCRComponent';
+ import type { DocumentJob } from '../models/Job';
++import { apiUrl } from './apiBase';
+ 
+ export async function getExtractionSession(jobIdOrIndex?: string | number) {
+-  let url = '/api/extraction';
++  let url = apiUrl('/api/extraction');
+   if (typeof jobIdOrIndex === 'string') {
+     url += `?jobId=${encodeURIComponent(jobIdOrIndex)}`;
+   } else if (typeof jobIdOrIndex === 'number') {
+@@ -27,7 +28,7 @@ export async function getBatchJobs(): Promise<{
+   activeJobIndex: number | null;
+   jobs: DocumentJob[];
+ }> {
+-  const response = await fetch('/api/extraction/jobs', {
++  const response = await fetch(apiUrl('/api/extraction/jobs'), {
+     method: 'GET',
+     credentials: 'include',
+   });
+@@ -51,7 +52,7 @@ export async function saveExtractionSession(
+     payload.index = jobIdOrIndex;
+   }
+ 
+-  const response = await fetch('/api/extraction', {
++  const response = await fetch(apiUrl('/api/extraction'), {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/json',
+@@ -79,7 +80,7 @@ export async function setActiveBatchJob(indexOrJobId: number | string): Promise<
+     payload.jobId = indexOrJobId;
+   }
+ 
+-  const response = await fetch('/api/extraction/active', {
++  const response = await fetch(apiUrl('/api/extraction/active'), {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/json',
+diff --git a/frontend/src/services/llmService.ts b/frontend/src/services/llmService.ts
+index 27598fb..4eddd93 100644
+--- a/frontend/src/services/llmService.ts
++++ b/frontend/src/services/llmService.ts
+@@ -6,12 +6,13 @@ import type {
+   ReviewField,
+ } from '../models/Message';
+ import type { ExtractedData } from '../models/TableData';
++import { apiUrl } from './apiBase';
+ 
+ export async function sendMessage(
+   messages: Message[],
+   documentContext?: ExtractedData
+ ): Promise<ChatResponse> {
+-  const response = await fetch('/api/llm/chat', {
++  const response = await fetch(apiUrl('/api/llm/chat'), {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/json',
+@@ -34,7 +35,7 @@ export async function requestFieldReview(
+   field: ReviewField,
+   documentContext: ExtractedData
+ ): Promise<ChatResponse> {
+-  const response = await fetch('/api/llm/chat/review-field', {
++  const response = await fetch(apiUrl('/api/llm/chat/review-field'), {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({ field, documentContext }),
+@@ -49,7 +50,7 @@ export async function requestFieldReview(
+ export async function requestBulkFieldReview(
+   request: BulkReviewFieldRequest
+ ): Promise<ChatResponse> {
+-  const response = await fetch('/api/llm/chat/review-field-bulk', {
++  const response = await fetch(apiUrl('/api/llm/chat/review-field-bulk'), {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify(request),
+@@ -64,7 +65,7 @@ export async function requestBulkFieldReview(
+ export async function requestFormatDetection(
+   sampledData: Record<string, string[]>
+ ): Promise<Record<string, string>> {
+-  const response = await fetch('/api/llm/chat/detect-format', {
++  const response = await fetch(apiUrl('/api/llm/chat/detect-format'), {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({ sampledData }),
+diff --git a/frontend/src/services/testService.ts b/frontend/src/services/testService.ts
+index 76a5f8b..2b0353f 100644
+--- a/frontend/src/services/testService.ts
++++ b/frontend/src/services/testService.ts
+@@ -1,9 +1,11 @@
++import { apiUrl } from './apiBase';
++
+ /**
+  * Fetches the mock OCR test data.
+  * Mirrors GET /api/extraction/testData
+  */
+ export async function getTestData(): Promise<any> {
+-  const response = await fetch('/api/test/testData', {
++  const response = await fetch(apiUrl('/api/test/testData'), {
+     credentials: 'include',
+   });
+ 
+@@ -20,7 +22,7 @@ export async function getTestData(): Promise<any> {
+  * Mirrors GET /api/extraction/testImageUrls
+  */
+ export async function getTestImageUrls(): Promise<string[]> {
+-  const response = await fetch('/api/test/testImageUrls', {
++  const response = await fetch(apiUrl('/api/test/testImageUrls'), {
+     credentials: 'include',
+   });
+ 
+@@ -37,5 +39,5 @@ export async function getTestImageUrls(): Promise<string[]> {
+  * GET /api/extraction/testImage/:index which streams the file from disk.
+  */
+ export function getTestImageUrl(index: number = 0): string {
+-  return `/api/test/testImage/${index}`;
++  return apiUrl(`/api/test/testImage/${index}`);
+ }
+diff --git a/frontend/src/services/uploadService.ts b/frontend/src/services/uploadService.ts
+index 7493e27..d1b884c 100644
+--- a/frontend/src/services/uploadService.ts
++++ b/frontend/src/services/uploadService.ts
+@@ -1,4 +1,5 @@
+ import type { BatchProgressEvent, DocumentJob } from '../models/Job';
++import { apiUrl } from './apiBase';
+ 
+ export interface UploadPageInput {
+   src: string;
+@@ -40,7 +41,7 @@ export async function uploadPageToBackend(
+   }
+ 
+   const response = await fetch(
+-    `/api/upload/page?documentId=${encodeURIComponent(documentId)}&pageIndex=${pageIndex}`,
++    apiUrl(`/api/upload/page?documentId=${encodeURIComponent(documentId)}&pageIndex=${pageIndex}`),
+     {
+       method: 'POST',
+       credentials: 'include',
+@@ -58,7 +59,7 @@ export async function uploadPageToBackend(
+  * Deletes a single page from the backend.
+  */
+ export async function deletePageFromBackend(documentId: string, pageIndex: number): Promise<void> {
+-  const response = await fetch(`/api/upload/page/${encodeURIComponent(documentId)}/${pageIndex}`, {
++  const response = await fetch(apiUrl(`/api/upload/page/${encodeURIComponent(documentId)}/${pageIndex}`), {
+     method: 'DELETE',
+     credentials: 'include',
+   });
+@@ -72,7 +73,7 @@ export async function deletePageFromBackend(documentId: string, pageIndex: numbe
+  * Deletes an entire document from the backend.
+  */
+ export async function deleteDocumentFromBackend(documentId: string): Promise<void> {
+-  const response = await fetch(`/api/upload/document/${encodeURIComponent(documentId)}`, {
++  const response = await fetch(apiUrl(`/api/upload/document/${encodeURIComponent(documentId)}`), {
+     method: 'DELETE',
+     credentials: 'include',
+   });
+@@ -90,7 +91,7 @@ export async function processDocuments(
+   onRetryMessage?: (msg: string) => void,
+   onProgress?: (event: BatchProgressEvent) => void
+ ): Promise<BatchUploadResult | void> {
+-  const response = await fetch('/api/upload/process', {
++  const response = await fetch(apiUrl('/api/upload/process'), {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/json',
+@@ -164,9 +165,9 @@ export async function processDocuments(
+  */
+ export function getUploadedImageUrl(documentId?: string, pageIndex?: number): string {
+   if (documentId !== undefined && pageIndex !== undefined) {
+-    return `/api/upload/image/${encodeURIComponent(documentId)}/${pageIndex}`;
++    return apiUrl(`/api/upload/image/${encodeURIComponent(documentId)}/${pageIndex}`);
+   }
+-  return '/api/upload/image';
++  return apiUrl('/api/upload/image');
+ }
+ 
+ /**
+@@ -175,7 +176,7 @@ export function getUploadedImageUrl(documentId?: string, pageIndex?: number): st
+ export async function getUploadedDocuments(): Promise<
+   { documentId: string; label?: string; type?: string; pages: string[] }[]
+ > {
+-  const response = await fetch('/api/upload/documents');
++  const response = await fetch(apiUrl('/api/upload/documents'));
+   if (!response.ok) {
+     throw new Error('Failed to fetch uploaded documents');
+   }
+@@ -194,7 +195,7 @@ export async function getUploadedImageUrls(): Promise<string[]> {
+  * Returns a list of URLs for the images that were actually processed via OCR.
+  */
+ export async function getProcessedImageUrls(): Promise<string[]> {
+-  const response = await fetch('/api/upload/processed-images');
++  const response = await fetch(apiUrl('/api/upload/processed-images'));
+   if (!response.ok) {
+     throw new Error('Failed to fetch processed image URLs');
+   }
+diff --git a/frontend/src/vite-env.d.ts b/frontend/src/vite-env.d.ts
+new file mode 100644
+index 0000000..c57d674
+--- /dev/null
++++ b/frontend/src/vite-env.d.ts
+@@ -0,0 +1,9 @@
++/// <reference types="vite/client" />
++
++interface ImportMetaEnv {
++  readonly VITE_API_URL?: string;
++}
++
++interface ImportMeta {
++  readonly env: ImportMetaEnv;
++}

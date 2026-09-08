@@ -42,7 +42,7 @@ export async function withRetry<T>(
       if (onRetry) {
         onRetry(attempts, maxRetries);
       }
-      await wait(3000);
+      await wait(delayMs);
     }
   }
 }

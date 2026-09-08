@@ -1,26 +1,42 @@
 import type { ExtractedData } from '../../../../models/TableData';
 import type { ReviewField } from '../../../../models/Message';
 
-const DOCUMENT_QUALITY_FLOOR = 0.85;
-const RELATIVE_OUTLIER_STDDEV = 1.5;
+// Absolute thresholds
+const CRITICAL_FLOOR = 0.6; // Always flag below this, no matter what
+const HIGH_CONFIDENCE_PASS = 0.95; // Never flag above this
+const OUTLIER_MULTIPLIER = 2.0; // Multiplier for MAD threshold
+
+function getMedian(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
 
 /**
- * Uses the table data and scan foe fields whoses confidence value is lower then
- * the 1.5 standard deviations from the average. If so, we push it into a list of fields to review.
+ * Calculates Median Absolute Deviation (MAD)
  */
+function getMAD(values: number[], median: number): number {
+  const absoluteDeviations = values.map((v) => Math.abs(v - median));
+  return getMedian(absoluteDeviations);
+}
+
 export function detectReviewFields(data: ExtractedData): ReviewField[] {
   const allConfidences = data.rows.flatMap((r) => Object.values(r._cellConfidence ?? {}));
   if (allConfidences.length === 0) return [];
 
-  const mean = allConfidences.reduce((a, b) => a + b, 0) / allConfidences.length;
-  const variance =
-    allConfidences.reduce((sum, c) => sum + (c - mean) ** 2, 0) / allConfidences.length;
-  const stdDev = Math.sqrt(variance);
+  const median = getMedian(allConfidences);
+  const mad = getMAD(allConfidences, median);
 
-  const threshold =
-    mean < DOCUMENT_QUALITY_FLOOR
-      ? DOCUMENT_QUALITY_FLOOR
-      : mean - RELATIVE_OUTLIER_STDDEV * stdDev;
+  // Dynamic cutoff: cells significantly lower than the median relative quality
+  // If MAD is 0 (all values nearly identical), fall back to a small default dispersion.
+  const dynamicThreshold = median - OUTLIER_MULTIPLIER * (mad || 0.05);
+
+  // Bound the final threshold between our hard floor and max pass limit
+  const effectiveThreshold = Math.min(
+    Math.max(dynamicThreshold, CRITICAL_FLOOR),
+    HIGH_CONFIDENCE_PASS
+  );
+
   const fields: ReviewField[] = [];
 
   for (const row of data.rows) {
@@ -29,12 +45,14 @@ export function detectReviewFields(data: ExtractedData): ReviewField[] {
       const value = row[col];
 
       if (confidence === undefined || typeof value !== 'string') continue;
-      if (confidence < threshold) {
+
+      // Flag if below dynamic threshold OR below hard safety floor
+      if (confidence < effectiveThreshold || confidence < CRITICAL_FLOOR) {
         fields.push({ rowId: row._id, column: col, value, confidence });
       }
     }
   }
 
-  // lowest confidence first
+  // Lowest confidence first
   return fields.sort((a, b) => a.confidence - b.confidence);
 }

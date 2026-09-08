@@ -2,17 +2,24 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import DocumentPanel from './components/document/DocumentPanel';
 import ExtractedDataPanel from './components/extracted-data/ExtractedDataPanel';
 import ChatPanel from './components/chat/ChatPanel';
-import type { ChatMessage } from '../../models/Message';
-import type { OCRComponent } from '../../models/OCRComponent';
-import { flattenOcrData } from './components/extracted-data/FlattenOcrData';
-import type { ExtractedData } from '../../models/TableData';
+import type { ChatMessage, ReviewField } from '../../models/Message';
+import type { OCRComponent, Pages } from '../../models/OCRComponent';
+import type { ExtractedPage } from '../../models/TableData';
+import { getProcessedImageUrls, getUploadedImageUrl } from '../../services/uploadService';
+//import type { DocumentJob } from '../../models/Job';
 import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
-import { getUploadedImageUrl } from '../../services/uploadService';
+import { reindentRow, type IndentDirection } from './components/extracted-data/indentEditor';
 import { detectReviewFields } from './components/extracted-data/detectReviewFields';
-import { requestFieldReview } from '../../services/llmService';
-import OcrReviewWidget from './components/chat/OcrReviewWidget';
+import {
+  requestBulkFieldReview,
+  requestFieldReview,
+  requestFormatDetection,
+} from '../../services/llmService';
 import type { OcrIssue } from './components/chat/OcrReviewWidget';
 import { flatten } from './components/extracted-data/flattener';
+import { checkTableFormats } from './components/extracted-data/detectFormat';
+
+import type { HistoryEntry } from '../HistoryEntry';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -27,39 +34,95 @@ function useIsLargeScreen() {
 }
 
 function ValidationPage() {
+  //const [jobs, setJobs] = useState<DocumentJob[]>([]);
+  //const [activeJobIndex, setActiveJobIndex] = useState<number>(0);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [documentContext, setDocumentContext] = useState<ExtractedData | null>(null);
   const [splitPercent, setSplitPercent] = useState(50);
-  const [oldContext, setOldContext] = useState<ExtractedData | null>(null); //for AI suggesiton
-  const [documentImageURL, setDocumentImageURL] = useState<string>();
-  const [ocrData, setOCRData] = useState<OCRComponent[]>([]);
+  const [oldContext, setOldContext] = useState<ExtractedPage | null>(null); //for AI suggesiton
+  const [imageUrls, setImageUrls] = useState<string[]>([]); // one image URL per page
+  const [ocrPages, setOcrPages] = useState<Pages>([]); // raw OCR, one array per page
+  const [extractedPages, setExtractedPages] = useState<ExtractedPage[]>([]); // flattened, one per page
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+
+  const documentContext: ExtractedPage | null = extractedPages[currentPageIndex] ?? null;
+  const ocrData: OCRComponent[] = ocrPages[currentPageIndex]?.components ?? [];
+  const documentImageURL: string | undefined = imageUrls[currentPageIndex];
+
   const isLarge = useIsLargeScreen();
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const undoStack = useRef<ExtractedData[]>([]);
-  const redoStack = useRef<ExtractedData[]>([]);
-  const documentContextRef = useRef<ExtractedData | null>(null);
+  const undoStack = useRef<ExtractedPage[][]>([]);
+  const redoStack = useRef<ExtractedPage[][]>([]);
+
   const [tableKey, setTableKey] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
-
   const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
-  const [hasDetected, setHasDetected] = useState(false);
-  const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review'>('chat');
+  const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review' | 'history'>('chat');
+
+  const extractedPagesRef = useRef<ExtractedPage[]>([]);
+  const currentPageIndexRef = useRef(0);
+  useEffect(() => {
+    extractedPagesRef.current = extractedPages;
+  }, [extractedPages]);
+  useEffect(() => {
+    currentPageIndexRef.current = currentPageIndex;
+  }, [currentPageIndex]);
+
+  const [resolvedIssueIds, setResolvedIssueIds] = useState<Set<string>>(new Set());
+
+  const handleResolveIssues = (ids: string[]) => {
+    setResolvedIssueIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  const addHistoryEntry = (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
+    setHistory((prev) => [
+      {
+        ...entry,
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+  };
 
   useEffect(() => {
     async function loadSession() {
       try {
-        let ocrData = await getExtractionSession();
-        setOCRData(ocrData);
+        // const batchData = await getBatchJobs().catch(() => null);
+
+        // if (batchData && batchData.jobs && batchData.jobs.length > 0) {
+        //   setJobs(batchData.jobs);
+        //   const initialIndex = batchData.activeJobIndex ?? 0;
+        //   setActiveJobIndex(initialIndex);
+
+        //   const activeJob = batchData.jobs[initialIndex] || batchData.jobs[0];
+        //   setOCRData(activeJob.ocrData || []);
+        //   setDocumentImageURL(getUploadedImageUrl(activeJob.imageIndex ?? initialIndex));
+
+        //   const initialTable =
+        //     activeJob.extractedData || flatten(activeJob.ocrData as OCRComponent[]);
+        //   setDocumentContext(initialTable);
+        //   return;
+        // }
+
+        const ocrData = await getExtractionSession(); //IMORTANT NOTE, CHANGE API TO NEW ONE
+        setOcrPages(ocrData);
         // console.log("SESSION DATA:", sessionData);
         // console.log("OCR DATA:", sessionData?.ocrData);
         // if (!sessionData?.ocrData) {
         //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
         // }
-        setDocumentImageURL(await getUploadedImageUrl());
-        setDocumentContext(flatten(ocrData as OCRComponent[]));
+        const processedUrls = await getProcessedImageUrls();
+        console.log(processedUrls);
+        setImageUrls(processedUrls.length > 0 ? processedUrls : [await getUploadedImageUrl()]);
       } catch (error) {
         console.error('Failed to load extraction session', error);
       }
@@ -67,76 +130,172 @@ function ValidationPage() {
     loadSession();
   }, []);
 
+  // re-flatten ALL pages whenever the raw OCR data or any page's
+  // manual indent overrides change. This is the single source of truth for
+  // extractedPages — nothing else should call flatten() directly
   useEffect(() => {
-    if (documentContext && !hasDetected) {
-      const fields = detectReviewFields(documentContext);
-      const issues = fields.map((f) => ({
-        fieldId: `${f.rowId}:${f.column}`,
-        fieldName: f.column,
-        ocrValue: String(f.value),
-        confidenceScore: f.confidence,
-      }));
-      setFlaggedIssues(issues);
-      setHasDetected(true);
-      if (issues.length > 0) {
+    if (ocrPages.length === 0) return;
+    const newExtractedPages: ExtractedPage[] = ocrPages.map((page, _pageIndex) => ({
+      ...flatten(page.components),
+      pageIndex: page.page_num - 1,
+    }));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setExtractedPages(newExtractedPages);
+  }, [ocrPages]);
+
+  const hasStartedRef = useRef(false);
+
+  useEffect(() => {
+    async function performFormatDetection() {
+      if (extractedPages.length === 0 || hasStartedRef.current) return;
+      hasStartedRef.current = true;
+
+      let allIssues: OcrIssue[] = [];
+
+      for (let pageIdx = 0; pageIdx < extractedPages.length; pageIdx++) {
+        const pageContext = extractedPages[pageIdx];
+
+        // Low Confidence Detection
+        const fields = detectReviewFields(pageContext);
+        const confidenceIssues: OcrIssue[] = fields.map((f) => ({
+          fieldId: `${f.rowId}:${f.column}`,
+          fieldName: f.column,
+          ocrValue: String(f.value),
+          confidenceScore: f.confidence,
+          issueType: 'confidence',
+          rowId: f.rowId,
+          pageIndex: pageIdx,
+        }));
+
+        const sampledData: Record<string, string[]> = {};
+        const maxSamples = 20;
+
+        for (const col of pageContext.columns) {
+          // Filter out empty/null values
+          const cleanValues = pageContext.rows
+            .map((row) => row[col])
+            .filter(
+              (val): val is string => val !== null && val !== undefined && String(val).trim() !== ''
+            )
+            .map((val) => String(val).trim());
+
+          if (cleanValues.length > 0) {
+            // Evenly sample across top, middle, and bottom rows rather than pure random
+            if (cleanValues.length <= maxSamples) {
+              sampledData[col] = cleanValues;
+            } else {
+              const step = Math.floor(cleanValues.length / maxSamples);
+              sampledData[col] = cleanValues
+                .filter((_, idx) => idx % step === 0)
+                .slice(0, maxSamples);
+            }
+          }
+        }
+
+        let formatIssues: OcrIssue[] = [];
+        let columnRegexMap: Record<string, string> = {};
+        try {
+          // If we have no sampled data, no need to request format detection
+          if (Object.keys(sampledData).length > 0) {
+            columnRegexMap = await requestFormatDetection(sampledData);
+            formatIssues = checkTableFormats(pageContext, columnRegexMap).map((f) => ({
+              fieldId: `${f.rowId}:${f.column}`,
+              fieldName: f.column,
+              ocrValue: String(f.value),
+              confidenceScore: 0.3, // fallback confidence score for format issues
+              issueType: 'format' as const,
+              rowId: f.rowId,
+              pageIndex: pageIdx,
+            }));
+          }
+        } catch (error) {
+          console.error('Failed to detect format issues on page ' + pageIdx, error);
+        }
+
+        // Group format issues by column.
+        const byColumn = formatIssues.reduce<Record<string, OcrIssue[]>>((acc, issue) => {
+          (acc[issue.fieldName] ??= []).push(issue);
+          return acc;
+        }, {});
+
+        Object.entries(byColumn).forEach(([column, colIssues]) => {
+          if (colIssues.length > 1) {
+            const groupId = `format:${column}:page${pageIdx}`;
+            colIssues.forEach((issue) => {
+              issue.groupId = groupId;
+              issue.formatRegex = columnRegexMap[column];
+            });
+          }
+        });
+
+        allIssues = allIssues.concat(confidenceIssues, formatIssues);
+      }
+
+      setFlaggedIssues(allIssues);
+      if (allIssues.length > 0) {
         setChatActiveTab('review');
       }
     }
-  }, [documentContext, hasDetected]);
 
-  useEffect(() => {
-    documentContextRef.current = documentContext;
-  }, [documentContext]);
+    performFormatDetection();
+  }, [extractedPages]);
+
+  // UNDO/REDO PIPELINE
+  const isModifierPressed = (e: KeyboardEvent) => e.metaKey || e.ctrlKey;
+
+  const handleUndo = useCallback(() => {
+    if (undoStack.current.length === 0) return;
+
+    const previous = undoStack.current.pop()!;
+    redoStack.current.push(extractedPagesRef.current);
+
+    setExtractedPages(previous);
+    saveExtractionSession(previous);
+    setEditedCells(new Set());
+    setTableKey((k) => k + 1);
+    addHistoryEntry({
+      type: 'undo',
+      description: 'Undid last change',
+    });
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    if (redoStack.current.length === 0) return;
+
+    const next = redoStack.current.pop()!;
+    undoStack.current.push(extractedPagesRef.current);
+
+    setExtractedPages(next);
+    saveExtractionSession(next);
+    setEditedCells(new Set());
+    setTableKey((k) => k + 1);
+    addHistoryEntry({
+      type: 'redo',
+      description: 'Redid last change',
+    });
+  }, [saveExtractionSession, addHistoryEntry]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.toUpperCase().includes('MAC');
-      const isUndo = e.metaKey && e.key === 'z' && !e.shiftKey;
-      const isRedo = e.metaKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey));
+      const key = e.key.toLowerCase();
+      const hasModifier = isModifierPressed(e);
+      const isUndo = hasModifier && key === 'z' && !e.shiftKey;
+      const isRedo = hasModifier && (key === 'y' || (key === 'z' && e.shiftKey));
 
       if (isUndo) {
         e.preventDefault();
-
-        if (undoStack.current.length === 0) {
-          return;
-        }
-
-        // pop last state from undo stack
-        const previous = undoStack.current.pop()!;
-
-        // push current into redo stack
-        redoStack.current.push(documentContextRef.current!);
-
-        //restore previous state
-        setDocumentContext(previous);
-        saveExtractionSession(previous);
-        setEditedCells(new Set());
-        setTableKey((k) => k + 1);
+        handleUndo();
       }
 
       if (isRedo) {
         e.preventDefault();
-
-        if (redoStack.current.length === 0) {
-          return;
-        }
-
-        // pop last state from redo stack
-        const next = redoStack.current.pop()!;
-
-        // push current into undo stack
-        undoStack.current.push(documentContextRef.current!);
-
-        setDocumentContext(next);
-        saveExtractionSession(next);
-        setEditedCells(new Set());
-        setTableKey((k) => k + 1);
+        handleRedo();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [handleUndo, handleRedo]);
 
   //Resizing Functions
   //Set dragging to be true
@@ -175,39 +334,48 @@ function ValidationPage() {
   }, [onMouseMove, onMouseUp]);
 
   //bounding box hover state
-  const [hoveredTableFieldId, setHoveredTableFieldId] = useState<string | null>(null);
-  const [hoveredDocumentOverlayId, setHoveredDocumentOverlayId] = useState<string | null>(null);
+  const [hoveredTableFieldIds, setHoveredTableFieldIds] = useState<string[]>([]);
+  const [hoveredDocumentOverlayIds, setHoveredDocumentOverlayIds] = useState<string[]>([]);
 
-  const handleSlideChange = useCallback(
-    (fieldId: string | null) => {
-      setHoveredTableFieldId(fieldId);
-      if (!fieldId) {
-        setHoveredDocumentOverlayId(null);
-        return;
-      }
-      const [rowId, column] = fieldId.split(':');
-      if (documentContext) {
-        const row = documentContext.rows.find((r) => String(r._id) === rowId);
-        if (row && row._cellKeyMap && row._cellKeyMap[column]) {
-          setHoveredDocumentOverlayId(row._cellKeyMap[column]);
-          return;
-        }
-      }
-      setHoveredDocumentOverlayId(null);
-    },
-    [documentContext]
-  );
+  const handleSlideChange = useCallback((fieldIds: string[], pageIndex?: number) => {
+    setHoveredTableFieldIds(fieldIds);
+
+    if (pageIndex !== undefined && pageIndex !== currentPageIndexRef.current) {
+      setCurrentPageIndex(pageIndex);
+    }
+
+    const contextPageIndex = pageIndex !== undefined ? pageIndex : currentPageIndexRef.current;
+    const currentContext = extractedPagesRef.current[contextPageIndex];
+
+    if (fieldIds.length === 0 || !currentContext) {
+      setHoveredDocumentOverlayIds([]);
+      return;
+    }
+
+    const overlayIds = fieldIds
+      .map((fieldId) => {
+        const [rowId, column] = fieldId.split(':');
+        const row = currentContext.rows.find((r) => String(r._id) === rowId);
+        return row?._cellKeyMap?.[column];
+      })
+      .filter((id): id is string => Boolean(id));
+
+    setHoveredDocumentOverlayIds(overlayIds);
+  }, []);
 
   const addMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
   };
 
   // called when AI returns updatedContext after accepting suggestion
-  const handleContextUpdate = (updatedData: ExtractedData) => {
-    setOldContext(documentContext); // save snapshot before overwriting
-    setDocumentContext(updatedData);
+  const handleContextUpdate = (updatedData: ExtractedPage) => {
+    undoStack.current.push(extractedPagesRef.current);
+    redoStack.current = [];
+    setOldContext(documentContext);
+    setExtractedPages((prev) =>
+      prev.map((page, i) => (i === currentPageIndex ? updatedData : page))
+    );
   };
-
   const resolveLastMessage = () => {
     setMessages((prev) =>
       prev.map((msg, i) => (i === prev.length - 1 ? { ...msg, resolved: true } : msg))
@@ -216,17 +384,14 @@ function ValidationPage() {
 
   //handle accept
   const handleAccept = async () => {
-    if (!documentContext) {
-      return;
-    }
+    if (!documentContext) return;
     try {
-      await saveExtractionSession(documentContext); // accept content
+      await saveExtractionSession(extractedPages);
     } catch (error) {
       console.error('Failed to save session after accept', error);
     }
-    setOldContext(null); // old to null
-    resolveLastMessage(); // hide buttons
-    //ai confirmation message
+    setOldContext(null);
+    resolveLastMessage();
     addMessage({
       id: crypto.randomUUID(),
       role: 'model',
@@ -237,12 +402,12 @@ function ValidationPage() {
 
   //handle reject
   const handleReject = () => {
-    if (!oldContext) {
-      return;
-    }
-    setDocumentContext(oldContext); // back to old
-    setOldContext(null); // old to null
-    resolveLastMessage(); // hide buttons
+    if (!oldContext) return;
+    setExtractedPages((prev) =>
+      prev.map((page, i) => (i === currentPageIndex ? oldContext : page))
+    );
+    setOldContext(null);
+    resolveLastMessage();
     addMessage({
       id: crypto.randomUUID(),
       role: 'model',
@@ -251,39 +416,153 @@ function ValidationPage() {
     });
   };
 
-  const handleCarouselAccept = (fieldId: string, newValue: string) => {
+  //Handle Row Indent
+  // Shared by indent + outdent: transforms the current page's rows in
+  // place via reindentRow (see indentEditor.ts) instead of reflattening
+  // from OCR, so no other edits on the page get lost.
+  const applyReindent = useCallback((rowId: string | number, direction: IndentDirection) => {
+    const pageIndex = currentPageIndexRef.current;
+    const currentPage = extractedPagesRef.current[pageIndex];
+    if (!currentPage) return;
+
+    const reindented = reindentRow(currentPage, rowId, direction);
+    if (reindented === currentPage) return; // already at min/max depth, nothing changed
+
+    undoStack.current.push(extractedPagesRef.current);
+    redoStack.current = [];
+
+    addHistoryEntry({
+      type: 'edit',
+      pageIndex,
+      fieldId: String(rowId),
+      column: '_indentLevel',
+      oldValue: '',
+      newValue: direction,
+      description: `${direction === 'in' ? 'Indented' : 'Outdented'} row on page ${pageIndex + 1}`,
+    });
+
+    setExtractedPages((prev) => prev.map((page, i) => (i === pageIndex ? reindented : page)));
+    saveExtractionSession(extractedPagesRef.current);
+  }, []);
+
+  const handleRowIndent = useCallback(
+    (rowId: string | number) => applyReindent(rowId, 'in'),
+    [applyReindent]
+  );
+
+  //Handle Row Outdent
+  const handleRowOutdent = useCallback(
+    (rowId: string | number) => applyReindent(rowId, 'out'),
+    [applyReindent]
+  );
+
+  const handleCarouselAccept = (updates: { fieldId: string; newValue: string }[]) => {
     if (!documentContext) return;
-    const [rowId, column] = fieldId.split(':');
-    const newContext = {
-      ...documentContext,
-      rows: documentContext.rows.map((r) => (r._id === rowId ? { ...r, [column]: newValue } : r)),
-    };
-    setDocumentContext(newContext);
-    saveExtractionSession(newContext);
-    setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
+    undoStack.current.push(extractedPagesRef.current);
+    redoStack.current = [];
+    setExtractedPages((prev) => {
+      const next = [...prev];
+      updates.forEach(({ fieldId, newValue }) => {
+        const [rowId, column] = fieldId.split(':');
+
+        //find what page the issue belongs to
+        const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
+        const pageIdx = issue?.pageIndex ?? currentPageIndex;
+
+        next[pageIdx] = {
+          ...next[pageIdx],
+          rows: next[pageIdx].rows.map((r) =>
+            String(r._id) === String(rowId) ? { ...r, [column]: newValue } : r
+          ),
+        };
+      });
+      return next;
+    });
+
+    updates.forEach(({ fieldId, newValue }) => {
+      const [rowId, column] = fieldId.split(':');
+      const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
+      const pageIdx = issue?.pageIndex ?? currentPageIndex;
+
+      const currentRow = extractedPagesRef.current[pageIdx]?.rows.find(
+        (r) => String(r._id) === String(rowId)
+      );
+      const oldValue = currentRow ? String(currentRow[column] ?? '') : '';
+
+      addHistoryEntry({
+        type: 'accept',
+        pageIndex: pageIdx,
+        fieldId,
+        column,
+        oldValue,
+        newValue,
+        description: `Accepted correction for "${column}" on page ${pageIdx + 1}: "${oldValue}" to "${newValue}"`,
+      });
+    });
+
+    saveExtractionSession(extractedPagesRef.current);
+    const fieldIds = updates.map(({ fieldId }) => fieldId);
+    setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
   };
 
-  const handleCarouselReject = (fieldId: string) => {
+  const handleCarouselReject = (fieldIds: string[]) => {
     if (!documentContext) return;
-    const [rowId, column] = fieldId.split(':');
-    const newContext = {
-      ...documentContext,
-      rows: documentContext.rows.map((r) => (r._id === rowId ? { ...r, [column]: '' } : r)),
-    };
-    setDocumentContext(newContext);
-    saveExtractionSession(newContext);
-    setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
+
+    fieldIds.forEach((fieldId) => {
+      const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
+
+      addHistoryEntry({
+        type: 'skip',
+        pageIndex: issue?.pageIndex,
+        fieldId,
+        column: issue?.fieldName,
+        oldValue: issue?.ocrValue,
+        description: `Skipped "${issue?.fieldName}" on page ${(issue?.pageIndex ?? 0) + 1}: "${issue?.ocrValue}"`,
+      });
+    });
+
+    setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
   };
 
   const handleCarouselManualEdit = (fieldId: string, newValue: string) => {
     if (!documentContext) return;
+
+    undoStack.current.push(extractedPagesRef.current);
+    redoStack.current = [];
     const [rowId, column] = fieldId.split(':');
-    const newContext = {
-      ...documentContext,
-      rows: documentContext.rows.map((r) => (r._id === rowId ? { ...r, [column]: newValue } : r)),
-    };
-    setDocumentContext(newContext);
-    saveExtractionSession(newContext);
+
+    // find what page the issue is in
+    const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
+    const pageIdx = issue?.pageIndex ?? currentPageIndex;
+
+    const currentRow = extractedPagesRef.current[pageIdx]?.rows.find(
+      (r) => String(r._id) === String(rowId)
+    );
+    const oldValue = currentRow ? String(currentRow[column] ?? '') : '';
+
+    addHistoryEntry({
+      type: 'edit',
+      pageIndex: pageIdx,
+      fieldId,
+      column,
+      oldValue,
+      newValue,
+      description: `Manually corrected "${column}" on page ${pageIdx + 1}: "${oldValue}" to "${newValue}"`,
+    });
+
+    setExtractedPages((prev) =>
+      prev.map((page, i) => {
+        if (i !== pageIdx) return page;
+        return {
+          ...page,
+          rows: page.rows.map((r) =>
+            String(r._id) === String(rowId) ? { ...r, [column]: newValue } : r
+          ),
+        };
+      })
+    );
+
+    saveExtractionSession(extractedPagesRef.current);
     setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
   };
 
@@ -294,7 +573,13 @@ function ValidationPage() {
       const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
       if (!issue) return null;
 
-      const field = { rowId, column, value: issue.ocrValue, confidence: issue.confidenceScore };
+      const field: ReviewField = {
+        rowId,
+        column,
+        value: issue.ocrValue,
+        confidence: issue.confidenceScore,
+        issueType: issue.issueType,
+      };
 
       try {
         const reply = await requestFieldReview(field, documentContext);
@@ -309,7 +594,63 @@ function ValidationPage() {
             return String(updatedRow[column]);
           }
         }
-        return reply.response; // fallback to text response
+        return reply.response;
+      } catch (e) {
+        console.error(e);
+        return null;
+      }
+    },
+    [documentContext, flaggedIssues]
+  );
+
+  const handleFetchBulkSuggestion = useCallback(
+    async (
+      column: string,
+      fields: { fieldId: string; rowId: string | number; ocrValue: string }[],
+      formatRegex?: string
+    ): Promise<Record<string, string> | null> => {
+      if (!documentContext) return null;
+
+      const reviewFields: ReviewField[] = fields.map((f) => {
+        const issue = flaggedIssues.find((i) => i.fieldId === f.fieldId);
+        return {
+          rowId: f.rowId,
+          column,
+          value: f.ocrValue,
+          confidence: issue?.confidenceScore ?? 0.3,
+          issueType: issue?.issueType ?? 'format',
+        };
+      });
+
+      try {
+        const reply = await requestBulkFieldReview({
+          column,
+          fields: reviewFields,
+          formatRegex,
+          documentContext,
+        });
+
+        const map: Record<string, string> = {};
+
+        if (reply.intent?.type === 'bulk_update' && reply.intent.bulkUpdates) {
+          reply.intent.bulkUpdates.forEach((u) => {
+            map[String(u.rowId)] = u.newValue;
+          });
+        }
+
+        if (reply.updatedContext) {
+          fields.forEach(({ rowId }) => {
+            if (map[String(rowId)] !== undefined) return;
+            const updatedRow = reply.updatedContext!.rows.find(
+              (r) => r._id === rowId || String(r._id) === String(rowId)
+            );
+            if (updatedRow && updatedRow[column] !== undefined) {
+              map[String(rowId)] = String(updatedRow[column]);
+            }
+          });
+        }
+
+        return Object.keys(map).length > 0 ? map : null;
       } catch (e) {
         console.error(e);
         return null;
@@ -337,9 +678,12 @@ function ValidationPage() {
           style={isLarge ? { width: `${splitPercent}%` } : { width: '100%' }}
         >
           <DocumentPanel
-            hoveredOverlayId={hoveredDocumentOverlayId}
+            hoveredOverlayIds={hoveredDocumentOverlayIds}
             documentImageUrl={documentImageURL}
             ocrData={ocrData}
+            imageUrls={imageUrls}
+            currentPageIndex={currentPageIndex}
+            onPageChange={setCurrentPageIndex}
           />
         </div>
 
@@ -362,138 +706,178 @@ function ValidationPage() {
           }
         >
           <ExtractedDataPanel
+            onUndoLast={handleUndo}
             key={tableKey}
             isEditMode={isEditMode}
             onEditModeChange={setIsEditMode}
             editedCells={editedCells}
             onHover={(id) => {
               if (isChatOpen && chatActiveTab === 'review') return;
-              setHoveredTableFieldId(id);
+
+              setHoveredTableFieldIds(id ? [id] : []);
+
               if (id && documentContext) {
                 const [rowId, column] = id.split(':');
                 const row = documentContext.rows.find((r) => String(r._id) === rowId);
-                setHoveredDocumentOverlayId(row?._cellKeyMap?.[column] ?? null);
+                const overlayId = row?._cellKeyMap?.[column] ?? null;
+                setHoveredDocumentOverlayIds(overlayId ? [overlayId] : []);
               } else {
-                setHoveredDocumentOverlayId(null);
+                setHoveredDocumentOverlayIds([]);
               }
             }}
             extractedData={documentContext}
-            hoveredOverlayId={hoveredTableFieldId}
+            hoveredOverlayIds={hoveredTableFieldIds}
+            onRowIndent={handleRowIndent}
+            onRowOutdent={handleRowOutdent}
             onCellEdit={(fieldId, newValue) => {
               if (!documentContext) return;
 
-              undoStack.current.push(documentContext);
-              redoStack.current = [];
+              undoStack.current.push(extractedPagesRef.current);
 
               const [rowId, column] = fieldId.split(':');
-              const newContext = {
-                ...documentContext,
-                rows: documentContext.rows.map((r) =>
-                  String(r._id) === rowId ? { ...r, [column]: newValue } : r
-                ),
-              };
+
+              // get old value for histroy
+              const currentPage = extractedPagesRef.current[currentPageIndex];
+              const currentRow = currentPage?.rows.find((r) => String(r._id) === rowId);
+              const oldValue = currentRow ? String(currentRow[column] ?? '') : '';
+
+              addHistoryEntry({
+                type: 'edit',
+                pageIndex: currentPageIndex,
+                fieldId,
+                column,
+                oldValue,
+                newValue,
+                description: `Edited "${column}" on page ${currentPageIndex + 1}: "${oldValue}" to "${newValue}"`,
+              });
+
+              redoStack.current = [];
+
+              setExtractedPages((prev) =>
+                prev.map((page, i) =>
+                  i !== currentPageIndex
+                    ? page
+                    : {
+                        ...page,
+                        rows: page.rows.map((r) =>
+                          String(r._id) === rowId ? { ...r, [column]: newValue } : r
+                        ),
+                      }
+                )
+              );
 
               setEditedCells((prev) => new Set(prev).add(fieldId));
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+              saveExtractionSession(extractedPagesRef.current);
               setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
             }}
-            //Acknowledgement: AI (Google Gemini) was used while coding the
-            // manual corrections
             onRowAdd={() => {
               if (!documentContext) return;
-              undoStack.current.push(documentContext);
+              undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
+
               const newRowId = `manual_row_${Date.now()}`;
               const newRow: any = { _id: newRowId, _confidence: 1, _cellConfidence: {} };
               documentContext.columns.forEach((col) => {
                 newRow[col] = '';
               });
-              const newContext = {
-                ...documentContext,
-                rows: [...documentContext.rows, newRow],
-              };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+
+              setExtractedPages((prev) =>
+                prev.map((page, i) =>
+                  i !== currentPageIndex ? page : { ...page, rows: [...page.rows, newRow] }
+                )
+              );
+              saveExtractionSession(extractedPagesRef.current);
             }}
             onRowDelete={(rowId) => {
               if (!documentContext) return;
-              undoStack.current.push(documentContext);
+              undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
-              const newContext = {
-                ...documentContext,
-                rows: documentContext.rows.filter((r) => r._id !== rowId),
-              };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+
+              setExtractedPages((prev) =>
+                prev.map((page, i) =>
+                  i !== currentPageIndex
+                    ? page
+                    : { ...page, rows: page.rows.filter((r) => r._id !== rowId) }
+                )
+              );
+              saveExtractionSession(extractedPagesRef.current);
             }}
             onColumnAdd={(columnName) => {
               if (!documentContext) return;
-              undoStack.current.push(documentContext);
-              redoStack.current = [];
-              // Avoid duplicates
               if (documentContext.columns.includes(columnName)) return;
+              undoStack.current.push(extractedPagesRef.current);
+              redoStack.current = [];
 
-              const newContext = {
-                ...documentContext,
-                columns: [...documentContext.columns, columnName],
-                rows: documentContext.rows.map((r) => ({ ...r, [columnName]: '' })),
-              };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+              setExtractedPages((prev) =>
+                prev.map((page, i) =>
+                  i !== currentPageIndex
+                    ? page
+                    : {
+                        ...page,
+                        columns: [...page.columns, columnName],
+                        rows: page.rows.map((r) => ({ ...r, [columnName]: '' })),
+                      }
+                )
+              );
+              saveExtractionSession(extractedPagesRef.current);
             }}
             onColumnDelete={(columnName) => {
               if (!documentContext) return;
-              undoStack.current.push(documentContext);
+              undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
-              const newContext = {
-                ...documentContext,
-                columns: documentContext.columns.filter((c) => c !== columnName),
-                rows: documentContext.rows.map((r) => {
-                  const newRow = { ...r };
-                  delete newRow[columnName];
-                  return newRow;
-                }),
-              };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+
+              setExtractedPages((prev) =>
+                prev.map((page, i) => {
+                  if (i !== currentPageIndex) return page;
+                  return {
+                    ...page,
+                    columns: page.columns.filter((c) => c !== columnName),
+                    rows: page.rows.map((r) => {
+                      const newRow = { ...r };
+                      delete newRow[columnName];
+                      return newRow;
+                    }),
+                  };
+                })
+              );
+              saveExtractionSession(extractedPagesRef.current);
             }}
             onRowMove={(rowId, direction) => {
               if (!documentContext) return;
-              undoStack.current.push(documentContext);
-              redoStack.current = [];
-              const rows = [...documentContext.rows];
+              const rows = documentContext.rows;
               const idx = rows.findIndex((r) => r._id === rowId);
-              if (idx === -1) return;
+              const canMove =
+                idx !== -1 &&
+                ((direction === 'up' && idx > 0) ||
+                  (direction === 'down' && idx < rows.length - 1));
+              if (!canMove) return;
 
-              if (direction === 'up' && idx > 0) {
-                const temp = rows[idx];
-                rows[idx] = rows[idx - 1];
-                rows[idx - 1] = temp;
-              } else if (direction === 'down' && idx < rows.length - 1) {
-                const temp = rows[idx];
-                rows[idx] = rows[idx + 1];
-                rows[idx + 1] = temp;
-              } else {
-                return; // No move needed
-              }
+              undoStack.current.push(extractedPagesRef.current);
+              redoStack.current = [];
 
-              const newContext = { ...documentContext, rows };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+              setExtractedPages((prev) =>
+                prev.map((page, i) => {
+                  if (i !== currentPageIndex) return page;
+                  const rows = [...page.rows];
+                  const idx = rows.findIndex((r) => r._id === rowId);
+                  if (direction === 'up') [rows[idx - 1], rows[idx]] = [rows[idx], rows[idx - 1]];
+                  else [rows[idx], rows[idx + 1]] = [rows[idx + 1], rows[idx]];
+                  return { ...page, rows };
+                })
+              );
+              saveExtractionSession(extractedPagesRef.current);
             }}
             onColumnReorder={(newColumns) => {
-              if (!documentContext) {
-                return;
-              }
-              undoStack.current.push(documentContext);
+              if (!documentContext) return;
+              undoStack.current.push(extractedPagesRef.current);
               redoStack.current = [];
-              const newContext = {
-                ...documentContext,
-                columns: newColumns,
-              };
-              setDocumentContext(newContext);
-              saveExtractionSession(newContext);
+
+              setExtractedPages((prev) =>
+                prev.map((page, i) =>
+                  i !== currentPageIndex ? page : { ...page, columns: newColumns }
+                )
+              );
+              saveExtractionSession(extractedPagesRef.current);
             }}
           />
         </div>
@@ -515,8 +899,12 @@ function ValidationPage() {
         onCarouselManualEdit={handleCarouselManualEdit}
         onSlideChange={handleSlideChange}
         onFetchSuggestion={handleFetchSuggestion}
+        onFetchBulkSuggestion={handleFetchBulkSuggestion}
         activeTab={chatActiveTab}
         onTabChange={setChatActiveTab}
+        resolvedIssueIds={resolvedIssueIds}
+        onResolveIssues={handleResolveIssues}
+        history={history}
       />
     </>
   );

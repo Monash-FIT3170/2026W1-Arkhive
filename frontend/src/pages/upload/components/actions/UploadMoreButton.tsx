@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import type { ChangeEvent } from "react";
-import { filterValidFiles } from "../dropzone/DropZone";
+import { filterValidFiles } from "../dropzone/dropZoneUtils";
 
 type UploadMoreButtonProps = {
   onFilesSelected: (files: File[]) => void;

@@ -12,6 +12,15 @@ vi.mock('fs', () => ({
   }
 }));
 
+// Mock Azure table extraction
+const { mockAnalyseResult } = vi.hoisted(() => ({
+  mockAnalyseResult: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('./utils/utils_table_extraction_new.js', () => ({
+  analyse_result: mockAnalyseResult,
+}));
+
 // Mock Google Cloud Vision
 const { mockDocumentTextDetection } = vi.hoisted(() => ({
   mockDocumentTextDetection: vi.fn().mockResolvedValue([{
@@ -47,7 +56,7 @@ describe('ocr service', () => {
       
       expect(result).toBe('Extracted sample text');
       expect(mockDocumentTextDetection).toHaveBeenCalledWith({
-        image: { content: buffer.toString('base64') }
+        image: { content: buffer }
       });
     });
 
@@ -63,23 +72,9 @@ describe('ocr service', () => {
 
   describe('parseTableWithRetries', () => {
     it('should call parseTable (with retries on failure)', async () => {
-      // Mock the inner return from vision API to avoid crashing extractStructuredComponents
-      mockDocumentTextDetection.mockResolvedValue([{
-        fullTextAnnotation: {
-          pages: [] // Empty pages to simplify the utils_table_extraction mock
-        }
-      }]);
-      
-      // We also need to mock utils_table_extraction for this to work cleanly
-      // but since it's an integration-like test, we let it run with empty pages
-      // As long as it doesn't throw, it's successful.
-      try {
-        await ocr.parseTableWithRetries(Buffer.from('test'));
-      } catch (e) {
-        // If extractStructuredComponents throws due to missing data structure,
-        // we at least know it attempted the call.
-      }
-      expect(mockDocumentTextDetection).toHaveBeenCalled();
+      await ocr.parseTableWithRetries(Buffer.from('test'));
+      expect(mockAnalyseResult).toHaveBeenCalled();
     });
   });
 });
+

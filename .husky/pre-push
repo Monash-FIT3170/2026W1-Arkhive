@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+# Mirrors the frontend-tests, backend-tests, backend-integration-tests and
+# frontend-integration-tests jobs from .github/workflows/ci.yml, so pushes
+# fail locally instead of in CI. Skips docker-build/Trivy (needs Docker
+# daemon, not worth it on every push) — that stays CI-only.
+set -e
+
+echo "== Frontend: lint =="
+(cd frontend && npm run lint)
+
+echo "== Frontend: type-check & build =="
+(cd frontend && npm run build)
+
+echo "== Frontend: unit tests =="
+(cd frontend && npm test)
+
+echo "== Frontend: integration tests =="
+(cd frontend && npm run test:integration)
+
+echo "== Backend: lint =="
+(cd backend && npm run lint)
+
+echo "== Backend: type-check =="
+(cd backend && npm run typecheck)
+
+echo "== Backend: unit tests =="
+(cd backend && npm test)
+
+echo "== Backend: integration tests =="
+(cd backend && npm run test:integration)
+
+echo "All checks passed — pushing."

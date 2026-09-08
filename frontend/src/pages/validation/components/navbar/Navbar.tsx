@@ -1,6 +1,5 @@
-import { Sun, Moon, Upload, LayoutGrid, Columns2, Share2Icon } from 'lucide-react';
+import { Sun, Moon, Upload, LayoutGrid, Columns2, ChevronLeft } from 'lucide-react';
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
 import { getMaxStep } from "../../../../services/stepGuard";
 
 export const Navbar = () => {
@@ -10,12 +9,7 @@ export const Navbar = () => {
   const step = params.get('step');
 
   // Re-read maxStep on every render so it stays in sync with sessionStorage
-  const [maxStep, setMaxStep] = useState(getMaxStep);
-
-  // Sync maxStep whenever the route changes (user navigated successfully)
-  useEffect(() => {
-    setMaxStep(getMaxStep());
-  }, [location]);
+  const maxStep = getMaxStep();
 
   function getCurrentStep(): number {
     if (location.pathname === '/validation') return 2;
@@ -25,7 +19,7 @@ export const Navbar = () => {
   const currentStep = getCurrentStep();
 
   function handleStepClick(targetStep: number, path: string) {
-    if (targetStep > maxStep) return; // locked — do nothing
+    if (targetStep > maxStep) return; // locked - do nothing
     navigate(path);
   }
 
@@ -50,10 +44,11 @@ export const Navbar = () => {
     },
   ];
 
+  const isOnValidation = location.pathname === '/validation';
 
-
-
-
+  function handleBack() {
+    navigate("/?step=preview");
+  }
 
   return (
     <div>
@@ -70,10 +65,13 @@ export const Navbar = () => {
               return (
                 <li
                   key={s}
-                  className={`step ${isActive ? "step-primary" : isUnlocked ? "" : "animate-pulse"} z-${50 - s * 10}`}
+                  className={`step ${isActive ? "step-primary" : isUnlocked ? "" : "animate-pulse"}`}
                   onClick={() => handleStepClick(s, path)}
                   title={!isUnlocked ? `Complete the previous step to unlock ${label}` : undefined}
-                  style={{ cursor: isUnlocked ? "pointer" : "not-allowed" }}
+                  style={{ 
+                    cursor: isUnlocked ? "pointer" : "not-allowed",
+                    zIndex: 50 - s
+                  }}
                 >
                   <span
                     className={`step-icon transition ${isUnlocked ? "hover:scale-130" : "opacity-40"}`}
@@ -86,14 +84,25 @@ export const Navbar = () => {
                 </li>
               );
             })}
-
-            <label className="swap swap-rotate cursor-pointer mx-2">
-              <input type="checkbox" value="night" className="theme-controller hover:scale-110 transition" />
-              <Sun className="swap-off w-8 h-8 hover:scale-110 transition" />
-              <Moon className="swap-on w-8 h-8 hover:scale-110 transition" />
-              <span className="sr-only">Toggle Theme</span>
-            </label>
           </ul>
+
+          {isOnValidation && (
+            <button
+              type="button"
+              onClick={handleBack}
+              className="btn btn-outline btn-sm"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back
+            </button>
+          )}
+
+          <label className="swap swap-rotate cursor-pointer mx-2">
+            <input type="checkbox" value="night" className="theme-controller hover:scale-110 transition" />
+            <Sun className="swap-off w-8 h-8 hover:scale-110 transition" />
+            <Moon className="swap-on w-8 h-8 hover:scale-110 transition" />
+            <span className="sr-only">Toggle Theme</span>
+          </label>
         </div>
       </div>
     </div>

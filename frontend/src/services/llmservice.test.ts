@@ -13,8 +13,9 @@ const sampleMessages: Message[] = [
 
 const sampleContext: ExtractedData = {
   columns: ["ITEM", "QTY", "PRICE"],
+  itemColumnKey: "ITEM",
   rows: [
-    { _id: "comp_1", confidence: 0.95, ITEM: "Apples", QTY: "10", PRICE: "5000" }
+    { _id: "comp_1", confidence: 0.95, _cellConfidence: {}, ITEM: "Apples", QTY: "10", PRICE: "5000" }
   ]
 };
 
