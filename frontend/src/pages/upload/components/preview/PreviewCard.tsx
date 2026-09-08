@@ -18,7 +18,6 @@ type Props = {
   onToggle: (index: number) => void;
   onRemove?: (index: number) => void;
   onReplaceWithFile?: (index: number, file: File) => void;
-  documentType?: string;
 };
 
 export default function PreviewCard({
@@ -36,7 +35,6 @@ export default function PreviewCard({
   onToggle,
   onRemove,
   onReplaceWithFile,
-  documentType,
 }: Props) {
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const displayName = subtitle ? `${label} - ${subtitle}` : label;
@@ -102,13 +100,7 @@ export default function PreviewCard({
         ) : (
           <p className="mt-1.5 text-center text-xs text-base-content/50">{index + 1}</p>
         )}
-        {documentType && (
-          <div className="mt-1 flex justify-center">
-            <span className="badge badge-primary badge-outline badge-sm">
-              {documentType}
-            </span>
-          </div>
-        )}
+
         {isProcessed && (
           <div className="mt-1 flex justify-center">
             <span className="badge badge-success badge-sm font-semibold">

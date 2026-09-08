@@ -153,7 +153,7 @@ export default function UploadPage() {
         const enhancedItems = newItems.map((item) => {
           const backendPageIndex = nextPageIndexRef.current++;
           const documentId = `File_${item.fileIndex}_${sessionIdSuffix}`;
-          return { ...item, backendPageIndex, documentId, documentType: 'Other' };
+          return { ...item, backendPageIndex, documentId };
         });
 
         // Trigger the uploads OUTSIDE the state setter sequentially to prevent session race conditions!
@@ -165,8 +165,7 @@ export default function UploadPage() {
                   item.previewSrc,
                   item.documentId!,
                   item.backendPageIndex!,
-                  item.label,
-                  item.documentType
+                  item.label
                 );
               } catch (err) {
                 console.error('Background upload failed:', err);
@@ -337,7 +336,7 @@ export default function UploadPage() {
         const enhancedItems = newItems.map((item) => {
           const backendPageIndex = nextPageIndexRef.current++;
           const documentId = `File_${item.fileIndex}_${sessionIdSuffix}`;
-          return { ...item, backendPageIndex, documentId, documentType: 'Other' };
+          return { ...item, backendPageIndex, documentId };
         });
 
         // Trigger the uploads OUTSIDE the state setter sequentially!
@@ -349,8 +348,7 @@ export default function UploadPage() {
                   item.previewSrc,
                   item.documentId!,
                   item.backendPageIndex!,
-                  item.label,
-                  item.documentType
+                  item.label
                 );
               } catch (err) {
                 console.error('Background upload failed:', err);
@@ -466,7 +464,7 @@ export default function UploadPage() {
           newItemsGroup.map((item) => {
             const backendPageIndex = nextPageIndexRef.current++;
             const documentId = `File_${item.fileIndex}_${sessionIdSuffix}`;
-            return { ...item, backendPageIndex, documentId, documentType: 'Other' };
+            return { ...item, backendPageIndex, documentId };
           })
         );
 
@@ -480,8 +478,7 @@ export default function UploadPage() {
                     item.previewSrc,
                     item.documentId!,
                     item.backendPageIndex!,
-                    item.label,
-                    item.documentType
+                    item.label
                   );
                 } catch (err) {
                   console.error('Background upload failed:', err);
@@ -533,7 +530,7 @@ export default function UploadPage() {
     setUploadSuccess(false); // US-1.5: clear any previous success before retrying
 
     try {
-      const selectedItemsMap = new Map<string, { type: string; pages: string[] }>();
+      const selectedItemsMap = new Map<string, { pages: string[] }>();
 
       const sortedSelectedIndices = [...selectedPages].sort((a, b) => a - b);
 
@@ -542,7 +539,7 @@ export default function UploadPage() {
         if (item?.hasFile && item.backendPageIndex !== undefined && item.documentId) {
           const docId = item.documentId;
           if (!selectedItemsMap.has(docId)) {
-            selectedItemsMap.set(docId, { type: item.documentType || 'Other', pages: [] });
+            selectedItemsMap.set(docId, { pages: [] });
           }
           selectedItemsMap.get(docId)!.pages.push(item.backendPageIndex.toString());
         }
@@ -550,7 +547,6 @@ export default function UploadPage() {
 
       const selectedPayload = Array.from(selectedItemsMap.entries()).map(([documentId, data]) => ({
         documentId,
-        type: data.type,
         pages: data.pages,
       }));
 
