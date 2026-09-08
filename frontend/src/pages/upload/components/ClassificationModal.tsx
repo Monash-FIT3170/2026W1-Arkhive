@@ -1,4 +1,6 @@
-import { useState} from 'react';
+// TO BE REMOVED
+
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { PreviewItem } from '../types';
 
@@ -21,13 +23,13 @@ export default function ClassificationModal({ items, onComplete, onCancel }: Pro
     const initial: Record<number, string> = {};
     items.forEach(({ index, item }) => {
       initial[index] = item.documentType || '';
-            /**
-       * TODO (AI Integration):
-       * Here we could call an AI service (e.g. vision model) to predict the document type
-       * based on `item.previewSrc` (image data URL) or actual file contents.
-       * e.g. `const predictedType = await predictType(item.previewSrc);`
-       *      `initial[index] = predictedType;`
-       */
+      /**
+ * TODO (AI Integration):
+ * Here we could call an AI service (e.g. vision model) to predict the document type
+ * based on `item.previewSrc` (image data URL) or actual file contents.
+ * e.g. `const predictedType = await predictType(item.previewSrc);`
+ *      `initial[index] = predictedType;`
+ */
     });
     setSelections(initial);
   }
