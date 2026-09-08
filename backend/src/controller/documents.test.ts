@@ -1,10 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import documentsController from './documents';
-import { supabase } from '../services/supabaseClient';
+vi.mock('../services/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: null },
+      }),
+    },
+  },
+  isSupabaseConfigured: false,
+}));
 import * as r2Client from '../services/r2Client';
 import * as ocrService from '../services/ocr/ocr';
 
-function createMockReqRes(userId: string | null = 'test-user-123', body = {}, params = {}, query = {}) {
+function createMockReqRes(
+  userId: string | null = 'test-user-123',
+  body = {},
+  params = {},
+  query = {}
+) {
   const req: any = {
     userId: userId ?? undefined,
     body,
@@ -108,7 +122,9 @@ describe('Documents Controller', () => {
 
   describe('getDownloadUrl', () => {
     it('returns presigned download URL when document belongs to user', async () => {
-      vi.spyOn(r2Client, 'generateDownloadUrl').mockResolvedValue('https://r2.test/download-presigned');
+      vi.spyOn(r2Client, 'generateDownloadUrl').mockResolvedValue(
+        'https://r2.test/download-presigned'
+      );
 
       const mockDoc = {
         id: 'doc-123',
@@ -126,7 +142,11 @@ describe('Documents Controller', () => {
         }),
       } as any);
 
-      const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {}, { id: 'doc-123' });
+      const { req, res, getStatus, getJson } = createMockReqRes(
+        'test-user-123',
+        {},
+        { id: 'doc-123' }
+      );
 
       await documentsController.getDownloadUrl(req, res);
 
@@ -164,9 +184,11 @@ describe('Documents Controller', () => {
     const mockOcrResult = [{ id: 'comp_1', text: 'Total: $50.00', confidence: 0.98 }];
 
     function mockOwnedDocument(updateImpl?: ReturnType<typeof vi.fn>) {
-      const update = updateImpl ?? vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ error: null }),
-      });
+      const update =
+        updateImpl ??
+        vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ error: null }),
+        });
 
       vi.spyOn(supabase, 'from').mockReturnValue({
         select: vi.fn().mockReturnValue({
@@ -187,7 +209,11 @@ describe('Documents Controller', () => {
       vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('fake-pdf-bytes'));
       vi.spyOn(ocrService, 'parseTableWithRetries').mockResolvedValue(mockOcrResult as any);
 
-      const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {}, { id: 'doc-123' });
+      const { req, res, getStatus, getJson } = createMockReqRes(
+        'test-user-123',
+        {},
+        { id: 'doc-123' }
+      );
 
       await documentsController.processDocument(req, res);
 
@@ -207,7 +233,9 @@ describe('Documents Controller', () => {
         'user/proj/doc-123/page-2.png',
         'user/proj/doc-123/page-1.png',
       ]);
-      const getObjectBufferSpy = vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('page'));
+      const getObjectBufferSpy = vi
+        .spyOn(r2Client, 'getObjectBuffer')
+        .mockResolvedValue(Buffer.from('page'));
       vi.spyOn(ocrService, 'parseTableWithRetries').mockResolvedValue(mockOcrResult as any);
 
       const { req, res } = createMockReqRes('test-user-123', {}, { id: 'doc-123' });
@@ -225,7 +253,11 @@ describe('Documents Controller', () => {
       vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('fake-pdf-bytes'));
       vi.spyOn(ocrService, 'parseTableWithRetries').mockRejectedValue(new Error('OCR exploded'));
 
-      const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {}, { id: 'doc-123' });
+      const { req, res, getStatus, getJson } = createMockReqRes(
+        'test-user-123',
+        {},
+        { id: 'doc-123' }
+      );
       await documentsController.processDocument(req, res);
 
       expect(getStatus()).toBe(500);
@@ -347,7 +379,11 @@ describe('Documents Controller', () => {
         }),
       } as any);
 
-      const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {}, { id: 'doc-123' });
+      const { req, res, getStatus, getJson } = createMockReqRes(
+        'test-user-123',
+        {},
+        { id: 'doc-123' }
+      );
 
       await documentsController.deleteDocument(req, res);
 
@@ -387,7 +423,9 @@ describe('Documents Controller', () => {
     });
 
     it('retrieves presigned URL for a specific page of a document', async () => {
-      vi.spyOn(r2Client, 'generateDownloadUrl').mockResolvedValue('https://r2.test/download-page-1');
+      vi.spyOn(r2Client, 'generateDownloadUrl').mockResolvedValue(
+        'https://r2.test/download-page-1'
+      );
 
       const mockDoc = {
         id: 'doc-123',

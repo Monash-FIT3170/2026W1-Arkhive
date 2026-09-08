@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import projectsController from './projects';
-import { supabase } from '../services/supabaseClient';
+vi.mock('../services/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: null },
+      }),
+    },
+  },
+  isSupabaseConfigured: false,
+}));
 import * as r2Client from '../services/r2Client';
 
 function createMockReqRes(
