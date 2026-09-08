@@ -1,4 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('./supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: null },
+      }),
+    },
+  },
+  isSupabaseConfigured: false,
+}));
+
 import {
   createProject,
   listProjects,
@@ -32,7 +44,10 @@ describe('projectService', () => {
   });
 
   it('lists projects via GET /api/projects', async () => {
-    const mockProjects = [{ id: 'p1', name: 'P1' }, { id: 'p2', name: 'P2' }];
+    const mockProjects = [
+      { id: 'p1', name: 'P1' },
+      { id: 'p2', name: 'P2' },
+    ];
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
       json: async () => mockProjects,
