@@ -7,9 +7,11 @@ vi.mock('../services/supabaseClient', () => ({
         data: { session: null },
       }),
     },
+    from: vi.fn(),
   },
   isSupabaseConfigured: false,
 }));
+
 import { supabase } from '../services/supabaseClient';
 import * as r2Client from '../services/r2Client';
 
@@ -182,7 +184,8 @@ describe('Projects Controller', () => {
 
   describe('deleteProject', () => {
     it('deletes R2 objects and DB records', async () => {
-      const deleteObjectsSpy = vi.spyOn(r2Client, 'deleteObjects').mockResolvedValue();
+      // Update the spy to mock deletePrefix instead of deleteObjects
+      const deletePrefixSpy = vi.spyOn(r2Client, 'deletePrefix').mockResolvedValue();
 
       vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
         if (table === 'projects') {
@@ -224,7 +227,8 @@ describe('Projects Controller', () => {
 
       await projectsController.deleteProject(req, res);
 
-      expect(deleteObjectsSpy).toHaveBeenCalledWith(['user/proj/file1.pdf']);
+      // Assert that deletePrefix was called with the trailing slash
+      expect(deletePrefixSpy).toHaveBeenCalledWith('user/proj/file1.pdf/');
       expect(getStatus()).toBe(200);
       expect(getJson()).toEqual({ success: true });
     });

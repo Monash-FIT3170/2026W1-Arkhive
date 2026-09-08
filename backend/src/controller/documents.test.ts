@@ -7,9 +7,11 @@ vi.mock('../services/supabaseClient', () => ({
         data: { session: null },
       }),
     },
+    from: vi.fn(),
   },
   isSupabaseConfigured: false,
 }));
+
 import { supabase } from '../services/supabaseClient';
 import * as r2Client from '../services/r2Client';
 import * as ocrService from '../services/ocr/ocr';
@@ -57,7 +59,7 @@ describe('Documents Controller', () => {
         id: 'doc-123',
         project_id: 'proj-1',
         filename: 'report.pdf',
-        storage_path: 'test-user-123/proj-1/report.pdf',
+        storage_path: 'test-user-123/proj-1/doc-123',
         status: 'pending',
       };
 
@@ -89,6 +91,8 @@ describe('Documents Controller', () => {
         projectId: 'proj-1',
         filename: 'report.pdf',
         contentType: 'application/pdf',
+        pageIndex: 0,
+        documentId: 'doc-123', // Pass documentId so randomUUID() is skipped
       });
 
       await documentsController.getUploadUrl(req, res);
@@ -113,6 +117,7 @@ describe('Documents Controller', () => {
       const { req, res, getStatus } = createMockReqRes('test-user-123', {
         projectId: 'other-proj',
         filename: 'report.pdf',
+        pageIndex: 0, // Added required pageIndex
       });
 
       await documentsController.getUploadUrl(req, res);
@@ -250,6 +255,9 @@ describe('Documents Controller', () => {
     });
 
     it('sets status to error when OCR fails', async () => {
+      // Suppress console.error logs for this test
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
       const update = mockOwnedDocument();
       vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('fake-pdf-bytes'));
       vi.spyOn(ocrService, 'parseTableWithRetries').mockRejectedValue(new Error('OCR exploded'));
@@ -261,12 +269,16 @@ describe('Documents Controller', () => {
       );
       await documentsController.processDocument(req, res);
 
-      expect(getStatus()).toBe(500);
-      expect(getJson().error).toContain('OCR exploded');
+      expect(getStatus()).toBe(500); //[cite: 4]
+      expect(getJson().error).toContain('OCR exploded'); //[cite: 4]
       expect(update.mock.calls.map((call) => call[0])).toEqual([
-        { status: 'processing' },
-        { status: 'error' },
-      ]);
+        //[cite: 4]
+        { status: 'processing' }, //[cite: 4]
+        { status: 'error' }, //[cite: 4]
+      ]); //[cite: 4]
+
+      // Restore console.error
+      consoleSpy.mockRestore();
     });
   });
 
@@ -360,6 +372,8 @@ describe('Documents Controller', () => {
 
   describe('deleteDocument', () => {
     it('deletes R2 object and DB record', async () => {
+      // Mock both deletePrefix and deleteObject methods
+      const deletePrefixSpy = vi.spyOn(r2Client, 'deletePrefix').mockResolvedValue();
       const deleteObjectSpy = vi.spyOn(r2Client, 'deleteObject').mockResolvedValue();
 
       const mockDoc = {
@@ -388,6 +402,8 @@ describe('Documents Controller', () => {
 
       await documentsController.deleteDocument(req, res);
 
+      // Verify both functions are called as defined in documents.ts
+      expect(deletePrefixSpy).toHaveBeenCalledWith('user/proj/file.pdf/');
       expect(deleteObjectSpy).toHaveBeenCalledWith('user/proj/file.pdf');
       expect(getStatus()).toBe(200);
       expect(getJson()).toEqual({ success: true, documentId: 'doc-123' });
