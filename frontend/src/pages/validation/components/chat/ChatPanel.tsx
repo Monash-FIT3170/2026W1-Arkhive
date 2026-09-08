@@ -8,7 +8,7 @@ import type { ExtractedPage } from '../../../../models/TableData';
 import OcrReviewWidget from './OcrReviewWidget';
 import { buildSlides, type OcrIssue } from './ocrReviewUtils';
 
-import type { HistoryEntry } from '../../../HistoryEntry';
+import type { HistoryEntry } from '../../../../models/HistoryEntry';
 
 function ChatPanel({
   isOpen,
