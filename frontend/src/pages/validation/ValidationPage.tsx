@@ -82,7 +82,7 @@ function ValidationPage() {
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  const addHistoryEntry = (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
+  const addHistoryEntry = useCallback((entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
     setHistory((prev) => [
       {
         ...entry,
@@ -91,7 +91,7 @@ function ValidationPage() {
       },
       ...prev,
     ]);
-  };
+  }, []);
 
   useEffect(() => {
     async function loadSession() {
@@ -273,7 +273,7 @@ function ValidationPage() {
       type: 'redo',
       description: 'Redid last change',
     });
-  }, [saveExtractionSession, addHistoryEntry]);
+  }, [addHistoryEntry]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

@@ -233,7 +233,7 @@ export default {
               imageIndex: index,
               imageUrl: `/api/upload/image/${documentId}/${files[0].pageIndex}`,
               status: 'completed',
-              ocrData: ocrComponents,
+              ocrData: ocrComponents as any,
               confidence,
               createdAt: Date.now(),
               updatedAt: Date.now(),

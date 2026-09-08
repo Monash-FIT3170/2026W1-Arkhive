@@ -90,8 +90,9 @@ export default function UploadPage() {
 
   // Clean up object URLs when leaving the page
   useEffect(() => {
+    const urlsToRevoke = createdUrlsRef.current;
     return () => {
-      createdUrlsRef.current.forEach(URL.revokeObjectURL);
+      urlsToRevoke.forEach(URL.revokeObjectURL);
     };
   }, []);
 
@@ -116,7 +117,6 @@ export default function UploadPage() {
               isImage: true,
               hasFile: true,
               fileIndex: fileIdx,
-              documentType: doc.type || 'Other',
               backendPageIndex,
               documentId: doc.documentId,
               isProcessed: processedSet.has(pageUrl),
@@ -490,7 +490,6 @@ export default function UploadPage() {
 
         setPreviewItems((prev) => {
           const next = [...prev];
-          const newIndices: number[] = [];
 
           [...pairs].reverse().forEach((pair, i) => {
             const itemToRemove = next[pair.previewIndex];
@@ -839,7 +838,6 @@ export default function UploadPage() {
                         isDark={item.isDark}
                         shouldWarn={item.shouldWarn}
                         isProcessed={item.isProcessed}
-                        documentType={item.documentType}
                         onToggle={togglePageSelection}
                         onRemove={handleRemovePreview}
                         onReplaceWithFile={handleReplaceWithFile}

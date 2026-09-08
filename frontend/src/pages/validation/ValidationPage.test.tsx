@@ -21,7 +21,6 @@ const { mockJobs } = vi.hoisted(() => ({
       id: 'job-2',
       index: 1,
       fileName: 'receipt-02.png',
-      documentType: 'Receipt',
       imageIndex: 1,
       imageUrl: '/api/upload/image/1',
       status: 'completed',
