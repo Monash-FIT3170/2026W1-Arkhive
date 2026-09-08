@@ -1,3 +1,4 @@
+// @ts-expect-error - no types available for fetch-cookie
 import fetchCookie from 'fetch-cookie';
 import { CookieJar } from 'tough-cookie';
 
