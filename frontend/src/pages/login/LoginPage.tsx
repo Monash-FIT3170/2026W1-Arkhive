@@ -213,6 +213,35 @@ export const LoginPage = () => {
           Continue as Guest
         </button>
       </div>
+
+      {/* Guest warning modal */}
+      {showGuestWarning && (
+        <div className="modal modal-open">
+          <div className="modal-box bg-base-200">
+            <h3 className="font-bold text-lg">Guest Mode</h3>
+            <p className="py-4 text-sm text-base-content/70">
+              You are continuing as a guest. Your data will{' '}
+              <span className="font-semibold text-warning">not be saved</span> after your session
+              ends. To keep your work, create a free account.
+            </p>
+            <div className="modal-action gap-2">
+              <button className="btn btn-ghost" onClick={() => setShowGuestWarning(false)}>
+                Go Back
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setShowGuestWarning(false);
+                  continueAsGuest();
+                }}
+              >
+                Continue as Guest
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => setShowGuestWarning(false)} />
+        </div>
+      )}
     </div>
   );
 };
