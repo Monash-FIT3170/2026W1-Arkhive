@@ -41,6 +41,10 @@ export const LoginPage = () => {
     if (!email.trim()) return 'Email is required.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Please enter a valid email address.';
     if (!password) return 'Password is required.';
+    if (mode === 'register') {
+      if (password.length < 6) return 'Password must be at least 6 characters.';
+      if (password !== confirmPassword) return 'Passwords do not match.';
+    }
     return null;
   };
 
@@ -110,6 +114,16 @@ export const LoginPage = () => {
           >
             Login
           </button>
+          <button
+            className={`flex-1 py-2 text-sm font-medium transition-colors ${mode === 'register' ? 'bg-primary text-primary-content' : 'bg-base-100 text-base-content/60 hover:text-base-content'}`}
+            onClick={() => {
+              setMode('register');
+              setError(null);
+              setSuccessMessage(null);
+            }}
+          >
+            Register
+          </button>
         </div>
 
         {/* Form */}
@@ -132,6 +146,17 @@ export const LoginPage = () => {
             onKeyDown={handleKeyDown}
             disabled={isSubmitting}
           />
+          {mode === 'register' && (
+            <input
+              type="password"
+              placeholder="Confirm Password"
+              className="input input-bordered w-full bg-base-100"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={isSubmitting}
+            />
+          )}
         </div>
 
         {/* Error/Success */}
@@ -188,35 +213,6 @@ export const LoginPage = () => {
           Continue as Guest
         </button>
       </div>
-
-      {/* Guest warning modal */}
-      {showGuestWarning && (
-        <div className="modal modal-open">
-          <div className="modal-box bg-base-200">
-            <h3 className="font-bold text-lg">Guest Mode</h3>
-            <p className="py-4 text-sm text-base-content/70">
-              You are continuing as a guest. Your data will{' '}
-              <span className="font-semibold text-warning">not be saved</span> after your session
-              ends. To keep your work, create a free account.
-            </p>
-            <div className="modal-action gap-2">
-              <button className="btn btn-ghost" onClick={() => setShowGuestWarning(false)}>
-                Go Back
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  setShowGuestWarning(false);
-                  continueAsGuest();
-                }}
-              >
-                Continue as Guest
-              </button>
-            </div>
-          </div>
-          <div className="modal-backdrop" onClick={() => setShowGuestWarning(false)} />
-        </div>
-      )}
     </div>
   );
 };
