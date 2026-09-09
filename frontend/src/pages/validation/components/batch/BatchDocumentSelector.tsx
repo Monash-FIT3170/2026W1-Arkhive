@@ -200,7 +200,7 @@ export default function BatchDocumentSelector({
                   ? 'bg-base-100 border-primary shadow-sm text-base-content ring-1 ring-primary'
                   : 'bg-base-100/60 hover:bg-base-100 border-base-300 text-base-content/70'
               }`}
-              title={`${job.fileName} (${job.documentType})`}
+              title={job.fileName}
             >
               <div className="flex items-center justify-center w-5 h-5 rounded bg-base-200 text-[11px] font-bold text-base-content/80">
                 {index + 1}
@@ -210,9 +210,7 @@ export default function BatchDocumentSelector({
                 <span className="truncate font-semibold text-[11px]">
                   {job.fileName || `Document ${index + 1}`}
                 </span>
-                <span className="text-[10px] text-base-content/50">
-                  {job.documentType || 'Document'}
-                </span>
+
               </div>
 
               {/* Status / Confidence Badge */}

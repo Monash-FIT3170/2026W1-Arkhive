@@ -21,7 +21,6 @@ type Props = {
   onError?: (msg: string | null) => void;
   onBulkRemove: () => void;                     // triggers bulk-remove confirmation
   onBulkReplaceFiles: (files: File[]) => void;   // triggers bulk-replace confirmation
-  onBulkChangeType: () => void;
 };
 
 export default function UploadSidebar({
@@ -35,7 +34,6 @@ export default function UploadSidebar({
   onError,
   onBulkRemove,
   onBulkReplaceFiles,
-  onBulkChangeType,
 }: Props) {
   return (
     <aside className="border-base-300 bg-base-100 flex w-80 shrink-0 flex-col gap-2 border-l px-4 py-4 overflow-y-auto">
@@ -53,7 +51,6 @@ export default function UploadSidebar({
         totalCount={totalCount}
         onBulkRemove={onBulkRemove}
         onBulkReplaceFiles={onBulkReplaceFiles}
-        onBulkChangeType={onBulkChangeType}
       />
 
       <div className="divider my-0" />

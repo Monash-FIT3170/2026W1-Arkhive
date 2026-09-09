@@ -72,7 +72,7 @@ export default function OcrReviewWidget({
           : currentSlide.issues[0]?.pageIndex;
       onSlideChange(fieldIds, pageIndex);
     }
-  }, [currentIndex, slides.length, onSlideChange, unresolvedIssues]);
+  }, [currentIndex, slides.length, onSlideChange, unresolvedIssues, currentSlide]);
 
   // Whenever the slide list shrinks (or changes) for any reason — resolving an
   // issue, the parent updating `issues`, — make sure currentIndex still

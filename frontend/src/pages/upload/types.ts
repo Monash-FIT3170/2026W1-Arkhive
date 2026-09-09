@@ -10,7 +10,6 @@ export type PreviewItem = {
   isBlurry?: boolean;
   isDark?: boolean;
   shouldWarn?: boolean;
-  documentType?: string; // The classified type of the document (e.g. Receipt, Invoice)
   backendPageIndex?: number; // Stable identifier for the page in the backend
   documentId?: string; // Unique identifier for the document
   isProcessed?: boolean; // True if the file has been successfully processed by OCR

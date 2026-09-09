@@ -17,7 +17,6 @@ declare module 'express-session' {
     };
     documents?: {
       [documentId: string]: {
-        type?: string;
         label?: string;
         pages: { [pageIndex: string]: string };
       };
@@ -58,11 +57,6 @@ export default {
     const sessionId = req.session.id;
     const relativePath = path.join(sessionId, documentId, file.filename);
     req.session.documents[documentId].pages[pageIndex] = relativePath;
-
-    // Optional: save document type if sent
-    if (req.body.type) {
-      req.session.documents[documentId].type = req.body.type;
-    }
 
     // Save document label if sent (only needed once per document)
     if (req.body.label && !req.session.documents[documentId].label) {
@@ -130,7 +124,7 @@ export default {
 
   // Process selected documents/pages with OCR, tracked as a batch of per-document jobs
   processDocuments: async (req: Request, res: Response) => {
-    const selected: { documentId: string; pages: string[]; type: string }[] =
+    const selected: { documentId: string; pages: string[] }[] =
       req.body.selected || [];
 
     if (!selected || selected.length === 0) {
@@ -145,17 +139,13 @@ export default {
     const documentsToProcess: {
       documentId: string;
       label?: string;
-      type: string;
       files: { pageIndex: string; path: string }[];
     }[] = [];
 
     for (const selection of selected) {
-      const { documentId, pages, type } = selection;
+      const { documentId, pages } = selection;
       const doc = sessionDocs[documentId];
       if (!doc) continue;
-
-      // Update type if provided
-      doc.type = type || doc.type || 'Other';
 
       const files: { pageIndex: string; path: string }[] = [];
       for (const pageIndex of pages) {
@@ -172,7 +162,6 @@ export default {
         documentsToProcess.push({
           documentId,
           label: doc.label,
-          type: doc.type,
           files,
         });
       }
@@ -195,7 +184,7 @@ export default {
       // Process each *document* (which may span multiple pages) as one job in the batch
       const jobs: DocumentJob[] = await Promise.all(
         documentsToProcess.map(async (docEntry, index) => {
-          const { documentId, label, type, files } = docEntry;
+          const { documentId, label, files } = docEntry;
           const fileName = label || documentId;
           const jobId = `job-${Date.now()}-${index}`;
 
@@ -230,7 +219,7 @@ export default {
                     }) + '\n'
                   );
                 });
-                return text.map((item: any) => ({ ...item, documentType: type }));
+                return text;
               })
             );
 
@@ -241,11 +230,10 @@ export default {
               id: jobId,
               index,
               fileName,
-              documentType: type,
               imageIndex: index,
               imageUrl: `/api/upload/image/${documentId}/${files[0].pageIndex}`,
               status: 'completed',
-              ocrData: ocrComponents,
+              ocrData: ocrComponents as any,
               confidence,
               createdAt: Date.now(),
               updatedAt: Date.now(),
@@ -288,7 +276,6 @@ export default {
               id: jobId,
               index,
               fileName,
-              documentType: type,
               imageIndex: index,
               imageUrl: `/api/upload/image/${documentId}/${files[0].pageIndex}`,
               status: 'failed',
@@ -368,7 +355,6 @@ export default {
       return {
         documentId,
         label: doc.label,
-        type: doc.type,
         pages,
       };
     });
