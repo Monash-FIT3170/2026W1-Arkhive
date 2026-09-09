@@ -3,7 +3,7 @@
 // page is selected. These sit below the existing selection summary box.
 
 import { useRef } from "react";
-import { Trash2, RefreshCw, Tag } from "lucide-react";
+import { Trash2, RefreshCw } from "lucide-react";
 
 const REPLACE_INPUT_ACCEPT = ".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif";
 
@@ -14,7 +14,6 @@ type Props = {
   totalCount: number;
   onBulkRemove: () => void;
   onBulkReplaceFiles: (files: File[]) => void;
-  onBulkChangeType: () => void;
 };
 
 export default function SelectionActions({
@@ -24,7 +23,6 @@ export default function SelectionActions({
   totalCount,
   onBulkRemove,
   onBulkReplaceFiles,
-  onBulkChangeType,
 }: Props) {
   // hidden native multi-file input used to pick replacement files
   // for all currently selected pages at once
@@ -78,14 +76,6 @@ export default function SelectionActions({
           >
             <RefreshCw className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
             Replace Selected ({selectedCount})
-          </button>
-          <button
-            type="button"
-            onClick={onBulkChangeType}
-            className="btn btn-outline btn-sm w-full rounded-xl"
-          >
-            <Tag className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
-            Change Type ({selectedCount})
           </button>
           <button
             type="button"

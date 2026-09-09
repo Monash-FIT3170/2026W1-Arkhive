@@ -285,7 +285,7 @@ export function exportBatchAsCSV(jobs: DocumentJob[], filename = 'arkhive-batch-
 
   jobs.forEach((job, index) => {
     const data = getJobExtractedData(job);
-    const headerRow = `--- DOCUMENT ${index + 1}: ${job.fileName} (${job.documentType}) ---`;
+    const headerRow = `--- DOCUMENT ${index + 1}: ${job.fileName} ---`;
     const colRow = (data.columns || []).map((col) => `"${col.replace(/"/g, '""')}"`).join(',');
     const rowLines = (data.rows || []).map((row) =>
       (data.columns || [])
@@ -313,7 +313,6 @@ export function exportBatchAsJSON(jobs: DocumentJob[], filename = 'arkhive-batch
   const batchPayload = jobs.map((job) => ({
     id: job.id,
     fileName: job.fileName,
-    documentType: job.documentType,
     status: job.status,
     confidence: job.confidence,
     extractedData: getJobExtractedData(job),
@@ -336,7 +335,7 @@ export function exportBatchAsTXT(jobs: DocumentJob[], filename = 'arkhive-batch-
 
   jobs.forEach((job, index) => {
     const data = getJobExtractedData(job);
-    const banner = `========================================================\nDOCUMENT ${index + 1}: ${job.fileName}\nTYPE: ${job.documentType} | CONFIDENCE: ${Math.round((job.confidence || 0) * 100)}%\n========================================================`;
+    const banner = `========================================================\nDOCUMENT ${index + 1}: ${job.fileName}\nCONFIDENCE: ${Math.round((job.confidence || 0) * 100)}%\n========================================================`;
     const colHeader = (data.columns || []).join('\t');
     const rowLines = (data.rows || []).map((row) =>
       (data.columns || []).map((col) => String(row[col] ?? '')).join('\t')
