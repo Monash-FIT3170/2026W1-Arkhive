@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Trash2, RefreshCw, Tag, Eye, X } from "lucide-react";
+import { Trash2, RefreshCw, Eye, X } from "lucide-react";
 
 const REPLACE_INPUT_ACCEPT = ".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif";
 
@@ -18,8 +18,6 @@ type Props = {
   onToggle: (index: number) => void;
   onRemove?: (index: number) => void;
   onReplaceWithFile?: (index: number, file: File) => void;
-  documentType?: string;
-  onChangeType?: (index: number) => void;
 };
 
 export default function PreviewCard({
@@ -37,8 +35,6 @@ export default function PreviewCard({
   onToggle,
   onRemove,
   onReplaceWithFile,
-  documentType,
-  onChangeType,
 }: Props) {
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const displayName = subtitle ? `${label} - ${subtitle}` : label;
@@ -104,13 +100,7 @@ export default function PreviewCard({
         ) : (
           <p className="mt-1.5 text-center text-xs text-base-content/50">{index + 1}</p>
         )}
-        {documentType && (
-          <div className="mt-1 flex justify-center">
-            <span className="badge badge-primary badge-outline badge-sm">
-              {documentType}
-            </span>
-          </div>
-        )}
+
         {isProcessed && (
           <div className="mt-1 flex justify-center">
             <span className="badge badge-success badge-sm font-semibold">
@@ -120,9 +110,9 @@ export default function PreviewCard({
         )}
       </div>
 
-      {/* UPDATED: Replace/Remove/Change Type are now a compact icon-only row
+      {/* UPDATED: Replace/Remove are now a compact icon-only row
           instead of stacked full-width text buttons */}
-      {hasFile && (onRemove || onReplaceWithFile || onChangeType) && (
+      {hasFile && (onRemove || onReplaceWithFile) && (
         <div className="mt-3 flex flex-col items-center gap-2">
           <div className="flex items-center justify-center gap-2">
             {onReplaceWithFile && (
@@ -166,20 +156,6 @@ export default function PreviewCard({
                 }}
               >
                 <Trash2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
-              </button>
-            )}
-            {onChangeType && (
-              <button
-                type="button"
-                className="btn btn-outline btn-sm btn-square"
-                aria-label={`Change type of page ${displayName}`}
-                title="Change Type"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChangeType(index);
-                }}
-              >
-                <Tag className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
               </button>
             )}
           </div>
