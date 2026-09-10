@@ -18,6 +18,8 @@ export default async function setup() {
         PORT: String(TEST_BACKEND_PORT),
         OCR_MODE: 'mock',
         SESSION_SECRET: 'integration-test-secret',
+        SUPABASE_URL: process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
+        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key',
       },
     }
   );
