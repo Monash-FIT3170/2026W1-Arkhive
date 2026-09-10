@@ -4,8 +4,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import llmRoutes from './routes/llmRoutes';
 import extractionRoutes from './routes/extractionRoutes';
-import testRouter from './routes/testRoute';
 import uploadRouter from './routes/upload';
+import projectsRouter from './routes/projects';
+import documentsRouter from './routes/documents';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +32,8 @@ app.use(
 app.use('/api/llm', llmRoutes);
 app.use('/api/extraction', extractionRoutes);
 app.use('/api/upload', uploadRouter);
-app.use('/api/test', testRouter);
+app.use('/api/projects', projectsRouter);
+app.use('/api/documents', documentsRouter);
 
 app.use((req: Request, res: Response, next) => {
   console.log('HIT:', req.method, req.url);

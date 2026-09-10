@@ -19,7 +19,7 @@ import type { OcrIssue } from './components/chat/OcrReviewWidget';
 import { flatten } from './components/extracted-data/flattener';
 import { checkTableFormats } from './components/extracted-data/detectFormat';
 
-import type { HistoryEntry } from '../HistoryEntry';
+import type { HistoryEntry } from '../../models/HistoryEntry';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
