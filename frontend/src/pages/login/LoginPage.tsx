@@ -23,6 +23,8 @@ export const LoginPage = () => {
   const destination = (location.state as { from?: { pathname?: string } })?.from?.pathname || '/';
 
   const [mode, setMode] = useState<Mode>('login');
+  const [displayName, setDisplayName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -38,6 +40,9 @@ export const LoginPage = () => {
 
   // Form validation
   const validate = (): string | null => {
+    if (mode === 'register') {
+      if (!displayName.trim()) return 'Display name is required.';
+    }
     if (!email.trim()) return 'Email is required.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Please enter a valid email address.';
     if (!password) return 'Password is required.';
@@ -66,7 +71,11 @@ export const LoginPage = () => {
         setError(error);
       }
     } else {
-      const { error, needsEmailConfirmation } = await signUp(email, password);
+      const { error, needsEmailConfirmation } = await signUp(email, password, {
+        displayName: displayName.trim(),
+        firstName: displayName.trim(),
+        lastName: lastName.trim(),
+      });
       if (error) {
         setError(error);
       } else if (needsEmailConfirmation) {
@@ -128,6 +137,28 @@ export const LoginPage = () => {
 
         {/* Form */}
         <div className="flex flex-col gap-3">
+          {mode === 'register' && (
+            <>
+              <input
+                type="text"
+                placeholder="Display Name (first name or nickname)"
+                className="input input-bordered w-full bg-base-100"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={isSubmitting}
+              />
+              <input
+                type="text"
+                placeholder="Last Name (optional)"
+                className="input input-bordered w-full bg-base-100"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={isSubmitting}
+              />
+            </>
+          )}
           <input
             type="email"
             placeholder="Email"

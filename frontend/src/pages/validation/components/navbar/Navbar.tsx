@@ -128,10 +128,12 @@ export const Navbar = () => {
             <div className="flex items-center gap-2 text-xs">
               <span
                 className="flex items-center gap-1 font-medium text-base-content/80 max-w-[160px] truncate"
-                title={user.email}
+                title={user.user_metadata?.display_name || user.user_metadata?.full_name || user.email}
               >
                 <UserIcon className="w-3.5 h-3.5 shrink-0 text-primary" />
-                <span className="truncate">{user.user_metadata?.full_name || user.email}</span>
+                <span className="truncate">
+                  {user.user_metadata?.display_name || user.user_metadata?.full_name || user.email}
+                </span>
               </span>
               <button
                 type="button"

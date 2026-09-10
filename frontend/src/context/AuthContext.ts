@@ -1,6 +1,12 @@
 import { createContext, useContext } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 
+export interface SignUpMetadata {
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
 export interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -10,7 +16,8 @@ export interface AuthContextType {
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (
     email: string,
-    password: string
+    password: string,
+    metadata?: SignUpMetadata
   ) => Promise<{ error: string | null; needsEmailConfirmation?: boolean }>;
   continueAsGuest: () => void;
   signOut: () => Promise<{ error: string | null }>;

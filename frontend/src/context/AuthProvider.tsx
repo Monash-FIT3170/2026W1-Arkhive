@@ -7,7 +7,7 @@ import {
 } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../services/supabaseClient';
-import { AuthContext } from './AuthContext';
+import { AuthContext, type SignUpMetadata } from './AuthContext';
 
 const GUEST_STORAGE_KEY = 'arkhive_guest_mode';
 
@@ -115,14 +115,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   /**
-   * Registers a new user with email and password.
+   * Registers a new user with email and password, plus optional display/name metadata.
    * Password hashing (bcrypt) is handled automatically on Supabase's secure Auth server.
    */
-  const signUp = useCallback(async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string, metadata?: SignUpMetadata) => {
     try {
+      const trimmedDisplayName = metadata?.displayName?.trim() || metadata?.firstName?.trim() || '';
+      const trimmedLastName = metadata?.lastName?.trim() || '';
+      const fullName = [trimmedDisplayName, trimmedLastName].filter(Boolean).join(' ');
+
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
+        options: {
+          data: {
+            ...(trimmedDisplayName ? { display_name: trimmedDisplayName, first_name: trimmedDisplayName } : {}),
+            ...(trimmedLastName ? { last_name: trimmedLastName } : {}),
+            ...(fullName ? { full_name: fullName } : {}),
+          },
+        },
       });
 
       if (error) {
