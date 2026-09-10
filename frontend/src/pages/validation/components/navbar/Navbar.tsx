@@ -65,7 +65,13 @@ export const Navbar = () => {
 
   // Allows guests to navigate to login/register if they choose to save their work
   function handleLoginClick() {
-    navigate('/login');
+    navigate('/login', {
+      state: {
+        from: {
+          pathname: location.pathname + location.search,
+        },
+      },
+    });
   }
   return (
     <div>
@@ -148,7 +154,7 @@ export const Navbar = () => {
           )}
 
           {/* Guest State: Display warning badge that data is session based + link to log in */}
-          {isGuest && (
+          {isGuest && !isOnLogin && (
             <div className="flex items-center gap-2 text-xs">
               <span className="badge badge-warning badge-sm">Guest Mode</span>
               <button

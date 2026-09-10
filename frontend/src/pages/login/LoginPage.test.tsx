@@ -202,4 +202,68 @@ describe('LoginPage', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('allows guests to view the login page to sign in or register', () => {
+    mockUseAuth.mockReturnValue({
+      user: null,
+      session: null,
+      isGuest: true,
+      isLoading: false,
+      signInWithGoogle: mockSignInWithGoogle,
+      signInWithPassword: mockSignInWithPassword,
+      signUp: mockSignUp,
+      continueAsGuest: mockContinueAsGuest,
+      signOut: vi.fn(),
+      getAccessToken: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByPlaceholderText('Email')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Password')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument();
+  });
+
+  it('redirects authenticated users away from the login page', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'u1', email: 'test@example.com' } as any,
+      session: { access_token: 'tok' } as any,
+      isGuest: false,
+      isLoading: false,
+      signInWithGoogle: mockSignInWithGoogle,
+      signInWithPassword: mockSignInWithPassword,
+      signUp: mockSignUp,
+      continueAsGuest: mockContinueAsGuest,
+      signOut: vi.fn(),
+      getAccessToken: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByPlaceholderText('Email')).not.toBeInTheDocument();
+  });
+
+  it('invokes continueAsGuest when confirming the guest mode modal', () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue as Guest' }));
+    expect(screen.getByText(/you are continuing as a guest/i)).toBeInTheDocument();
+
+    const modalConfirmBtn = screen.getAllByRole('button', { name: 'Continue as Guest' })[1];
+    fireEvent.click(modalConfirmBtn);
+
+    expect(mockContinueAsGuest).toHaveBeenCalledTimes(1);
+  });
 });

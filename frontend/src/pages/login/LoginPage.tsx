@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useState } from 'react';
 
@@ -12,13 +12,13 @@ type Mode = 'login' | 'register';
 export const LoginPage = () => {
   const {
     user,
-    isGuest,
     isLoading,
     signInWithPassword,
     signUp,
     signInWithGoogle,
     continueAsGuest,
   } = useAuth();
+  const navigate = useNavigate();
   const location = useLocation();
   const destination = (location.state as { from?: { pathname?: string } })?.from?.pathname || '/';
 
@@ -33,8 +33,8 @@ export const LoginPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showGuestWarning, setShowGuestWarning] = useState(false);
 
-  // Redirect if already authenticated or guest
-  if (!isLoading && (user || isGuest)) {
+  // Redirect if already authenticated as a signed-in user
+  if (!isLoading && user) {
     return <Navigate to={destination} replace />;
   }
 
@@ -264,6 +264,7 @@ export const LoginPage = () => {
                 onClick={() => {
                   setShowGuestWarning(false);
                   continueAsGuest();
+                  navigate(destination, { replace: true });
                 }}
               >
                 Continue as Guest
