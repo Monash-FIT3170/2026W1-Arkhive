@@ -6,7 +6,6 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
-    
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -23,9 +22,12 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1127.0",
+    "@aws-sdk/s3-request-presigner": "^3.1127.0",
     "@azure-rest/ai-document-intelligence": "^1.1.0",
     "@google-cloud/vision": "^5.3.5",
     "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.116.0",
     "@types/express-session": "^1.19.0",
     "@types/multer": "^2.1.0",
     "cors": "^2.8.6",

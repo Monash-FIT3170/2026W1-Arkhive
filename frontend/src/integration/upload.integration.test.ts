@@ -20,13 +20,13 @@ describe('upload -> process integration', () => {
 
     // Upload: proves the frontend's multipart request actually reaches
     // the real backend and the session cookie is set correctly.
-    await uploadPageToBackend(pageSrc, documentId, 0, 'invoice.png', 'Invoice');
+    await uploadPageToBackend(pageSrc, documentId, 0, 'invoice.png');
 
     // Process: proves the same session persists across a second call,
     // and that OCR_MODE=mock is correctly routing the backend around
     // the real Azure/Gemini calls -- this is the mock fixture from
     // mockOcrFixture.ts coming back, not a real OCR result.
-    const result = await processDocuments([{ documentId, pages: ['0'], type: 'Invoice' }]);
+    const result = await processDocuments([{ documentId, pages: ['0'] }]);
 
     expect(result?.success).toBe(true);
     expect(result?.ocrData?.[0]?.text).toBe('Invoice total');

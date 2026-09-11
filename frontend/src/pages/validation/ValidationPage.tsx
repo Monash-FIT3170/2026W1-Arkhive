@@ -19,7 +19,7 @@ import type { OcrIssue } from './components/chat/OcrReviewWidget';
 import { flatten } from './components/extracted-data/flattener';
 import { checkTableFormats } from './components/extracted-data/detectFormat';
 
-import type { HistoryEntry } from '../HistoryEntry';
+import type { HistoryEntry } from '../../models/HistoryEntry';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -82,7 +82,7 @@ function ValidationPage() {
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  const addHistoryEntry = (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
+  const addHistoryEntry = useCallback((entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
     setHistory((prev) => [
       {
         ...entry,
@@ -91,7 +91,7 @@ function ValidationPage() {
       },
       ...prev,
     ]);
-  };
+  }, []);
 
   useEffect(() => {
     async function loadSession() {
@@ -273,7 +273,7 @@ function ValidationPage() {
       type: 'redo',
       description: 'Redid last change',
     });
-  }, [saveExtractionSession, addHistoryEntry]);
+  }, [addHistoryEntry]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
