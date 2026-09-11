@@ -105,7 +105,7 @@ export default {
 
       const { data: documents, error: docsError } = await supabase
         .from('documents')
-        .select('*')
+        .select('*, pages:document_pages(*)')
         .eq('project_id', id)
         .order('created_at', { ascending: false });
 
