@@ -8,378 +8,12 @@
         "indentation": 416,
         "y": 75,
         "boundingBoxes": {},
-        "layer": 0,
+        "layer": 1,
         "text": "INVOICE #1024",
         "confidence": 0.992
       },
       {
-        "id": "table_0_row_0",
-        "type": "TABLE_ROW",
-        "indentation": 62,
-        "y": 190,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "BILLED TO:",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 62,
-                "y": 189
-              },
-              {
-                "x": 214,
-                "y": 190
-              },
-              {
-                "x": 214,
-                "y": 226
-              },
-              {
-                "x": 62,
-                "y": 227
-              }
-            ],
-            "confidence": 0.994
-          },
-          "col_1": {
-            "text": "Really Great Company",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 214,
-                "y": 190
-              },
-              {
-                "x": 442,
-                "y": 190
-              },
-              {
-                "x": 441,
-                "y": 226
-              },
-              {
-                "x": 214,
-                "y": 226
-              }
-            ],
-            "confidence": 0.994
-          }
-        },
-        "layer": 1,
-        "text": "BILLED TO: Really Great Company",
-        "confidence": 0.994,
-        "cells": [
-          "BILLED TO:",
-          "Really Great Company"
-        ]
-      },
-      {
-        "id": "table_0_row_1",
-        "type": "TABLE_ROW",
-        "indentation": 62,
-        "y": 226,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "PAY TO:",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 62,
-                "y": 227
-              },
-              {
-                "x": 214,
-                "y": 226
-              },
-              {
-                "x": 214,
-                "y": 299
-              },
-              {
-                "x": 62,
-                "y": 299
-              }
-            ],
-            "confidence": 0.994
-          },
-          "col_1": {
-            "text": "Avery Davis 123 Anywhere St., Any City 123-456-7890",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 214,
-                "y": 226
-              },
-              {
-                "x": 441,
-                "y": 226
-              },
-              {
-                "x": 441,
-                "y": 299
-              },
-              {
-                "x": 214,
-                "y": 299
-              }
-            ],
-            "confidence": 0.988
-          }
-        },
-        "layer": 1,
-        "text": "PAY TO: Avery Davis 123 Anywhere St., Any City 123-456-7890",
-        "confidence": 0.988,
-        "cells": [
-          "PAY TO:",
-          "Avery Davis 123 Anywhere St., Any City 123-456-7890"
-        ]
-      },
-      {
-        "id": "table_0_row_2",
-        "type": "TABLE_ROW",
-        "indentation": 62,
-        "y": 299,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "Bank",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 62,
-                "y": 299
-              },
-              {
-                "x": 214,
-                "y": 299
-              },
-              {
-                "x": 214,
-                "y": 326
-              },
-              {
-                "x": 62,
-                "y": 326
-              }
-            ],
-            "confidence": 0.988
-          },
-          "col_1": {
-            "text": "Really Great Bank",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 214,
-                "y": 299
-              },
-              {
-                "x": 441,
-                "y": 299
-              },
-              {
-                "x": 440,
-                "y": 325
-              },
-              {
-                "x": 214,
-                "y": 326
-              }
-            ],
-            "confidence": 0.991
-          }
-        },
-        "layer": 1,
-        "text": "Bank Really Great Bank",
-        "confidence": 0.989,
-        "cells": [
-          "Bank",
-          "Really Great Bank"
-        ]
-      },
-      {
-        "id": "table_0_row_3",
-        "type": "TABLE_ROW",
-        "indentation": 62,
-        "y": 326,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "Account Name",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 62,
-                "y": 326
-              },
-              {
-                "x": 214,
-                "y": 326
-              },
-              {
-                "x": 214,
-                "y": 346
-              },
-              {
-                "x": 62,
-                "y": 346
-              }
-            ],
-            "confidence": 0.993
-          },
-          "col_1": {
-            "text": "John Smith",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 214,
-                "y": 326
-              },
-              {
-                "x": 440,
-                "y": 325
-              },
-              {
-                "x": 440,
-                "y": 346
-              },
-              {
-                "x": 214,
-                "y": 346
-              }
-            ],
-            "confidence": 0.992
-          }
-        },
-        "layer": 1,
-        "text": "Account Name John Smith",
-        "confidence": 0.992,
-        "cells": [
-          "Account Name",
-          "John Smith"
-        ]
-      },
-      {
-        "id": "table_0_row_4",
-        "type": "TABLE_ROW",
-        "indentation": 61,
-        "y": 346,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "BSB",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 62,
-                "y": 346
-              },
-              {
-                "x": 214,
-                "y": 346
-              },
-              {
-                "x": 214,
-                "y": 366
-              },
-              {
-                "x": 61,
-                "y": 367
-              }
-            ],
-            "confidence": 0.996
-          },
-          "col_1": {
-            "text": "000-000",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 214,
-                "y": 346
-              },
-              {
-                "x": 440,
-                "y": 346
-              },
-              {
-                "x": 440,
-                "y": 365
-              },
-              {
-                "x": 214,
-                "y": 366
-              }
-            ],
-            "confidence": 0.984
-          }
-        },
-        "layer": 1,
-        "text": "BSB 000-000",
-        "confidence": 0.99,
-        "cells": [
-          "BSB",
-          "000-000"
-        ]
-      },
-      {
-        "id": "table_0_row_5",
-        "type": "TABLE_ROW",
-        "indentation": 61,
-        "y": 366,
-        "boundingBoxes": {
-          "col_0": {
-            "text": "Account Number",
-            "column": "Column 0",
-            "vertices": [
-              {
-                "x": 61,
-                "y": 367
-              },
-              {
-                "x": 214,
-                "y": 366
-              },
-              {
-                "x": 214,
-                "y": 392
-              },
-              {
-                "x": 61,
-                "y": 393
-              }
-            ],
-            "confidence": 0.994
-          },
-          "col_1": {
-            "text": "0000 0000",
-            "column": "Column 1",
-            "vertices": [
-              {
-                "x": 214,
-                "y": 366
-              },
-              {
-                "x": 440,
-                "y": 365
-              },
-              {
-                "x": 440,
-                "y": 391
-              },
-              {
-                "x": 214,
-                "y": 392
-              }
-            ],
-            "confidence": 0.987
-          }
-        },
-        "layer": 1,
-        "text": "Account Number 0000 0000",
-        "confidence": 0.99,
-        "cells": [
-          "Account Number",
-          "0000 0000"
-        ]
-      },
-      {
-        "id": "table_1_cols_0",
+        "id": "table_cols_0",
         "type": "TABLE_COLS",
         "indentation": 62,
         "y": 420,
@@ -479,7 +113,7 @@
         },
         "layer": 1,
         "text": "DESCRIPTION RATE HOURS AMOUNT",
-        "confidence": 0.99375,
+        "confidence": 0.994,
         "cells": [
           "DESCRIPTION",
           "RATE",
@@ -488,7 +122,7 @@
         ]
       },
       {
-        "id": "table_1_row_1",
+        "id": "table_row_1",
         "type": "TABLE_ROW",
         "indentation": 62,
         "y": 466,
@@ -597,7 +231,7 @@
         ]
       },
       {
-        "id": "table_1_row_2",
+        "id": "table_row_2",
         "type": "TABLE_ROW",
         "indentation": 62,
         "y": 511,
@@ -706,7 +340,7 @@
         ]
       },
       {
-        "id": "table_1_row_3",
+        "id": "table_row_3",
         "type": "TABLE_ROW",
         "indentation": 61,
         "y": 554,
@@ -806,7 +440,7 @@
         },
         "layer": 1,
         "text": "Website Design $50/hr 5 $250.00",
-        "confidence": 0.99275,
+        "confidence": 0.993,
         "cells": [
           "Website Design",
           "$50/hr",
@@ -815,7 +449,7 @@
         ]
       },
       {
-        "id": "table_1_row_4",
+        "id": "table_row_4",
         "type": "TABLE_ROW",
         "indentation": 61,
         "y": 597,
@@ -841,7 +475,7 @@
                 "y": 641
               }
             ],
-            "confidence": 0.9925
+            "confidence": 0.992
           },
           "col_1": {
             "text": "$100/hr",
@@ -915,7 +549,7 @@
         },
         "layer": 1,
         "text": "Website Development $100/hr 5 $500.00",
-        "confidence": 0.988375,
+        "confidence": 0.988,
         "cells": [
           "Website Development",
           "$100/hr",
@@ -924,7 +558,7 @@
         ]
       },
       {
-        "id": "table_1_row_5",
+        "id": "table_row_5",
         "type": "TABLE_ROW",
         "indentation": 61,
         "y": 641,
@@ -1024,7 +658,7 @@
         },
         "layer": 1,
         "text": "SEO $50/hr 4 $200.00",
-        "confidence": 0.99425,
+        "confidence": 0.994,
         "cells": [
           "SEO",
           "$50/hr",
@@ -1033,7 +667,7 @@
         ]
       },
       {
-        "id": "table_1_row_6",
+        "id": "table_row_6",
         "type": "TABLE_ROW",
         "indentation": 61,
         "y": 684,
@@ -1133,7 +767,7 @@
         },
         "layer": 1,
         "text": "Sub-Total $1,250.00",
-        "confidence": 0.98075,
+        "confidence": 0.961,
         "cells": [
           "Sub-Total",
           "",
@@ -1142,7 +776,7 @@
         ]
       },
       {
-        "id": "table_1_row_7",
+        "id": "table_row_7",
         "type": "TABLE_ROW",
         "indentation": 61,
         "y": 721,
@@ -1242,7 +876,7 @@
         },
         "layer": 1,
         "text": "Package Discount (30%) $375.00",
-        "confidence": 0.99425,
+        "confidence": 0.992,
         "cells": [
           "Package Discount (30%)",
           "",
@@ -1251,7 +885,7 @@
         ]
       },
       {
-        "id": "table_1_row_8",
+        "id": "table_row_8",
         "type": "TABLE_ROW",
         "indentation": 60,
         "y": 757,
@@ -1351,7 +985,7 @@
         },
         "layer": 1,
         "text": "TOTAL $875.00",
-        "confidence": 0.99625,
+        "confidence": 0.996,
         "cells": [
           "TOTAL",
           "",
@@ -1365,27 +999,17 @@
         "indentation": 72,
         "y": 859,
         "boundingBoxes": {},
-        "layer": 0,
-        "text": "Payment is required within 14 business days of invoice date.",
-        "confidence": 0.988
+        "layer": 1,
+        "text": "Payment is required within 14 business days of invoice date. Please send remittance to hello@reallygreatsite.com.",
+        "confidence": 0.985
       },
       {
         "id": "body_text_1",
         "type": "BODY_TEXT",
-        "indentation": 72,
-        "y": 879,
-        "boundingBoxes": {},
-        "layer": 0,
-        "text": "Please send remittance to hello@reallygreatsite.com.",
-        "confidence": 0.986
-      },
-      {
-        "id": "body_text_2",
-        "type": "BODY_TEXT",
         "indentation": 71,
         "y": 920,
         "boundingBoxes": {},
-        "layer": 0,
+        "layer": 1,
         "text": "Thank you for your business.",
         "confidence": 0.993
       }
