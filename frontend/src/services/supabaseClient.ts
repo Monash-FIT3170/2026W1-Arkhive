@@ -8,7 +8,7 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 if (!isSupabaseConfigured) {
   console.warn(
     '[Supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. ' +
-    'Authentication and cloud features will be unavailable until environment variables are set in frontend/.env.'
+      'Authentication and cloud features will be unavailable until environment variables are set in frontend/.env.'
   );
 }
 

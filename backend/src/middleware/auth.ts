@@ -1,15 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
+import { supabase } from '../services/supabaseClient';
 
 export interface AuthenticatedRequest extends Request {
   userId?: string;
 }
 
 /**
- * Authentication middleware stub.
- * Pluggable boundary for Supabase Auth integration.
- *
- * In production, it extracts the Bearer token and verifies with Supabase auth.getUser(token).
- * In development / test, if no Bearer token or Supabase is not configured, it falls back to a dev user ID.
+ * Authentication middleware. Reads the Authorization: Bearer <token> header,
+ * verifies it against Supabase Auth, and attaches the resulting user id to
+ * req.userId. Rejects any request without a valid token
  */
 export async function requireAuth(
   req: AuthenticatedRequest,
@@ -18,26 +17,25 @@ export async function requireAuth(
 ): Promise<void> {
   const authHeader = req.headers.authorization;
 
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
-    try {
-      // In real integration, supabase.auth.getUser(token) will be called by teammate.
-      // For now, if token is provided or in dev mode:
-      if (token && token !== 'dev-token') {
-        // If Supabase client is configured, we could attempt to verify or decode:
-        // const { data: { user }, error } = await supabase.auth.getUser(token);
-        // if (!error && user) { req.userId = user.id; return next(); }
-      }
-    } catch (err) {
-      console.error('Error verifying auth token:', err);
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Unauthorized. Missing Bearer token.' });
+    return;
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+
+    if (error || !data.user) {
+      res.status(401).json({ error: 'Unauthorized. Invalid or expired token.' });
+      return;
     }
-  }
 
-  // Development / fallback environment support
-  if (process.env.NODE_ENV !== 'production' || !process.env.SUPABASE_URL) {
-    req.userId = (req.headers['x-dev-user-id'] as string) || '00000000-0000-0000-0000-000000000001';
-    return next();
+    req.userId = data.user.id;
+    next();
+  } catch (err) {
+    console.error('Error verifying auth token:', err);
+    res.status(401).json({ error: 'Unauthorized. Failed to verify token.' });
   }
-
-  res.status(401).json({ error: 'Unauthorized. Missing or invalid authentication token.' });
 }

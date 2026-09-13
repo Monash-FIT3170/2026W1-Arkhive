@@ -1,7 +1,18 @@
-import { Sun, Moon, Upload, LayoutGrid, Columns2, ChevronLeft, LogOut, User as UserIcon, LogIn } from 'lucide-react';
-import { useNavigate, useLocation } from "react-router-dom";
-import { getMaxStep } from "../../../../services/stepGuard";
-import { useAuth } from "../../../../context/AuthContext";
+import {
+  Sun,
+  Moon,
+  Upload,
+  LayoutGrid,
+  Columns2,
+  ChevronLeft,
+  LogOut,
+  User as UserIcon,
+  LogIn,
+  FolderKanban,
+} from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { getMaxStep } from '../../../../services/stepGuard';
+import { useAuth } from '../../../../context/AuthContext';
 
 export const Navbar = () => {
   const navigate = useNavigate();
@@ -27,20 +38,20 @@ export const Navbar = () => {
   const stepConfig = [
     {
       step: 0,
-      label: "Upload",
-      path: "/",
+      label: 'Upload',
+      path: '/',
       icon: <Upload className="w-4 h-4" />,
     },
     {
       step: 1,
-      label: "Document Preview",
-      path: "/?step=preview",
+      label: 'Document Preview',
+      path: '/?step=preview',
       icon: <LayoutGrid className="w-4 h-4" />,
     },
     {
       step: 2,
-      label: "Validation",
-      path: "/validation",
+      label: 'Validation',
+      path: '/validation',
       icon: <Columns2 className="w-4 h-4" />,
     },
   ];
@@ -50,11 +61,15 @@ export const Navbar = () => {
   // Check if current route is the login page
   const isOnLogin = location.pathname === '/login';
 
+  // Check if current route is anywhere under /projects — the guest-only
+  // step progress bar (Upload/Preview/Validation) doesn't apply there.
+  const isOnProjects = location.pathname.startsWith('/projects');
+
   // Global auth state: access user identity, guest status, and sign-out action
   const { user, isGuest, signOut } = useAuth();
 
   function handleBack() {
-    navigate("/?step=preview");
+    navigate('/?step=preview');
   }
 
   // Signs out of Supabase, cleans up local session/guest data, and routes to login
@@ -73,6 +88,11 @@ export const Navbar = () => {
       },
     });
   }
+
+  function handleProjectsClick() {
+    navigate('/projects');
+  }
+
   return (
     <div>
       <div className="navbar bg-base-200 text-base-content px-17 border-b border-base-300">
@@ -84,10 +104,26 @@ export const Navbar = () => {
           >
             Arkhive
           </button>
+
+          {/* Projects tab — only shown to real logged-in users. Guests never
+              persist data, so this section is intentionally hidden for them
+              rather than shown-but-disabled, to avoid implying guests can
+              use it. */}
+          {user && (
+            <button
+              type="button"
+              onClick={handleProjectsClick}
+              className={`btn btn-sm gap-1.5 ml-4 ${isOnProjects ? 'btn-primary' : 'btn-ghost'}`}
+            >
+              <FolderKanban className="w-4 h-4" />
+              Projects
+            </button>
+          )}
         </div>
         <div className="ml-auto flex items-center gap-6">
-          {/* Hide the 3-step workflow progress bar when the user is on the login page */}
-          {!isOnLogin && (
+          {/* Hide the 3-step workflow progress bar when on the login page or
+              anywhere in the Projects section — that flow doesn't apply there. */}
+          {!isOnLogin && !isOnProjects && (
             <ul className="steps">
               {stepConfig.map(({ step: s, label, path, icon }) => {
                 const isUnlocked = s <= maxStep;
@@ -96,22 +132,22 @@ export const Navbar = () => {
                 return (
                   <li
                     key={s}
-                    className={`step ${isActive ? "step-primary" : isUnlocked ? "" : "animate-pulse"}`}
+                    className={`step ${isActive ? 'step-primary' : isUnlocked ? '' : 'animate-pulse'}`}
                     onClick={() => handleStepClick(s, path)}
-                    title={!isUnlocked ? `Complete the previous step to unlock ${label}` : undefined}
-                    style={{ 
-                      cursor: isUnlocked ? "pointer" : "not-allowed",
-                      zIndex: 50 - s
+                    title={
+                      !isUnlocked ? `Complete the previous step to unlock ${label}` : undefined
+                    }
+                    style={{
+                      cursor: isUnlocked ? 'pointer' : 'not-allowed',
+                      zIndex: 50 - s,
                     }}
                   >
                     <span
-                      className={`step-icon transition ${isUnlocked ? "hover:scale-130" : "opacity-40"}`}
+                      className={`step-icon transition ${isUnlocked ? 'hover:scale-130' : 'opacity-40'}`}
                     >
                       {icon}
                     </span>
-                    <span className={!isUnlocked ? "opacity-40" : undefined}>
-                      {label}
-                    </span>
+                    <span className={!isUnlocked ? 'opacity-40' : undefined}>{label}</span>
                   </li>
                 );
               })}
@@ -119,11 +155,7 @@ export const Navbar = () => {
           )}
 
           {isOnValidation && (
-            <button
-              type="button"
-              onClick={handleBack}
-              className="btn btn-outline btn-sm"
-            >
+            <button type="button" onClick={handleBack} className="btn btn-outline btn-sm">
               <ChevronLeft className="w-4 h-4" />
               Back
             </button>
@@ -134,7 +166,9 @@ export const Navbar = () => {
             <div className="flex items-center gap-2 text-xs">
               <span
                 className="flex items-center gap-1 font-medium text-base-content/80 max-w-[160px] truncate"
-                title={user.user_metadata?.display_name || user.user_metadata?.full_name || user.email}
+                title={
+                  user.user_metadata?.display_name || user.user_metadata?.full_name || user.email
+                }
               >
                 <UserIcon className="w-3.5 h-3.5 shrink-0 text-primary" />
                 <span className="truncate">
@@ -171,7 +205,11 @@ export const Navbar = () => {
 
           {/* Dark/Light theme toggle */}
           <label className="swap swap-rotate cursor-pointer mx-2">
-            <input type="checkbox" value="night" className="theme-controller hover:scale-110 transition" />
+            <input
+              type="checkbox"
+              value="night"
+              className="theme-controller hover:scale-110 transition"
+            />
             <Sun className="swap-off w-8 h-8 hover:scale-110 transition" />
             <Moon className="swap-on w-8 h-8 hover:scale-110 transition" />
             <span className="sr-only">Toggle Theme</span>
