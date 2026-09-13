@@ -14,7 +14,12 @@ import UploadMoreButton from '../upload/components/actions/UploadMoreButton';
 import DocumentPanel from '../validation/components/document/DocumentPanel';
 import ExtractedDataPanel from '../validation/components/extracted-data/ExtractedDataPanel';
 import { flatten } from '../validation/components/extracted-data/flattener';
-import type { ProjectDetail, DocumentRecord, PageStatus, PageSelection } from '../../models/Project';
+import type {
+  ProjectDetail,
+  DocumentRecord,
+  PageStatus,
+  PageSelection,
+} from '../../models/Project';
 import type { ExtractedPage } from '../../models/TableData';
 import type { OCRComponent } from '../../models/OCRComponent';
 
@@ -69,6 +74,7 @@ export default function ProjectWorkspacePage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [mode, setMode] = useState<'files' | 'validate'>('files');
+  const [isEditmode, setEditMode] = useState<boolean>(false);
   const [currentValidationIndex, setCurrentValidationIndex] = useState(0);
   const [hoveredTableFieldIds, setHoveredTableFieldIds] = useState<string[]>([]);
   const [hoveredDocumentOverlayIds, setHoveredDocumentOverlayIds] = useState<string[]>([]);
@@ -109,7 +115,12 @@ export default function ProjectWorkspacePage() {
 
   // Every page across every document, sorted for stable rendering.
   const allPages = useMemo(() => {
-    const list: { document: DocumentRecord; pageIndex: number; status: PageStatus; hasResult: boolean }[] = [];
+    const list: {
+      document: DocumentRecord;
+      pageIndex: number;
+      status: PageStatus;
+      hasResult: boolean;
+    }[] = [];
     documents.forEach((doc) => {
       (doc.pages || [])
         .slice()
@@ -161,7 +172,8 @@ export default function ProjectWorkspacePage() {
     const page = findPage(documentId, pageIndex);
     if (!page) return null;
     if (page.extracted_data) return page.extracted_data;
-    if (page.raw_ocr_result) return { ...flatten(extractComponents(page.raw_ocr_result)), pageIndex };
+    if (page.raw_ocr_result)
+      return { ...flatten(extractComponents(page.raw_ocr_result)), pageIndex };
     return null;
   }
 
@@ -406,7 +418,9 @@ export default function ProjectWorkspacePage() {
     const entry = validationList[Math.min(currentValidationIndex, validationList.length - 1)];
     const extractedData = getExtractedData(entry.documentId, entry.pageIndex);
     const ocrData = extractComponents(findPage(entry.documentId, entry.pageIndex)?.raw_ocr_result);
-    const imageUrls = validationList.map((e) => imageUrlMap[pageKey(e.documentId, e.pageIndex)] || '');
+    const imageUrls = validationList.map(
+      (e) => imageUrlMap[pageKey(e.documentId, e.pageIndex)] || ''
+    );
 
     if (!extractedData) {
       return (
@@ -432,6 +446,8 @@ export default function ProjectWorkspacePage() {
           </div>
           <div className="w-full h-[50vh] lg:h-full lg:w-1/2">
             <ExtractedDataPanel
+              isEditMode={isEditmode}
+              onEditModeChange={setEditMode}
               extractedData={extractedData}
               hoveredOverlayIds={hoveredTableFieldIds}
               onHover={(fieldId) => {
@@ -456,7 +472,11 @@ export default function ProjectWorkspacePage() {
               }}
               onRowAdd={() => {
                 updateExtractedData(entry.documentId, entry.pageIndex, (data) => {
-                  const newRow: any = { _id: `manual_row_${Date.now()}`, _confidence: 1, _cellConfidence: {} };
+                  const newRow: any = {
+                    _id: `manual_row_${Date.now()}`,
+                    _confidence: 1,
+                    _cellConfidence: {},
+                  };
                   data.columns.forEach((col) => {
                     newRow[col] = '';
                   });
@@ -496,7 +516,8 @@ export default function ProjectWorkspacePage() {
                   const idx = rows.findIndex((r) => r._id === rowId);
                   const canMove =
                     idx !== -1 &&
-                    ((direction === 'up' && idx > 0) || (direction === 'down' && idx < rows.length - 1));
+                    ((direction === 'up' && idx > 0) ||
+                      (direction === 'down' && idx < rows.length - 1));
                   if (!canMove) return data;
                   if (direction === 'up') [rows[idx - 1], rows[idx]] = [rows[idx], rows[idx - 1]];
                   else [rows[idx], rows[idx + 1]] = [rows[idx + 1], rows[idx]];
@@ -584,7 +605,11 @@ export default function ProjectWorkspacePage() {
                           onClick={() => toggleSelected(doc.id, page.page_index)}
                         >
                           {imageUrl ? (
-                            <img src={imageUrl} alt={`Page ${page.page_index + 1}`} className="w-full h-full object-cover" />
+                            <img
+                              src={imageUrl}
+                              alt={`Page ${page.page_index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
                               <span className="loading loading-spinner loading-sm" />
@@ -605,7 +630,10 @@ export default function ProjectWorkspacePage() {
                           </span>
                         </div>
                         {page.error_message && (
-                          <div className="px-2 pb-2 text-xs text-error truncate" title={page.error_message}>
+                          <div
+                            className="px-2 pb-2 text-xs text-error truncate"
+                            title={page.error_message}
+                          >
                             {page.error_message}
                           </div>
                         )}
