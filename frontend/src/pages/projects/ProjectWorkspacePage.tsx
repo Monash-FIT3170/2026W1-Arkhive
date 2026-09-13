@@ -80,6 +80,7 @@ export default function ProjectWorkspacePage() {
   useEffect(() => {
     if (!id) return;
     let isMounted = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     getProject(id)
       .then((data) => {

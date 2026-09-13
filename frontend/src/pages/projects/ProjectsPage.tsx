@@ -28,7 +28,6 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     let isMounted = true;
-    setIsLoading(true);
     listProjects()
       .then((data) => {
         if (isMounted) setProjects(data);
