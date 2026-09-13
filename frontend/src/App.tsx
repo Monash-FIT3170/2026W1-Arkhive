@@ -8,6 +8,7 @@ import Navbar from './pages/validation/components/navbar/Navbar';
 import UploadPage from './pages/upload/UploadPage';
 import ValidationPage from './pages/validation/ValidationPage';
 import ProjectsPage from './pages/projects/ProjectsPage';
+import ProjectWorkspacePage from './pages/projects/ProjectWorkspacePage';
 
 function App() {
   return (
@@ -24,7 +25,7 @@ function App() {
               </Route>
               <Route element={<RequireUser />}>
                 <Route path="/projects" element={<ProjectsPage />} />
-                <Route path="/projects/:id" element={<ProjectsPage />} />
+                <Route path="/projects/:id" element={<ProjectWorkspacePage />} />
               </Route>
             </Routes>
           </div>

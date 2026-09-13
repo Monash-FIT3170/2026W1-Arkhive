@@ -5,10 +5,10 @@ import { createProject, listProjects, deleteProject } from '../../services/proje
 import type { Project } from '../../models/Project';
 
 /**
- * Temporary Projects page — list/create/delete only.
- * Clicking into a project currently just navigates to /projects/:id, which
- * doesn't have a real view yet (see ProjectWorkspacePage, still to be built).
- * This is intentionally minimal — styling/UX is a placeholder.
+ * Projects list page — list/create/delete only.
+ * Clicking into a project navigates to /projects/:id, handled by
+ * ProjectWorkspacePage. This is intentionally minimal — styling/UX is a
+ * placeholder.
  *
  * Guest access is blocked upstream by the RequireUser route guard (see
  * App.tsx) — this component can assume a real user is always present.
@@ -28,7 +28,6 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     let isMounted = true;
-    setIsLoading(true);
     listProjects()
       .then((data) => {
         if (isMounted) setProjects(data);
