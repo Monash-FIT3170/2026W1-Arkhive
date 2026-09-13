@@ -115,9 +115,36 @@ export default {
         return;
       }
 
+      const documentIds = (documents || []).map((doc) => doc.id);
+      let pagesByDocument = new Map<string, unknown[]>();
+
+      if (documentIds.length > 0) {
+        const { data: pages, error: pagesError } = await supabase
+          .from('document_pages')
+          .select('*')
+          .in('document_id', documentIds)
+          .order('page_index', { ascending: true });
+
+        if (pagesError) {
+          console.error('Failed to retrieve document pages:', pagesError);
+          res.status(500).json({ error: pagesError.message });
+          return;
+        }
+
+        pagesByDocument = (pages || []).reduce((map, page) => {
+          const list = map.get(page.document_id) ?? [];
+          list.push(page);
+          map.set(page.document_id, list);
+          return map;
+        }, new Map<string, unknown[]>());
+      }
+
       res.json({
         ...project,
-        documents: documents || [],
+        documents: (documents || []).map((doc) => ({
+          ...doc,
+          pages: pagesByDocument.get(doc.id) ?? [],
+        })),
       });
     } catch (err: any) {
       console.error('Unexpected error in getProject:', err);

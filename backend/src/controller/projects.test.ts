@@ -120,9 +120,12 @@ describe('Projects Controller', () => {
   });
 
   describe('getProject', () => {
-    it('returns project with its documents', async () => {
+    it('returns project with its documents and each document\'s pages', async () => {
       const mockProject = { id: 'proj-1', name: 'P1', owner_id: 'test-user-123' };
       const mockDocs = [{ id: 'doc-1', filename: 'invoice.pdf', project_id: 'proj-1' }];
+      const mockPages = [
+        { id: 'page-1', document_id: 'doc-1', page_index: 0, status: 'pending' },
+      ];
 
       vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
         if (table === 'projects') {
@@ -145,6 +148,15 @@ describe('Projects Controller', () => {
             }),
           } as any;
         }
+        if (table === 'document_pages') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: mockPages, error: null }),
+              }),
+            }),
+          } as any;
+        }
         return {} as any;
       });
 
@@ -159,7 +171,7 @@ describe('Projects Controller', () => {
       expect(getStatus()).toBe(200);
       expect(getJson()).toEqual({
         ...mockProject,
-        documents: mockDocs,
+        documents: [{ ...mockDocs[0], pages: mockPages }],
       });
     });
 
