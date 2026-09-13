@@ -16,6 +16,20 @@ import ExtractedDataPanel from '../validation/components/extracted-data/Extracte
 import { flatten } from '../validation/components/extracted-data/flattener';
 import type { ProjectDetail, DocumentRecord, PageStatus, PageSelection } from '../../models/Project';
 import type { ExtractedPage } from '../../models/TableData';
+import type { OCRComponent } from '../../models/OCRComponent';
+
+// The OCR backend stores one page's result per document_pages row, but the
+// real Azure/Gemini pipeline wraps it as `Pages` — [{ page_num, components }]
+// — while the OCR_MODE=mock fixture returns a flat OCRComponent[] instead.
+// Unwrap defensively so either shape renders correctly.
+function extractComponents(raw: unknown): OCRComponent[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  const first = raw[0] as any;
+  if (first && typeof first === 'object' && Array.isArray(first.components)) {
+    return first.components as OCRComponent[];
+  }
+  return raw as OCRComponent[];
+}
 
 // MVP project workspace: upload pages into the project, batch-process them
 // with OCR, then validate/edit the extracted table per page. Intentionally
@@ -146,7 +160,7 @@ export default function ProjectWorkspacePage() {
     const page = findPage(documentId, pageIndex);
     if (!page) return null;
     if (page.extracted_data) return page.extracted_data;
-    if (page.raw_ocr_result) return { ...flatten(page.raw_ocr_result), pageIndex };
+    if (page.raw_ocr_result) return { ...flatten(extractComponents(page.raw_ocr_result)), pageIndex };
     return null;
   }
 
@@ -390,7 +404,7 @@ export default function ProjectWorkspacePage() {
   if (mode === 'validate' && validationList.length > 0) {
     const entry = validationList[Math.min(currentValidationIndex, validationList.length - 1)];
     const extractedData = getExtractedData(entry.documentId, entry.pageIndex);
-    const ocrData = findPage(entry.documentId, entry.pageIndex)?.raw_ocr_result || [];
+    const ocrData = extractComponents(findPage(entry.documentId, entry.pageIndex)?.raw_ocr_result);
     const imageUrls = validationList.map((e) => imageUrlMap[pageKey(e.documentId, e.pageIndex)] || '');
 
     if (!extractedData) {
