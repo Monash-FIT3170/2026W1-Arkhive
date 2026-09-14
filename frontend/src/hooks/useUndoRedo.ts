@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, type RefObject } from 'react';
 
 interface UseUndoRedoOptions<T> {
-  // Applies a restored snapshot back into your component's state.
-  onApply: (value: T) => void;
+  // Applies a restored snapshot back into your component's state. `direction`
+  // lets the caller log history/analytics differently for undo vs redo
+  // without needing its own keydown listener.
+  onApply: (value: T, direction: 'undo' | 'redo') => void;
   // Set false if the consumer wants to wire up its own key bindings
   // (e.g. to scope them to when a modal/panel is focused).
   enableKeyboardShortcuts?: boolean;
@@ -30,7 +32,7 @@ export function useUndoRedo<T>(
     if (undoStack.current.length === 0) return false;
     const previous = undoStack.current.pop()!;
     redoStack.current.push(currentRef.current);
-    onApply(previous);
+    onApply(previous, 'undo');
     return true;
   }, [onApply, currentRef]);
 
@@ -38,7 +40,7 @@ export function useUndoRedo<T>(
     if (redoStack.current.length === 0) return false;
     const next = redoStack.current.pop()!;
     undoStack.current.push(currentRef.current);
-    onApply(next);
+    onApply(next, 'redo');
     return true;
   }, [onApply, currentRef]);
 

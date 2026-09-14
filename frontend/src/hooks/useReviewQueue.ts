@@ -2,10 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import type { ExtractedPage } from '../models/TableData';
 import type { ReviewField } from '../models/Message';
 import type { HistoryEntry } from '../models/HistoryEntry';
-// NOTE: OcrIssue currently lives alongside the review-carousel UI component.
-// It's really a domain type now that a hook depends on it too — worth moving
-// to src/models/OcrIssue.ts next time you touch this area.
-import type { OcrIssue } from '../pages/validation/components/chat/OcrReviewWidget';
+import type { OcrIssue } from '../models/IssueReview';
 import {
   requestBulkFieldReview,
   requestFieldReview,
