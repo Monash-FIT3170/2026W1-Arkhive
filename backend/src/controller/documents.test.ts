@@ -84,6 +84,11 @@ describe('Documents Controller', () => {
             }),
           } as any;
         }
+        if (table === 'document_pages') {
+          return {
+            upsert: vi.fn().mockResolvedValue({ error: null }),
+          } as any;
+        }
         return {} as any;
       });
 
@@ -189,62 +194,79 @@ describe('Documents Controller', () => {
 
     const mockOcrResult = [{ id: 'comp_1', text: 'Total: $50.00', confidence: 0.98 }];
 
-    function mockOwnedDocument(updateImpl?: ReturnType<typeof vi.fn>) {
+    // pageRows simulates what's already in document_pages for the requested
+    // pageIndices (empty = none started yet, so nothing gets skipped as 'done').
+    function mockOwnedDocument(
+      pageRows: any[] = [],
+      updateImpl?: ReturnType<typeof vi.fn>
+    ) {
       const update =
         updateImpl ??
         vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null }),
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          }),
         });
 
-      vi.spyOn(supabase, 'from').mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: mockDoc, error: null }),
+      vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+        if (table === 'documents') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({ data: mockDoc, error: null }),
+                }),
+              }),
             }),
-          }),
-        }),
-        update,
-      } as any);
+          } as any;
+        }
+        if (table === 'document_pages') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                in: vi.fn().mockResolvedValue({ data: pageRows, error: null }),
+              }),
+            }),
+            update,
+          } as any;
+        }
+        return {} as any;
+      });
 
       return update;
     }
 
-    it('downloads from R2, runs OCR pipeline, and returns rawResult without writing extracted_data', async () => {
+    it('downloads from R2, runs OCR pipeline, and persists rawResult with pending status', async () => {
       const update = mockOwnedDocument();
       vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('fake-pdf-bytes'));
       vi.spyOn(ocrService, 'parseTableWithRetries').mockResolvedValue(mockOcrResult as any);
 
-      const { req, res, getStatus, getJson } = createMockReqRes(
-        'test-user-123',
-        {},
-        { id: 'doc-123' }
-      );
+      const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
+        selections: [{ documentId: 'doc-123', pageIndices: [0] }],
+      });
 
       await documentsController.processDocument(req, res);
 
       expect(getStatus()).toBe(200);
-      expect(getJson().status).toBe('pending');
-      expect(getJson().rawResult).toEqual([mockOcrResult]);
+      expect(getJson().results).toEqual([
+        { documentId: 'doc-123', pageIndex: 0, status: 'pending', rawResult: mockOcrResult },
+      ]);
       expect(update.mock.calls.map((call) => call[0])).toEqual([
         { status: 'processing' },
-        { status: 'pending' },
+        { status: 'pending', raw_ocr_result: mockOcrResult, error_message: null },
       ]);
     });
 
-    it('sorts discovered page keys numerically (page-2 before page-10)', async () => {
+    it('processes every page index in a selection, building the correct R2 key for each', async () => {
       mockOwnedDocument();
-      vi.spyOn(r2Client, 'listObjects').mockResolvedValue([
-        'user/proj/doc-123/page-10.png',
-        'user/proj/doc-123/page-2.png',
-        'user/proj/doc-123/page-1.png',
-      ]);
       const getObjectBufferSpy = vi
         .spyOn(r2Client, 'getObjectBuffer')
         .mockResolvedValue(Buffer.from('page'));
       vi.spyOn(ocrService, 'parseTableWithRetries').mockResolvedValue(mockOcrResult as any);
 
-      const { req, res } = createMockReqRes('test-user-123', {}, { id: 'doc-123' });
+      const { req, res } = createMockReqRes('test-user-123', {
+        selections: [{ documentId: 'doc-123', pageIndices: [1, 2, 10] }],
+      });
       await documentsController.processDocument(req, res);
 
       expect(getObjectBufferSpy.mock.calls.map((call) => call[0])).toEqual([
@@ -254,7 +276,23 @@ describe('Documents Controller', () => {
       ]);
     });
 
-    it('sets status to error when OCR fails', async () => {
+    it('skips a page already marked done unless force is set', async () => {
+      mockOwnedDocument([{ page_index: 0, status: 'done', raw_ocr_result: mockOcrResult }]);
+      const getObjectBufferSpy = vi.spyOn(r2Client, 'getObjectBuffer');
+      vi.spyOn(ocrService, 'parseTableWithRetries');
+
+      const { req, res, getJson } = createMockReqRes('test-user-123', {
+        selections: [{ documentId: 'doc-123', pageIndices: [0] }],
+      });
+      await documentsController.processDocument(req, res);
+
+      expect(getObjectBufferSpy).not.toHaveBeenCalled();
+      expect(getJson().results).toEqual([
+        { documentId: 'doc-123', pageIndex: 0, status: 'done', rawResult: mockOcrResult, skipped: true },
+      ]);
+    });
+
+    it('sets status to error when OCR fails, without failing the whole request', async () => {
       // Suppress console.error logs for this test
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -262,20 +300,19 @@ describe('Documents Controller', () => {
       vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('fake-pdf-bytes'));
       vi.spyOn(ocrService, 'parseTableWithRetries').mockRejectedValue(new Error('OCR exploded'));
 
-      const { req, res, getStatus, getJson } = createMockReqRes(
-        'test-user-123',
-        {},
-        { id: 'doc-123' }
-      );
+      const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
+        selections: [{ documentId: 'doc-123', pageIndices: [0] }],
+      });
       await documentsController.processDocument(req, res);
 
-      expect(getStatus()).toBe(500); //[cite: 4]
-      expect(getJson().error).toContain('OCR exploded'); //[cite: 4]
+      expect(getStatus()).toBe(200);
+      expect(getJson().results).toEqual([
+        { documentId: 'doc-123', pageIndex: 0, status: 'error', errorMessage: 'OCR exploded' },
+      ]);
       expect(update.mock.calls.map((call) => call[0])).toEqual([
-        //[cite: 4]
-        { status: 'processing' }, //[cite: 4]
-        { status: 'error' }, //[cite: 4]
-      ]); //[cite: 4]
+        { status: 'processing' },
+        { status: 'error', error_message: 'OCR exploded' },
+      ]);
 
       // Restore console.error
       consoleSpy.mockRestore();
@@ -289,17 +326,22 @@ describe('Documents Controller', () => {
       storage_path: 'user/proj/doc-123',
     };
 
-    const extractedData = [
-      {
-        pageIndex: 0,
-        columns: ['Item', 'Qty'],
-        rows: [{ _id: 'r1', _cellConfidence: { Item: 0.9 } }],
-        itemColumnKey: 'Item',
-      },
-    ];
+    // A single page's extracted data — saveExtractedData is page-scoped, so
+    // this (not an array of pages) is the valid shape for the request body.
+    const extractedData = {
+      pageIndex: 0,
+      columns: ['Item', 'Qty'],
+      rows: [{ _id: 'r1', _cellConfidence: { Item: 0.9 } }],
+      itemColumnKey: 'Item',
+    };
 
     it('writes extracted_data and sets status to done when the user owns the project', async () => {
-      const updatedDoc = { ...mockDoc, status: 'done', extracted_data: extractedData };
+      const updatedPage = {
+        document_id: 'doc-123',
+        page_index: 0,
+        status: 'done',
+        extracted_data: extractedData,
+      };
       vi.spyOn(supabase, 'from').mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
@@ -310,8 +352,10 @@ describe('Documents Controller', () => {
         }),
         update: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: updatedDoc, error: null }),
+            eq: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: updatedPage, error: null }),
+              }),
             }),
           }),
         }),
@@ -320,7 +364,7 @@ describe('Documents Controller', () => {
       const { req, res, getStatus, getJson } = createMockReqRes(
         'test-user-123',
         { extractedData },
-        { id: 'doc-123' }
+        { id: 'doc-123', pageIndex: '0' }
       );
 
       await documentsController.saveExtractedData(req, res);
@@ -329,16 +373,15 @@ describe('Documents Controller', () => {
       expect(getJson()).toEqual({
         success: true,
         documentId: 'doc-123',
-        status: 'done',
-        document: updatedDoc,
+        page: updatedPage,
       });
     });
 
-    it('returns 400 when extractedData is missing or not an array', async () => {
+    it('returns 400 when extractedData is missing or is an array instead of a single page object', async () => {
       const { req, res, getStatus, getJson } = createMockReqRes(
         'test-user-123',
-        { extractedData: { columns: [] } },
-        { id: 'doc-123' }
+        { extractedData: [extractedData] },
+        { id: 'doc-123', pageIndex: '0' }
       );
 
       await documentsController.saveExtractedData(req, res);
@@ -361,7 +404,7 @@ describe('Documents Controller', () => {
       const { req, res, getStatus } = createMockReqRes(
         'test-user-123',
         { extractedData },
-        { id: 'doc-unknown' }
+        { id: 'doc-unknown', pageIndex: '0' }
       );
 
       await documentsController.saveExtractedData(req, res);
@@ -414,15 +457,25 @@ describe('Documents Controller', () => {
     it('supports uploading a specific page of a multi-page document', async () => {
       vi.spyOn(r2Client, 'generateUploadUrl').mockResolvedValue('https://r2.test/page-1-presigned');
 
-      vi.spyOn(supabase, 'from').mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: { id: 'proj-1' }, error: null }),
+      vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+        if (table === 'projects') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({ data: { id: 'proj-1' }, error: null }),
+                }),
+              }),
             }),
-          }),
-        }),
-      } as any);
+          } as any;
+        }
+        if (table === 'document_pages') {
+          return {
+            upsert: vi.fn().mockResolvedValue({ error: null }),
+          } as any;
+        }
+        return {} as any;
+      });
 
       const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
         projectId: 'proj-1',
@@ -481,15 +534,29 @@ describe('Documents Controller', () => {
         storage_path: 'user/proj/doc-123',
       };
 
-      vi.spyOn(supabase, 'from').mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: mockDoc, error: null }),
+      vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+        if (table === 'documents') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({ data: mockDoc, error: null }),
+                }),
+              }),
             }),
-          }),
-        }),
-      } as any);
+          } as any;
+        }
+        if (table === 'document_pages') {
+          return {
+            delete: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: null }),
+              }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
 
       const { req, res, getStatus, getJson } = createMockReqRes(
         'test-user-123',

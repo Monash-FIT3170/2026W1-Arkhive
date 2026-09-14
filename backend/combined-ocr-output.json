@@ -1,8 +1,15 @@
 [
   {
     "id": "comp_1",
-    "text": "Invoice total: $42.00",
-    "confidence": 0.97,
-    "documentType": "Invoice"
+    "type": "TABLE_ROW",
+    "indentation": 0,
+    "y": 0,
+    "layer": 0,
+    "text": "Invoice total",
+    "cells": [
+      "Invoice total",
+      "$42.00"
+    ],
+    "confidence": 0.97
   }
 ]

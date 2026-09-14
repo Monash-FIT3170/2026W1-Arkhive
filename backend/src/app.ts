@@ -5,8 +5,8 @@ import { fileURLToPath } from 'url';
 import llmRoutes from './routes/llmRoutes';
 import extractionRoutes from './routes/extractionRoutes';
 import uploadRouter from './routes/upload';
-import projectsRouter from './routes/projects';
-import documentsRouter from './routes/documents';
+import projectsRouter from './routes/projectRoutes';
+import documentsRouter from './routes/documentRoutes';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

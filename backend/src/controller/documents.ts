@@ -8,32 +8,36 @@ import {
   getObjectBuffer,
   deleteObject,
   deletePrefix,
-  listObjects,
 } from '../services/r2Client';
 import { parseTableWithRetries } from '../services/ocr/ocr';
 import type { ExtractedPage } from '../models/TableData';
+import type { PageSelection, ProcessedPageResult } from '../models/Project.ts';
 
-/** Sort R2 keys like `.../page-2.png` before `.../page-10.png`. */
-function sortPageKeysNumerically(keys: string[]): string[] {
-  return [...keys].sort((a, b) => {
-    const indexA = Number(a.match(/page-(\d+)/i)?.[1] ?? Number.POSITIVE_INFINITY);
-    const indexB = Number(b.match(/page-(\d+)/i)?.[1] ?? Number.POSITIVE_INFINITY);
-    return indexA - indexB;
-  });
+/**
+ * Verifies the caller owns the project that (transitively) owns `documentId`,
+ * and returns the document row. Used by every page-scoped endpoint below so
+ * we don't duplicate the ownership join five times.
+ */
+async function getOwnedDocument(documentId: string, ownerId: string) {
+  const { data: document, error } = await supabase
+    .from('documents')
+    .select('*, projects!inner(owner_id)')
+    .eq('id', documentId)
+    .eq('projects.owner_id', ownerId)
+    .single();
+
+  if (error || !document) return null;
+  return document;
 }
 
 export default {
   /**
    * POST /api/documents/upload-url
-   * Generates a presigned PUT URL for Cloudflare R2 upload.
-   * Supports individual pages of a multi-page document.
+   * Generates a presigned PUT URL for a single page's PNG in R2, and ensures
+   * both the parent `documents` row and this page's `document_pages` row
+   * exist (status defaults to 'pending' — a fresh upload has no OCR yet).
    *
-   * Body parameters:
-   * - projectId: string (required)
-   * - filename: string (required)
-   * - contentType: string
-   * - pageIndex: number | string
-   * - documentId: string
+   * Body: { projectId, filename, contentType?, pageIndex, documentId? }
    */
   getUploadUrl: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
@@ -57,7 +61,6 @@ export default {
         return;
       }
 
-      // Verify caller owns the project
       const { data: project, error: projectError } = await supabase
         .from('projects')
         .select('id')
@@ -72,22 +75,19 @@ export default {
 
       const mimeType = contentType || 'image/png';
       const docId = existingDocId || randomUUID();
+      const numericPageIndex = Number(pageIndex);
 
-      // Key structure: {owner_id}/{project_id}/{document_id}/page-{pageIndex}.png
-      const storageKey = `${ownerId}/${projectId}/${docId}/page-${pageIndex}.png`;
+      const storageKey = `${ownerId}/${projectId}/${docId}/page-${numericPageIndex}.png`;
       const baseStoragePath = `${ownerId}/${projectId}/${docId}`;
 
-      // Generate presigned PUT URL (valid for 5 minutes)
       const uploadUrl = await generateUploadUrl(storageKey, mimeType, 300);
 
-      // Create or update document row in Supabase
       if (!existingDocId) {
         const { error: insertError } = await supabase.from('documents').insert({
           id: docId,
           project_id: projectId,
           storage_path: baseStoragePath,
           filename: filename,
-          status: 'pending',
         });
 
         if (insertError) {
@@ -97,10 +97,26 @@ export default {
         }
       }
 
+      // Ensure this page has a row to hang status/OCR data off of. If it
+      // already exists (e.g. re-upload of the same page), leave it alone —
+      // upsert with ignoreDuplicates so we don't clobber existing OCR state.
+      const { error: pageInsertError } = await supabase
+        .from('document_pages')
+        .upsert(
+          { document_id: docId, page_index: numericPageIndex, status: 'pending' },
+          { onConflict: 'document_id,page_index', ignoreDuplicates: true }
+        );
+
+      if (pageInsertError) {
+        console.error('Failed to create document_pages record:', pageInsertError);
+        res.status(500).json({ error: pageInsertError.message });
+        return;
+      }
+
       res.status(201).json({
         uploadUrl,
         documentId: docId,
-        pageIndex: Number(pageIndex),
+        pageIndex: numericPageIndex,
         storageKey,
       });
     } catch (err: any) {
@@ -112,13 +128,13 @@ export default {
   /**
    * GET /api/documents/:id/download-url
    * GET /api/documents/:id/pages/:pageIndex/url
-   * Generates a presigned GET URL for viewing or downloading a document or specific page from R2.
-   * Query params:
-   * - pageIndex: number (optional)
    */
   getDownloadUrl: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const { id, pageIndex: paramPageIndex } = req.params;
+      const { id, pageIndex: paramPageIndex } = req.params as {
+        id: string;
+        pageIndex: string;
+      };
       const queryPageIndex = req.query.pageIndex;
       const pageIndex = paramPageIndex !== undefined ? paramPageIndex : queryPageIndex;
       const ownerId = req.userId;
@@ -128,31 +144,20 @@ export default {
         return;
       }
 
-      // Fetch document and verify user owns the associated project
-      const { data: document, error: docError } = await supabase
-        .from('documents')
-        .select('*, projects!inner(owner_id)')
-        .eq('id', id)
-        .eq('projects.owner_id', ownerId)
-        .single();
-
-      if (docError || !document) {
+      const document = await getOwnedDocument(id, ownerId);
+      if (!document) {
         res.status(404).json({ error: 'Document not found or access denied.' });
         return;
       }
 
-      // Resolve key:
-      // If pageIndex is provided, key is ${document.storage_path}/page-${pageIndex}.png
-      // If not provided, either use direct file path or page-0
       let key = document.storage_path;
       if (pageIndex !== undefined && pageIndex !== null) {
         key = `${document.storage_path}/page-${pageIndex}.png`;
       } else if (!key.includes('.')) {
-        // base folder, default to page-0.png
         key = `${document.storage_path}/page-0.png`;
       }
 
-      const downloadUrl = await generateDownloadUrl(key, 900); // 15 min expiration
+      const downloadUrl = await generateDownloadUrl(key, 900);
 
       res.json({
         downloadUrl,
@@ -168,11 +173,14 @@ export default {
 
   /**
    * GET /api/documents/:id
-   * Retrieves document metadata and OCR results.
+   * Returns document metadata plus every page's status/extracted_data, so
+   * the frontend can decide per-page whether to show "processed — go to
+   * validation" or "needs OCR" without any extra calls.
    */
   getDocument: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
+
       const ownerId = req.userId;
 
       if (!ownerId) {
@@ -180,19 +188,25 @@ export default {
         return;
       }
 
-      const { data: document, error: docError } = await supabase
-        .from('documents')
-        .select('*, projects!inner(owner_id)')
-        .eq('id', id)
-        .eq('projects.owner_id', ownerId)
-        .single();
-
-      if (docError || !document) {
+      const document = await getOwnedDocument(id, ownerId);
+      if (!document) {
         res.status(404).json({ error: 'Document not found or access denied.' });
         return;
       }
 
-      res.json(document);
+      const { data: pages, error: pagesError } = await supabase
+        .from('document_pages')
+        .select('*')
+        .eq('document_id', id)
+        .order('page_index', { ascending: true });
+
+      if (pagesError) {
+        console.error('Failed to fetch document pages:', pagesError);
+        res.status(500).json({ error: pagesError.message });
+        return;
+      }
+
+      res.json({ ...document, pages: pages || [] });
     } catch (err: any) {
       console.error('Error fetching document:', err);
       res.status(500).json({ error: err.message || 'Internal server error.' });
@@ -200,14 +214,24 @@ export default {
   },
 
   /**
-   * POST /api/documents/:id/process
-   * Runs OCR on all pages of a document stored in R2 and returns raw per-page results.
-   * Does not write extracted_data — the frontend flattens/edits then PATCHes /data.
+   * POST /api/documents/process
+   * Batch endpoint: takes pages across one or MORE documents in a single
+   * call (`selections: PageSelection[]`), so a user can tick pages from
+   * several files and process them together.
+   *
+   * For each requested page:
+   *   - if status is already 'done' and `force` is not set, it's SKIPPED —
+   *     no OCR call, no R2 read. This is what lets a user reopen a project
+   *     and only pay for OCR on pages they haven't validated yet.
+   *   - otherwise OCR runs, and the raw result is persisted onto that page's
+   *     row immediately (not just returned in the response), so if the user
+   *     navigates away mid-validation the raw result is still there.
+   *
+   * Body: { selections: PageSelection[] }
    */
   processDocument: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const { id } = req.params;
-      const { pages } = req.body; // Optional array of page indices, e.g. [0, 1] or ['0', '1']
+      const { selections } = req.body as { selections?: PageSelection[] };
       const ownerId = req.userId;
 
       if (!ownerId) {
@@ -215,95 +239,120 @@ export default {
         return;
       }
 
-      // Fetch document and verify ownership
-      const { data: document, error: docError } = await supabase
-        .from('documents')
-        .select('*, projects!inner(owner_id)')
-        .eq('id', id)
-        .eq('projects.owner_id', ownerId)
-        .single();
-
-      if (docError || !document) {
-        res.status(404).json({ error: 'Document not found or access denied.' });
+      if (!Array.isArray(selections) || selections.length === 0) {
+        res.status(400).json({ error: 'selections must be a non-empty array.' });
         return;
       }
 
-      // Mark status as processing
-      await supabase.from('documents').update({ status: 'processing' }).eq('id', id);
+      const results: ProcessedPageResult[] = [];
 
-      // Determine the list of R2 keys to process
-      let pageKeys: string[] = [];
+      for (const selection of selections) {
+        const { documentId, pageIndices, force } = selection;
 
-      if (Array.isArray(pages) && pages.length > 0) {
-        pageKeys = sortPageKeysNumerically(
-          pages.map((p) => `${document.storage_path}/page-${p}.png`)
-        );
-      } else {
-        // Discover existing pages under the document prefix
-        const prefix = `${document.storage_path}/`;
-        try {
-          const discovered = await listObjects(prefix);
-          if (discovered.length > 0) {
-            pageKeys = sortPageKeysNumerically(discovered);
-          } else {
-            pageKeys = [document.storage_path];
+        const document = await getOwnedDocument(documentId, ownerId);
+        if (!document) {
+          for (const pageIndex of pageIndices) {
+            results.push({
+              documentId,
+              pageIndex,
+              status: 'error',
+              errorMessage: 'Document not found or access denied.',
+            });
           }
-        } catch {
-          pageKeys = [document.storage_path];
+          continue;
         }
-      }
 
-      // Download and run OCR on all pages
-      try {
-        const pageResults = await Promise.all(
-          pageKeys.map(async (key) => {
+        const { data: pageRows, error: pagesError } = await supabase
+          .from('document_pages')
+          .select('*')
+          .eq('document_id', documentId)
+          .in('page_index', pageIndices);
+
+        if (pagesError) {
+          console.error('Failed to fetch document_pages for processing:', pagesError);
+          for (const pageIndex of pageIndices) {
+            results.push({
+              documentId,
+              pageIndex,
+              status: 'error',
+              errorMessage: pagesError.message,
+            });
+          }
+          continue;
+        }
+
+        const pageByIndex = new Map((pageRows || []).map((p) => [p.page_index, p]));
+
+        for (const pageIndex of pageIndices) {
+          const pageRow = pageByIndex.get(pageIndex);
+
+          // Skip pages already validated, unless the caller forces a redo.
+          if (pageRow && pageRow.status === 'done' && !force) {
+            results.push({
+              documentId,
+              pageIndex,
+              status: 'done',
+              rawResult: pageRow.raw_ocr_result,
+              skipped: true,
+            });
+            continue;
+          }
+
+          await supabase
+            .from('document_pages')
+            .update({ status: 'processing' })
+            .eq('document_id', documentId)
+            .eq('page_index', pageIndex);
+
+          try {
+            const key = `${document.storage_path}/page-${pageIndex}.png`;
             const buffer = await getObjectBuffer(key);
-            const text = await parseTableWithRetries(buffer);
-            return text;
-          })
-        );
+            const rawResult = await parseTableWithRetries(buffer);
 
-        const { error: updateError } = await supabase
-          .from('documents')
-          .update({ status: 'pending' })
-          .eq('id', id);
+            // Persist immediately — this is the fix for "crash mid-validation
+            // means re-OCR everything." Status goes back to 'pending' (not
+            // 'done') because raw OCR output still needs user validation
+            // before it's trustworthy.
+            await supabase
+              .from('document_pages')
+              .update({ status: 'pending', raw_ocr_result: rawResult, error_message: null })
+              .eq('document_id', documentId)
+              .eq('page_index', pageIndex);
 
-        if (updateError) {
-          console.error('Failed to reset document status after OCR:', updateError);
-          res.status(500).json({ error: 'Failed to update document status.' });
-          return;
+            results.push({ documentId, pageIndex, status: 'pending', rawResult });
+          } catch (ocrError: any) {
+            const errorMessage =
+              ocrError?.message || 'OCR processing failed. Check credentials and document format.';
+            console.error(`OCR failed for ${documentId} page ${pageIndex}:`, ocrError);
+
+            await supabase
+              .from('document_pages')
+              .update({ status: 'error', error_message: errorMessage })
+              .eq('document_id', documentId)
+              .eq('page_index', pageIndex);
+
+            results.push({ documentId, pageIndex, status: 'error', errorMessage });
+          }
         }
-
-        res.json({
-          success: true,
-          documentId: id,
-          status: 'pending',
-          rawResult: pageResults,
-        });
-      } catch (ocrError: any) {
-        console.error('OCR processing pipeline failed:', ocrError);
-        await supabase.from('documents').update({ status: 'error' }).eq('id', id);
-
-        res.status(500).json({
-          error:
-            ocrError?.message || 'OCR processing failed. Check credentials and document format.',
-        });
       }
+
+      res.json({ success: true, results });
     } catch (err: any) {
-      console.error('Error processing document:', err);
+      console.error('Error processing documents:', err);
       res.status(500).json({ error: err.message || 'Internal server error.' });
     }
   },
 
   /**
-   * PATCH /api/documents/:id/data
-   * Persists flattened/edited ExtractedPage[] to extracted_data and marks the document done.
-   * Called after initial OCR flattening and on every subsequent user edit.
+   * PATCH /api/documents/:id/pages/:pageIndex/data
+   * Persists flattened/validated ExtractedData for ONE page and marks it done.
+   * Called after initial OCR flattening and on every subsequent user edit to
+   * that page.
    */
   saveExtractedData: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const { id } = req.params;
-      const { extractedData } = req.body as { extractedData?: ExtractedPage[] };
+      const { id, pageIndex } = req.params as { id: string; pageIndex: string };
+      const { extractedData } = req.body as { extractedData?: ExtractedPage };
       const ownerId = req.userId;
 
       if (!ownerId) {
@@ -311,45 +360,34 @@ export default {
         return;
       }
 
-      if (!Array.isArray(extractedData)) {
-        res.status(400).json({ error: 'extractedData must be an array of ExtractedPage objects.' });
+      if (!extractedData || typeof extractedData !== 'object' || Array.isArray(extractedData)) {
+        res.status(400).json({ error: 'extractedData must be a single ExtractedData object.' });
         return;
       }
 
-      const { data: document, error: docError } = await supabase
-        .from('documents')
-        .select('*, projects!inner(owner_id)')
-        .eq('id', id)
-        .eq('projects.owner_id', ownerId)
-        .single();
-
-      if (docError || !document) {
+      const document = await getOwnedDocument(id, ownerId);
+      if (!document) {
         res.status(404).json({ error: 'Document not found or access denied.' });
         return;
       }
 
-      const { data: updatedDoc, error: updateError } = await supabase
-        .from('documents')
-        .update({
-          extracted_data: extractedData,
-          status: 'done',
-        })
-        .eq('id', id)
+      const { data: updatedPage, error: updateError } = await supabase
+        .from('document_pages')
+        .update({ extracted_data: extractedData, status: 'done', error_message: null })
+        .eq('document_id', id)
+        .eq('page_index', Number(pageIndex))
         .select()
         .single();
 
-      if (updateError) {
+      if (updateError || !updatedPage) {
         console.error('Failed to save extracted data:', updateError);
-        res.status(500).json({ error: 'Failed to persist extracted data.' });
+        res
+          .status(500)
+          .json({ error: updateError?.message || 'Failed to persist extracted data.' });
         return;
       }
 
-      res.json({
-        success: true,
-        documentId: id,
-        status: 'done',
-        document: updatedDoc,
-      });
+      res.json({ success: true, documentId: id, page: updatedPage });
     } catch (err: any) {
       console.error('Error saving extracted data:', err);
       res.status(500).json({ error: err.message || 'Internal server error.' });
@@ -358,11 +396,13 @@ export default {
 
   /**
    * DELETE /api/documents/:id/pages/:pageIndex
-   * Removes a specific page image from R2.
+   * Removes the page image from R2 and deletes its document_pages row
+   * (previously this only deleted the R2 object — the row is what carries
+   * OCR/validation state now, so it must go too).
    */
   deletePage: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const { id, pageIndex } = req.params;
+      const { id, pageIndex } = req.params as { id: string; pageIndex: string };
       const ownerId = req.userId;
 
       if (!ownerId) {
@@ -370,15 +410,8 @@ export default {
         return;
       }
 
-      // Fetch document and verify ownership
-      const { data: document, error: docError } = await supabase
-        .from('documents')
-        .select('*, projects!inner(owner_id)')
-        .eq('id', id)
-        .eq('projects.owner_id', ownerId)
-        .single();
-
-      if (docError || !document) {
+      const document = await getOwnedDocument(id, ownerId);
+      if (!document) {
         res.status(404).json({ error: 'Document not found or access denied.' });
         return;
       }
@@ -390,6 +423,16 @@ export default {
         console.error('Failed to delete page from R2:', r2Err);
       }
 
+      const { error: deleteError } = await supabase
+        .from('document_pages')
+        .delete()
+        .eq('document_id', id)
+        .eq('page_index', Number(pageIndex));
+
+      if (deleteError) {
+        console.error('Failed to delete document_pages row:', deleteError);
+      }
+
       res.json({ success: true, documentId: id, pageIndex: Number(pageIndex) });
     } catch (err: any) {
       console.error('Error deleting page:', err);
@@ -399,11 +442,12 @@ export default {
 
   /**
    * DELETE /api/documents/:id
-   * Removes all pages from R2 storage and deletes the database record.
+   * Removes all pages from R2 storage and deletes the document row.
+   * document_pages rows are cleaned up automatically via ON DELETE CASCADE.
    */
   deleteDocument: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const ownerId = req.userId;
 
       if (!ownerId) {
@@ -411,20 +455,12 @@ export default {
         return;
       }
 
-      // Fetch document and verify ownership
-      const { data: document, error: docError } = await supabase
-        .from('documents')
-        .select('*, projects!inner(owner_id)')
-        .eq('id', id)
-        .eq('projects.owner_id', ownerId)
-        .single();
-
-      if (docError || !document) {
+      const document = await getOwnedDocument(id, ownerId);
+      if (!document) {
         res.status(404).json({ error: 'Document not found or access denied.' });
         return;
       }
 
-      // Delete all pages under prefix as well as individual file
       try {
         await deletePrefix(`${document.storage_path}/`);
         await deleteObject(document.storage_path);
@@ -432,7 +468,6 @@ export default {
         console.error('Failed to delete objects from R2:', r2Err);
       }
 
-      // Delete from database
       const { error: deleteError } = await supabase.from('documents').delete().eq('id', id);
 
       if (deleteError) {
