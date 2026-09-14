@@ -7,6 +7,7 @@ import extractionRoutes from './routes/extractionRoutes';
 import uploadRouter from './routes/upload';
 import projectsRouter from './routes/projectRoutes';
 import documentsRouter from './routes/documentRoutes';
+import qrRouter from './routes/qr';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +35,7 @@ app.use('/api/extraction', extractionRoutes);
 app.use('/api/upload', uploadRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/documents', documentsRouter);
+app.use('/api/qr', qrRouter);
 
 app.use((req: Request, res: Response, next) => {
   console.log('HIT:', req.method, req.url);
