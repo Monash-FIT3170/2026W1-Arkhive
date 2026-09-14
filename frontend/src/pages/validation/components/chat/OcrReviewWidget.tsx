@@ -13,9 +13,8 @@ import {
 
 // Acknowledgement: Google Gemini was used to help generate this file
 
-import { buildSlides, type OcrIssue } from './ocrReviewUtils';
-
-export type { OcrIssue };
+import { buildSlides } from '../../../../utils/ocrReviewUtils';
+import type { OcrIssue } from '../../../../models/IssueReview';
 
 interface OcrReviewWidgetProps {
   issues: OcrIssue[];

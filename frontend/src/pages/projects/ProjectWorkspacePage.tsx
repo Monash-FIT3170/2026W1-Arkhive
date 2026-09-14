@@ -13,7 +13,7 @@ import EmptyUploadView from '../upload/components/EmptyUploadView';
 import UploadMoreButton from '../upload/components/actions/UploadMoreButton';
 import DocumentPanel from '../validation/components/document/DocumentPanel';
 import ExtractedDataPanel from '../validation/components/extracted-data/ExtractedDataPanel';
-import { flatten } from '../validation/components/extracted-data/flattener';
+import { flatten } from '../../utils/flattener';
 import type {
   ProjectDetail,
   DocumentRecord,

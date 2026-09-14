@@ -8,18 +8,18 @@ import type { ExtractedPage } from '../../models/TableData';
 import { getProcessedImageUrls, getUploadedImageUrl } from '../../services/uploadService';
 //import type { DocumentJob } from '../../models/Job';
 import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
-import { reindentRow, type IndentDirection } from './components/extracted-data/indentEditor';
-import { detectReviewFields } from './components/extracted-data/detectReviewFields';
+import { reindentRow, type IndentDirection } from '../../utils/indentEditor';
+import { detectReviewFields } from '../../utils/detectReviewFields';
 import {
   requestBulkFieldReview,
   requestFieldReview,
   requestFormatDetection,
 } from '../../services/llmService';
-import type { OcrIssue } from './components/chat/OcrReviewWidget';
-import { flatten } from './components/extracted-data/flattener';
-import { checkTableFormats } from './components/extracted-data/detectFormat';
+import { flatten } from '../../utils/flattener';
+import { checkTableFormats } from '../../utils/detectFormat';
 
 import type { HistoryEntry } from '../../models/HistoryEntry';
+import type { OcrIssue } from '../../models/IssueReview';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
