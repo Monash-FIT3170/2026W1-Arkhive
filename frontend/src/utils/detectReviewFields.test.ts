@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { detectReviewFields } from './detectReviewFields';
-import type { ExtractedData, ExtractedRow } from '../../../../models/TableData';
+import type { ExtractedData, ExtractedRow } from '../models/TableData';
 
 function buildRow(overrides: Partial<ExtractedRow> & { _id: string | number }): ExtractedRow {
   return {

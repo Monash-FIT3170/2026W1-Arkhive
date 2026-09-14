@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 // Adjust this import path to wherever detectFormat.ts actually lives relative to this test file.
 import { checkColumnFormat, checkTableFormats, type ColumnRegexMap } from './detectFormat';
-import type { ExtractedData, ExtractedRow } from '../../../../models/TableData';
+import type { ExtractedData, ExtractedRow } from '../models/TableData';
 
 // Acknowledgment: The generation of these tests was done with the
 // assistance of Google Gemini

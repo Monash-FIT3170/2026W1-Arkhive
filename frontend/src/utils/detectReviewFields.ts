@@ -1,5 +1,5 @@
-import type { ExtractedData } from '../../../../models/TableData';
-import type { ReviewField } from '../../../../models/Message';
+import type { ExtractedData } from '../models/TableData';
+import type { ReviewField } from '../models/Message';
 
 // Absolute thresholds
 const CRITICAL_FLOOR = 0.6; // Always flag below this, no matter what

@@ -6,9 +6,10 @@ import { sendMessage } from '../../../../services/llmService';
 import type { ExtractedPage } from '../../../../models/TableData';
 
 import OcrReviewWidget from './OcrReviewWidget';
-import { buildSlides, type OcrIssue } from './ocrReviewUtils';
 
 import type { HistoryEntry } from '../../../../models/HistoryEntry';
+import type { OcrIssue } from '../../../../models/IssueReview';
+import { buildSlides } from '../../../../utils/ocrReviewUtils';
 
 function ChatPanel({
   isOpen,
