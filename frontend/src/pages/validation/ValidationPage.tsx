@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import ValidationWorkspace from './components/ValidationWorkspace';
 import type { Pages } from '../../models/OCRComponent';
 import type { ExtractedPage } from '../../models/TableData';
@@ -13,7 +13,6 @@ import { flatten } from '../../utils/flattener';
 function ValidationPage() {
   const [imageUrls, setImageUrls] = useState<string[]>([]); // one image URL per page
   const [ocrPages, setOcrPages] = useState<Pages>([]); // raw OCR, one array per page
-  const [extractedPages, setExtractedPages] = useState<ExtractedPage[]>([]); // flattened, one per page
 
   useEffect(() => {
     async function loadSession() {
@@ -33,14 +32,14 @@ function ValidationPage() {
   // source of truth for extractedPages — nothing else should call flatten()
   // directly. Once this feeds ValidationWorkspace, further edits are the
   // workspace's concern (they get reported back here only via onPersist).
-  useEffect(() => {
-    if (ocrPages.length === 0) return;
-    const newExtractedPages: ExtractedPage[] = ocrPages.map((page) => ({
-      ...flatten(page.components),
-      pageIndex: page.page_num - 1,
-    }));
-    setExtractedPages(newExtractedPages);
-  }, [ocrPages]);
+  const extractedPages: ExtractedPage[] = useMemo(
+    () =>
+      ocrPages.map((page) => ({
+        ...flatten(page.components),
+        pageIndex: page.page_num - 1,
+      })),
+    [ocrPages]
+  );
 
   if (extractedPages.length === 0) {
     return (
@@ -53,7 +52,7 @@ function ValidationPage() {
   return (
     <ValidationWorkspace
       pages={extractedPages}
-      syncKey={`${ocrPages.length}:${ocrPages.map((p) => p.page_num).join(',')}`}
+      key={`${ocrPages.length}:${ocrPages.map((p) => p.page_num).join(',')}`}
       ocrPages={ocrPages.map((p) => p.components)}
       imageUrls={imageUrls}
       onPersist={saveExtractionSession}

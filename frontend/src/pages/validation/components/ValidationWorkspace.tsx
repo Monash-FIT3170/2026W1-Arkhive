@@ -27,14 +27,6 @@ function useIsLargeScreen() {
 export interface ValidationWorkspaceProps {
   /** The pages to validate, adopted into internal state whenever `syncKey` changes. */
   pages: ExtractedPage[];
-  /**
-   * Changes whenever `pages` should be re-adopted from the caller (e.g. a new
-   * session loaded, or new pages finished processing). Should stay stable
-   * across re-renders that are just edits — edits flow back out through
-   * `onPersist`, not through this prop, so a stable key is what keeps the
-   * workspace from clobbering in-progress edits on every render.
-   */
-  syncKey: string;
   /** Raw OCR components per page, aligned index-for-index with `pages`. */
   ocrPages: OCRComponent[][];
   /** Image URL per page, aligned index-for-index with `pages`. */
@@ -56,7 +48,6 @@ export interface ValidationWorkspaceProps {
 // document/table split, and the floating chat + review + history panel.
 function ValidationWorkspace({
   pages,
-  syncKey,
   ocrPages,
   imageUrls,
   onPersist,
@@ -80,14 +71,24 @@ function ValidationWorkspace({
   const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
   const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review' | 'history'>('chat');
 
-  const extractedPagesRef = useRef<ExtractedPage[]>([]);
+  const extractedPagesRef = useRef<ExtractedPage[]>(pages);
   const currentPageIndexRef = useRef(0);
-  useEffect(() => {
-    extractedPagesRef.current = extractedPages;
-  }, [extractedPages]);
-  useEffect(() => {
-    currentPageIndexRef.current = currentPageIndex;
-  }, [currentPageIndex]);
+
+  const handlePagesChange = useCallback((action: React.SetStateAction<ExtractedPage[]>) => {
+    setExtractedPages((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      extractedPagesRef.current = next; // <-- Instantly update the Ref!
+      return next;
+    });
+  }, []);
+
+  const handlePageIndexChange = useCallback((action: React.SetStateAction<number>) => {
+    setCurrentPageIndex((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      currentPageIndexRef.current = next;
+      return next;
+    });
+  }, []);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
@@ -101,17 +102,6 @@ function ValidationWorkspace({
       ...prev,
     ]);
   }, []);
-
-  // Adopt the caller's pages whenever syncKey changes (new session loaded,
-  // new pages finished processing, etc). Nothing else should reset
-  // extractedPages — edits after this point flow through the hooks below.
-  useEffect(() => {
-    setExtractedPages(pages);
-    setCurrentPageIndex(0);
-    setEditedCells(new Set());
-    setTableKey((k) => k + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [syncKey]);
 
   // UNDO/REDO PIPELINE — stack + keyboard shortcuts live in the hook; we
   // just say what "apply a snapshot" means for this workspace's state.
@@ -144,7 +134,7 @@ function ValidationWorkspace({
     extractedPages,
     currentPageIndex,
     extractedPagesRef,
-    onPagesChange: setExtractedPages,
+    onPagesChange: handlePagesChange,
     onPersist,
     addHistoryEntry,
     pushUndo,
@@ -193,7 +183,7 @@ function ValidationWorkspace({
     useFieldHover(documentContext, {
       currentPageIndexRef,
       pagesRef: extractedPagesRef,
-      onPageChange: setCurrentPageIndex,
+      onPageChange: handlePageIndexChange,
     });
 
   // AI-suggestion propose/accept/reject flow (chat messages live here too,
@@ -203,7 +193,7 @@ function ValidationWorkspace({
       currentPageIndex,
       documentContext,
       extractedPagesRef,
-      onPagesChange: setExtractedPages,
+      onPagesChange: handlePagesChange,
       onPersist,
       pushUndo,
     });
@@ -212,7 +202,7 @@ function ValidationWorkspace({
   const { handleRowIndent, handleRowOutdent } = useRowIndent({
     currentPageIndexRef,
     extractedPagesRef,
-    onPagesChange: setExtractedPages,
+    onPagesChange: handlePagesChange,
     onPersist,
     addHistoryEntry,
     pushUndo,
@@ -223,7 +213,7 @@ function ValidationWorkspace({
     useTableEditor({
       currentPageIndexRef,
       extractedPagesRef,
-      onPagesChange: setExtractedPages,
+      onPagesChange: handlePagesChange,
       onPersist,
       addHistoryEntry,
       pushUndo,
@@ -257,7 +247,7 @@ function ValidationWorkspace({
             ocrData={ocrData}
             imageUrls={imageUrls}
             currentPageIndex={currentPageIndex}
-            onPageChange={setCurrentPageIndex}
+            onPageChange={handlePageIndexChange}
           />
         </div>
 

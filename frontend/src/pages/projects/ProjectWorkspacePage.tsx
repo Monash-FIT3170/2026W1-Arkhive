@@ -450,7 +450,7 @@ export default function ProjectWorkspacePage() {
         {header}
         <ValidationWorkspace
           pages={pages}
-          syncKey={validationKeysSignature}
+          key={validationKeysSignature}
           ocrPages={ocrPages}
           imageUrls={imageUrls}
           onPersist={persistPages}
