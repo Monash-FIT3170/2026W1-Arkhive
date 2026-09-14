@@ -1,4 +1,4 @@
-import type { ExtractedPage, ExtractedRow } from '../../../../models/TableData';
+import type { ExtractedPage, ExtractedRow } from '../models/TableData';
 // Acknowledgement: Google Gemini was used to help generate this file
 export type IndentDirection = 'in' | 'out';
 

@@ -1,4 +1,4 @@
-import type { ExtractedData } from '../../../../models/TableData';
+import type { ExtractedData } from '../models/TableData';
 
 /**
  * Map of column name -> format regex string (from the LLM step).
