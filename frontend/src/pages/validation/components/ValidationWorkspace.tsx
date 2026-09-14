@@ -40,6 +40,19 @@ export interface ValidationWorkspaceProps {
   onPersist: (pages: ExtractedPage[]) => void;
   /** Optional height override for the split container (defaults to filling the viewport below a 72px header). */
   heightClassName?: string;
+  /**
+   * Stable per-page identifiers, aligned index-for-index with `pages`
+   * (e.g. `${documentId}:${pageIndex}`). Passed straight through to
+   * useReviewQueue so it can tell "already processed" pages apart from
+   * newly-added ones across resyncs.
+   */
+  pageKeys?: string[];
+  /**
+   * Changes whenever the *set* of pages changes shape (a page was added or
+   * removed) — NOT on every parent re-render. When it changes, `pages` is
+   * re-adopted into internal state.
+   */
+  syncKey?: string;
 }
 
 // Everything below "how do we get pages in and where do they get saved" is
@@ -52,11 +65,14 @@ function ValidationWorkspace({
   imageUrls,
   onPersist,
   heightClassName = 'lg:h-[calc(100vh-72px)]',
+  pageKeys,
+  syncKey,
 }: ValidationWorkspaceProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [splitPercent, setSplitPercent] = useState(50);
   const [extractedPages, setExtractedPages] = useState<ExtractedPage[]>(pages);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [prevSyncKey, setPrevSyncKey] = useState(syncKey);
 
   const documentContext: ExtractedPage | null = extractedPages[currentPageIndex] ?? null;
   const ocrData: OCRComponent[] = ocrPages[currentPageIndex] ?? [];
@@ -73,6 +89,21 @@ function ValidationWorkspace({
 
   const extractedPagesRef = useRef<ExtractedPage[]>(pages);
   const currentPageIndexRef = useRef(0);
+
+  if (syncKey !== prevSyncKey) {
+    setPrevSyncKey(syncKey);
+    setExtractedPages(pages);
+    const clamped = Math.min(currentPageIndex, Math.max(pages.length - 1, 0));
+    setCurrentPageIndex(clamped);
+  }
+
+  useEffect(() => {
+    extractedPagesRef.current = extractedPages;
+  }, [extractedPages]);
+
+  useEffect(() => {
+    currentPageIndexRef.current = currentPageIndex;
+  }, [currentPageIndex]);
 
   const handlePagesChange = useCallback((action: React.SetStateAction<ExtractedPage[]>) => {
     setExtractedPages((prev) => {
@@ -139,6 +170,7 @@ function ValidationWorkspace({
     addHistoryEntry,
     pushUndo,
     onIssuesDetected: () => setChatActiveTab('review'),
+    pageKeys,
   });
 
   //Resizing Functions

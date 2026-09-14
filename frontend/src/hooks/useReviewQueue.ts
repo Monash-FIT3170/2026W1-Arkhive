@@ -28,6 +28,9 @@ interface UseReviewQueueOptions {
   // Fires once, the first time detection finds any issues — e.g. to switch a
   // chat panel over to its "review" tab.
   onIssuesDetected?: () => void;
+  // Optional stable identifier per entry in `extractedPages` (e.g.
+  // `${documentId}:${pageIndex}`)
+  pageKeys?: string[];
 }
 
 export function useReviewQueue({
@@ -39,10 +42,11 @@ export function useReviewQueue({
   addHistoryEntry,
   pushUndo,
   onIssuesDetected,
+  pageKeys,
 }: UseReviewQueueOptions) {
   const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
   const [resolvedIssueIds, setResolvedIssueIds] = useState<Set<string>>(new Set());
-  const hasStartedRef = useRef(false);
+  const processedPageKeysRef = useRef<Set<string>>(new Set());
 
   const handleResolveIssues = useCallback((ids: string[]) => {
     setResolvedIssueIds((prev) => {
@@ -56,14 +60,21 @@ export function useReviewQueue({
   // fields whose values don't match the column's inferred format.
   useEffect(() => {
     async function performFormatDetection() {
-      if (extractedPages.length === 0 || hasStartedRef.current) return;
-      hasStartedRef.current = true;
+      if (extractedPages.length === 0) return;
 
-      let allIssues: OcrIssue[] = [];
+      const pending = extractedPages
+        .map((page, idx) => ({
+          page,
+          idx,
+          key: pageKeys?.[idx] ?? String(idx),
+        }))
+        .filter(({ key }) => !processedPageKeysRef.current.has(key));
 
-      for (let pageIdx = 0; pageIdx < extractedPages.length; pageIdx++) {
-        const pageContext = extractedPages[pageIdx];
+      if (pending.length === 0) return;
 
+      let newIssues: OcrIssue[] = [];
+
+      for (const { page: pageContext, idx: pageIdx, key } of pending) {
         const fields = detectReviewFields(pageContext);
         const confidenceIssues: OcrIssue[] = fields.map((f) => ({
           fieldId: `${f.rowId}:${f.column}`,
@@ -107,7 +118,7 @@ export function useReviewQueue({
               fieldId: `${f.rowId}:${f.column}`,
               fieldName: f.column,
               ocrValue: String(f.value),
-              confidenceScore: 0.3, // fallback confidence score for format issues
+              confidenceScore: 0.3,
               issueType: 'format' as const,
               rowId: f.rowId,
               pageIndex: pageIdx,
@@ -132,17 +143,18 @@ export function useReviewQueue({
           }
         });
 
-        allIssues = allIssues.concat(confidenceIssues, formatIssues);
+        newIssues = newIssues.concat(confidenceIssues, formatIssues);
+        processedPageKeysRef.current.add(key);
       }
 
-      setFlaggedIssues(allIssues);
-      if (allIssues.length > 0) {
+      if (newIssues.length > 0) {
+        setFlaggedIssues((prev) => [...prev, ...newIssues]);
         onIssuesDetected?.();
       }
     }
 
     performFormatDetection();
-  }, [extractedPages, onIssuesDetected]);
+  }, [extractedPages, pageKeys, onIssuesDetected]);
 
   const handleCarouselAccept = useCallback(
     (updates: { fieldId: string; newValue: string }[]) => {

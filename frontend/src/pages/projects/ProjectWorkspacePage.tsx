@@ -83,6 +83,7 @@ export default function ProjectWorkspacePage() {
   // pages array passed to <ValidationWorkspace> corresponds to, so
   // persistPages can save each edited page back to the right place.
   const validationListRef = useRef<typeof validationList>([]);
+  const [hasEnteredValidate, setHasEnteredValidate] = useState(false);
 
   // ── Load project ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -365,6 +366,7 @@ export default function ProjectWorkspacePage() {
       setSelectedKeys(new Set());
       if (anySucceeded) {
         setMode('validate');
+        setHasEnteredValidate(true);
       }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to process pages.');
@@ -434,33 +436,26 @@ export default function ProjectWorkspacePage() {
     );
   }
 
-  if (mode === 'validate' && validationList.length > 0) {
-    const pages = validationList
-      .map((entry) => getExtractedData(entry.documentId, entry.pageIndex))
-      .filter((page): page is ExtractedPage => page !== null);
-    const ocrPages = validationList.map((entry) =>
-      extractComponents(findPage(entry.documentId, entry.pageIndex)?.raw_ocr_result)
-    );
-    const imageUrls = validationList.map(
-      (e) => imageUrlMap[pageKey(e.documentId, e.pageIndex)] || ''
-    );
+  const pages = hasEnteredValidate
+    ? validationList
+        .map((entry) => getExtractedData(entry.documentId, entry.pageIndex))
+        .filter((page): page is ExtractedPage => page !== null)
+    : [];
+  const ocrPages = hasEnteredValidate
+    ? validationList.map((entry) =>
+        extractComponents(findPage(entry.documentId, entry.pageIndex)?.raw_ocr_result)
+      )
+    : [];
+  const imageUrls = hasEnteredValidate
+    ? validationList.map((e) => imageUrlMap[pageKey(e.documentId, e.pageIndex)] || '')
+    : [];
+  // stable per-page identity for useReviewQueue, so appending pages later
+  // doesn't retrigger detection on pages already processed
+  const pageKeys = hasEnteredValidate
+    ? validationList.map((e) => pageKey(e.documentId, e.pageIndex))
+    : [];
 
-    return (
-      <>
-        {header}
-        <ValidationWorkspace
-          pages={pages}
-          key={validationKeysSignature}
-          ocrPages={ocrPages}
-          imageUrls={imageUrls}
-          onPersist={persistPages}
-          heightClassName="lg:h-[calc(100vh-124px)]"
-        />
-      </>
-    );
-  }
-
-  // ── Files view ─────────────────────────────────────────────────────────
+  // ── Files/Validation view ─────────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col">
       {header}
@@ -470,104 +465,124 @@ export default function ProjectWorkspacePage() {
           <div className="alert alert-error shadow-lg">{actionError}</div>
         </div>
       )}
-
-      <div className="flex items-center justify-between px-6 py-3 border-b border-base-300 gap-3">
-        <div className="flex items-center gap-2">
-          <button className="btn btn-sm btn-outline" onClick={selectAll}>
-            Select all
-          </button>
-          <button className="btn btn-sm btn-outline" onClick={deselectAll}>
-            Deselect all
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-40">
-            <UploadMoreButton onFilesSelected={handleFilesCaptured} />
+      {/* FILE VIEW AND UPLOAD */}
+      <div className={mode === 'files' ? 'flex-1 flex flex-col' : 'hidden'}>
+        <div className="flex items-center justify-between px-6 py-3 border-b border-base-300 gap-3">
+          <div className="flex items-center gap-2">
+            <button className="btn btn-sm btn-outline" onClick={selectAll}>
+              Select all
+            </button>
+            <button className="btn btn-sm btn-outline" onClick={deselectAll}>
+              Deselect all
+            </button>
           </div>
-          <button
-            className="btn btn-sm btn-primary"
-            disabled={selectedKeys.size === 0 || isProcessing}
-            onClick={handleProcessSelected}
-          >
-            {isProcessing ? (
-              <span className="loading loading-spinner loading-sm" />
-            ) : (
-              `Process Selected (${selectedKeys.size})`
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-40">
+              <UploadMoreButton onFilesSelected={handleFilesCaptured} />
+            </div>
+            <button
+              className="btn btn-sm btn-primary"
+              disabled={selectedKeys.size === 0 || isProcessing}
+              onClick={handleProcessSelected}
+            >
+              {isProcessing ? (
+                <span className="loading loading-spinner loading-sm" />
+              ) : (
+                `Process Selected (${selectedKeys.size})`
+              )}
+            </button>
+          </div>
         </div>
-      </div>
 
-      {isUploading && (
-        <div className="px-6 py-2 text-sm text-base-content/60 flex items-center gap-2">
-          <span className="loading loading-spinner loading-xs" /> Uploading...
-        </div>
-      )}
+        {isUploading && (
+          <div className="px-6 py-2 text-sm text-base-content/60 flex items-center gap-2">
+            <span className="loading loading-spinner loading-xs" /> Uploading...
+          </div>
+        )}
 
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="flex flex-col gap-6">
-          {documents.map((doc) => (
-            <section key={doc.id} className="rounded-lg border border-base-300 bg-base-200/40 p-4">
-              <h3 className="mb-3 text-sm font-semibold text-base-content/70 flex items-center gap-2">
-                <FileText className="w-4 h-4" /> {doc.filename}
-              </h3>
-              <div className="flex flex-wrap gap-4">
-                {(doc.pages || [])
-                  .slice()
-                  .sort((a, b) => a.page_index - b.page_index)
-                  .map((page) => {
-                    const key = pageKey(doc.id, page.page_index);
-                    const imageUrl = imageUrlMap[key];
-                    return (
-                      <div
-                        key={key}
-                        className="w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden"
-                      >
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex flex-col gap-6">
+            {documents.map((doc) => (
+              <section
+                key={doc.id}
+                className="rounded-lg border border-base-300 bg-base-200/40 p-4"
+              >
+                <h3 className="mb-3 text-sm font-semibold text-base-content/70 flex items-center gap-2">
+                  <FileText className="w-4 h-4" /> {doc.filename}
+                </h3>
+                <div className="flex flex-wrap gap-4">
+                  {(doc.pages || [])
+                    .slice()
+                    .sort((a, b) => a.page_index - b.page_index)
+                    .map((page) => {
+                      const key = pageKey(doc.id, page.page_index);
+                      const imageUrl = imageUrlMap[key];
+                      return (
                         <div
-                          className="relative h-[120px] bg-base-300 cursor-pointer"
-                          onClick={() => toggleSelected(doc.id, page.page_index)}
+                          key={key}
+                          className="w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden"
                         >
-                          {imageUrl ? (
-                            <img
-                              src={imageUrl}
-                              alt={`Page ${page.page_index + 1}`}
-                              className="w-full h-full object-cover"
+                          <div
+                            className="relative h-[120px] bg-base-300 cursor-pointer"
+                            onClick={() => toggleSelected(doc.id, page.page_index)}
+                          >
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={`Page ${page.page_index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="loading loading-spinner loading-sm" />
+                              </div>
+                            )}
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-sm checkbox-primary absolute top-2 left-2"
+                              checked={selectedKeys.has(key)}
+                              onChange={() => toggleSelected(doc.id, page.page_index)}
+                              onClick={(e) => e.stopPropagation()}
                             />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <span className="loading loading-spinner loading-sm" />
+                          </div>
+                          <div className="p-2 flex items-center justify-between text-xs">
+                            <span>Page {page.page_index + 1}</span>
+                            <span className={`badge badge-xs ${statusBadgeClass(page.status)}`}>
+                              {page.status}
+                            </span>
+                          </div>
+                          {page.error_message && (
+                            <div
+                              className="px-2 pb-2 text-xs text-error truncate"
+                              title={page.error_message}
+                            >
+                              {page.error_message}
                             </div>
                           )}
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-sm checkbox-primary absolute top-2 left-2"
-                            checked={selectedKeys.has(key)}
-                            onChange={() => toggleSelected(doc.id, page.page_index)}
-                            onClick={(e) => e.stopPropagation()}
-                          />
                         </div>
-                        <div className="p-2 flex items-center justify-between text-xs">
-                          <span>Page {page.page_index + 1}</span>
-                          <span className={`badge badge-xs ${statusBadgeClass(page.status)}`}>
-                            {page.status}
-                          </span>
-                        </div>
-                        {page.error_message && (
-                          <div
-                            className="px-2 pb-2 text-xs text-error truncate"
-                            title={page.error_message}
-                          >
-                            {page.error_message}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-              </div>
-            </section>
-          ))}
+                      );
+                    })}
+                </div>
+              </section>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* VALIDATION WORKSPACE */}
+      {hasEnteredValidate && validationList.length > 0 && (
+        <div className={mode === 'validate' ? 'flex-1 flex flex-col' : 'hidden'}>
+          <ValidationWorkspace
+            pages={pages}
+            ocrPages={ocrPages}
+            imageUrls={imageUrls}
+            pageKeys={pageKeys}
+            syncKey={validationKeysSignature}
+            onPersist={persistPages}
+            heightClassName="lg:h-[calc(100vh-124px)]"
+          />
+        </div>
+      )}
     </div>
   );
 }

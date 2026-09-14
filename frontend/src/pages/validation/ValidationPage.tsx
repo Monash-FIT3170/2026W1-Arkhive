@@ -52,7 +52,7 @@ function ValidationPage() {
   return (
     <ValidationWorkspace
       pages={extractedPages}
-      key={`${ocrPages.length}:${ocrPages.map((p) => p.page_num).join(',')}`}
+      syncKey={`${ocrPages.length}:${ocrPages.map((p) => p.page_num).join(',')}`}
       ocrPages={ocrPages.map((p) => p.components)}
       imageUrls={imageUrls}
       onPersist={saveExtractionSession}
