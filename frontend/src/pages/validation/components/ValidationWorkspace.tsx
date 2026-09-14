@@ -115,11 +115,7 @@ function ValidationWorkspace({
 
   // UNDO/REDO PIPELINE — stack + keyboard shortcuts live in the hook; we
   // just say what "apply a snapshot" means for this workspace's state.
-  const {
-    push: pushUndo,
-    undo: handleUndo,
-    redo: handleRedo,
-  } = useUndoRedo(extractedPagesRef, {
+  const { push: pushUndo, undo: handleUndo } = useUndoRedo(extractedPagesRef, {
     onApply: (updatedPages, direction) => {
       setExtractedPages(updatedPages);
       onPersist(updatedPages);
