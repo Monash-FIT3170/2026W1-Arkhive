@@ -726,6 +726,7 @@ function ValidationPage() {
               }
             }}
             extractedData={documentContext}
+            allExtractedData={extractedPages}
             hoveredOverlayIds={hoveredTableFieldIds}
             onRowIndent={handleRowIndent}
             onRowOutdent={handleRowOutdent}
