@@ -9,17 +9,15 @@ import { getProcessedImageUrls, getUploadedImageUrl } from '../../services/uploa
 //import type { DocumentJob } from '../../models/Job';
 import { getExtractionSession, saveExtractionSession } from '../../services/extractionService';
 import { reindentRow, type IndentDirection } from '../../utils/indentEditor';
-import { detectReviewFields } from '../../utils/detectReviewFields';
-import {
-  requestBulkFieldReview,
-  requestFieldReview,
-  requestFormatDetection,
-} from '../../services/llmService';
+import { requestBulkFieldReview, requestFieldReview } from '../../services/llmService';
 import { flatten } from '../../utils/flattener';
-import { checkTableFormats } from '../../utils/detectFormat';
-
 import type { HistoryEntry } from '../../models/HistoryEntry';
-import type { OcrIssue } from '../../models/IssueReview';
+import { useUndoRedo } from '../../hooks/useUndoRedo';
+import { useFieldHover } from '../../hooks/useFieldHover';
+import { useChatSuggestionFlow } from '../../hooks/useChat';
+import { useRowIndent } from '../../hooks/useRowIndent';
+import { useTableEditor } from '../../hooks/useTableEditor';
+import { useReviewQueue } from '../../hooks/useReviewQueue';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -34,12 +32,8 @@ function useIsLargeScreen() {
 }
 
 function ValidationPage() {
-  //const [jobs, setJobs] = useState<DocumentJob[]>([]);
-  //const [activeJobIndex, setActiveJobIndex] = useState<number>(0);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [splitPercent, setSplitPercent] = useState(50);
-  const [oldContext, setOldContext] = useState<ExtractedPage | null>(null); //for AI suggesiton
   const [imageUrls, setImageUrls] = useState<string[]>([]); // one image URL per page
   const [ocrPages, setOcrPages] = useState<Pages>([]); // raw OCR, one array per page
   const [extractedPages, setExtractedPages] = useState<ExtractedPage[]>([]); // flattened, one per page
@@ -52,13 +46,10 @@ function ValidationPage() {
   const isLarge = useIsLargeScreen();
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const undoStack = useRef<ExtractedPage[][]>([]);
-  const redoStack = useRef<ExtractedPage[][]>([]);
 
   const [tableKey, setTableKey] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
-  const [flaggedIssues, setFlaggedIssues] = useState<OcrIssue[]>([]);
   const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review' | 'history'>('chat');
 
   const extractedPagesRef = useRef<ExtractedPage[]>([]);
@@ -69,16 +60,6 @@ function ValidationPage() {
   useEffect(() => {
     currentPageIndexRef.current = currentPageIndex;
   }, [currentPageIndex]);
-
-  const [resolvedIssueIds, setResolvedIssueIds] = useState<Set<string>>(new Set());
-
-  const handleResolveIssues = (ids: string[]) => {
-    setResolvedIssueIds((prev) => {
-      const next = new Set(prev);
-      ids.forEach((id) => next.add(id));
-      return next;
-    });
-  };
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
@@ -96,30 +77,8 @@ function ValidationPage() {
   useEffect(() => {
     async function loadSession() {
       try {
-        // const batchData = await getBatchJobs().catch(() => null);
-
-        // if (batchData && batchData.jobs && batchData.jobs.length > 0) {
-        //   setJobs(batchData.jobs);
-        //   const initialIndex = batchData.activeJobIndex ?? 0;
-        //   setActiveJobIndex(initialIndex);
-
-        //   const activeJob = batchData.jobs[initialIndex] || batchData.jobs[0];
-        //   setOCRData(activeJob.ocrData || []);
-        //   setDocumentImageURL(getUploadedImageUrl(activeJob.imageIndex ?? initialIndex));
-
-        //   const initialTable =
-        //     activeJob.extractedData || flatten(activeJob.ocrData as OCRComponent[]);
-        //   setDocumentContext(initialTable);
-        //   return;
-        // }
-
         const ocrData = await getExtractionSession(); //IMORTANT NOTE, CHANGE API TO NEW ONE
         setOcrPages(ocrData);
-        // console.log("SESSION DATA:", sessionData);
-        // console.log("OCR DATA:", sessionData?.ocrData);
-        // if (!sessionData?.ocrData) {
-        //   sessionData = await saveExtractionSession(mockOcrData); // initialize with mock if no session exists
-        // }
         const processedUrls = await getProcessedImageUrls();
         console.log(processedUrls);
         setImageUrls(processedUrls.length > 0 ? processedUrls : [await getUploadedImageUrl()]);
@@ -143,159 +102,47 @@ function ValidationPage() {
     setExtractedPages(newExtractedPages);
   }, [ocrPages]);
 
-  const hasStartedRef = useRef(false);
+  // UNDO/REDO PIPELINE — stack + keyboard shortcuts live in the hook; we
+  // just say what "apply a snapshot" means for this page's state.
+  const {
+    push: pushUndo,
+    undo: handleUndo,
+    redo: handleRedo,
+  } = useUndoRedo(extractedPagesRef, {
+    onApply: (pages, direction) => {
+      setExtractedPages(pages);
+      saveExtractionSession(pages);
+      setEditedCells(new Set());
+      setTableKey((k) => k + 1);
+      addHistoryEntry({
+        type: direction,
+        description: direction === 'undo' ? 'Undid last change' : 'Redid last change',
+      });
+    },
+  });
 
-  useEffect(() => {
-    async function performFormatDetection() {
-      if (extractedPages.length === 0 || hasStartedRef.current) return;
-      hasStartedRef.current = true;
-
-      let allIssues: OcrIssue[] = [];
-
-      for (let pageIdx = 0; pageIdx < extractedPages.length; pageIdx++) {
-        const pageContext = extractedPages[pageIdx];
-
-        // Low Confidence Detection
-        const fields = detectReviewFields(pageContext);
-        const confidenceIssues: OcrIssue[] = fields.map((f) => ({
-          fieldId: `${f.rowId}:${f.column}`,
-          fieldName: f.column,
-          ocrValue: String(f.value),
-          confidenceScore: f.confidence,
-          issueType: 'confidence',
-          rowId: f.rowId,
-          pageIndex: pageIdx,
-        }));
-
-        const sampledData: Record<string, string[]> = {};
-        const maxSamples = 20;
-
-        for (const col of pageContext.columns) {
-          // Filter out empty/null values
-          const cleanValues = pageContext.rows
-            .map((row) => row[col])
-            .filter(
-              (val): val is string => val !== null && val !== undefined && String(val).trim() !== ''
-            )
-            .map((val) => String(val).trim());
-
-          if (cleanValues.length > 0) {
-            // Evenly sample across top, middle, and bottom rows rather than pure random
-            if (cleanValues.length <= maxSamples) {
-              sampledData[col] = cleanValues;
-            } else {
-              const step = Math.floor(cleanValues.length / maxSamples);
-              sampledData[col] = cleanValues
-                .filter((_, idx) => idx % step === 0)
-                .slice(0, maxSamples);
-            }
-          }
-        }
-
-        let formatIssues: OcrIssue[] = [];
-        let columnRegexMap: Record<string, string> = {};
-        try {
-          // If we have no sampled data, no need to request format detection
-          if (Object.keys(sampledData).length > 0) {
-            columnRegexMap = await requestFormatDetection(sampledData);
-            formatIssues = checkTableFormats(pageContext, columnRegexMap).map((f) => ({
-              fieldId: `${f.rowId}:${f.column}`,
-              fieldName: f.column,
-              ocrValue: String(f.value),
-              confidenceScore: 0.3, // fallback confidence score for format issues
-              issueType: 'format' as const,
-              rowId: f.rowId,
-              pageIndex: pageIdx,
-            }));
-          }
-        } catch (error) {
-          console.error('Failed to detect format issues on page ' + pageIdx, error);
-        }
-
-        // Group format issues by column.
-        const byColumn = formatIssues.reduce<Record<string, OcrIssue[]>>((acc, issue) => {
-          (acc[issue.fieldName] ??= []).push(issue);
-          return acc;
-        }, {});
-
-        Object.entries(byColumn).forEach(([column, colIssues]) => {
-          if (colIssues.length > 1) {
-            const groupId = `format:${column}:page${pageIdx}`;
-            colIssues.forEach((issue) => {
-              issue.groupId = groupId;
-              issue.formatRegex = columnRegexMap[column];
-            });
-          }
-        });
-
-        allIssues = allIssues.concat(confidenceIssues, formatIssues);
-      }
-
-      setFlaggedIssues(allIssues);
-      if (allIssues.length > 0) {
-        setChatActiveTab('review');
-      }
-    }
-
-    performFormatDetection();
-  }, [extractedPages]);
-
-  // UNDO/REDO PIPELINE
-  const isModifierPressed = (e: KeyboardEvent) => e.metaKey || e.ctrlKey;
-
-  const handleUndo = useCallback(() => {
-    if (undoStack.current.length === 0) return;
-
-    const previous = undoStack.current.pop()!;
-    redoStack.current.push(extractedPagesRef.current);
-
-    setExtractedPages(previous);
-    saveExtractionSession(previous);
-    setEditedCells(new Set());
-    setTableKey((k) => k + 1);
-    addHistoryEntry({
-      type: 'undo',
-      description: 'Undid last change',
-    });
-  }, []);
-
-  const handleRedo = useCallback(() => {
-    if (redoStack.current.length === 0) return;
-
-    const next = redoStack.current.pop()!;
-    undoStack.current.push(extractedPagesRef.current);
-
-    setExtractedPages(next);
-    saveExtractionSession(next);
-    setEditedCells(new Set());
-    setTableKey((k) => k + 1);
-    addHistoryEntry({
-      type: 'redo',
-      description: 'Redid last change',
-    });
-  }, [addHistoryEntry]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
-      const hasModifier = isModifierPressed(e);
-      const isUndo = hasModifier && key === 'z' && !e.shiftKey;
-      const isRedo = hasModifier && (key === 'y' || (key === 'z' && e.shiftKey));
-
-      if (isUndo) {
-        e.preventDefault();
-        handleUndo();
-      }
-
-      if (isRedo) {
-        e.preventDefault();
-        handleRedo();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo]);
+  // REVIEW QUEUE — confidence/format detection, carousel accept/reject/edit,
+  // and AI suggestion fetches. See src/hooks/useReviewQueue.ts.
+  const {
+    flaggedIssues,
+    setFlaggedIssues,
+    resolvedIssueIds,
+    handleResolveIssues,
+    handleCarouselAccept,
+    handleCarouselReject,
+    handleCarouselManualEdit,
+    handleFetchSuggestion,
+    handleFetchBulkSuggestion,
+  } = useReviewQueue({
+    extractedPages,
+    currentPageIndex,
+    extractedPagesRef,
+    onPagesChange: setExtractedPages,
+    onPersist: saveExtractionSession,
+    addHistoryEntry,
+    pushUndo,
+    onIssuesDetected: () => setChatActiveTab('review'),
+  });
 
   //Resizing Functions
   //Set dragging to be true
@@ -333,331 +180,51 @@ function ValidationPage() {
     };
   }, [onMouseMove, onMouseUp]);
 
-  //bounding box hover state
-  const [hoveredTableFieldIds, setHoveredTableFieldIds] = useState<string[]>([]);
-  const [hoveredDocumentOverlayIds, setHoveredDocumentOverlayIds] = useState<string[]>([]);
-
-  const handleSlideChange = useCallback((fieldIds: string[], pageIndex?: number) => {
-    setHoveredTableFieldIds(fieldIds);
-
-    if (pageIndex !== undefined && pageIndex !== currentPageIndexRef.current) {
-      setCurrentPageIndex(pageIndex);
-    }
-
-    const contextPageIndex = pageIndex !== undefined ? pageIndex : currentPageIndexRef.current;
-    const currentContext = extractedPagesRef.current[contextPageIndex];
-
-    if (fieldIds.length === 0 || !currentContext) {
-      setHoveredDocumentOverlayIds([]);
-      return;
-    }
-
-    const overlayIds = fieldIds
-      .map((fieldId) => {
-        const [rowId, column] = fieldId.split(':');
-        const row = currentContext.rows.find((r) => String(r._id) === rowId);
-        return row?._cellKeyMap?.[column];
-      })
-      .filter((id): id is string => Boolean(id));
-
-    setHoveredDocumentOverlayIds(overlayIds);
-  }, []);
-
-  const addMessage = (message: ChatMessage) => {
-    setMessages((prev) => [...prev, message]);
-  };
-
-  // called when AI returns updatedContext after accepting suggestion
-  const handleContextUpdate = (updatedData: ExtractedPage) => {
-    undoStack.current.push(extractedPagesRef.current);
-    redoStack.current = [];
-    setOldContext(documentContext);
-    setExtractedPages((prev) =>
-      prev.map((page, i) => (i === currentPageIndex ? updatedData : page))
-    );
-  };
-  const resolveLastMessage = () => {
-    setMessages((prev) =>
-      prev.map((msg, i) => (i === prev.length - 1 ? { ...msg, resolved: true } : msg))
-    );
-  };
-
-  //handle accept
-  const handleAccept = async () => {
-    if (!documentContext) return;
-    try {
-      await saveExtractionSession(extractedPages);
-    } catch (error) {
-      console.error('Failed to save session after accept', error);
-    }
-    setOldContext(null);
-    resolveLastMessage();
-    addMessage({
-      id: crypto.randomUUID(),
-      role: 'model',
-      content: 'Got it! The changes have been applied and saved.',
-      timestamp: new Date().toISOString(),
-    });
-  };
-
-  //handle reject
-  const handleReject = () => {
-    if (!oldContext) return;
-    setExtractedPages((prev) =>
-      prev.map((page, i) => (i === currentPageIndex ? oldContext : page))
-    );
-    setOldContext(null);
-    resolveLastMessage();
-    addMessage({
-      id: crypto.randomUUID(),
-      role: 'model',
-      content: 'No problem, the changes have been reverted.',
-      timestamp: new Date().toISOString(),
-    });
-  };
-
-  //Handle Row Indent
-  // Shared by indent + outdent: transforms the current page's rows in
-  // place via reindentRow (see indentEditor.ts) instead of reflattening
-  // from OCR, so no other edits on the page get lost.
-  const applyReindent = useCallback((rowId: string | number, direction: IndentDirection) => {
-    const pageIndex = currentPageIndexRef.current;
-    const currentPage = extractedPagesRef.current[pageIndex];
-    if (!currentPage) return;
-
-    const reindented = reindentRow(currentPage, rowId, direction);
-    if (reindented === currentPage) return; // already at min/max depth, nothing changed
-
-    undoStack.current.push(extractedPagesRef.current);
-    redoStack.current = [];
-
-    addHistoryEntry({
-      type: 'edit',
-      pageIndex,
-      fieldId: String(rowId),
-      column: '_indentLevel',
-      oldValue: '',
-      newValue: direction,
-      description: `${direction === 'in' ? 'Indented' : 'Outdented'} row on page ${pageIndex + 1}`,
+  // bounding box hover state — table field <-> document overlay sync,
+  // plus carousel-driven page navigation via handleSlideChange
+  const { hoveredTableFieldIds, hoveredDocumentOverlayIds, handleHover, handleSlideChange } =
+    useFieldHover(documentContext, {
+      currentPageIndexRef,
+      pagesRef: extractedPagesRef,
+      onPageChange: setCurrentPageIndex,
     });
 
-    setExtractedPages((prev) => prev.map((page, i) => (i === pageIndex ? reindented : page)));
-    saveExtractionSession(extractedPagesRef.current);
-  }, []);
-
-  const handleRowIndent = useCallback(
-    (rowId: string | number) => applyReindent(rowId, 'in'),
-    [applyReindent]
-  );
-
-  //Handle Row Outdent
-  const handleRowOutdent = useCallback(
-    (rowId: string | number) => applyReindent(rowId, 'out'),
-    [applyReindent]
-  );
-
-  const handleCarouselAccept = (updates: { fieldId: string; newValue: string }[]) => {
-    if (!documentContext) return;
-    undoStack.current.push(extractedPagesRef.current);
-    redoStack.current = [];
-    setExtractedPages((prev) => {
-      const next = [...prev];
-      updates.forEach(({ fieldId, newValue }) => {
-        const [rowId, column] = fieldId.split(':');
-
-        //find what page the issue belongs to
-        const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
-        const pageIdx = issue?.pageIndex ?? currentPageIndex;
-
-        next[pageIdx] = {
-          ...next[pageIdx],
-          rows: next[pageIdx].rows.map((r) =>
-            String(r._id) === String(rowId) ? { ...r, [column]: newValue } : r
-          ),
-        };
-      });
-      return next;
+  // AI-suggestion propose/accept/reject flow (chat messages live here too,
+  // since they only ever get created in response to accept/reject).
+  const { messages, addMessage, handleContextUpdate, handleAccept, handleReject } =
+    useChatSuggestionFlow({
+      currentPageIndex,
+      documentContext,
+      extractedPagesRef,
+      onPagesChange: setExtractedPages,
+      onPersist: saveExtractionSession,
+      pushUndo,
     });
 
-    updates.forEach(({ fieldId, newValue }) => {
-      const [rowId, column] = fieldId.split(':');
-      const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
-      const pageIdx = issue?.pageIndex ?? currentPageIndex;
+  // Row indent/outdent
+  const { handleRowIndent, handleRowOutdent } = useRowIndent({
+    currentPageIndexRef,
+    extractedPagesRef,
+    onPagesChange: setExtractedPages,
+    onPersist: saveExtractionSession,
+    addHistoryEntry,
+    pushUndo,
+  });
 
-      const currentRow = extractedPagesRef.current[pageIdx]?.rows.find(
-        (r) => String(r._id) === String(rowId)
-      );
-      const oldValue = currentRow ? String(currentRow[column] ?? '') : '';
-
-      addHistoryEntry({
-        type: 'accept',
-        pageIndex: pageIdx,
-        fieldId,
-        column,
-        oldValue,
-        newValue,
-        description: `Accepted correction for "${column}" on page ${pageIdx + 1}: "${oldValue}" to "${newValue}"`,
-      });
+  // Cell/row/column CRUD for the table itself
+  const { editCell, addRow, deleteRow, addColumn, deleteColumn, moveRow, reorderColumns } =
+    useTableEditor({
+      currentPageIndexRef,
+      extractedPagesRef,
+      onPagesChange: setExtractedPages,
+      onPersist: saveExtractionSession,
+      addHistoryEntry,
+      pushUndo,
+      onCellEdited: (fieldId) => {
+        setEditedCells((prev) => new Set(prev).add(fieldId));
+        setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
+      },
     });
-
-    saveExtractionSession(extractedPagesRef.current);
-    const fieldIds = updates.map(({ fieldId }) => fieldId);
-    setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
-  };
-
-  const handleCarouselReject = (fieldIds: string[]) => {
-    if (!documentContext) return;
-
-    fieldIds.forEach((fieldId) => {
-      const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
-
-      addHistoryEntry({
-        type: 'skip',
-        pageIndex: issue?.pageIndex,
-        fieldId,
-        column: issue?.fieldName,
-        oldValue: issue?.ocrValue,
-        description: `Skipped "${issue?.fieldName}" on page ${(issue?.pageIndex ?? 0) + 1}: "${issue?.ocrValue}"`,
-      });
-    });
-
-    setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
-  };
-
-  const handleCarouselManualEdit = (fieldId: string, newValue: string) => {
-    if (!documentContext) return;
-
-    undoStack.current.push(extractedPagesRef.current);
-    redoStack.current = [];
-    const [rowId, column] = fieldId.split(':');
-
-    // find what page the issue is in
-    const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
-    const pageIdx = issue?.pageIndex ?? currentPageIndex;
-
-    const currentRow = extractedPagesRef.current[pageIdx]?.rows.find(
-      (r) => String(r._id) === String(rowId)
-    );
-    const oldValue = currentRow ? String(currentRow[column] ?? '') : '';
-
-    addHistoryEntry({
-      type: 'edit',
-      pageIndex: pageIdx,
-      fieldId,
-      column,
-      oldValue,
-      newValue,
-      description: `Manually corrected "${column}" on page ${pageIdx + 1}: "${oldValue}" to "${newValue}"`,
-    });
-
-    setExtractedPages((prev) =>
-      prev.map((page, i) => {
-        if (i !== pageIdx) return page;
-        return {
-          ...page,
-          rows: page.rows.map((r) =>
-            String(r._id) === String(rowId) ? { ...r, [column]: newValue } : r
-          ),
-        };
-      })
-    );
-
-    saveExtractionSession(extractedPagesRef.current);
-    setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
-  };
-
-  const handleFetchSuggestion = useCallback(
-    async (fieldId: string) => {
-      if (!documentContext) return null;
-      const [rowId, column] = fieldId.split(':');
-      const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
-      if (!issue) return null;
-
-      const field: ReviewField = {
-        rowId,
-        column,
-        value: issue.ocrValue,
-        confidence: issue.confidenceScore,
-        issueType: issue.issueType,
-      };
-
-      try {
-        const reply = await requestFieldReview(field, documentContext);
-        if (reply.intent?.newValue) {
-          return reply.intent.newValue;
-        }
-        if (reply.updatedContext) {
-          const updatedRow = reply.updatedContext.rows.find(
-            (r) => r._id === rowId || String(r._id) === rowId
-          );
-          if (updatedRow && updatedRow[column] !== undefined) {
-            return String(updatedRow[column]);
-          }
-        }
-        return reply.response;
-      } catch (e) {
-        console.error(e);
-        return null;
-      }
-    },
-    [documentContext, flaggedIssues]
-  );
-
-  const handleFetchBulkSuggestion = useCallback(
-    async (
-      column: string,
-      fields: { fieldId: string; rowId: string | number; ocrValue: string }[],
-      formatRegex?: string
-    ): Promise<Record<string, string> | null> => {
-      if (!documentContext) return null;
-
-      const reviewFields: ReviewField[] = fields.map((f) => {
-        const issue = flaggedIssues.find((i) => i.fieldId === f.fieldId);
-        return {
-          rowId: f.rowId,
-          column,
-          value: f.ocrValue,
-          confidence: issue?.confidenceScore ?? 0.3,
-          issueType: issue?.issueType ?? 'format',
-        };
-      });
-
-      try {
-        const reply = await requestBulkFieldReview({
-          column,
-          fields: reviewFields,
-          formatRegex,
-          documentContext,
-        });
-
-        const map: Record<string, string> = {};
-
-        if (reply.intent?.type === 'bulk_update' && reply.intent.bulkUpdates) {
-          reply.intent.bulkUpdates.forEach((u) => {
-            map[String(u.rowId)] = u.newValue;
-          });
-        }
-
-        if (reply.updatedContext) {
-          fields.forEach(({ rowId }) => {
-            if (map[String(rowId)] !== undefined) return;
-            const updatedRow = reply.updatedContext!.rows.find(
-              (r) => r._id === rowId || String(r._id) === String(rowId)
-            );
-            if (updatedRow && updatedRow[column] !== undefined) {
-              map[String(rowId)] = String(updatedRow[column]);
-            }
-          });
-        }
-
-        return Object.keys(map).length > 0 ? map : null;
-      } catch (e) {
-        console.error(e);
-        return null;
-      }
-    },
-    [documentContext, flaggedIssues]
-  );
 
   if (!documentContext) {
     return (
@@ -713,172 +280,19 @@ function ValidationPage() {
             editedCells={editedCells}
             onHover={(id) => {
               if (isChatOpen && chatActiveTab === 'review') return;
-
-              setHoveredTableFieldIds(id ? [id] : []);
-
-              if (id && documentContext) {
-                const [rowId, column] = id.split(':');
-                const row = documentContext.rows.find((r) => String(r._id) === rowId);
-                const overlayId = row?._cellKeyMap?.[column] ?? null;
-                setHoveredDocumentOverlayIds(overlayId ? [overlayId] : []);
-              } else {
-                setHoveredDocumentOverlayIds([]);
-              }
+              handleHover(id);
             }}
             extractedData={documentContext}
             hoveredOverlayIds={hoveredTableFieldIds}
             onRowIndent={handleRowIndent}
             onRowOutdent={handleRowOutdent}
-            onCellEdit={(fieldId, newValue) => {
-              if (!documentContext) return;
-
-              undoStack.current.push(extractedPagesRef.current);
-
-              const [rowId, column] = fieldId.split(':');
-
-              // get old value for histroy
-              const currentPage = extractedPagesRef.current[currentPageIndex];
-              const currentRow = currentPage?.rows.find((r) => String(r._id) === rowId);
-              const oldValue = currentRow ? String(currentRow[column] ?? '') : '';
-
-              addHistoryEntry({
-                type: 'edit',
-                pageIndex: currentPageIndex,
-                fieldId,
-                column,
-                oldValue,
-                newValue,
-                description: `Edited "${column}" on page ${currentPageIndex + 1}: "${oldValue}" to "${newValue}"`,
-              });
-
-              redoStack.current = [];
-
-              setExtractedPages((prev) =>
-                prev.map((page, i) =>
-                  i !== currentPageIndex
-                    ? page
-                    : {
-                        ...page,
-                        rows: page.rows.map((r) =>
-                          String(r._id) === rowId ? { ...r, [column]: newValue } : r
-                        ),
-                      }
-                )
-              );
-
-              setEditedCells((prev) => new Set(prev).add(fieldId));
-              saveExtractionSession(extractedPagesRef.current);
-              setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
-            }}
-            onRowAdd={() => {
-              if (!documentContext) return;
-              undoStack.current.push(extractedPagesRef.current);
-              redoStack.current = [];
-
-              const newRowId = `manual_row_${Date.now()}`;
-              const newRow: any = { _id: newRowId, _confidence: 1, _cellConfidence: {} };
-              documentContext.columns.forEach((col) => {
-                newRow[col] = '';
-              });
-
-              setExtractedPages((prev) =>
-                prev.map((page, i) =>
-                  i !== currentPageIndex ? page : { ...page, rows: [...page.rows, newRow] }
-                )
-              );
-              saveExtractionSession(extractedPagesRef.current);
-            }}
-            onRowDelete={(rowId) => {
-              if (!documentContext) return;
-              undoStack.current.push(extractedPagesRef.current);
-              redoStack.current = [];
-
-              setExtractedPages((prev) =>
-                prev.map((page, i) =>
-                  i !== currentPageIndex
-                    ? page
-                    : { ...page, rows: page.rows.filter((r) => r._id !== rowId) }
-                )
-              );
-              saveExtractionSession(extractedPagesRef.current);
-            }}
-            onColumnAdd={(columnName) => {
-              if (!documentContext) return;
-              if (documentContext.columns.includes(columnName)) return;
-              undoStack.current.push(extractedPagesRef.current);
-              redoStack.current = [];
-
-              setExtractedPages((prev) =>
-                prev.map((page, i) =>
-                  i !== currentPageIndex
-                    ? page
-                    : {
-                        ...page,
-                        columns: [...page.columns, columnName],
-                        rows: page.rows.map((r) => ({ ...r, [columnName]: '' })),
-                      }
-                )
-              );
-              saveExtractionSession(extractedPagesRef.current);
-            }}
-            onColumnDelete={(columnName) => {
-              if (!documentContext) return;
-              undoStack.current.push(extractedPagesRef.current);
-              redoStack.current = [];
-
-              setExtractedPages((prev) =>
-                prev.map((page, i) => {
-                  if (i !== currentPageIndex) return page;
-                  return {
-                    ...page,
-                    columns: page.columns.filter((c) => c !== columnName),
-                    rows: page.rows.map((r) => {
-                      const newRow = { ...r };
-                      delete newRow[columnName];
-                      return newRow;
-                    }),
-                  };
-                })
-              );
-              saveExtractionSession(extractedPagesRef.current);
-            }}
-            onRowMove={(rowId, direction) => {
-              if (!documentContext) return;
-              const rows = documentContext.rows;
-              const idx = rows.findIndex((r) => r._id === rowId);
-              const canMove =
-                idx !== -1 &&
-                ((direction === 'up' && idx > 0) ||
-                  (direction === 'down' && idx < rows.length - 1));
-              if (!canMove) return;
-
-              undoStack.current.push(extractedPagesRef.current);
-              redoStack.current = [];
-
-              setExtractedPages((prev) =>
-                prev.map((page, i) => {
-                  if (i !== currentPageIndex) return page;
-                  const rows = [...page.rows];
-                  const idx = rows.findIndex((r) => r._id === rowId);
-                  if (direction === 'up') [rows[idx - 1], rows[idx]] = [rows[idx], rows[idx - 1]];
-                  else [rows[idx], rows[idx + 1]] = [rows[idx + 1], rows[idx]];
-                  return { ...page, rows };
-                })
-              );
-              saveExtractionSession(extractedPagesRef.current);
-            }}
-            onColumnReorder={(newColumns) => {
-              if (!documentContext) return;
-              undoStack.current.push(extractedPagesRef.current);
-              redoStack.current = [];
-
-              setExtractedPages((prev) =>
-                prev.map((page, i) =>
-                  i !== currentPageIndex ? page : { ...page, columns: newColumns }
-                )
-              );
-              saveExtractionSession(extractedPagesRef.current);
-            }}
+            onCellEdit={editCell}
+            onRowAdd={addRow}
+            onRowDelete={deleteRow}
+            onColumnAdd={addColumn}
+            onColumnDelete={deleteColumn}
+            onRowMove={moveRow}
+            onColumnReorder={reorderColumns}
           />
         </div>
       </div>
