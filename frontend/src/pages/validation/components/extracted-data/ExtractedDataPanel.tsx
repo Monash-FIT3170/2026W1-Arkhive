@@ -11,7 +11,8 @@ import {
   ChevronRight,
   ChevronLeft,
 } from 'lucide-react'; // NEW: Importing icons for confidence badges and export button
-import { useState, useEffect } from 'react';
+// TEST COMMIT FOR DRAFT PR
+import React, { useState, useEffect, useRef } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
 import { exportExtractedDataAsCSV } from '../../../../services/csvDownloadService';
 import { exportExtractedDataAsJSON } from '../../../../services/jsonDownloadService';
