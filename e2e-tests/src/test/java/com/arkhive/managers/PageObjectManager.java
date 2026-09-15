@@ -1,23 +1,32 @@
 package com.arkhive.managers;
 
 import com.arkhive.pages.DocumentPreviewPage;
+import com.arkhive.pages.LoginPage;
 import com.arkhive.pages.UploadPage;
 import com.arkhive.pages.ValidationPage;
 import org.openqa.selenium.WebDriver;
 
 /**
- * PageObjectManager acts as a factory and cache for Page instances (e.g. UploadPage, DocumentPreviewPage, ValidationPage).
+ * PageObjectManager acts as a factory and cache for Page instances (e.g. LoginPage, UploadPage, DocumentPreviewPage, ValidationPage).
  * It ensures that Page instances are lazily initialized and share the single active WebDriver instance.
  */
 public class PageObjectManager {
 
     private final WebDriver driver;
+    private LoginPage loginPage;
     private UploadPage uploadPage;
     private DocumentPreviewPage documentPreviewPage;
     private ValidationPage validationPage;
 
     public PageObjectManager(WebDriver driver) {
         this.driver = driver;
+    }
+
+    public LoginPage getLoginPage() {
+        if (loginPage == null) {
+            loginPage = new LoginPage(driver);
+        }
+        return loginPage;
     }
 
     public UploadPage getUploadPage() {
@@ -41,3 +50,4 @@ public class PageObjectManager {
         return validationPage;
     }
 }
+
