@@ -103,6 +103,8 @@ function ValidationWorkspace({
 
   useEffect(() => {
     currentPageIndexRef.current = currentPageIndex;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEditedCells(new Set());
   }, [currentPageIndex]);
 
   const handlePagesChange = useCallback((action: React.SetStateAction<ExtractedPage[]>) => {
@@ -251,7 +253,11 @@ function ValidationWorkspace({
       pushUndo,
       onCellEdited: (fieldId) => {
         setEditedCells((prev) => new Set(prev).add(fieldId));
-        setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
+        setFlaggedIssues((prev) =>
+          prev.filter(
+            (issue) => !(issue.fieldId === fieldId && issue.pageIndex === currentPageIndexRef.current)
+          )
+        );
       },
     });
 
@@ -303,7 +309,7 @@ function ValidationWorkspace({
         >
           <ExtractedDataPanel
             onUndoLast={handleUndo}
-            key={tableKey}
+            key={`${tableKey}-${currentPageIndex}`}
             isEditMode={isEditMode}
             onEditModeChange={setIsEditMode}
             editedCells={editedCells}

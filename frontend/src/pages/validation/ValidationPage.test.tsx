@@ -120,27 +120,6 @@ vi.mock('./components/chat/ChatPanel', () => ({
   default: () => <div data-testid="chat-panel" />,
 }));
 
-vi.mock('../../services/testService', () => ({
-  getTestData: vi.fn().mockResolvedValue([
-    {
-      page_num: 1,
-      components: [
-        {
-          id: '1',
-          type: 'TABLE_ROW',
-          cells: ['A'],
-          confidence: 0.9,
-          boundingBoxes: {},
-          indentation: 0,
-          y: 0,
-          layer: 0,
-          text: 'A',
-        },
-      ],
-    },
-  ]),
-  getTestImageUrls: vi.fn().mockResolvedValue(['http://localhost/mock.png']),
-}));
 
 describe('ValidationPage', () => {
   beforeEach(() => {
