@@ -1,6 +1,6 @@
 import type { OCRComponent } from '../models/OCRComponent';
 import type { ExtractedPage } from '../models/TableData';
-
+// Acknowledgment: The contents of this file was generated with the help of Google Gemini
 export interface ValidationPageItem {
   pageIndexInFile: number; // 0-based index within this file
   globalIndex: number; // 0-based index in the flat array

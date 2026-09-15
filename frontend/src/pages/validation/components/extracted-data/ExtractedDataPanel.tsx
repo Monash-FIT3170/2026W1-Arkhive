@@ -221,10 +221,12 @@ function ExtractedDataPanel({
       onMouseEnter={() => setIsMouseInside(true)}
       onMouseLeave={() => setIsMouseInside(false)}
     >
-      {/* Download Button & Notifications */}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h2 className="text-xl font-semibold text-base-content">EXTRACTED DATA</h2>
+      {/* Table Toolbar & Notifications */}
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h2 className="text-base font-bold text-base-content tracking-wide uppercase">
+            EXTRACTED DATA
+          </h2>
           {showSuccessMessage && (
             <span className="text-success text-xs font-semibold animate-fade-in-out flex items-center gap-1">
               <Check className="w-3.5 h-3.5" />
