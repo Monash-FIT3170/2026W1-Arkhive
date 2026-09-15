@@ -20,19 +20,15 @@ public class DocumentPreviewPage extends BasePage {
     }
 
     public boolean isDisplayed() {
-        return isDisplayed(pageObjects.previewHeader);
+        return isDisplayed(pageObjects.previewHeader) || isDisplayed(pageObjects.sidebarHeading);
     }
 
-    public boolean isClassificationModalDisplayed() {
-        return isDisplayed(pageObjects.classificationModalTitle);
+    public void selectAllPages() {
+        click(pageObjects.selectAllButton);
     }
 
-    public void confirmClassification() {
-        click(pageObjects.confirmClassificationButton);
-    }
-
-    public void cancelClassification() {
-        click(pageObjects.cancelClassificationButton);
+    public void deselectAllPages() {
+        click(pageObjects.deselectAllButton);
     }
 
     public int getPreviewCardCount() {
@@ -49,11 +45,24 @@ public class DocumentPreviewPage extends BasePage {
         click(pageObjects.processButton);
     }
 
+    public boolean isProcessButtonEnabled() {
+        try {
+            WebElement btn = waitForVisible(pageObjects.processButton);
+            return btn.isEnabled() && btn.getAttribute("disabled") == null;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public boolean hasErrorMessage() {
         return isDisplayed(pageObjects.errorAlert);
     }
 
     public String getErrorMessage() {
         return waitForVisible(pageObjects.errorAlert).getText();
+    }
+
+    public boolean hasSuccessMessage() {
+        return isDisplayed(pageObjects.successAlert);
     }
 }
