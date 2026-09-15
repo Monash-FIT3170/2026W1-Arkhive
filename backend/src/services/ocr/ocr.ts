@@ -3,6 +3,7 @@ import vision from '@google-cloud/vision';
 import fs from 'fs';
 //import { extractStructuredComponents } from './utils/legacy_utils_table_extraction.js';
 import { withRetry } from './utils/utils.js';
+import { analyse_result } from './utils/utils_table_extraction_new.js';
 import { getMockOcrResult } from './mockOcrFixture.js';
 
 const sampleImage = 'assets/sample-page-1.png';
@@ -102,13 +103,13 @@ export async function parseTableWithRetriesLegacy(imageBuffer: Buffer) {
 /** 
  @author Harsha Sharma (33879303)
 */
-async function parseTable(_imageBuffer: Buffer) {
+async function parseTable(imageBuffer: Buffer) {
   // Skips the real Azure Document Intelligence + Gemini calls entirely.
   // See mockOcrFixture.ts for why: no CI/test secrets, no flaky network dependency.
   if (process.env.OCR_MODE === 'mock') {
     return getMockOcrResult();
   }
-  throw new Error("Real OCR table extraction has been removed. Please set OCR_MODE=mock.");
+  return analyse_result(imageBuffer);
 }
 
 /*
