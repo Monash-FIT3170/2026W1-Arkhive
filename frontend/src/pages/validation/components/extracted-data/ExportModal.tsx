@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
 import { exportExtractedDataAsCSV } from '../../../../services/csvDownloadService';
 import { exportExtractedDataAsJSON } from '../../../../services/jsonDownloadService';
