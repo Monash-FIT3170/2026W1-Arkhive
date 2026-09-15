@@ -154,6 +154,21 @@ export default function ProjectWorkspacePage() {
     return list;
   }, [documents]);
 
+  const fileMetadata = useMemo(() => {
+    return documents
+      .map((doc) => {
+        const count = (doc.pages || []).filter(
+          (page) => page.raw_ocr_result || page.extracted_data
+        ).length;
+        return {
+          fileId: doc.id,
+          fileName: doc.filename,
+          pageCount: count,
+        };
+      })
+      .filter((m) => m.pageCount > 0);
+  }, [documents]);
+
   useEffect(() => {
     validationListRef.current = validationList;
   }, [validationList]);
@@ -577,6 +592,7 @@ export default function ProjectWorkspacePage() {
             ocrPages={ocrPages}
             imageUrls={imageUrls}
             pageKeys={pageKeys}
+            fileMetadata={fileMetadata}
             syncKey={validationKeysSignature}
             onPersist={persistPages}
             heightClassName="lg:h-[calc(100vh-124px)]"
