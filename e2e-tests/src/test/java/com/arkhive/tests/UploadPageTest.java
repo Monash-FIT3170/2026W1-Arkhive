@@ -10,7 +10,7 @@ import org.testng.annotations.Test;
 public class UploadPageTest extends BaseTest {
 
     @Test(description = "Verify that the Upload page loads successfully after entering guest mode")
-    public void testUploadPageLoads() {
+    public void testUploadLandingPage() {
         LoginPage loginPage = pageObjectManager.getLoginPage();
         UploadPage uploadPage = pageObjectManager.getUploadPage();
 
@@ -44,12 +44,11 @@ public class UploadPageTest extends BaseTest {
         }
     }
 
-    @Test(description = "Verify complete workflow across UploadPage -> DocumentPreviewPage -> ValidationPage")
-    public void testUploadValidFileAndProcess() {
+    @Test(description = "Verify file upload and preview page transition for valid PDF")
+    public void testUploadValidFileAndPreview() {
         LoginPage loginPage = pageObjectManager.getLoginPage();
         UploadPage uploadPage = pageObjectManager.getUploadPage();
         DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
-        ValidationPage validationPage = pageObjectManager.getValidationPage();
 
         loginPage.loginAsGuest(testConfig.getBaseUrl());
 
@@ -58,23 +57,11 @@ public class UploadPageTest extends BaseTest {
 
         Assert.assertTrue(previewPage.isDisplayed(),
             "DocumentPreviewPage should be displayed upon file upload");
-
         Assert.assertTrue(previewPage.getPreviewCardCount() > 0,
             "At least one preview card should be rendered on DocumentPreviewPage");
-
-        previewPage.clickProcess();
-
-        boolean redirected = validationPage.isDisplayed();
-        if (!redirected) {
-            Assert.assertTrue(previewPage.hasErrorMessage() || previewPage.isDisplayed(),
-                "Expected either successful redirection to ValidationPage or notification on DocumentPreviewPage when processing OCR");
-        } else {
-            Assert.assertTrue(redirected,
-                "User should be redirected to ValidationPage after processing the uploaded file");
-        }
     }
 
-    @Test(description = "Verify selection toggle actions on DocumentPreviewPage")
+    @Test(description = "Verify page selection toggles on DocumentPreviewPage")
     public void testDocumentPreviewSelectionToggle() {
         LoginPage loginPage = pageObjectManager.getLoginPage();
         UploadPage uploadPage = pageObjectManager.getUploadPage();
@@ -94,5 +81,34 @@ public class UploadPageTest extends BaseTest {
         previewPage.selectAllPages();
         Assert.assertTrue(previewPage.isProcessButtonEnabled(),
             "Process button should be enabled when pages are selected");
+    }
+
+    @Test(description = "Verify complete workflow across UploadPage -> DocumentPreviewPage -> ValidationPage")
+    public void testCompleteWorkflowToValidation() {
+        LoginPage loginPage = pageObjectManager.getLoginPage();
+        UploadPage uploadPage = pageObjectManager.getUploadPage();
+        DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
+        ValidationPage validationPage = pageObjectManager.getValidationPage();
+
+        loginPage.loginAsGuest(testConfig.getBaseUrl());
+
+        String validFilePath = testFileUtils.getTestFilePath("valid-sample.pdf");
+        uploadPage.uploadFile(validFilePath);
+
+        Assert.assertTrue(previewPage.isDisplayed(),
+            "DocumentPreviewPage should be displayed upon file upload");
+        Assert.assertTrue(previewPage.getPreviewCardCount() > 0,
+            "At least one preview card should be rendered on DocumentPreviewPage");
+
+        previewPage.clickProcess();
+
+        boolean redirected = validationPage.isDisplayed();
+        if (!redirected) {
+            Assert.assertTrue(previewPage.hasErrorMessage() || previewPage.isDisplayed(),
+                "Expected either successful redirection to ValidationPage or notification on DocumentPreviewPage when processing OCR");
+        } else {
+            Assert.assertTrue(redirected,
+                "User should be redirected to ValidationPage after processing the uploaded file");
+        }
     }
 }
