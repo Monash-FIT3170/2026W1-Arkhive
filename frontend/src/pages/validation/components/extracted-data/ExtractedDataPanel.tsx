@@ -11,7 +11,7 @@ import {
   ChevronRight,
   ChevronLeft,
 } from 'lucide-react'; // NEW: Importing icons for confidence badges and export button
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
 import { ExportModal } from './ExportModal'; // NEW: Excel export service (US-4.5)
 import TextInputModal from '../modals/TextInputModal';
@@ -91,7 +91,6 @@ function ExtractedDataPanel({
   const [isMouseInside, setIsMouseInside] = useState(false);
 
   // Editing state
-  const [isCellHighlighted, setIsCellHighlighted] = useState(false);
   const [editingCellId, setEditingCellId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [initialEditValue, setInitialEditValue] = useState<string>('');
