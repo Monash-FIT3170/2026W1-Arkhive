@@ -1,7 +1,6 @@
 package com.arkhive.tests;
 
 import com.arkhive.pages.DocumentPreviewPage;
-import com.arkhive.pages.LoginPage;
 import com.arkhive.pages.UploadPage;
 import com.arkhive.pages.ValidationPage;
 import org.testng.Assert;
@@ -9,106 +8,68 @@ import org.testng.annotations.Test;
 
 public class UploadPageTest extends BaseTest {
 
-    @Test(description = "Verify that the Upload page loads successfully after entering guest mode")
-    public void testUploadLandingPage() {
-        LoginPage loginPage = pageObjectManager.getLoginPage();
+    @Test(description = "Verify that the Upload page dropzone is displayed after guest login setup")
+    public void testUploadPageDisplayedAfterGuestLogin() {
         UploadPage uploadPage = pageObjectManager.getUploadPage();
 
-        loginPage.loginAsGuest(testConfig.getBaseUrl());
-
-        Assert.assertTrue(uploadPage.isDisplayed(), "The upload page dropzone should be visible after guest mode entry");
+        Assert.assertTrue(uploadPage.isDisplayed(), "The upload page dropzone should be visible after guest mode login");
     }
 
-    @Test(description = "Verify uploading sample-file.pdf from UploadPage")
-    public void testUploadSampleFile() {
-        LoginPage loginPage = pageObjectManager.getLoginPage();
+    @Test(description = "Verify that uploading an oversized file (sample-file.pdf) displays an error message")
+    public void testOversizedFileIsRejected() {
         UploadPage uploadPage = pageObjectManager.getUploadPage();
-        DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
 
-        loginPage.loginAsGuest(testConfig.getBaseUrl());
+        String oversizedFilePath = testFileUtils.getTestFilePath("sample-file.pdf");
+        uploadPage.uploadFile(oversizedFilePath);
 
-        String sampleFilePath = testFileUtils.getTestFilePath("sample-file.pdf");
-        Assert.assertNotNull(sampleFilePath, "sample-file.pdf should be present");
-
-        uploadPage.uploadFile(sampleFilePath);
-
-        if (uploadPage.hasErrorMessage()) {
-            String errorMsg = uploadPage.getErrorMessage();
-            Assert.assertTrue(errorMsg.contains("5MB limit") || errorMsg.contains("exceed") || errorMsg.contains("large"),
-                "Expected file size error message for sample-file.pdf, got: " + errorMsg);
-        } else {
-            Assert.assertTrue(previewPage.isDisplayed(),
-                "DocumentPreviewPage should display after uploading sample-file.pdf");
-            Assert.assertTrue(previewPage.getPreviewCardCount() > 0,
-                "Preview card grid should contain rendered page cards");
-        }
+        Assert.assertTrue(uploadPage.hasErrorMessage(), "Oversized file upload should display an error message");
+        String errorMsg = uploadPage.getErrorMessage();
+        Assert.assertTrue(errorMsg.contains("5MB limit") || errorMsg.contains("exceed") || errorMsg.contains("large"),
+            "Expected file size error message for sample-file.pdf, got: " + errorMsg);
     }
 
-    @Test(description = "Verify file upload and preview page transition for valid PDF")
-    public void testUploadValidFileAndPreview() {
-        LoginPage loginPage = pageObjectManager.getLoginPage();
+    @Test(description = "Verify that uploading a valid file transitions to DocumentPreviewPage with preview cards")
+    public void testValidFileDisplaysPreview() {
         UploadPage uploadPage = pageObjectManager.getUploadPage();
         DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
-
-        loginPage.loginAsGuest(testConfig.getBaseUrl());
 
         String validFilePath = testFileUtils.getTestFilePath("valid-sample.pdf");
         uploadPage.uploadFile(validFilePath);
 
-        Assert.assertTrue(previewPage.isDisplayed(),
-            "DocumentPreviewPage should be displayed upon file upload");
-        Assert.assertTrue(previewPage.getPreviewCardCount() > 0,
-            "At least one preview card should be rendered on DocumentPreviewPage");
+        Assert.assertTrue(previewPage.isDisplayed(), "DocumentPreviewPage should be displayed upon uploading valid file");
+        Assert.assertTrue(previewPage.getPreviewCardCount() > 0, "At least one preview card should be rendered on DocumentPreviewPage");
     }
 
-    @Test(description = "Verify page selection toggles on DocumentPreviewPage")
-    public void testDocumentPreviewSelectionToggle() {
-        LoginPage loginPage = pageObjectManager.getLoginPage();
+    @Test(description = "Verify that page selection toggles update the process button enabled state")
+    public void testPageSelectionCanBeToggled() {
         UploadPage uploadPage = pageObjectManager.getUploadPage();
         DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
-
-        loginPage.loginAsGuest(testConfig.getBaseUrl());
 
         String validFilePath = testFileUtils.getTestFilePath("valid-sample.pdf");
         uploadPage.uploadFile(validFilePath);
 
-        Assert.assertTrue(previewPage.isDisplayed(),
-            "DocumentPreviewPage grid should be displayed upon file selection");
-        Assert.assertTrue(previewPage.getPreviewCardCount() > 0,
-            "Preview cards should exist on DocumentPreviewPage");
+        Assert.assertTrue(previewPage.isDisplayed(), "DocumentPreviewPage should be displayed upon uploading valid file");
 
         previewPage.deselectAllPages();
+        Assert.assertFalse(previewPage.isProcessButtonEnabled(), "Process button should be disabled when all pages are deselected");
+
         previewPage.selectAllPages();
-        Assert.assertTrue(previewPage.isProcessButtonEnabled(),
-            "Process button should be enabled when pages are selected");
+        Assert.assertTrue(previewPage.isProcessButtonEnabled(), "Process button should be enabled when pages are selected");
     }
 
-    @Test(description = "Verify complete workflow across UploadPage -> DocumentPreviewPage -> ValidationPage")
-    public void testCompleteWorkflowToValidation() {
-        LoginPage loginPage = pageObjectManager.getLoginPage();
+    @Test(description = "Verify that processing a valid document navigates to ValidationPage")
+    public void testValidFileCanBeProcessedToValidation() {
         UploadPage uploadPage = pageObjectManager.getUploadPage();
         DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
         ValidationPage validationPage = pageObjectManager.getValidationPage();
 
-        loginPage.loginAsGuest(testConfig.getBaseUrl());
-
         String validFilePath = testFileUtils.getTestFilePath("valid-sample.pdf");
         uploadPage.uploadFile(validFilePath);
 
-        Assert.assertTrue(previewPage.isDisplayed(),
-            "DocumentPreviewPage should be displayed upon file upload");
-        Assert.assertTrue(previewPage.getPreviewCardCount() > 0,
-            "At least one preview card should be rendered on DocumentPreviewPage");
+        Assert.assertTrue(previewPage.isDisplayed(), "DocumentPreviewPage should be displayed upon uploading valid file");
 
         previewPage.clickProcess();
 
-        boolean redirected = validationPage.isDisplayed();
-        if (!redirected) {
-            Assert.assertTrue(previewPage.hasErrorMessage() || previewPage.isDisplayed(),
-                "Expected either successful redirection to ValidationPage or notification on DocumentPreviewPage when processing OCR");
-        } else {
-            Assert.assertTrue(redirected,
-                "User should be redirected to ValidationPage after processing the uploaded file");
-        }
+        Assert.assertTrue(validationPage.isDisplayed(20), "User should be navigated to ValidationPage after processing document");
     }
 }

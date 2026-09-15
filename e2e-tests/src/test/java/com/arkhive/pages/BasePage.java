@@ -26,6 +26,11 @@ public class BasePage {
         return wait.until(ExpectedConditions.visibilityOfElementLocated(locator));
     }
 
+    protected WebElement waitForVisible(By locator, int timeoutSeconds) {
+        WebDriverWait customWait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+        return customWait.until(ExpectedConditions.visibilityOfElementLocated(locator));
+    }
+
     protected WebElement waitForClickable(By locator) {
         return wait.until(ExpectedConditions.elementToBeClickable(locator));
     }
@@ -53,6 +58,15 @@ public class BasePage {
     protected boolean waitForUrlContains(String urlFraction) {
         try {
             return Boolean.TRUE.equals(wait.until(ExpectedConditions.urlContains(urlFraction)));
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    protected boolean waitForUrlContains(String urlFraction, int timeoutSeconds) {
+        try {
+            WebDriverWait customWait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            return Boolean.TRUE.equals(customWait.until(ExpectedConditions.urlContains(urlFraction)));
         } catch (TimeoutException e) {
             return false;
         }

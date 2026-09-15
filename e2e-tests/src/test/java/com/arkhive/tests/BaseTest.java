@@ -9,7 +9,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 
 /**
- * Base test class owning the TestNG test lifecycle, browser setup, configuration, and PageObjectManager initialization.
+ * Base test class owning the TestNG test lifecycle, browser setup, configuration,
+ * PageObjectManager initialization, and common guest mode authentication setup.
  */
 public abstract class BaseTest {
 
@@ -27,6 +28,9 @@ public abstract class BaseTest {
         driverManager.initializeDriver();
         driver = driverManager.getDriver();
         pageObjectManager = new PageObjectManager(driver);
+
+        // Common setup: Navigate and enter guest mode for all tests
+        pageObjectManager.getLoginPage().loginAsGuest(testConfig.getBaseUrl());
     }
 
     @AfterMethod(alwaysRun = true)

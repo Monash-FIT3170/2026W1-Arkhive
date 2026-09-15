@@ -7,8 +7,8 @@ import org.testng.annotations.Test;
 
 public class LoginPageTest extends BaseTest {
 
-    @Test(description = "Verify that the Login page loads successfully for unauthenticated users")
-    public void testLoginPageLoads() {
+    @Test(description = "Verify that navigating to /login displays the Login page elements")
+    public void testLoginPageDisplayed() {
         LoginPage loginPage = pageObjectManager.getLoginPage();
         loginPage.open(testConfig.getBaseUrl());
 
@@ -16,7 +16,7 @@ public class LoginPageTest extends BaseTest {
     }
 
     @Test(description = "Verify continuing as guest from Login page grants access to Upload page")
-    public void testContinueAsGuest() {
+    public void testGuestLoginGrantsUploadAccess() {
         LoginPage loginPage = pageObjectManager.getLoginPage();
         UploadPage uploadPage = pageObjectManager.getUploadPage();
 
@@ -27,7 +27,7 @@ public class LoginPageTest extends BaseTest {
     }
 
     @Test(description = "Verify invalid login attempt displays error notification")
-    public void testInvalidLoginCredentials() {
+    public void testInvalidLoginCredentialsRejected() {
         LoginPage loginPage = pageObjectManager.getLoginPage();
         loginPage.open(testConfig.getBaseUrl());
 

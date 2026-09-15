@@ -19,6 +19,10 @@ public class ValidationPage extends BasePage {
         return waitForUrlContains("/validation");
     }
 
+    public boolean isDisplayed(int timeoutSeconds) {
+        return waitForUrlContains("/validation", timeoutSeconds);
+    }
+
     public boolean isDocumentPanelDisplayed() {
         return isDisplayed(pageObjects.documentViewer);
     }
