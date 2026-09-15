@@ -11,12 +11,9 @@ import {
   ChevronRight,
   ChevronLeft,
 } from 'lucide-react'; // NEW: Importing icons for confidence badges and export button
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
-import { exportExtractedDataAsCSV } from '../../../../services/csvDownloadService';
-import { exportExtractedDataAsJSON } from '../../../../services/jsonDownloadService';
-import { exportExtractedDataAsTXT } from '../../../../services/txtDownloadService'; // NEW: TXT export service
-import { exportExtractedDataAsXLSX } from '../../../../services/xlsxDownloadService'; // NEW: Excel export service (US-4.5)
+import { ExportModal } from './ExportModal'; // NEW: Excel export service (US-4.5)
 import TextInputModal from '../modals/TextInputModal';
 import Toast from '../modals/Toast';
 
@@ -57,6 +54,7 @@ function getConfidenceTier(confidence: number): {
 function ExtractedDataPanel({
   onHover,
   extractedData,
+  allExtractedData,
   hoveredOverlayIds,
   onCellEdit,
   onRowAdd,
@@ -74,6 +72,7 @@ function ExtractedDataPanel({
 }: {
   onHover: (id: string | null) => void;
   extractedData: ExtractedData;
+  allExtractedData?: ExtractedData[];
   hoveredOverlayIds?: string[];
   onCellEdit?: (fieldId: string, newValue: string) => void;
   onRowAdd?: () => void;
@@ -89,12 +88,6 @@ function ExtractedDataPanel({
   editedCells?: Set<string>;
   onUndoLast?: () => void;
 }) {
-  // used to check if file exported, and which format was last exported
-  // UPDATED: was a plain boolean for CSV only; now tracks which format
-  // (csv/txt/xlsx) was exported so a single button/dropdown can serve all three
-  const [exportedFormat, setExportedFormat] = useState<null | 'csv' | 'txt' | 'xlsx' | 'json'>(
-    null
-  );
   const [isMouseInside, setIsMouseInside] = useState(false);
 
   // Editing state
@@ -105,6 +98,8 @@ function ExtractedDataPanel({
   const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
   const [showDiscardMessage, setShowDiscardMessage] = useState<boolean>(false);
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportedFormat, setExportedFormat] = useState<boolean>(false);
   const [columnDeleteToast, setColumnDeleteToast] = useState<string | null>(null);
   const [rowDeleteToast, setRowDeleteToast] = useState(false);
 
@@ -112,26 +107,7 @@ function ExtractedDataPanel({
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
-  // function to import csv/txt/xlsx/json download services and trigger the download
-  // for whichever format the user picked from the dropdown
-  // UPDATED: replaces the old handleExportCSV, now handles all export formats
-  function handleExport(format: 'csv' | 'txt' | 'xlsx' | 'json') {
-    if (format === 'csv') {
-      exportExtractedDataAsCSV(extractedData);
-    } else if (format === 'txt') {
-      exportExtractedDataAsTXT(extractedData);
-    } else if (format === 'xlsx') {
-      exportExtractedDataAsXLSX(extractedData);
-    } else if (format === 'json') {
-      exportExtractedDataAsJSON(extractedData);
-    }
 
-    setExportedFormat(format);
-    setTimeout(() => setExportedFormat(null), 2500);
-
-    // close the dropdown menu after a selection is made
-    (document.activeElement as HTMLElement)?.blur();
-  }
 
   useEffect(() => {
     if (hoveredOverlayIds && hoveredOverlayIds.length > 0 && !isMouseInside) {
@@ -267,44 +243,23 @@ function ExtractedDataPanel({
               Add Column
             </button>
           )}
-          <div className="dropdown dropdown-end">
-            <button
-              tabIndex={0}
-              className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${
-                exportedFormat ? 'btn-success' : 'btn-primary'
+          <button
+            onClick={() => setShowExportModal(true)}
+            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${exportedFormat ? 'btn-success' : 'btn-primary'
               }`}
-            >
-              {exportedFormat ? (
-                <>
-                  <Check className="w-3.5 h-3.5" />
-                  Downloaded!
-                </>
-              ) : (
-                <>
-                  <Download className="w-3.5 h-3.5" />
-                  Download
-                </>
-              )}
-            </button>
-            <ul
-              tabIndex={0}
-              className="dropdown-content menu bg-base-100 rounded-box z-10 w-45 p-2 shadow-md border border-base-300"
-            >
-              <li>
-                <a onClick={() => handleExport('csv')}>Download as CSV</a>
-              </li>
-              <li>
-                <a onClick={() => handleExport('txt')}>Download as TXT</a>
-              </li>
-              {/* NEW: Excel export option (US-4.5) */}
-              <li>
-                <a onClick={() => handleExport('xlsx')}>Download as Excel</a>
-              </li>
-              <li>
-                <a onClick={() => handleExport('json')}>Download as JSON</a>
-              </li>
-            </ul>
-          </div>
+          >
+            {exportedFormat ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                Exported!
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5" />
+                Export
+              </>
+            )}
+          </button>
         </div>
       </div>
       {/*Acknowledgement: AI (Google Gemini) was used while coding the
@@ -319,11 +274,10 @@ function ExtractedDataPanel({
               {extractedData.columns.map((column) => (
                 <th
                   key={column}
-                  className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${
-                    isEditMode && dragOverColumn === column && draggedColumn !== column
+                  className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${isEditMode && dragOverColumn === column && draggedColumn !== column
                       ? 'bg-primary/20'
                       : ''
-                  }`}
+                    }`}
                   style={{ height: '1px' }}
                   draggable={isEditMode}
                   onDragStart={() => {
@@ -403,9 +357,8 @@ function ExtractedDataPanel({
               return (
                 <tr
                   key={row._id}
-                  className={`border-b border-base-300 hover:bg-base-300/40 ${
-                    tier.isLow ? 'bg-error/10' : ''
-                  }`}
+                  className={`border-b border-base-300 hover:bg-base-300/40 ${tier.isLow ? 'bg-error/10' : ''
+                    }`}
                 >
                   {extractedData.columns.map((column) => {
                     const fieldId = `${String(row._id)}:${column}`;
@@ -424,16 +377,15 @@ function ExtractedDataPanel({
                       <td
                         key={column}
                         id={`cell-${safeId}`}
-                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 text-base-content text-[13px] transition-colors ${
-                          isEditMode ? 'cursor-pointer' : ''
-                        } ${
+                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 text-base-content text-[13px] transition-colors ${isEditMode ? 'cursor-pointer' : ''
+                          } ${
                           //yellow tint
                           isCellHighlighted && !isEditing
                             ? 'bg-primary text-primary-content font-bold rounded shadow-inner'
                             : editedCells?.has(fieldId)
                               ? 'bg-warning/15'
                               : ''
-                        }`}
+                          }`}
                         onMouseEnter={() => onHover(fieldId)}
                         onMouseLeave={() => onHover(null)}
                         onClick={() => {
@@ -479,13 +431,12 @@ function ExtractedDataPanel({
                         </span>
                       )}
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-                          tier.badgeClass === 'badge-success'
+                        className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === 'badge-success'
                             ? 'border-success text-success bg-[var(--color-base-100)]'
                             : tier.badgeClass === 'badge-warning'
                               ? 'border-warning text-warning bg-[var(--color-base-100)]'
                               : ' border-error text-error bg-[var(--color-base-100)]'
-                        }`}
+                          }`}
                       >
                         {tier.label}
                       </span>
@@ -600,6 +551,17 @@ function ExtractedDataPanel({
         actionLabel="Undo"
         onAction={onUndoLast}
         onDismiss={() => setColumnDeleteToast(null)}
+      />
+
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        extractedData={extractedData}
+        allExtractedData={allExtractedData}
+        onExport={() => {
+          setExportedFormat(true);
+          setTimeout(() => setExportedFormat(false), 2500);
+        }}
       />
     </div>
   );
