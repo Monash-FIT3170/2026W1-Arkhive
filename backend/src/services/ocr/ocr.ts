@@ -102,7 +102,7 @@ export async function parseTableWithRetriesLegacy(imageBuffer: Buffer) {
 /** 
  @author Harsha Sharma (33879303)
 */
-async function parseTable(imageBuffer: Buffer) {
+async function parseTable(_imageBuffer: Buffer) {
   // Skips the real Azure Document Intelligence + Gemini calls entirely.
   // See mockOcrFixture.ts for why: no CI/test secrets, no flaky network dependency.
   if (process.env.OCR_MODE === 'mock') {
