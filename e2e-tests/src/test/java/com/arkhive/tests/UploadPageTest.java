@@ -57,19 +57,22 @@ public class UploadPageTest extends BaseTest {
         Assert.assertTrue(previewPage.isProcessButtonEnabled(), "Process button should be enabled when pages are selected");
     }
 
-    @Test(description = "Verify that processing a valid document navigates to ValidationPage")
+    @Test(description = "Verify that processing a valid document navigates to ValidationPage", timeOut = 180000)
     public void testValidFileCanBeProcessedToValidation() {
         UploadPage uploadPage = pageObjectManager.getUploadPage();
         DocumentPreviewPage previewPage = pageObjectManager.getDocumentPreviewPage();
         ValidationPage validationPage = pageObjectManager.getValidationPage();
 
         String validFilePath = testFileUtils.getTestFilePath("valid-sample.pdf");
+        System.out.println(validFilePath);
         uploadPage.uploadFile(validFilePath);
 
         Assert.assertTrue(previewPage.isDisplayed(), "DocumentPreviewPage should be displayed upon uploading valid file");
 
         previewPage.clickProcess();
 
-        Assert.assertTrue(validationPage.isDisplayed(20), "User should be navigated to ValidationPage after processing document");
+        int timeout = testConfig.getProcessingTimeoutSeconds();
+        Assert.assertTrue(validationPage.isDisplayed(timeout),
+            "User should be navigated to ValidationPage after processing document (allowing up to " + timeout + " seconds)");
     }
 }

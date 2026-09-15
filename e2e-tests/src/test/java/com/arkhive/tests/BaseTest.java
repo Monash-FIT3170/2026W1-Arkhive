@@ -23,7 +23,7 @@ public abstract class BaseTest {
     @BeforeMethod
     public void setUp() {
         testConfig = new TestConfig();
-        testFileUtils = new TestFileUtils();
+        testFileUtils = new TestFileUtils(testConfig);
         driverManager = new DriverManager(testConfig);
         driverManager.initializeDriver();
         driver = driverManager.getDriver();

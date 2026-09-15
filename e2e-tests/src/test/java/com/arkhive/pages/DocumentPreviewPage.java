@@ -48,7 +48,7 @@ public class DocumentPreviewPage extends BasePage {
     public boolean isProcessButtonEnabled() {
         try {
             WebElement btn = waitForVisible(pageObjects.processButton);
-            return btn.isEnabled() && btn.getAttribute("disabled") == null;
+            return btn.isEnabled() && btn.getDomProperty("disabled") == null;
         } catch (Exception e) {
             return false;
         }
