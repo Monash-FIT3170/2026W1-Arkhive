@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { getProject } from '../../services/projectService';
@@ -11,9 +11,8 @@ import {
 import { buildPreviewItemsForFiles } from '../upload/components/preview/previewHelpers';
 import EmptyUploadView from '../upload/components/EmptyUploadView';
 import UploadMoreButton from '../upload/components/actions/UploadMoreButton';
-import DocumentPanel from '../validation/components/document/DocumentPanel';
-import ExtractedDataPanel from '../validation/components/extracted-data/ExtractedDataPanel';
-import { flatten } from '../validation/components/extracted-data/flattener';
+import ValidationWorkspace from '../validation/components/ValidationWorkspace';
+import { flatten } from '../../utils/flattener';
 import type {
   ProjectDetail,
   DocumentRecord,
@@ -36,11 +35,13 @@ function extractComponents(raw: unknown): OCRComponent[] {
   return raw as OCRComponent[];
 }
 
-// MVP project workspace: upload pages into the project, batch-process them
-// with OCR, then validate/edit the extracted table per page. Intentionally
-// simpler than the session-based Upload/Validation flow — no AI chat
-// suggestions, bulk review, or undo/redo yet. Pages are flattened across all
-// of the project's documents for validation (one continuous carousel).
+// Project workspace: upload pages into the project, batch-process them with
+// OCR, then validate/edit the extracted table per page. The validate mode
+// renders <ValidationWorkspace>, the same component ValidationPage uses —
+// this page's job is just knowing where the data comes from (documents/pages
+// on the project) and where edits get saved (saveExtractedData, per page).
+// Pages are flattened across all of the project's documents for validation
+// (one continuous carousel).
 
 function statusBadgeClass(status: PageStatus): string {
   switch (status) {
@@ -74,13 +75,15 @@ export default function ProjectWorkspacePage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [mode, setMode] = useState<'files' | 'validate'>('files');
-  const [isEditmode, setEditMode] = useState<boolean>(false);
-  const [currentValidationIndex, setCurrentValidationIndex] = useState(0);
-  const [hoveredTableFieldIds, setHoveredTableFieldIds] = useState<string[]>([]);
-  const [hoveredDocumentOverlayIds, setHoveredDocumentOverlayIds] = useState<string[]>([]);
 
   const [imageUrlMap, setImageUrlMap] = useState<Record<string, string>>({});
   const createdUrlsRef = useRef<string[]>([]);
+
+  // Keeps track of which (documentId, pageIndex) each index in the flat
+  // pages array passed to <ValidationWorkspace> corresponds to, so
+  // persistPages can save each edited page back to the right place.
+  const validationListRef = useRef<typeof validationList>([]);
+  const [hasEnteredValidate, setHasEnteredValidate] = useState(false);
 
   // ── Load project ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -151,6 +154,18 @@ export default function ProjectWorkspacePage() {
     return list;
   }, [documents]);
 
+  useEffect(() => {
+    validationListRef.current = validationList;
+  }, [validationList]);
+
+  // A cheap signature of *which* pages are validate-able (not their content),
+  // so the flat extractedPages array only gets rebuilt from `documents` when
+  // pages are added/removed — not on every edit (edits flow the other way,
+  // through persistPages, so they aren't clobbered by this effect).
+  const validationKeysSignature = validationList
+    .map((entry) => pageKey(entry.documentId, entry.pageIndex))
+    .join('|');
+
   // Lazily resolve a viewable image URL for every known page.
   useEffect(() => {
     allPages.forEach(({ document, pageIndex }) => {
@@ -177,33 +192,40 @@ export default function ProjectWorkspacePage() {
     return null;
   }
 
-  function updateExtractedData(
-    documentId: string,
-    pageIndex: number,
-    updater: (data: ExtractedPage) => ExtractedPage
-  ) {
-    const current = getExtractedData(documentId, pageIndex);
-    if (!current) return;
-    const updated = updater(current);
+  // Persist a full pages array back to each page's document/pageIndex pair
+  // (the project workspace saves per-page, unlike ValidationPage's single
+  // saveExtractionSession call), and mirror the change into `documents` so
+  // the Files view and future validate-mode entries stay in sync. This is
+  // the one bit of domain knowledge <ValidationWorkspace> doesn't have —
+  // everything else about editing/review lives there.
+  const persistPages = useCallback((pages: ExtractedPage[]) => {
+    const entries = validationListRef.current;
 
     setDocuments((prev) =>
       prev.map((doc) => {
-        if (doc.id !== documentId) return doc;
+        const updatesForDoc = entries
+          .map((entry, idx) => ({ entry, page: pages[idx] }))
+          .filter(({ entry, page }) => entry.documentId === doc.id && page);
+        if (updatesForDoc.length === 0) return doc;
         return {
           ...doc,
-          pages: (doc.pages || []).map((page) =>
-            page.page_index === pageIndex
-              ? { ...page, extracted_data: updated, status: 'done' as const }
-              : page
-          ),
+          pages: (doc.pages || []).map((page) => {
+            const match = updatesForDoc.find(({ entry }) => entry.pageIndex === page.page_index);
+            if (!match) return page;
+            return { ...page, extracted_data: match.page, status: 'done' as const };
+          }),
         };
       })
     );
 
-    saveExtractedData(documentId, pageIndex, updated).catch((err) =>
-      console.error('Failed to save extracted data', err)
-    );
-  }
+    entries.forEach((entry, idx) => {
+      const page = pages[idx];
+      if (!page) return;
+      saveExtractedData(entry.documentId, entry.pageIndex, page).catch((err) =>
+        console.error('Failed to save extracted data', err)
+      );
+    });
+  }, []);
 
   // ── Upload ─────────────────────────────────────────────────────────────
   async function handleFilesCaptured(files: File[]) {
@@ -344,7 +366,7 @@ export default function ProjectWorkspacePage() {
       setSelectedKeys(new Set());
       if (anySucceeded) {
         setMode('validate');
-        setCurrentValidationIndex(0);
+        setHasEnteredValidate(true);
       }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to process pages.');
@@ -414,130 +436,26 @@ export default function ProjectWorkspacePage() {
     );
   }
 
-  if (mode === 'validate' && validationList.length > 0) {
-    const entry = validationList[Math.min(currentValidationIndex, validationList.length - 1)];
-    const extractedData = getExtractedData(entry.documentId, entry.pageIndex);
-    const ocrData = extractComponents(findPage(entry.documentId, entry.pageIndex)?.raw_ocr_result);
-    const imageUrls = validationList.map(
-      (e) => imageUrlMap[pageKey(e.documentId, e.pageIndex)] || ''
-    );
+  const pages = hasEnteredValidate
+    ? validationList
+        .map((entry) => getExtractedData(entry.documentId, entry.pageIndex))
+        .filter((page): page is ExtractedPage => page !== null)
+    : [];
+  const ocrPages = hasEnteredValidate
+    ? validationList.map((entry) =>
+        extractComponents(findPage(entry.documentId, entry.pageIndex)?.raw_ocr_result)
+      )
+    : [];
+  const imageUrls = hasEnteredValidate
+    ? validationList.map((e) => imageUrlMap[pageKey(e.documentId, e.pageIndex)] || '')
+    : [];
+  // stable per-page identity for useReviewQueue, so appending pages later
+  // doesn't retrigger detection on pages already processed
+  const pageKeys = hasEnteredValidate
+    ? validationList.map((e) => pageKey(e.documentId, e.pageIndex))
+    : [];
 
-    if (!extractedData) {
-      return (
-        <div className="flex h-screen items-center justify-center font-semibold text-lg">
-          Loading...
-        </div>
-      );
-    }
-
-    return (
-      <>
-        {header}
-        <div className="flex flex-col lg:flex-row w-full p-3 gap-3 h-auto lg:h-[calc(100vh-124px)] lg:overflow-hidden">
-          <div className="w-full h-[50vh] lg:h-full lg:w-1/2">
-            <DocumentPanel
-              hoveredOverlayIds={hoveredDocumentOverlayIds}
-              documentImageUrl={imageUrls[currentValidationIndex]}
-              ocrData={ocrData}
-              imageUrls={imageUrls}
-              currentPageIndex={currentValidationIndex}
-              onPageChange={setCurrentValidationIndex}
-            />
-          </div>
-          <div className="w-full h-[50vh] lg:h-full lg:w-1/2">
-            <ExtractedDataPanel
-              isEditMode={isEditmode}
-              onEditModeChange={setEditMode}
-              extractedData={extractedData}
-              hoveredOverlayIds={hoveredTableFieldIds}
-              onHover={(fieldId) => {
-                setHoveredTableFieldIds(fieldId ? [fieldId] : []);
-                if (fieldId) {
-                  const [rowId, column] = fieldId.split(':');
-                  const row = extractedData.rows.find((r) => String(r._id) === rowId);
-                  const overlayId = row?._cellKeyMap?.[column] ?? null;
-                  setHoveredDocumentOverlayIds(overlayId ? [overlayId] : []);
-                } else {
-                  setHoveredDocumentOverlayIds([]);
-                }
-              }}
-              onCellEdit={(fieldId, newValue) => {
-                const [rowId, column] = fieldId.split(':');
-                updateExtractedData(entry.documentId, entry.pageIndex, (data) => ({
-                  ...data,
-                  rows: data.rows.map((r) =>
-                    String(r._id) === rowId ? { ...r, [column]: newValue } : r
-                  ),
-                }));
-              }}
-              onRowAdd={() => {
-                updateExtractedData(entry.documentId, entry.pageIndex, (data) => {
-                  const newRow: any = {
-                    _id: `manual_row_${Date.now()}`,
-                    _confidence: 1,
-                    _cellConfidence: {},
-                  };
-                  data.columns.forEach((col) => {
-                    newRow[col] = '';
-                  });
-                  return { ...data, rows: [...data.rows, newRow] };
-                });
-              }}
-              onRowDelete={(rowId) => {
-                updateExtractedData(entry.documentId, entry.pageIndex, (data) => ({
-                  ...data,
-                  rows: data.rows.filter((r) => r._id !== rowId),
-                }));
-              }}
-              onColumnAdd={(columnName) => {
-                updateExtractedData(entry.documentId, entry.pageIndex, (data) => {
-                  if (data.columns.includes(columnName)) return data;
-                  return {
-                    ...data,
-                    columns: [...data.columns, columnName],
-                    rows: data.rows.map((r) => ({ ...r, [columnName]: '' })),
-                  };
-                });
-              }}
-              onColumnDelete={(columnName) => {
-                updateExtractedData(entry.documentId, entry.pageIndex, (data) => ({
-                  ...data,
-                  columns: data.columns.filter((c) => c !== columnName),
-                  rows: data.rows.map((r) => {
-                    const newRow = { ...r };
-                    delete newRow[columnName];
-                    return newRow;
-                  }),
-                }));
-              }}
-              onRowMove={(rowId, direction) => {
-                updateExtractedData(entry.documentId, entry.pageIndex, (data) => {
-                  const rows = [...data.rows];
-                  const idx = rows.findIndex((r) => r._id === rowId);
-                  const canMove =
-                    idx !== -1 &&
-                    ((direction === 'up' && idx > 0) ||
-                      (direction === 'down' && idx < rows.length - 1));
-                  if (!canMove) return data;
-                  if (direction === 'up') [rows[idx - 1], rows[idx]] = [rows[idx], rows[idx - 1]];
-                  else [rows[idx], rows[idx + 1]] = [rows[idx + 1], rows[idx]];
-                  return { ...data, rows };
-                });
-              }}
-              onColumnReorder={(newColumns) => {
-                updateExtractedData(entry.documentId, entry.pageIndex, (data) => ({
-                  ...data,
-                  columns: newColumns,
-                }));
-              }}
-            />
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ── Files view ─────────────────────────────────────────────────────────
+  // ── Files/Validation view ─────────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col">
       {header}
@@ -547,104 +465,124 @@ export default function ProjectWorkspacePage() {
           <div className="alert alert-error shadow-lg">{actionError}</div>
         </div>
       )}
-
-      <div className="flex items-center justify-between px-6 py-3 border-b border-base-300 gap-3">
-        <div className="flex items-center gap-2">
-          <button className="btn btn-sm btn-outline" onClick={selectAll}>
-            Select all
-          </button>
-          <button className="btn btn-sm btn-outline" onClick={deselectAll}>
-            Deselect all
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-40">
-            <UploadMoreButton onFilesSelected={handleFilesCaptured} />
+      {/* FILE VIEW AND UPLOAD */}
+      <div className={mode === 'files' ? 'flex-1 flex flex-col' : 'hidden'}>
+        <div className="flex items-center justify-between px-6 py-3 border-b border-base-300 gap-3">
+          <div className="flex items-center gap-2">
+            <button className="btn btn-sm btn-outline" onClick={selectAll}>
+              Select all
+            </button>
+            <button className="btn btn-sm btn-outline" onClick={deselectAll}>
+              Deselect all
+            </button>
           </div>
-          <button
-            className="btn btn-sm btn-primary"
-            disabled={selectedKeys.size === 0 || isProcessing}
-            onClick={handleProcessSelected}
-          >
-            {isProcessing ? (
-              <span className="loading loading-spinner loading-sm" />
-            ) : (
-              `Process Selected (${selectedKeys.size})`
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-40">
+              <UploadMoreButton onFilesSelected={handleFilesCaptured} />
+            </div>
+            <button
+              className="btn btn-sm btn-primary"
+              disabled={selectedKeys.size === 0 || isProcessing}
+              onClick={handleProcessSelected}
+            >
+              {isProcessing ? (
+                <span className="loading loading-spinner loading-sm" />
+              ) : (
+                `Process Selected (${selectedKeys.size})`
+              )}
+            </button>
+          </div>
         </div>
-      </div>
 
-      {isUploading && (
-        <div className="px-6 py-2 text-sm text-base-content/60 flex items-center gap-2">
-          <span className="loading loading-spinner loading-xs" /> Uploading...
-        </div>
-      )}
+        {isUploading && (
+          <div className="px-6 py-2 text-sm text-base-content/60 flex items-center gap-2">
+            <span className="loading loading-spinner loading-xs" /> Uploading...
+          </div>
+        )}
 
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="flex flex-col gap-6">
-          {documents.map((doc) => (
-            <section key={doc.id} className="rounded-lg border border-base-300 bg-base-200/40 p-4">
-              <h3 className="mb-3 text-sm font-semibold text-base-content/70 flex items-center gap-2">
-                <FileText className="w-4 h-4" /> {doc.filename}
-              </h3>
-              <div className="flex flex-wrap gap-4">
-                {(doc.pages || [])
-                  .slice()
-                  .sort((a, b) => a.page_index - b.page_index)
-                  .map((page) => {
-                    const key = pageKey(doc.id, page.page_index);
-                    const imageUrl = imageUrlMap[key];
-                    return (
-                      <div
-                        key={key}
-                        className="w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden"
-                      >
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex flex-col gap-6">
+            {documents.map((doc) => (
+              <section
+                key={doc.id}
+                className="rounded-lg border border-base-300 bg-base-200/40 p-4"
+              >
+                <h3 className="mb-3 text-sm font-semibold text-base-content/70 flex items-center gap-2">
+                  <FileText className="w-4 h-4" /> {doc.filename}
+                </h3>
+                <div className="flex flex-wrap gap-4">
+                  {(doc.pages || [])
+                    .slice()
+                    .sort((a, b) => a.page_index - b.page_index)
+                    .map((page) => {
+                      const key = pageKey(doc.id, page.page_index);
+                      const imageUrl = imageUrlMap[key];
+                      return (
                         <div
-                          className="relative h-[120px] bg-base-300 cursor-pointer"
-                          onClick={() => toggleSelected(doc.id, page.page_index)}
+                          key={key}
+                          className="w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden"
                         >
-                          {imageUrl ? (
-                            <img
-                              src={imageUrl}
-                              alt={`Page ${page.page_index + 1}`}
-                              className="w-full h-full object-cover"
+                          <div
+                            className="relative h-[120px] bg-base-300 cursor-pointer"
+                            onClick={() => toggleSelected(doc.id, page.page_index)}
+                          >
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={`Page ${page.page_index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="loading loading-spinner loading-sm" />
+                              </div>
+                            )}
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-sm checkbox-primary absolute top-2 left-2"
+                              checked={selectedKeys.has(key)}
+                              onChange={() => toggleSelected(doc.id, page.page_index)}
+                              onClick={(e) => e.stopPropagation()}
                             />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <span className="loading loading-spinner loading-sm" />
+                          </div>
+                          <div className="p-2 flex items-center justify-between text-xs">
+                            <span>Page {page.page_index + 1}</span>
+                            <span className={`badge badge-xs ${statusBadgeClass(page.status)}`}>
+                              {page.status}
+                            </span>
+                          </div>
+                          {page.error_message && (
+                            <div
+                              className="px-2 pb-2 text-xs text-error truncate"
+                              title={page.error_message}
+                            >
+                              {page.error_message}
                             </div>
                           )}
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-sm checkbox-primary absolute top-2 left-2"
-                            checked={selectedKeys.has(key)}
-                            onChange={() => toggleSelected(doc.id, page.page_index)}
-                            onClick={(e) => e.stopPropagation()}
-                          />
                         </div>
-                        <div className="p-2 flex items-center justify-between text-xs">
-                          <span>Page {page.page_index + 1}</span>
-                          <span className={`badge badge-xs ${statusBadgeClass(page.status)}`}>
-                            {page.status}
-                          </span>
-                        </div>
-                        {page.error_message && (
-                          <div
-                            className="px-2 pb-2 text-xs text-error truncate"
-                            title={page.error_message}
-                          >
-                            {page.error_message}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-              </div>
-            </section>
-          ))}
+                      );
+                    })}
+                </div>
+              </section>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* VALIDATION WORKSPACE */}
+      {hasEnteredValidate && validationList.length > 0 && (
+        <div className={mode === 'validate' ? 'flex-1 flex flex-col' : 'hidden'}>
+          <ValidationWorkspace
+            pages={pages}
+            ocrPages={ocrPages}
+            imageUrls={imageUrls}
+            pageKeys={pageKeys}
+            syncKey={validationKeysSignature}
+            onPersist={persistPages}
+            heightClassName="lg:h-[calc(100vh-124px)]"
+          />
+        </div>
+      )}
     </div>
   );
 }
