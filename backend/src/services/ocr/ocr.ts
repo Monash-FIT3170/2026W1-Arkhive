@@ -3,6 +3,7 @@ import vision from '@google-cloud/vision';
 import fs from 'fs';
 //import { extractStructuredComponents } from './utils/legacy_utils_table_extraction.js';
 import { withRetry } from './utils/utils.js';
+// @ts-expect-error - JS file has no declaration
 import { analyse_result } from './utils/utils_table_extraction_new.js';
 import { getMockOcrResult } from './mockOcrFixture.js';
 
