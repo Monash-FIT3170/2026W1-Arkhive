@@ -526,6 +526,26 @@ function ValidationWorkspace({
             </button>
           </div>
 
+          {/* Table Mode: Document Preview Toggle */}
+          {viewMode === 'table' && (
+            <button
+              onClick={() => setIsPiPOpen(!isPiPOpen)}
+              className={`btn btn-xs rounded-lg gap-1.5 h-7 min-h-0 text-xs ${
+                isPiPOpen ? 'btn-primary shadow-xs' : 'btn-outline'
+              }`}
+              title={
+                isPiPOpen
+                  ? 'Hide Picture-in-Picture document preview'
+                  : 'Show Picture-in-Picture document preview'
+              }
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">
+                {isPiPOpen ? 'Hide Preview' : 'Document Preview'}
+              </span>
+            </button>
+          )}
+
           {/* Quick Undo Button */}
           <button
             onClick={handleUndo}
@@ -650,17 +670,6 @@ function ValidationWorkspace({
                   />
                 </div>
               </div>
-            )}
-
-            {/* Floating button to restore PiP if dismissed in Table mode */}
-            {viewMode === 'table' && !isPiPOpen && (
-              <button
-                onClick={() => setIsPiPOpen(true)}
-                className="absolute bottom-4 left-4 z-20 btn btn-xs btn-outline bg-base-100/90 shadow-md gap-1.5 rounded-lg text-xs"
-                title="Show Picture-in-Picture document preview"
-              >
-                <FileText className="w-3.5 h-3.5 text-primary" /> Show Document Preview
-              </button>
             )}
           </div>
         )}

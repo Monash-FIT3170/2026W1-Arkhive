@@ -312,7 +312,7 @@ function ExtractedDataPanel({
       {/*Acknowledgement: AI (Google Gemini) was used while coding the
             manual corrections*/}
       {/* Table */}
-      <div className="flex-1 overflow-auto min-h-0 max-w-full">
+      <div className="flex-1 overflow-auto min-h-0 max-w-full pb-20">
         <table className="table table-fixed w-full border border-base-300 text-[10px]">
           {/* Table Header */}
           <thead>
