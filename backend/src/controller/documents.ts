@@ -315,11 +315,11 @@ export default {
             // before it's trustworthy.
             await supabase
               .from('document_pages')
-              .update({ status: 'pending', raw_ocr_result: rawResult, error_message: null })
+              .update({ status: 'done', raw_ocr_result: rawResult, error_message: null })
               .eq('document_id', documentId)
               .eq('page_index', pageIndex);
 
-            results.push({ documentId, pageIndex, status: 'pending', rawResult });
+            results.push({ documentId, pageIndex, status: 'done', rawResult });
           } catch (ocrError: any) {
             const errorMessage =
               ocrError?.message || 'OCR processing failed. Check credentials and document format.';
