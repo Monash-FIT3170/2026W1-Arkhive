@@ -9,6 +9,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import DocumentPanel from './document/DocumentPanel';
+import DocumentPreviewPiP from './document/DocumentPreviewPiP';
 import ExtractedDataPanel from './extracted-data/ExtractedDataPanel';
 import ChatPanel from './chat/ChatPanel';
 import type { OCRComponent } from '../../../models/OCRComponent';
@@ -636,40 +637,14 @@ function ValidationWorkspace({
 
             {/* Picture-in-Picture (PiP) mini document preview when in Table Focus Mode */}
             {viewMode === 'table' && isPiPOpen && (
-              <div className="absolute bottom-4 left-4 z-20 w-80 h-56 bg-base-100/95 border border-base-300 rounded-xl shadow-2xl overflow-hidden flex flex-col backdrop-blur-md">
-                <div className="bg-base-200 px-3 py-1.5 border-b border-base-300 flex items-center justify-between text-xs font-semibold text-base-content/80">
-                  <span className="flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-primary" />
-                    Document Preview
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setViewMode('split')}
-                      className="btn btn-ghost btn-xs h-5 px-1.5 text-[10px] gap-1"
-                      title="Switch to Split View"
-                    >
-                      <Columns2 className="w-3 h-3" /> Expand
-                    </button>
-                    <button
-                      onClick={() => setIsPiPOpen(false)}
-                      className="btn btn-ghost btn-xs btn-circle h-5 w-5 min-h-0"
-                      title="Hide preview"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-                <div className="flex-1 relative overflow-hidden bg-base-300/30">
-                  <DocumentPanel
-                    hoveredOverlayIds={hoveredDocumentOverlayIds}
-                    documentImageUrl={documentImageURL}
-                    ocrData={ocrData}
-                    currentPageIndex={currentPageIndex}
-                    hideThumbnails={true}
-                    compactMode={true}
-                  />
-                </div>
-              </div>
+              <DocumentPreviewPiP
+                documentImageUrl={documentImageURL}
+                ocrData={ocrData}
+                currentPageIndex={currentPageIndex}
+                hoveredOverlayIds={hoveredDocumentOverlayIds}
+                onClose={() => setIsPiPOpen(false)}
+                containerRef={containerRef}
+              />
             )}
           </div>
         )}
