@@ -429,11 +429,17 @@ export default function OcrReviewWidget({
 
               <div className="flex gap-1.5 flex-1 justify-center items-center px-2 overflow-hidden">
                 {slides.length <= 10 ? (
-                  unresolvedIssues.map((_, idx) => (
-                    <div
+                  slides.map((_, idx) => (
+                    <button
                       key={idx}
-                      className={`h-2 flex-shrink-0 rounded-full transition-all duration-300 ${
-                        idx === currentIndex ? 'w-6 bg-primary' : 'w-2 bg-base-300'
+                      type="button"
+                      aria-label={`Go to slide ${idx + 1}`}
+                      onClick={() => {
+                        setCurrentIndex(idx);
+                        resetEditState();
+                      }}
+                      className={`h-2 flex-shrink-0 rounded-full transition-all duration-300 p-0 border-0 cursor-pointer ${
+                        idx === currentIndex ? 'w-6 bg-primary' : 'w-2 bg-base-300 hover:bg-base-content/40'
                       }`}
                     />
                   ))
