@@ -71,9 +71,12 @@ describe('ValidationWorkspace - File Separation & Adaptive View Modes', () => {
     );
 
     // Should show active file name
-    expect(screen.getByTitle('Invoice_01.pdf')).toBeInTheDocument();
+    expect(screen.getByTestId('active-file-name')).toHaveTextContent('Invoice_01.pdf');
     // Should show file counter: (1/2)
     expect(screen.getByText('(1/2)')).toBeInTheDocument();
+    // Dropdown should list files with page count badges
+    expect(screen.getByText('2 pages')).toBeInTheDocument();
+    expect(screen.getByText('1 page')).toBeInTheDocument();
     // Should show page 1 and page 2 buttons for the 2-page document
     expect(screen.getByRole('button', { name: '1' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
@@ -96,8 +99,10 @@ describe('ValidationWorkspace - File Separation & Adaptive View Modes', () => {
     fireEvent.click(nextFileBtn);
 
     // Now File 2 is active
-    expect(screen.getByTitle('Receipt_02.png')).toBeInTheDocument();
+    expect(screen.getByTestId('active-file-name')).toHaveTextContent('Receipt_02.png');
     expect(screen.getByText('(2/2)')).toBeInTheDocument();
+    // 1-page file displays "1 of 1" page indicator
+    expect(screen.getByText('1 of 1')).toBeInTheDocument();
     // Table should display File 2 data
     expect(screen.getByText('Item 2A')).toBeInTheDocument();
 
@@ -106,7 +111,7 @@ describe('ValidationWorkspace - File Separation & Adaptive View Modes', () => {
     fireEvent.click(prevFileBtn);
 
     // Should switch back to File 1
-    expect(screen.getByTitle('Invoice_01.pdf')).toBeInTheDocument();
+    expect(screen.getByTestId('active-file-name')).toHaveTextContent('Invoice_01.pdf');
     expect(screen.getByText('Item 1A')).toBeInTheDocument();
   });
 

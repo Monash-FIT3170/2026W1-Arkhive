@@ -348,21 +348,22 @@ function ValidationWorkspace({
                 tabIndex={0}
                 className="btn btn-ghost btn-xs gap-1.5 font-medium normal-case h-7 min-h-0 px-2 cursor-pointer"
               >
-                <FileText className="w-3.5 h-3.5 text-primary" />
+                <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
                 <span
-                  className="max-w-[170px] truncate text-xs"
+                  data-testid="active-file-name"
+                  className="max-w-[160px] sm:max-w-[240px] truncate text-xs"
                   title={currentFileGroup?.fileName || 'Document'}
                 >
                   {currentFileGroup?.fileName || 'Document'}
                 </span>
-                <span className="text-[10px] text-base-content/60 font-normal">
+                <span className="text-[10px] text-base-content/60 font-normal shrink-0">
                   ({activeFileIndex + 1}/{fileGroups.length})
                 </span>
-                <ChevronDown className="w-3 h-3 opacity-60" />
+                <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
               </label>
               <ul
                 tabIndex={0}
-                className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-64 border border-base-300 z-30"
+                className="dropdown-content menu p-2 shadow-xl bg-base-100 rounded-box w-80 max-w-[calc(100vw-2rem)] border border-base-300 z-30 overflow-hidden"
               >
                 <li className="menu-title text-xs font-semibold px-2 py-1 text-base-content/60">
                   Uploaded Files
@@ -370,20 +371,35 @@ function ValidationWorkspace({
                 {fileGroups.map((fg, idx) => (
                   <li key={fg.fileId || idx}>
                     <button
-                      className={`flex items-center justify-between py-2 text-xs ${
-                        idx === activeFileIndex ? 'active font-semibold' : ''
+                      type="button"
+                      className={`flex items-center justify-between gap-3 px-2.5 py-2 text-xs rounded-lg transition-colors w-full min-w-0 ${
+                        idx === activeFileIndex
+                          ? 'active font-semibold bg-primary text-primary-content'
+                          : 'hover:bg-base-200'
                       }`}
                       onClick={() => {
                         handleSelectFile(idx);
                         (document.activeElement as HTMLElement)?.blur();
                       }}
                     >
-                      <span className="truncate flex-1 text-left flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 shrink-0" />
-                        {fg.fileName}
+                      <span className="flex items-center gap-2 min-w-0 flex-1">
+                        <FileText
+                          className={`w-3.5 h-3.5 shrink-0 ${
+                            idx === activeFileIndex ? 'text-primary-content' : 'text-primary'
+                          }`}
+                        />
+                        <span className="truncate text-left font-normal" title={fg.fileName}>
+                          {fg.fileName}
+                        </span>
                       </span>
-                      <span className="badge badge-xs badge-ghost shrink-0">
-                        {fg.pages.length} {fg.pages.length === 1 ? 'p' : 'pp'}
+                      <span
+                        className={`badge badge-xs shrink-0 font-medium ${
+                          idx === activeFileIndex
+                            ? 'badge-ghost bg-primary-content/20 text-primary-content border-none'
+                            : 'badge-ghost text-base-content/70'
+                        }`}
+                      >
+                        {fg.pages.length} {fg.pages.length === 1 ? 'page' : 'pages'}
                       </span>
                     </button>
                   </li>
@@ -403,44 +419,56 @@ function ValidationWorkspace({
           </div>
 
           {/* Scoped Page Navigation within current file */}
-          {totalPagesInFile > 1 && (
-            <div className="flex items-center gap-1 bg-base-100 rounded-xl border border-base-300 px-2 py-0.5 shadow-sm text-xs h-8">
-              <span className="text-base-content/60 font-medium mr-1 text-[11px]">Page</span>
-              <button
-                onClick={() => handleSelectPageInFile(activePageIndexInFile - 1)}
-                disabled={activePageIndexInFile <= 0}
-                className="btn btn-ghost btn-xs btn-square h-6 w-6 min-h-0 disabled:opacity-30"
-                title="Previous Page"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
+          <div className="flex items-center gap-1 bg-base-100 rounded-xl border border-base-300 px-2 py-0.5 shadow-sm text-xs h-8">
+            <span className="text-base-content/60 font-medium mr-1 text-[11px]">Page</span>
+            {totalPagesInFile > 1 ? (
+              <>
+                <button
+                  onClick={() => handleSelectPageInFile(activePageIndexInFile - 1)}
+                  disabled={activePageIndexInFile <= 0}
+                  className="btn btn-ghost btn-xs btn-square h-6 w-6 min-h-0 disabled:opacity-30"
+                  title="Previous Page"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
 
-              <div className="flex items-center gap-1">
-                {Array.from({ length: totalPagesInFile }).map((_, pIdx) => (
-                  <button
-                    key={pIdx}
-                    onClick={() => handleSelectPageInFile(pIdx)}
-                    className={`btn btn-xs h-6 min-h-0 px-2 rounded-lg text-xs transition-all ${
-                      pIdx === activePageIndexInFile
-                        ? 'btn-primary font-bold shadow-xs'
-                        : 'btn-ghost hover:bg-base-200'
-                    }`}
-                  >
-                    {pIdx + 1}
-                  </button>
-                ))}
-              </div>
+                <div className="flex items-center gap-1">
+                  {totalPagesInFile <= 8 ? (
+                    Array.from({ length: totalPagesInFile }).map((_, pIdx) => (
+                      <button
+                        key={pIdx}
+                        onClick={() => handleSelectPageInFile(pIdx)}
+                        className={`btn btn-xs h-6 min-h-0 px-2 rounded-lg text-xs transition-all ${
+                          pIdx === activePageIndexInFile
+                            ? 'btn-primary font-bold shadow-xs'
+                            : 'btn-ghost hover:bg-base-200'
+                        }`}
+                      >
+                        {pIdx + 1}
+                      </button>
+                    ))
+                  ) : (
+                    <span className="px-1.5 font-medium">
+                      {activePageIndexInFile + 1} / {totalPagesInFile}
+                    </span>
+                  )}
+                </div>
 
-              <button
-                onClick={() => handleSelectPageInFile(activePageIndexInFile + 1)}
-                disabled={activePageIndexInFile >= totalPagesInFile - 1}
-                className="btn btn-ghost btn-xs btn-square h-6 w-6 min-h-0 disabled:opacity-30"
-                title="Next Page"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
+                <button
+                  onClick={() => handleSelectPageInFile(activePageIndexInFile + 1)}
+                  disabled={activePageIndexInFile >= totalPagesInFile - 1}
+                  className="btn btn-ghost btn-xs btn-square h-6 w-6 min-h-0 disabled:opacity-30"
+                  title="Next Page"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </>
+            ) : (
+              <span className="font-semibold text-xs px-1 text-base-content/80">
+                1 of 1
+              </span>
+            )}
+          </div>
 
           {/* Average Confidence Badge */}
           <div
