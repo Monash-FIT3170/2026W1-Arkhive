@@ -4,7 +4,7 @@ import { AuthProvider } from './context/AuthProvider';
 import { AuthGuard } from './components/auth/AuthGuard';
 import { RequireUser } from './components/auth/RequireUser';
 import LoginPage from './pages/login/LoginPage';
-import Navbar from './pages/validation/components/navbar/Navbar';
+import Navbar from './components/navbar/Navbar';
 import UploadPage from './pages/upload/UploadPage';
 import ValidationPage from './pages/validation/ValidationPage';
 import ProjectsPage from './pages/projects/ProjectsPage';
