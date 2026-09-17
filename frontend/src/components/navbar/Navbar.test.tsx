@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Navbar from './Navbar';
-import * as AuthContextModule from '../../../../context/AuthContext';
+import * as AuthContextModule from '../../context/AuthContext';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -13,7 +13,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../../context/AuthContext', async (importOriginal) => {
+vi.mock('../../context/AuthContext', async (importOriginal) => {
   const actual = await importOriginal<typeof AuthContextModule>();
   return {
     ...actual,

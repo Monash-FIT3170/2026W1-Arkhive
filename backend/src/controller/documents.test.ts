@@ -196,10 +196,7 @@ describe('Documents Controller', () => {
 
     // pageRows simulates what's already in document_pages for the requested
     // pageIndices (empty = none started yet, so nothing gets skipped as 'done').
-    function mockOwnedDocument(
-      pageRows: any[] = [],
-      updateImpl?: ReturnType<typeof vi.fn>
-    ) {
+    function mockOwnedDocument(pageRows: any[] = [], updateImpl?: ReturnType<typeof vi.fn>) {
       const update =
         updateImpl ??
         vi.fn().mockReturnValue({
@@ -236,7 +233,7 @@ describe('Documents Controller', () => {
       return update;
     }
 
-    it('downloads from R2, runs OCR pipeline, and persists rawResult with pending status', async () => {
+    it('downloads from R2, runs OCR pipeline, and persists rawResult with done status', async () => {
       const update = mockOwnedDocument();
       vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('fake-pdf-bytes'));
       vi.spyOn(ocrService, 'parseTableWithRetries').mockResolvedValue(mockOcrResult as any);
@@ -249,11 +246,11 @@ describe('Documents Controller', () => {
 
       expect(getStatus()).toBe(200);
       expect(getJson().results).toEqual([
-        { documentId: 'doc-123', pageIndex: 0, status: 'pending', rawResult: mockOcrResult },
+        { documentId: 'doc-123', pageIndex: 0, status: 'done', rawResult: mockOcrResult },
       ]);
       expect(update.mock.calls.map((call) => call[0])).toEqual([
         { status: 'processing' },
-        { status: 'pending', raw_ocr_result: mockOcrResult, error_message: null },
+        { status: 'done', raw_ocr_result: mockOcrResult, error_message: null },
       ]);
     });
 
@@ -288,7 +285,13 @@ describe('Documents Controller', () => {
 
       expect(getObjectBufferSpy).not.toHaveBeenCalled();
       expect(getJson().results).toEqual([
-        { documentId: 'doc-123', pageIndex: 0, status: 'done', rawResult: mockOcrResult, skipped: true },
+        {
+          documentId: 'doc-123',
+          pageIndex: 0,
+          status: 'done',
+          rawResult: mockOcrResult,
+          skipped: true,
+        },
       ]);
     });
 
