@@ -3,7 +3,7 @@ import type { Message, ReviewField } from '../../models/message';
 import dotenv from 'dotenv';
 import { ExtractedData } from '../../models/TableData';
 import { buildFocusedContext } from './utils/contextMaker';
-import { maskToRegex, profileColumnLocally } from './utils/formatUtils';
+import { profileColumnLocally } from './utils/formatUtils';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
