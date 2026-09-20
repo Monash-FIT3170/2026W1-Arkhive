@@ -8,6 +8,7 @@ import {
   processPages,
   saveExtractedData,
   deletePage,
+  deleteDocument,
 } from '../../services/documentService';
 import { buildPreviewItemsForFiles } from '../upload/components/preview/previewHelpers';
 import EmptyUploadView from '../upload/components/EmptyUploadView';
@@ -423,20 +424,31 @@ export default function ProjectWorkspacePage() {
     setActionError(null);
 
     try {
-      if (deleteTarget.type === 'single') {
-        const { documentId, pageIndex } = deleteTarget;
-        await deletePage(documentId, pageIndex);
-        removePagesFromState(new Set([pageKey(documentId, pageIndex)]));
-      } else {
-        const keys = Array.from(selectedKeys);
-        await Promise.all(
-          keys.map((key) => {
-            const [documentId, pageIndexStr] = key.split(':');
-            return deletePage(documentId, Number(pageIndexStr));
-          })
-        );
-        removePagesFromState(new Set(keys));
-      }
+      const keys =
+        deleteTarget.type === 'single'
+          ? [pageKey(deleteTarget.documentId, deleteTarget.pageIndex)]
+          : Array.from(selectedKeys);
+
+      const byDoc = new Map<string, number[]>();
+      keys.forEach((key) => {
+        const [documentId, pageIndexStr] = key.split(':');
+        if (!byDoc.has(documentId)) byDoc.set(documentId, []);
+        byDoc.get(documentId)!.push(Number(pageIndexStr));
+      });
+
+      await Promise.all(
+        Array.from(byDoc.entries()).map(([documentId, pageIndices]) => {
+          const totalPages = documents.find((d) => d.id === documentId)?.pages?.length ?? 0;
+          // Deleting every page of a document removes the document row too,
+          // instead of leaving an empty orphan that resurfaces on reload.
+          if (totalPages > 0 && pageIndices.length === totalPages) {
+            return deleteDocument(documentId);
+          }
+          return Promise.all(pageIndices.map((pageIndex) => deletePage(documentId, pageIndex)));
+        })
+      );
+
+      removePagesFromState(new Set(keys));
       setDeleteTarget(null);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to delete page(s).');
@@ -539,38 +551,50 @@ export default function ProjectWorkspacePage() {
       )}
       {/* FILE VIEW AND UPLOAD */}
       <div className={mode === 'files' ? 'flex-1 flex flex-col' : 'hidden'}>
-        <div className="flex items-center justify-between px-6 py-3 border-b border-base-300 gap-3">
-          <div className="flex items-center gap-2">
-            <button className="btn btn-sm btn-outline" onClick={selectAll}>
-              Select all
-            </button>
-            <button className="btn btn-sm btn-outline" onClick={deselectAll}>
-              Deselect all
-            </button>
+        <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg bg-base-200/40 px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            {selectedKeys.size > 0 ? (
+              <>
+                <span className="text-sm font-medium text-base-content/70">
+                  {selectedKeys.size} selected
+                </span>
+                <button className="btn btn-ghost btn-xs" onClick={deselectAll}>
+                  Clear
+                </button>
+              </>
+            ) : (
+              <button className="btn btn-ghost btn-sm" onClick={selectAll}>
+                Select all
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2">
+            {selectedKeys.size > 0 && (
+              <>
+                <button
+                  className="btn btn-sm btn-error btn-outline gap-1.5"
+                  disabled={isProcessing || isDeleting}
+                  onClick={() => setDeleteTarget({ type: 'bulk' })}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  {`Delete (${selectedKeys.size})`}
+                </button>
+                <button
+                  className="btn btn-sm btn-primary"
+                  disabled={isProcessing || isDeleting}
+                  onClick={handleProcessSelected}
+                >
+                  {isProcessing ? (
+                    <span className="loading loading-spinner loading-sm" />
+                  ) : (
+                    `Process (${selectedKeys.size})`
+                  )}
+                </button>
+              </>
+            )}
             <div className="w-40">
               <UploadMoreButton onFilesSelected={handleFilesCaptured} />
             </div>
-            <button
-              className="btn btn-sm btn-error btn-outline gap-1.5"
-              disabled={selectedKeys.size === 0 || isProcessing || isDeleting}
-              onClick={() => setDeleteTarget({ type: 'bulk' })}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              {`Delete Selected (${selectedKeys.size})`}
-            </button>
-            <button
-              className="btn btn-sm btn-primary"
-              disabled={selectedKeys.size === 0 || isProcessing}
-              onClick={handleProcessSelected}
-            >
-              {isProcessing ? (
-                <span className="loading loading-spinner loading-sm" />
-              ) : (
-                `Process Selected (${selectedKeys.size})`
-              )}
-            </button>
           </div>
         </div>
 
@@ -582,7 +606,9 @@ export default function ProjectWorkspacePage() {
 
         <div className="flex-1 overflow-y-auto p-6">
           <div className="flex flex-col gap-6">
-            {documents.map((doc) => (
+            {documents
+              .filter((doc) => (doc.pages || []).length > 0)
+              .map((doc) => (
               <section
                 key={doc.id}
                 className="rounded-lg border border-base-300 bg-base-200/40 p-4"

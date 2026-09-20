@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import type { ChangeEvent } from "react";
+import { Upload } from "lucide-react";
 import { filterValidFiles } from "../dropzone/dropZoneUtils";
 
 type UploadMoreButtonProps = {
@@ -30,11 +31,12 @@ function UploadMoreButton({ onFilesSelected }: UploadMoreButtonProps) {
         className="hidden"
         onChange={handleUploadMoreChange}
       />
-      <button className="btn btn-sm btn-outline"
+      <button
+        className="btn btn-sm btn-outline gap-1.5"
         type="button"
         onClick={() => inputRef.current?.click()}
       >
-
+        <Upload className="w-3.5 h-3.5" />
         Upload More
       </button>
     </>
