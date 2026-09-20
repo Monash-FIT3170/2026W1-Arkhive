@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { filterValidFiles, partitionBySize, MAX_FILE_SIZE_MB } from './dropZoneUtils';
 
@@ -19,7 +19,7 @@ export default function DropZone({ onFilesCaptured, onError }: DropZoneProps) {
    * Run files through size check before passing to parent.
    * Accepted files proceed; rejected files trigger an error message.
    */
-  function processFiles(files: File[]) {
+  const processFiles = useCallback((files: File[]) => {
     if (onError) onError(null); else setSizeError(null);
     const { accepted, rejected } = partitionBySize(files);
 
@@ -31,7 +31,7 @@ export default function DropZone({ onFilesCaptured, onError }: DropZoneProps) {
     }
 
     if (accepted.length > 0) onFilesCaptured(accepted);
-  }
+  }, [onError, onFilesCaptured]);
 
   // Handles file selection via file picker
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -96,7 +96,7 @@ export default function DropZone({ onFilesCaptured, onError }: DropZoneProps) {
       window.removeEventListener('dragover', handleWindowDragOver);
       window.removeEventListener('drop', handleWindowDrop);
     };
-  }, [onError, onFilesCaptured]);
+  }, [processFiles]);
 
   return (
     <div className="dropzone-handoff-container">

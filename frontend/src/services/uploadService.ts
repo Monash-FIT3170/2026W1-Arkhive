@@ -22,8 +22,7 @@ export async function uploadPageToBackend(
   pageSrc: string,
   documentId: string,
   pageIndex: number,
-  originalFilename: string,
-  documentType?: string
+  originalFilename: string
 ): Promise<BatchUploadResult | void> {
   const formData = new FormData();
 
@@ -33,9 +32,7 @@ export async function uploadPageToBackend(
   // Force .png extension since the frontend generates png blobs for previews
   const filename = originalFilename.replace(/\.[^/.]+$/, '') + '.png';
   formData.append('page', blob, filename);
-  if (documentType) {
-    formData.append('type', documentType);
-  }
+
   if (originalFilename) {
     formData.append('label', originalFilename);
   }
@@ -87,7 +84,7 @@ export async function deleteDocumentFromBackend(documentId: string): Promise<voi
  * Triggers the OCR processing for the selected documents and pages.
  */
 export async function processDocuments(
-  selected: { documentId: string; pages: string[]; type: string }[],
+  selected: { documentId: string; pages: string[] }[],
   onRetryMessage?: (msg: string) => void,
   onProgress?: (event: BatchProgressEvent) => void
 ): Promise<BatchUploadResult | void> {
@@ -174,7 +171,7 @@ export function getUploadedImageUrl(documentId?: string, pageIndex?: number): st
  * Returns a list of structured documents from the session.
  */
 export async function getUploadedDocuments(): Promise<
-  { documentId: string; label?: string; type?: string; pages: string[] }[]
+  { documentId: string; label?: string; pages: string[] }[]
 > {
   const response = await fetch(apiUrl('/api/upload/documents'));
   if (!response.ok) {

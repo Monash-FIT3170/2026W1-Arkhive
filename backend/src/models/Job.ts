@@ -7,7 +7,6 @@ export interface DocumentJob {
   id: string;
   index: number;
   fileName: string;
-  documentType: string;
   imageIndex: number;
   imageUrl: string;
   status: JobStatus;
@@ -37,6 +36,5 @@ export interface BatchProgressEvent {
   maxRetries?: number;
   confidence?: number;
   message?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
 }

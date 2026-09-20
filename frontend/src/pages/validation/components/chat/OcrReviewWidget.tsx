@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Check,
   X,
@@ -13,9 +13,8 @@ import {
 
 // Acknowledgement: Google Gemini was used to help generate this file
 
-import { buildSlides, type OcrIssue } from './ocrReviewUtils';
-
-export type { OcrIssue };
+import { buildSlides } from '../../../../utils/ocrReviewUtils';
+import type { OcrIssue } from '../../../../models/IssueReview';
 
 interface OcrReviewWidgetProps {
   issues: OcrIssue[];
@@ -52,10 +51,13 @@ export default function OcrReviewWidget({
   const [fetchingId, setFetchingId] = useState<string | null>(null);
 
   // Filter out issues that have already been resolved
-  const unresolvedIssues = issues.filter((issue) => !resolvedIds?.has(issue.fieldId));
+  const unresolvedIssues = useMemo(
+    () => issues.filter((issue) => !resolvedIds?.has(issue.fieldId)),
+    [issues, resolvedIds]
+  );
 
   // Make review slide per ocr issue
-  const slides = buildSlides(unresolvedIssues);
+  const slides = useMemo(() => buildSlides(unresolvedIssues), [unresolvedIssues]);
   // Current Slide UI is on
   const currentSlide = slides[currentIndex];
 
@@ -72,7 +74,7 @@ export default function OcrReviewWidget({
           : currentSlide.issues[0]?.pageIndex;
       onSlideChange(fieldIds, pageIndex);
     }
-  }, [currentIndex, slides.length, onSlideChange, unresolvedIssues]);
+  }, [currentIndex, currentSlide]);
 
   // Whenever the slide list shrinks (or changes) for any reason — resolving an
   // issue, the parent updating `issues`, — make sure currentIndex still
@@ -427,11 +429,17 @@ export default function OcrReviewWidget({
 
               <div className="flex gap-1.5 flex-1 justify-center items-center px-2 overflow-hidden">
                 {slides.length <= 10 ? (
-                  unresolvedIssues.map((_, idx) => (
-                    <div
+                  slides.map((_, idx) => (
+                    <button
                       key={idx}
-                      className={`h-2 flex-shrink-0 rounded-full transition-all duration-300 ${
-                        idx === currentIndex ? 'w-6 bg-primary' : 'w-2 bg-base-300'
+                      type="button"
+                      aria-label={`Go to slide ${idx + 1}`}
+                      onClick={() => {
+                        setCurrentIndex(idx);
+                        resetEditState();
+                      }}
+                      className={`h-2 flex-shrink-0 rounded-full transition-all duration-300 p-0 border-0 cursor-pointer ${
+                        idx === currentIndex ? 'w-6 bg-primary' : 'w-2 bg-base-300 hover:bg-base-content/40'
                       }`}
                     />
                   ))

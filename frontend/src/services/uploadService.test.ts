@@ -25,7 +25,7 @@ describe('uploadService', () => {
       });
 
       await expect(
-        uploadPageToBackend('blob:http://localhost/123', 'doc1', 0, 'test.png', 'Other')
+        uploadPageToBackend('blob:http://localhost/123', 'doc1', 0, 'test.png')
       ).resolves.toBeUndefined();
 
       expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -54,7 +54,7 @@ describe('uploadService', () => {
       });
 
       await expect(
-        uploadPageToBackend('blob:http://localhost/123', 'doc1', 0, 'test.png', 'Other')
+        uploadPageToBackend('blob:http://localhost/123', 'doc1', 0, 'test.png')
       ).rejects.toThrow('Server error');
     });
   });

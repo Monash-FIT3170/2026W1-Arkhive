@@ -7,7 +7,6 @@ export interface DocumentJob {
   id: string;
   index: number;
   fileName: string;
-  documentType: string;
   imageIndex: number;
   imageUrl: string;
   status: JobStatus;
