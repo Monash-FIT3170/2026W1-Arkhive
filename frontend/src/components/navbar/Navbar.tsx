@@ -9,6 +9,7 @@ import {
   User as UserIcon,
   LogIn,
   FolderKanban,
+  Home as HomeIcon,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getMaxStep } from '../../services/stepGuard';
@@ -25,7 +26,7 @@ export const Navbar = () => {
 
   function getCurrentStep(): number {
     if (location.pathname === '/validation') return 2;
-    if (location.pathname === '/' && step === 'preview') return 1;
+    if (location.pathname === '/upload' && step === 'preview') return 1;
     return 0;
   }
   const currentStep = getCurrentStep();
@@ -39,13 +40,13 @@ export const Navbar = () => {
     {
       step: 0,
       label: 'Upload',
-      path: '/',
+      path: '/upload',
       icon: <Upload className="w-4 h-4" />,
     },
     {
       step: 1,
       label: 'Document Preview',
-      path: '/?step=preview',
+      path: '/upload?step=preview',
       icon: <LayoutGrid className="w-4 h-4" />,
     },
     {
@@ -61,6 +62,10 @@ export const Navbar = () => {
   // Check if current route is the login page
   const isOnLogin = location.pathname === '/login';
 
+  // Check if current route is the landing page — the Upload/Preview/
+  // Validation step progress bar doesn't apply there either.
+  const isOnHome = location.pathname === '/';
+
   // Check if current route is anywhere under /projects — the guest-only
   // step progress bar (Upload/Preview/Validation) doesn't apply there.
   const isOnProjects = location.pathname.startsWith('/projects');
@@ -69,7 +74,7 @@ export const Navbar = () => {
   const { user, isGuest, signOut } = useAuth();
 
   function handleBack() {
-    navigate('/?step=preview');
+    navigate('/upload?step=preview');
   }
 
   // Signs out of Supabase, cleans up local session/guest data, and routes to login
@@ -93,6 +98,10 @@ export const Navbar = () => {
     navigate('/projects');
   }
 
+  function handleHomeClick() {
+    navigate('/');
+  }
+
   return (
     <div>
       <div className="navbar bg-base-200 text-base-content px-17 py-2 border-b border-base-300">
@@ -105,29 +114,46 @@ export const Navbar = () => {
             Arkhive
           </button>
 
-          {/* Projects tab — only shown to real logged-in users. Guests never
-              persist data, so this section is intentionally hidden for them
-              rather than shown-but-disabled, to avoid implying guests can
-              use it. */}
-          {user && (
-            <button
-              type="button"
-              onClick={handleProjectsClick}
-              className={`btn btn-ghost btn-sm gap-1.5 ml-4 rounded-none border-b-2 ${
-                isOnProjects
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-base-content/70'
-              }`}
-            >
-              <FolderKanban className="w-4 h-4" />
-              Projects
-            </button>
+          {/* Home + Projects tabs — only shown once someone's past the login
+              gate (real user or guest). Projects itself still requires a
+              real user; guests see Home only and get bounced to /login if
+              they pick "Create a Project" there (handled by RequireUser). */}
+          {(user || isGuest) && !isOnLogin && (
+            <div className="ml-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleHomeClick}
+                className={`btn btn-ghost btn-sm gap-1.5 rounded-none border-b-2 ${
+                  isOnHome
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-base-content/70'
+                }`}
+              >
+                <HomeIcon className="w-4 h-4" />
+                Home
+              </button>
+              {user && (
+                <button
+                  type="button"
+                  onClick={handleProjectsClick}
+                  className={`btn btn-ghost btn-sm gap-1.5 rounded-none border-b-2 ${
+                    isOnProjects
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-base-content/70'
+                  }`}
+                >
+                  <FolderKanban className="w-4 h-4" />
+                  Projects
+                </button>
+              )}
+            </div>
           )}
         </div>
         <div className="ml-auto flex items-center gap-6">
-          {/* Hide the 3-step workflow progress bar when on the login page or
-              anywhere in the Projects section — that flow doesn't apply there. */}
-          {!isOnLogin && !isOnProjects && (
+          {/* Hide the 3-step workflow progress bar when on the login page,
+              the Home landing page, or anywhere in the Projects section —
+              that flow doesn't apply there. */}
+          {!isOnLogin && !isOnHome && !isOnProjects && (
             <ul className="steps">
               {stepConfig.map(({ step: s, label, path, icon }) => {
                 const isUnlocked = s <= maxStep;
