@@ -95,8 +95,8 @@ export const Navbar = () => {
 
   return (
     <div>
-      <div className="navbar bg-base-200 text-base-content px-17 border-b border-base-300">
-        <div className="margin-left-2 flex items-center gap-2">
+      <div className="navbar bg-base-200 text-base-content px-17 py-2 border-b border-base-300">
+        <div className="ml-2 flex items-center gap-2">
           <button
             type="button"
             onClick={() => navigate('/')}
@@ -155,7 +155,7 @@ export const Navbar = () => {
           )}
 
           {isOnValidation && (
-            <button type="button" onClick={handleBack} className="btn btn-outline btn-sm">
+            <button type="button" onClick={handleBack} className="btn btn-outline btn-sm gap-1.5">
               <ChevronLeft className="w-4 h-4" />
               Back
             </button>
@@ -163,14 +163,14 @@ export const Navbar = () => {
 
           {/* Authenticated State: Display user name or email + sign out button */}
           {user && (
-            <div className="flex items-center gap-2 text-xs">
+            <div className="flex items-center gap-3 text-sm">
               <span
-                className="flex items-center gap-1 font-medium text-base-content/80 max-w-[160px] truncate"
+                className="flex items-center gap-1.5 font-medium text-base-content/80 max-w-40 truncate"
                 title={
                   user.user_metadata?.display_name || user.user_metadata?.full_name || user.email
                 }
               >
-                <UserIcon className="w-3.5 h-3.5 shrink-0 text-primary" />
+                <UserIcon className="w-4 h-4 shrink-0 text-primary" />
                 <span className="truncate">
                   {user.user_metadata?.display_name || user.user_metadata?.full_name || user.email}
                 </span>
@@ -178,10 +178,10 @@ export const Navbar = () => {
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="btn btn-ghost btn-xs text-error gap-1"
+                className="btn btn-ghost btn-sm text-error gap-1.5"
                 title="Sign out of your account"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className="w-4 h-4" />
                 Sign Out
               </button>
             </div>
@@ -189,15 +189,15 @@ export const Navbar = () => {
 
           {/* Guest State: Display warning badge that data is session based + link to log in */}
           {isGuest && !isOnLogin && (
-            <div className="flex items-center gap-2 text-xs">
-              <span className="badge badge-warning badge-sm">Guest Mode</span>
+            <div className="flex items-center gap-3 text-sm">
+              <span className="badge badge-warning badge-md">Guest Mode</span>
               <button
                 type="button"
                 onClick={handleLoginClick}
-                className="btn btn-outline btn-xs gap-1"
+                className="btn btn-outline btn-sm gap-1.5"
                 title="Sign in to save documents"
               >
-                <LogIn className="w-3.5 h-3.5" />
+                <LogIn className="w-4 h-4" />
                 Log In
               </button>
             </div>
@@ -210,8 +210,8 @@ export const Navbar = () => {
               value="night"
               className="theme-controller hover:scale-110 transition"
             />
-            <Sun className="swap-off w-8 h-8 hover:scale-110 transition" />
-            <Moon className="swap-on w-8 h-8 hover:scale-110 transition" />
+            <Sun className="swap-off w-5 h-5 hover:scale-110 transition" />
+            <Moon className="swap-on w-5 h-5 hover:scale-110 transition" />
             <span className="sr-only">Toggle Theme</span>
           </label>
         </div>
