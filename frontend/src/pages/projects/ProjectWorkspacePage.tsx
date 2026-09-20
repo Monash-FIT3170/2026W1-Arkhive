@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, FileText, Trash2, Columns2 } from 'lucide-react';
 import { getProject } from '../../services/projectService';
 import {
   uploadPageToR2,
   getDownloadUrl,
   processPages,
   saveExtractedData,
+  deletePage,
 } from '../../services/documentService';
 import { buildPreviewItemsForFiles } from '../upload/components/preview/previewHelpers';
 import EmptyUploadView from '../upload/components/EmptyUploadView';
@@ -73,6 +74,13 @@ export default function ProjectWorkspacePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Delete confirmation covers both a single hover-triggered card delete and
+  // the toolbar's bulk "Delete Selected" action, sharing one modal/handler.
+  const [deleteTarget, setDeleteTarget] = useState<
+    { type: 'single'; documentId: string; pageIndex: number } | { type: 'bulk' } | null
+  >(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [mode, setMode] = useState<'files' | 'validate'>('files');
 
@@ -390,6 +398,53 @@ export default function ProjectWorkspacePage() {
     }
   }
 
+  // ── Delete ─────────────────────────────────────────────────────────────
+  // Removes deleted pages from `documents`, dropping a document entirely once
+  // its last page is gone so the Files view doesn't show an empty section.
+  function removePagesFromState(keys: Set<string>) {
+    setDocuments((prev) =>
+      prev
+        .map((doc) => ({
+          ...doc,
+          pages: (doc.pages || []).filter((page) => !keys.has(pageKey(doc.id, page.page_index))),
+        }))
+        .filter((doc) => (doc.pages || []).length > 0)
+    );
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      keys.forEach((key) => next.delete(key));
+      return next;
+    });
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    setActionError(null);
+
+    try {
+      if (deleteTarget.type === 'single') {
+        const { documentId, pageIndex } = deleteTarget;
+        await deletePage(documentId, pageIndex);
+        removePagesFromState(new Set([pageKey(documentId, pageIndex)]));
+      } else {
+        const keys = Array.from(selectedKeys);
+        await Promise.all(
+          keys.map((key) => {
+            const [documentId, pageIndexStr] = key.split(':');
+            return deletePage(documentId, Number(pageIndexStr));
+          })
+        );
+        removePagesFromState(new Set(keys));
+      }
+      setDeleteTarget(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to delete page(s).');
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
@@ -421,15 +476,17 @@ export default function ProjectWorkspacePage() {
       {validationList.length > 0 && (
         <div className="join">
           <button
-            className={`btn btn-sm join-item ${mode === 'files' ? 'btn-active' : ''}`}
+            className={`btn btn-sm join-item gap-1.5 ${mode === 'files' ? 'btn-active' : ''}`}
             onClick={() => setMode('files')}
           >
+            <FileText className="w-4 h-4" />
             Files
           </button>
           <button
-            className={`btn btn-sm join-item ${mode === 'validate' ? 'btn-active' : ''}`}
+            className={`btn btn-sm join-item gap-1.5 ${mode === 'validate' ? 'btn-active' : ''}`}
             onClick={() => setMode('validate')}
           >
+            <Columns2 className="w-4 h-4" />
             Validate
           </button>
         </div>
@@ -496,6 +553,14 @@ export default function ProjectWorkspacePage() {
               <UploadMoreButton onFilesSelected={handleFilesCaptured} />
             </div>
             <button
+              className="btn btn-sm btn-error btn-outline gap-1.5"
+              disabled={selectedKeys.size === 0 || isProcessing || isDeleting}
+              onClick={() => setDeleteTarget({ type: 'bulk' })}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {`Delete Selected (${selectedKeys.size})`}
+            </button>
+            <button
               className="btn btn-sm btn-primary"
               disabled={selectedKeys.size === 0 || isProcessing}
               onClick={handleProcessSelected}
@@ -535,7 +600,7 @@ export default function ProjectWorkspacePage() {
                       return (
                         <div
                           key={key}
-                          className="w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden"
+                          className="group w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden"
                         >
                           <div
                             className="relative h-[120px] bg-base-300 cursor-pointer"
@@ -552,13 +617,31 @@ export default function ProjectWorkspacePage() {
                                 <span className="loading loading-spinner loading-sm" />
                               </div>
                             )}
+                            <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/25" />
                             <input
                               type="checkbox"
-                              className="checkbox checkbox-sm checkbox-primary absolute top-2 left-2"
+                              className={`checkbox checkbox-sm checkbox-primary absolute border-2 top-2 left-2 transition-opacity ${
+                                selectedKeys.has(key) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                              }`}
                               checked={selectedKeys.has(key)}
                               onChange={() => toggleSelected(doc.id, page.page_index)}
                               onClick={(e) => e.stopPropagation()}
                             />
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs btn-circle absolute top-2 right-2 bg-base-100/80 text-error opacity-0 transition-opacity group-hover:opacity-100"
+                              title="Delete page"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteTarget({
+                                  type: 'single',
+                                  documentId: doc.id,
+                                  pageIndex: page.page_index,
+                                });
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                           <div className="p-2 flex items-center justify-between text-xs">
                             <span>Page {page.page_index + 1}</span>
@@ -597,6 +680,35 @@ export default function ProjectWorkspacePage() {
             onPersist={persistPages}
             heightClassName="lg:h-[calc(100vh-124px)]"
           />
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {deleteTarget && (
+        <div className="modal modal-open z-50">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">
+              {deleteTarget.type === 'single' ? 'Delete Page' : 'Delete Selected Pages'}
+            </h3>
+            <p className="py-4 text-sm">
+              {deleteTarget.type === 'single'
+                ? 'This permanently deletes this page. This cannot be undone.'
+                : `This permanently deletes ${selectedKeys.size} selected page(s). This cannot be undone.`}
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button className="btn btn-error" onClick={confirmDelete} disabled={isDeleting}>
+                {isDeleting ? <span className="loading loading-spinner loading-sm" /> : 'Delete'}
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => setDeleteTarget(null)} />
         </div>
       )}
     </div>
