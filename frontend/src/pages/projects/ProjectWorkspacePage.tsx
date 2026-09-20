@@ -479,11 +479,12 @@ export default function ProjectWorkspacePage() {
 
   const header = (
     <div className="flex items-center justify-between px-6 h-12 border-b border-base-300 shrink-0">
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
         <button className="btn btn-ghost btn-sm gap-1.5" onClick={() => navigate('/projects')}>
           <ArrowLeft className="w-4 h-4" /> Projects
         </button>
-        <span className="font-semibold truncate">{project.name}</span>
+        <span className="text-base-content/40">/</span>
+        <span className="text-sm font-semibold truncate">{project.name}</span>
       </div>
       {validationList.length > 0 && (
         <div className="join">
