@@ -75,6 +75,7 @@ export default function ProjectWorkspacePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showReprocessConfirm, setShowReprocessConfirm] = useState(false);
 
   // Delete confirmation covers both a single hover-triggered card delete and
   // the toolbar's bulk "Delete Selected" action, sharing one modal/handler.
@@ -347,8 +348,36 @@ export default function ProjectWorkspacePage() {
   }
 
   // ── Process ────────────────────────────────────────────────────────────
+  // Counts how many currently-selected pages are already 'done' — used to
+  // decide whether processing needs an "are you sure" confirmation, since
+  // reprocessing overwrites their existing extracted data.
+  function countSelectedAlreadyProcessed(): number {
+    let count = 0;
+    documents.forEach((doc) => {
+      (doc.pages || []).forEach((page) => {
+        if (selectedKeys.has(pageKey(doc.id, page.page_index)) && page.status === 'done') {
+          count++;
+        }
+      });
+    });
+    return count;
+  }
+
+  // Entry point for the "Process" button — routes through a confirmation
+  // modal first if any selected page would be reprocessed (overwriting
+  // existing data), otherwise processes immediately like before.
+  function handleProcessClick() {
+    if (selectedKeys.size === 0 || isProcessing) return;
+    if (countSelectedAlreadyProcessed() > 0) {
+      setShowReprocessConfirm(true);
+    } else {
+      handleProcessSelected();
+    }
+  }
+
   async function handleProcessSelected() {
     if (selectedKeys.size === 0 || isProcessing) return;
+    setShowReprocessConfirm(false);
     setIsProcessing(true);
     setActionError(null);
 
@@ -360,8 +389,10 @@ export default function ProjectWorkspacePage() {
         byDoc.get(documentId)!.push(Number(pageIndexStr));
       });
 
+      // force:true is a no-op for pages that aren't already 'done', so it's
+      // safe to set unconditionally — it only matters for the reprocess case.
       const selections: PageSelection[] = Array.from(byDoc.entries()).map(
-        ([documentId, pageIndices]) => ({ documentId, pageIndices })
+        ([documentId, pageIndices]) => ({ documentId, pageIndices, force: true })
       );
 
       const { results } = await processPages(selections);
@@ -480,11 +511,11 @@ export default function ProjectWorkspacePage() {
   const header = (
     <div className="flex items-center justify-between px-6 h-12 border-b border-base-300 shrink-0">
       <div className="flex items-center gap-2 min-w-0">
-        <button className="btn btn-ghost btn-sm gap-1.0" onClick={() => navigate('/projects')}>
+        <button className="btn btn-ghost btn-sm gap-1.0 p-1.0" onClick={() => navigate('/projects')}>
           <ArrowLeft className="w-4 h-4" /> Projects
         </button>
-        <span className="text-base-content/40">/</span>
-        <span className="text-sm font-semibold truncate">{project.name}</span>
+        <span className="text-base-content/40 p-0">/</span>
+        <span className="text-xs font-semibold truncate">{project.name}</span>
       </div>
       {validationList.length > 0 && (
         <div className="join">
@@ -583,7 +614,7 @@ export default function ProjectWorkspacePage() {
                 <button
                   className="btn btn-sm btn-primary"
                   disabled={isProcessing || isDeleting}
-                  onClick={handleProcessSelected}
+                  onClick={handleProcessClick}
                 >
                   {isProcessing ? (
                     <span className="loading loading-spinner loading-sm" />
@@ -736,6 +767,35 @@ export default function ProjectWorkspacePage() {
             </div>
           </div>
           <div className="modal-backdrop" onClick={() => setDeleteTarget(null)} />
+        </div>
+      )}
+
+      {/* Reprocess confirmation */}
+      {showReprocessConfirm && (
+        <div className="modal modal-open z-50">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Reprocess Pages?</h3>
+            <p className="py-4 text-sm">
+              {`${countSelectedAlreadyProcessed()} of the ${selectedKeys.size} selected page(s) have already been processed. Reprocessing will overwrite their existing extracted data. This cannot be undone.`}
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setShowReprocessConfirm(false)}
+                disabled={isProcessing}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-warning"
+                onClick={handleProcessSelected}
+                disabled={isProcessing}
+              >
+                {isProcessing ? <span className="loading loading-spinner loading-sm" /> : 'Reprocess'}
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => setShowReprocessConfirm(false)} />
         </div>
       )}
     </div>

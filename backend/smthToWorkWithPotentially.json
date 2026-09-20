@@ -3,7 +3,7 @@
     "page_num": 1,
     "components": [
       {
-        "id": "title_0",
+        "id": "comp_0",
         "type": "TITLE",
         "indentation": 98,
         "y": 34,
@@ -13,57 +13,27 @@
         "confidence": 0.994
       },
       {
-        "id": "header_0",
-        "type": "HEADER",
+        "id": "comp_1",
+        "type": "BODY_TEXT",
         "indentation": 105,
         "y": 105,
         "boundingBoxes": {},
         "layer": 0,
-        "text": "LOWE'S HOME CENTER, LLC",
-        "confidence": 0.988
-      },
-      {
-        "id": "body_0",
-        "type": "BODY_TEXT",
-        "indentation": 100,
-        "y": 119,
-        "boundingBoxes": {},
-        "layer": 0,
-        "text": "1101 BEAVER CREEK COMMONS APEX, NC, 34343",
+        "text": "LOWE'S HOME CENTER, LLC 1101 BEAVER CREEK COMMONS APEX, NC, 34343 (888) 232 2323",
         "confidence": 0.99
       },
       {
-        "id": "body_1",
-        "type": "BODY_TEXT",
-        "indentation": 133,
-        "y": 148,
-        "boundingBoxes": {},
-        "layer": 0,
-        "text": "(888) 232 2323",
-        "confidence": 0.993
-      },
-      {
-        "id": "body_2",
-        "type": "BODY_TEXT",
-        "indentation": 145,
-        "y": 175,
-        "boundingBoxes": {},
-        "layer": 0,
-        "text": "- SALE -",
-        "confidence": 0.989
-      },
-      {
-        "id": "body_3",
+        "id": "comp_2",
         "type": "BODY_TEXT",
         "indentation": 27,
         "y": 192,
         "boundingBoxes": {},
         "layer": 0,
-        "text": "SALES#: S86614388236618 TRANS#: 11219309 05/11/2021",
-        "confidence": 0.974
+        "text": "- SALE - SALES#: S86614388236618 TRANS#: 11219309 05/11/2021",
+        "confidence": 0.98
       },
       {
-        "id": "table_row_0",
+        "id": "comp_3",
         "type": "TABLE_ROW",
         "indentation": 44,
         "y": 211,
@@ -89,7 +59,7 @@
                 "y": 235
               }
             ],
-            "confidence": 0.988
+            "confidence": 0.99
           },
           "col_1": {
             "text": "21.12",
@@ -112,19 +82,19 @@
                 "y": 235
               }
             ],
-            "confidence": 0.994
+            "confidence": 0.99
           }
         },
         "layer": 0,
         "text": "1-CU FT COMPOSTED BLACK K 21.12",
-        "confidence": 0.988,
+        "confidence": 0.99,
         "cells": [
           "1-CU FT COMPOSTED BLACK K",
           "21.12"
         ]
       },
       {
-        "id": "table_row_1",
+        "id": "comp_4",
         "type": "TABLE_ROW",
         "indentation": 67,
         "y": 235,
@@ -150,7 +120,7 @@
                 "y": 249
               }
             ],
-            "confidence": 0.995
+            "confidence": 0.99
           },
           "col_1": {
             "text": "",
@@ -178,15 +148,15 @@
         },
         "layer": 1,
         "text": "2 @ 10.56",
-        "confidence": 0.995,
+        "confidence": 0.99,
         "cells": [
           "2 @ 10.56",
           ""
         ],
-        "parentId": "table_row_0"
+        "parentId": "comp_3"
       },
       {
-        "id": "table_row_2",
+        "id": "comp_5",
         "type": "TABLE_ROW",
         "indentation": 43,
         "y": 249,
@@ -212,7 +182,7 @@
                 "y": 265
               }
             ],
-            "confidence": 0.984
+            "confidence": 0.99
           },
           "col_1": {
             "text": "69.69",
@@ -235,19 +205,19 @@
                 "y": 265
               }
             ],
-            "confidence": 0.998
+            "confidence": 0.99
           }
         },
         "layer": 0,
         "text": "2-CU FT COMPOSTED WHITE K 69.69",
-        "confidence": 0.984,
+        "confidence": 0.99,
         "cells": [
           "2-CU FT COMPOSTED WHITE K",
           "69.69"
         ]
       },
       {
-        "id": "table_row_3",
+        "id": "comp_6",
         "type": "TABLE_ROW",
         "indentation": 67,
         "y": 265,
@@ -273,7 +243,7 @@
                 "y": 278
               }
             ],
-            "confidence": 0.996
+            "confidence": 0.99
           },
           "col_1": {
             "text": "",
@@ -301,15 +271,15 @@
         },
         "layer": 1,
         "text": "3 @ 23.23",
-        "confidence": 0.996,
+        "confidence": 0.99,
         "cells": [
           "3 @ 23.23",
           ""
         ],
-        "parentId": "table_row_2"
+        "parentId": "comp_5"
       },
       {
-        "id": "table_row_4",
+        "id": "comp_7",
         "type": "TABLE_ROW",
         "indentation": 43,
         "y": 278,
@@ -335,7 +305,7 @@
                 "y": 295
               }
             ],
-            "confidence": 0.994
+            "confidence": 0.99
           },
           "col_1": {
             "text": "23.80",
@@ -358,19 +328,19 @@
                 "y": 295
               }
             ],
-            "confidence": 0.995
+            "confidence": 0.99
           }
         },
         "layer": 0,
         "text": "SOLID BRICKS 23.80",
-        "confidence": 0.994,
+        "confidence": 0.99,
         "cells": [
           "SOLID BRICKS",
           "23.80"
         ]
       },
       {
-        "id": "table_row_5",
+        "id": "comp_8",
         "type": "TABLE_ROW",
         "indentation": 68,
         "y": 295,
@@ -396,7 +366,7 @@
                 "y": 309
               }
             ],
-            "confidence": 0.998
+            "confidence": 0.99
           },
           "col_1": {
             "text": "",
@@ -424,15 +394,15 @@
         },
         "layer": 1,
         "text": "20 @ 1.19",
-        "confidence": 0.998,
+        "confidence": 0.99,
         "cells": [
           "20 @ 1.19",
           ""
         ],
-        "parentId": "table_row_4"
+        "parentId": "comp_7"
       },
       {
-        "id": "table_row_6",
+        "id": "comp_9",
         "type": "TABLE_ROW",
         "indentation": 43,
         "y": 309,
@@ -458,7 +428,7 @@
                 "y": 325
               }
             ],
-            "confidence": 0.992
+            "confidence": 0.99
           },
           "col_1": {
             "text": "89.00",
@@ -481,19 +451,19 @@
                 "y": 324
               }
             ],
-            "confidence": 0.996
+            "confidence": 0.99
           }
         },
         "layer": 0,
         "text": "ROSE PLANTS 89.00",
-        "confidence": 0.992,
+        "confidence": 0.99,
         "cells": [
           "ROSE PLANTS",
           "89.00"
         ]
       },
       {
-        "id": "table_row_7",
+        "id": "comp_10",
         "type": "TABLE_ROW",
         "indentation": 68,
         "y": 325,
@@ -519,7 +489,7 @@
                 "y": 346
               }
             ],
-            "confidence": 0.998
+            "confidence": 0.99
           },
           "col_1": {
             "text": "",
@@ -547,17 +517,17 @@
         },
         "layer": 1,
         "text": "10 @ 8.90",
-        "confidence": 0.998,
+        "confidence": 0.99,
         "cells": [
           "10 @ 8.90",
           ""
         ],
-        "parentId": "table_row_6"
+        "parentId": "comp_9"
       },
       {
-        "id": "table_row_8",
+        "id": "comp_11",
         "type": "TABLE_ROW",
-        "indentation": 30,
+        "indentation": 144,
         "y": 346,
         "boundingBoxes": {
           "col_0": {
@@ -581,7 +551,7 @@
                 "y": 370
               }
             ],
-            "confidence": 0.992
+            "confidence": 0.99
           },
           "col_1": {
             "text": "203.61",
@@ -604,21 +574,21 @@
                 "y": 369
               }
             ],
-            "confidence": 0.995
+            "confidence": 0.99
           }
         },
         "layer": 0,
         "text": "SUBTOTAL : 203.61",
-        "confidence": 0.992,
+        "confidence": 0.99,
         "cells": [
           "SUBTOTAL :",
           "203.61"
         ]
       },
       {
-        "id": "table_row_9",
+        "id": "comp_12",
         "type": "TABLE_ROW",
-        "indentation": 30,
+        "indentation": 108,
         "y": 370,
         "boundingBoxes": {
           "col_0": {
@@ -642,7 +612,7 @@
                 "y": 386
               }
             ],
-            "confidence": 0.992
+            "confidence": 0.98
           },
           "col_1": {
             "text": "10.23",
@@ -665,21 +635,21 @@
                 "y": 385
               }
             ],
-            "confidence": 0.997
+            "confidence": 0.99
           }
         },
         "layer": 0,
         "text": "SALES TAX 7.8% : 10.23",
-        "confidence": 0.992,
+        "confidence": 0.98,
         "cells": [
           "SALES TAX 7.8% :",
           "10.23"
         ]
       },
       {
-        "id": "table_row_10",
+        "id": "comp_13",
         "type": "TABLE_ROW",
-        "indentation": 30,
+        "indentation": 78,
         "y": 386,
         "boundingBoxes": {
           "col_0": {
@@ -703,7 +673,7 @@
                 "y": 401
               }
             ],
-            "confidence": 0.993
+            "confidence": 0.99
           },
           "col_1": {
             "text": "213.84",
@@ -726,21 +696,21 @@
                 "y": 400
               }
             ],
-            "confidence": 0.997
+            "confidence": 0.99
           }
         },
         "layer": 0,
         "text": "INVOICE 19305 TOTAL : 213.84",
-        "confidence": 0.993,
+        "confidence": 0.99,
         "cells": [
           "INVOICE 19305 TOTAL :",
           "213.84"
         ]
       },
       {
-        "id": "table_row_11",
+        "id": "comp_14",
         "type": "TABLE_ROW",
-        "indentation": 30,
+        "indentation": 162,
         "y": 401,
         "boundingBoxes": {
           "col_0": {
@@ -764,7 +734,7 @@
                 "y": 423
               }
             ],
-            "confidence": 0.984
+            "confidence": 0.98
           },
           "col_1": {
             "text": "213.84",
@@ -787,89 +757,89 @@
                 "y": 422
               }
             ],
-            "confidence": 0.997
+            "confidence": 0.99
           }
         },
         "layer": 0,
         "text": "VISA : 213.84",
-        "confidence": 0.984,
+        "confidence": 0.98,
         "cells": [
           "VISA :",
           "213.84"
         ]
       },
       {
-        "id": "body_4",
+        "id": "comp_15",
         "type": "BODY_TEXT",
         "indentation": 35,
         "y": 433,
         "boundingBoxes": {},
         "layer": 0,
         "text": "VISA: XXXXXXXXXXXX AMOUNT : 213.84 AUTHCD: J7AEOS",
-        "confidence": 0.98
+        "confidence": 0.96
       },
       {
-        "id": "body_5",
+        "id": "comp_16",
         "type": "BODY_TEXT",
         "indentation": 45,
         "y": 449,
         "boundingBoxes": {},
         "layer": 0,
         "text": "CHIP REFID:927639501767 05/11/2021 22:31:57",
-        "confidence": 0.988
+        "confidence": 0.98
       },
       {
-        "id": "body_6",
+        "id": "comp_17",
         "type": "BODY_TEXT",
         "indentation": 81,
         "y": 465,
         "boundingBoxes": {},
         "layer": 0,
         "text": "APL:CHASE VISA TVR: 186974119814",
-        "confidence": 0.979
+        "confidence": 0.99
       },
       {
-        "id": "body_7",
+        "id": "comp_18",
         "type": "BODY_TEXT",
         "indentation": 87,
         "y": 481,
         "boundingBoxes": {},
         "layer": 0,
         "text": "AID: 3470942513772519 TSI:HU9A",
-        "confidence": 0.986
+        "confidence": 0.98
       },
       {
-        "id": "body_8",
+        "id": "comp_19",
         "type": "BODY_TEXT",
         "indentation": 51,
         "y": 497,
         "boundingBoxes": {},
         "layer": 0,
         "text": "STORE:4520 TERMINAL:1 05/11/2021 22:32:07",
-        "confidence": 0.973
+        "confidence": 0.97
       },
       {
-        "id": "body_9",
+        "id": "comp_20",
         "type": "BODY_TEXT",
         "indentation": 65,
         "y": 514,
         "boundingBoxes": {},
         "layer": 0,
         "text": "# OF ITEMS PURCHASED : 35",
-        "confidence": 0.989
+        "confidence": 0.98
       },
       {
-        "id": "body_10",
+        "id": "comp_21",
         "type": "BODY_TEXT",
         "indentation": 32,
         "y": 533,
         "boundingBoxes": {},
         "layer": 0,
         "text": "EXCLUDES FEES, SERVICES AND SPECIAL ORDER ITEMS",
-        "confidence": 0.993
+        "confidence": 0.99
       },
       {
-        "id": "body_11",
+        "id": "comp_22",
         "type": "BODY_TEXT",
         "indentation": 84,
         "y": 610,
@@ -879,34 +849,34 @@
         "confidence": 0.99
       },
       {
-        "id": "body_12",
+        "id": "comp_23",
         "type": "BODY_TEXT",
         "indentation": 72,
         "y": 624,
         "boundingBoxes": {},
         "layer": 0,
         "text": "SEE REVERSE SIDE FOR RETURN POLICY",
-        "confidence": 0.993
+        "confidence": 0.99
       },
       {
-        "id": "body_13",
+        "id": "comp_24",
         "type": "BODY_TEXT",
         "indentation": 90,
         "y": 638,
         "boundingBoxes": {},
         "layer": 0,
         "text": "STORE MANAGER BRIAN BRANNOCK",
-        "confidence": 0.994
+        "confidence": 0.99
       },
       {
-        "id": "body_14",
+        "id": "comp_25",
         "type": "BODY_TEXT",
         "indentation": 51,
         "y": 671,
         "boundingBoxes": {},
         "layer": 0,
         "text": "STORE:4520 TERMINAL:1 05/11/2021 22:32:07",
-        "confidence": 0.969
+        "confidence": 0.97
       }
     ]
   }
