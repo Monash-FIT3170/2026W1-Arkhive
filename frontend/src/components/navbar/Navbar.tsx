@@ -11,8 +11,8 @@ import {
   FolderKanban,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getMaxStep } from '../../../../services/stepGuard';
-import { useAuth } from '../../../../context/AuthContext';
+import { getMaxStep } from '../../services/stepGuard';
+import { useAuth } from '../../context/AuthContext';
 
 export const Navbar = () => {
   const navigate = useNavigate();

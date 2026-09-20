@@ -1,5 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {
+  Columns2,
+  FileText,
+  LayoutGrid,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  RotateCcw,
+} from 'lucide-react';
 import DocumentPanel from './document/DocumentPanel';
+import DocumentPreviewPiP from './document/DocumentPreviewPiP';
 import ExtractedDataPanel from './extracted-data/ExtractedDataPanel';
 import ChatPanel from './chat/ChatPanel';
 import type { OCRComponent } from '../../../models/OCRComponent';
@@ -11,6 +21,13 @@ import { useChatSuggestionFlow } from '../../../hooks/useChat';
 import { useRowIndent } from '../../../hooks/useRowIndent';
 import { useTableEditor } from '../../../hooks/useTableEditor';
 import { useReviewQueue } from '../../../hooks/useReviewQueue';
+import {
+  groupPagesByFiles,
+  getGlobalIndex,
+  getFileAndLocalPage,
+  calculateAverageConfidence,
+  type FileMetadataInput,
+} from '../../../utils/fileGrouping';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -53,6 +70,8 @@ export interface ValidationWorkspaceProps {
    * re-adopted into internal state.
    */
   syncKey?: string;
+  /** Optional file metadata describing document boundaries and filenames */
+  fileMetadata?: FileMetadataInput[];
 }
 
 // Everything below "how do we get pages in and where do they get saved" is
@@ -67,9 +86,13 @@ function ValidationWorkspace({
   heightClassName = 'lg:h-[calc(100vh-72px)]',
   pageKeys,
   syncKey,
+  fileMetadata,
 }: ValidationWorkspaceProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [splitPercent, setSplitPercent] = useState(50);
+  const [viewMode, setViewMode] = useState<'split' | 'document' | 'table'>('split');
+  const [isPiPOpen, setIsPiPOpen] = useState(true);
+
   const [extractedPages, setExtractedPages] = useState<ExtractedPage[]>(pages);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [prevSyncKey, setPrevSyncKey] = useState(syncKey);
@@ -103,6 +126,8 @@ function ValidationWorkspace({
 
   useEffect(() => {
     currentPageIndexRef.current = currentPageIndex;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEditedCells(new Set());
   }, [currentPageIndex]);
 
   const handlePagesChange = useCallback((action: React.SetStateAction<ExtractedPage[]>) => {
@@ -120,6 +145,42 @@ function ValidationWorkspace({
       return next;
     });
   }, []);
+
+  // ── File Grouping & Scoped Navigation ────────────────────────────────────
+  const fileGroups = useMemo(
+    () => groupPagesByFiles(extractedPages, ocrPages, imageUrls, pageKeys, fileMetadata),
+    [extractedPages, ocrPages, imageUrls, pageKeys, fileMetadata]
+  );
+
+  const { fileIndex: activeFileIndex, pageIndexInFile: activePageIndexInFile } = useMemo(
+    () => getFileAndLocalPage(fileGroups, currentPageIndex),
+    [fileGroups, currentPageIndex]
+  );
+
+  const currentFileGroup = fileGroups[activeFileIndex] ?? fileGroups[0];
+  const totalPagesInFile = currentFileGroup?.pages?.length ?? 1;
+
+  const handleSelectFile = useCallback(
+    (newFileIndex: number) => {
+      if (newFileIndex < 0 || newFileIndex >= fileGroups.length) return;
+      const newGlobal = getGlobalIndex(fileGroups, newFileIndex, 0);
+      handlePageIndexChange(newGlobal);
+    },
+    [fileGroups, handlePageIndexChange]
+  );
+
+  const handleSelectPageInFile = useCallback(
+    (newLocalPage: number) => {
+      if (newLocalPage < 0 || newLocalPage >= totalPagesInFile) return;
+      const newGlobal = getGlobalIndex(fileGroups, activeFileIndex, newLocalPage);
+      handlePageIndexChange(newGlobal);
+    },
+    [fileGroups, activeFileIndex, totalPagesInFile, handlePageIndexChange]
+  );
+
+  // Confidence calculation for top toolbar
+  const averageConfidence = calculateAverageConfidence(ocrData);
+  const confidencePercent = Math.round(averageConfidence * 100);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
@@ -173,15 +234,13 @@ function ValidationWorkspace({
     pageKeys,
   });
 
-  //Resizing Functions
-  //Set dragging to be true
+  // Resizing Functions for Split View
   const onMouseDown = useCallback(() => {
     isDragging.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }, []);
 
-  //Given mouse even that is moving, we calculate the presentage of mouse relative to container size
   const onMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging.current || !containerRef.current) return;
 
@@ -193,7 +252,6 @@ function ValidationWorkspace({
     setSplitPercent(Math.min(80, Math.max(20, percent)));
   }, []);
 
-  //On mouse up, we set dragging to be false
   const onMouseUp = useCallback(() => {
     isDragging.current = false;
     document.body.style.cursor = '';
@@ -251,7 +309,11 @@ function ValidationWorkspace({
       pushUndo,
       onCellEdited: (fieldId) => {
         setEditedCells((prev) => new Set(prev).add(fieldId));
-        setFlaggedIssues((prev) => prev.filter((issue) => issue.fieldId !== fieldId));
+        setFlaggedIssues((prev) =>
+          prev.filter(
+            (issue) => !(issue.fieldId === fieldId && issue.pageIndex === currentPageIndexRef.current)
+          )
+        );
       },
     });
 
@@ -263,67 +325,329 @@ function ValidationWorkspace({
     );
   }
 
+  // Acknowledgment: this code was generated by Google Gemini
   return (
-    <>
+    <div className={`flex flex-col w-full ${heightClassName} overflow-hidden bg-base-100`}>
+      {/* ── TOP UNIFIED WORKSPACE BAR ── */}
+      <div className="bg-base-200 border-b border-base-300 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        {/* Left: File Navigator + Scoped Page Navigator */}
+        <div className="flex items-center gap-3">
+          {/* File Navigator Dropdown & Flick Buttons */}
+          <div className="flex items-center bg-base-100 rounded-xl border border-base-300 p-0.5 shadow-sm">
+            <button
+              onClick={() => handleSelectFile(activeFileIndex - 1)}
+              disabled={activeFileIndex <= 0}
+              className="btn btn-ghost btn-xs btn-square disabled:opacity-30 h-7 w-7 min-h-0"
+              title="Previous File"
+              aria-label="Previous File"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <div className="dropdown">
+              <label
+                tabIndex={0}
+                className="btn btn-ghost btn-xs gap-1.5 font-medium normal-case h-7 min-h-0 px-2 cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span
+                  data-testid="active-file-name"
+                  className="max-w-[160px] sm:max-w-[240px] truncate text-xs"
+                  title={currentFileGroup?.fileName || 'Document'}
+                >
+                  {currentFileGroup?.fileName || 'Document'}
+                </span>
+                <span className="text-[10px] text-base-content/60 font-normal shrink-0">
+                  ({activeFileIndex + 1}/{fileGroups.length})
+                </span>
+                <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
+              </label>
+              <ul
+                tabIndex={0}
+                className="dropdown-content menu p-2 shadow-xl bg-base-100 rounded-box w-80 max-w-[calc(100vw-2rem)] border border-base-300 z-30 overflow-hidden"
+              >
+                <li className="menu-title text-xs font-semibold px-2 py-1 text-base-content/60">
+                  Uploaded Files
+                </li>
+                {fileGroups.map((fg, idx) => (
+                  <li key={fg.fileId || idx}>
+                    <button
+                      type="button"
+                      className={`flex items-center justify-between gap-3 px-2.5 py-2 text-xs rounded-lg transition-colors w-full min-w-0 ${
+                        idx === activeFileIndex
+                          ? 'active font-semibold bg-primary text-primary-content'
+                          : 'hover:bg-base-200'
+                      }`}
+                      onClick={() => {
+                        handleSelectFile(idx);
+                        (document.activeElement as HTMLElement)?.blur();
+                      }}
+                    >
+                      <span className="flex items-center gap-2 min-w-0 flex-1">
+                        <FileText
+                          className={`w-3.5 h-3.5 shrink-0 ${
+                            idx === activeFileIndex ? 'text-primary-content' : 'text-primary'
+                          }`}
+                        />
+                        <span className="truncate text-left font-normal" title={fg.fileName}>
+                          {fg.fileName}
+                        </span>
+                      </span>
+                      <span
+                        className={`badge badge-xs shrink-0 font-medium ${
+                          idx === activeFileIndex
+                            ? 'badge-ghost bg-primary-content/20 text-primary-content border-none'
+                            : 'badge-ghost text-base-content/70'
+                        }`}
+                      >
+                        {fg.pages.length} {fg.pages.length === 1 ? 'page' : 'pages'}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <button
+              onClick={() => handleSelectFile(activeFileIndex + 1)}
+              disabled={activeFileIndex >= fileGroups.length - 1}
+              className="btn btn-ghost btn-xs btn-square disabled:opacity-30 h-7 w-7 min-h-0"
+              title="Next File"
+              aria-label="Next File"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Scoped Page Navigation within current file */}
+          <div className="flex items-center gap-1 bg-base-100 rounded-xl border border-base-300 px-2 py-0.5 shadow-sm text-xs h-8">
+            <span className="text-base-content/60 font-medium mr-1 text-[11px]">Page</span>
+            {totalPagesInFile > 1 ? (
+              <>
+                <button
+                  onClick={() => handleSelectPageInFile(activePageIndexInFile - 1)}
+                  disabled={activePageIndexInFile <= 0}
+                  className="btn btn-ghost btn-xs btn-square h-6 w-6 min-h-0 disabled:opacity-30"
+                  title="Previous Page"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {totalPagesInFile <= 8 ? (
+                    Array.from({ length: totalPagesInFile }).map((_, pIdx) => (
+                      <button
+                        key={pIdx}
+                        onClick={() => handleSelectPageInFile(pIdx)}
+                        className={`btn btn-xs h-6 min-h-0 px-2 rounded-lg text-xs transition-all ${
+                          pIdx === activePageIndexInFile
+                            ? 'btn-primary font-bold shadow-xs'
+                            : 'btn-ghost hover:bg-base-200'
+                        }`}
+                      >
+                        {pIdx + 1}
+                      </button>
+                    ))
+                  ) : (
+                    <span className="px-1.5 font-medium">
+                      {activePageIndexInFile + 1} / {totalPagesInFile}
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => handleSelectPageInFile(activePageIndexInFile + 1)}
+                  disabled={activePageIndexInFile >= totalPagesInFile - 1}
+                  className="btn btn-ghost btn-xs btn-square h-6 w-6 min-h-0 disabled:opacity-30"
+                  title="Next Page"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </>
+            ) : (
+              <span className="font-semibold text-xs px-1 text-base-content/80">
+                1 of 1
+              </span>
+            )}
+          </div>
+
+          {/* Average Confidence Badge */}
+          <div
+            className="hidden sm:flex items-center gap-1.5 text-xs text-base-content/70"
+            title="Overall OCR Confidence for this document"
+          >
+            <span>Confidence:</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                confidencePercent >= 85
+                  ? 'border-success text-success bg-base-100'
+                  : confidencePercent >= 70
+                    ? 'border-warning text-warning bg-base-100'
+                    : 'border-error text-error bg-base-100'
+              }`}
+            >
+              {confidencePercent}%
+            </span>
+          </div>
+        </div>
+
+        {/* Right: View Mode Switcher + Global Actions */}
+        <div className="flex items-center gap-2">
+          {/* View Mode Toggle: Split / Document / Table */}
+          <div className="join bg-base-100 border border-base-300 rounded-xl p-0.5 shadow-sm">
+            <button
+              onClick={() => setViewMode('split')}
+              className={`btn btn-xs join-item rounded-lg gap-1 h-7 min-h-0 ${
+                viewMode === 'split' ? 'btn-primary shadow-xs' : 'btn-ghost'
+              }`}
+              title="Side-by-side Split View"
+            >
+              <Columns2 className="w-3.5 h-3.5" />
+              <span className="hidden md:inline text-xs">Split</span>
+            </button>
+            <button
+              onClick={() => setViewMode('document')}
+              className={`btn btn-xs join-item rounded-lg gap-1 h-7 min-h-0 ${
+                viewMode === 'document' ? 'btn-primary shadow-xs' : 'btn-ghost'
+              }`}
+              title="Document Full Focus View"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span className="hidden md:inline text-xs">Document</span>
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`btn btn-xs join-item rounded-lg gap-1 h-7 min-h-0 ${
+                viewMode === 'table' ? 'btn-primary shadow-xs' : 'btn-ghost'
+              }`}
+              title="Table Full Focus View"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden md:inline text-xs">Table</span>
+            </button>
+          </div>
+
+          {/* Table Mode: Document Preview Toggle */}
+          {viewMode === 'table' && (
+            <button
+              onClick={() => setIsPiPOpen(!isPiPOpen)}
+              className={`btn btn-xs rounded-lg gap-1.5 h-7 min-h-0 text-xs ${
+                isPiPOpen ? 'btn-primary shadow-xs' : 'btn-outline'
+              }`}
+              title={
+                isPiPOpen
+                  ? 'Hide Picture-in-Picture document preview'
+                  : 'Show Picture-in-Picture document preview'
+              }
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">
+                {isPiPOpen ? 'Hide Preview' : 'Document Preview'}
+              </span>
+            </button>
+          )}
+
+          {/* Quick Undo Button */}
+          <button
+            onClick={handleUndo}
+            className="btn btn-ghost btn-xs btn-square rounded-xl h-7 w-7 min-h-0"
+            title="Undo last change (⌘Z / Ctrl+Z)"
+            aria-label="Undo"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* ── WORKSPACE BODY ── */}
       <div
         ref={containerRef}
-        className={`flex flex-col lg:flex-row w-full p-3 gap-3 h-auto ${heightClassName} lg:overflow-hidden`}
+        className="flex flex-col lg:flex-row w-full p-3 gap-3 flex-1 min-h-0 relative overflow-hidden"
       >
-        <div
-          className="w-full h-[50vh] lg:h-full"
-          style={isLarge ? { width: `${splitPercent}%` } : { width: '100%' }}
-        >
-          <DocumentPanel
-            hoveredOverlayIds={hoveredDocumentOverlayIds}
-            documentImageUrl={documentImageURL}
-            ocrData={ocrData}
-            imageUrls={imageUrls}
-            currentPageIndex={currentPageIndex}
-            onPageChange={handlePageIndexChange}
-          />
-        </div>
+        {/* Document Panel (Rendered in 'split' or 'document' mode) */}
+        {(viewMode === 'split' || viewMode === 'document') && (
+          <div
+            className="h-full transition-all duration-200"
+            style={
+              viewMode === 'document'
+                ? { width: '100%' }
+                : isLarge
+                  ? { width: `${splitPercent}%` }
+                  : { width: '100%' }
+            }
+          >
+            <DocumentPanel
+              hoveredOverlayIds={hoveredDocumentOverlayIds}
+              documentImageUrl={documentImageURL}
+              ocrData={ocrData}
+              imageUrls={imageUrls}
+              currentPageIndex={currentPageIndex}
+              onPageChange={handlePageIndexChange}
+              hideThumbnails={true}
+            />
+          </div>
+        )}
 
-        <div
-          onMouseDown={onMouseDown}
-          onDoubleClick={() => setSplitPercent(50)}
-          className="hidden lg:flex items-center justify-center w-2 mx-1 cursor-col-resize flex-shrink-0 group"
-        >
-          <div className="w-1 h-12 rounded-full bg-gray-300 group-hover:bg-blue-400 transition-colors duration-150" />
-        </div>
+        {/* Resizer divider (Only in 'split' mode on large screens) */}
+        {viewMode === 'split' && (
+          <div
+            onMouseDown={onMouseDown}
+            onDoubleClick={() => setSplitPercent(50)}
+            className="hidden lg:flex items-center justify-center w-2 mx-1 cursor-col-resize flex-shrink-0 group"
+            title="Drag to resize panels (Double-click to reset 50/50)"
+          >
+            <div className="w-1 h-12 rounded-full bg-gray-300 group-hover:bg-blue-400 transition-colors duration-150" />
+          </div>
+        )}
 
-        <div
-          className="w-full h-[50vh] lg:h-full"
-          style={
-            isLarge
-              ? {
-                  width: `${100 - splitPercent}%`,
-                }
-              : { width: '100%' }
-          }
-        >
-          <ExtractedDataPanel
-            onUndoLast={handleUndo}
-            key={tableKey}
-            isEditMode={isEditMode}
-            onEditModeChange={setIsEditMode}
-            editedCells={editedCells}
-            onHover={(id) => {
-              if (isChatOpen && chatActiveTab === 'review') return;
-              handleHover(id);
-            }}
-            extractedData={documentContext}
-            hoveredOverlayIds={hoveredTableFieldIds}
-            onRowIndent={handleRowIndent}
-            onRowOutdent={handleRowOutdent}
-            onCellEdit={editCell}
-            onRowAdd={addRow}
-            onRowDelete={deleteRow}
-            onColumnAdd={addColumn}
-            onColumnDelete={deleteColumn}
-            onRowMove={moveRow}
-            onColumnReorder={reorderColumns}
-          />
-        </div>
+        {/* Extracted Data Table Panel (Rendered in 'split' or 'table' mode) */}
+        {(viewMode === 'split' || viewMode === 'table') && (
+          <div
+            className="h-full relative transition-all duration-200 flex-1 min-w-0"
+            style={
+              viewMode === 'table'
+                ? { width: '100%' }
+                : isLarge
+                  ? { width: `${100 - splitPercent}%` }
+                  : { width: '100%' }
+            }
+          >
+            <ExtractedDataPanel
+              onUndoLast={handleUndo}
+              key={`${tableKey}-${currentPageIndex}`}
+              isEditMode={isEditMode}
+              onEditModeChange={setIsEditMode}
+              editedCells={editedCells}
+              onHover={(id) => {
+                if (isChatOpen && chatActiveTab === 'review') return;
+                handleHover(id);
+              }}
+              extractedData={documentContext}
+              hoveredOverlayIds={hoveredTableFieldIds}
+              onRowIndent={handleRowIndent}
+              onRowOutdent={handleRowOutdent}
+              onCellEdit={editCell}
+              onRowAdd={addRow}
+              onRowDelete={deleteRow}
+              onColumnAdd={addColumn}
+              onColumnDelete={deleteColumn}
+              onRowMove={moveRow}
+              onColumnReorder={reorderColumns}
+            />
+
+            {/* Picture-in-Picture (PiP) mini document preview when in Table Focus Mode */}
+            {viewMode === 'table' && isPiPOpen && (
+              <DocumentPreviewPiP
+                documentImageUrl={documentImageURL}
+                ocrData={ocrData}
+                currentPageIndex={currentPageIndex}
+                hoveredOverlayIds={hoveredDocumentOverlayIds}
+                onClose={() => setIsPiPOpen(false)}
+                containerRef={containerRef}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Floating Chat Modal / Review Panel */}
@@ -349,7 +673,7 @@ function ValidationWorkspace({
         onResolveIssues={handleResolveIssues}
         history={history}
       />
-    </>
+    </div>
   );
 }
 

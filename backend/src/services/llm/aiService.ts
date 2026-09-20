@@ -3,7 +3,7 @@ import type { Message, ReviewField } from '../../models/message';
 import dotenv from 'dotenv';
 import { ExtractedData } from '../../models/TableData';
 import { buildFocusedContext } from './utils/contextMaker';
-import { maskToRegex, profileColumnLocally } from './utils/formatUtils';
+import { profileColumnLocally } from './utils/formatUtils';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -204,18 +204,23 @@ const formatDetectionSchema: Schema = {
         type: SchemaType.OBJECT,
         properties: {
           column: { type: SchemaType.STRING },
-          structuralMask: {
-            type: SchemaType.STRING,
-            description:
-              "Template string: '9' for digit, 'A' for uppercase, 'a' for lowercase, 'X' for alphanumeric. Punctuation as-is (e.g. 'AAA-99-999', '$9,999.99').",
-          },
-          isVariableLength: {
+          isFreeText: {
             type: SchemaType.BOOLEAN,
             description:
-              'True if values have dynamic length (e.g., quantities, standard floats), False for fixed-length codes.',
+              'True if the column is arbitrary text (names, addresses, comments, descriptions) with no strict structural rules.',
+          },
+          reasoning: {
+            type: SchemaType.STRING,
+            description:
+              'Deduce the intended structural format. Explicitly note any OCR errors or inconsistencies in the samples that your strict regex will intentionally reject.',
+          },
+          regex: {
+            type: SchemaType.STRING,
+            description:
+              "A STRICT Javascript regex matching ONLY the perfect intended format. Do not allow OCR noise. Example: '^([A-Z]{2,3})-\\d{4}$'",
           },
         },
-        required: ['column', 'structuralMask', 'isVariableLength'],
+        required: ['column', 'isFreeText', 'reasoning', 'regex'],
       },
     },
   },
@@ -437,21 +442,32 @@ export default {
     const formattedSample = JSON.stringify(unresolvedSamples, null, 2);
     console.log(formattedSample);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.5-flash',
-      systemInstruction: `You are an AI assistant validating OCR tables.
-        Look at each column's sample values and identify the dominant structural character skeleton.
+      model: 'gemini-3.5-flash-lite',
+      systemInstruction: `You are an AI data architect building validation rules for an OCR system.
+        CRITICAL CONTEXT: You are evaluating a small, random sample of a larger dataset. Defend against "Small Sample Bias."
 
-        Return a structuralMask using these placeholders:
-        - '9' = Digit
-        - 'A' = Uppercase letter
-        - 'a' = Lowercase letter
-        - 'X' = Any letter or digit
-        - Punctuation, dashes, spaces stay as literal characters.
+        CRITICAL PRINCIPLES:
+        1. AGGRESSIVE TYPE COERCION (Defeating Noise Bias): If the column name implies a pure primitive type (e.g., counters, metrics, latencies, amounts, indices), write a strict numeric/primitive regex (e.g., '^\\d+$' or '^\\d+(\\.\\d+)?$'). Ignore appended text or OCR bleed, even if present across multiple sample rows.
+        2. BROAD IDENTIFIERS (Defeating Uniformity Bias): For generic codes, reference IDs, or serial tags, do not overfit to the exact length or punctuation seen in a small sample. Use broad classes like '^[\\w\\s.,/-]+$' to allow natural variance in unseen rows.
+        3. SEMI-STRUCTURED / HYBRID DATA: If entries contain a strict prefix or state tag followed by free text, enforce the prefix strictly but use '.*' for the remainder of the string.
+        4. STRICT REGULATED FORMATS: Reserve rigid, exact-character regexes for standardized formats (e.g., dates, ISO codes, exact fixed-length checksums).
+        5. FREE TEXT: If a column contains natural language, arbitrary names, or notes, set isFreeText to true so it evaluates to '.*'.
 
-        Ignore occasional OCR noise/errors and find the dominant underlying format.
-        Set isVariableLength to true if the column represents arbitrary numbers or free text.
+        EXAMPLES:
+        Column: "Telemetry_Ping_ms"
+        Samples: ["45", "42", "48 BAD_SIGNAL", "41"]
+        Reasoning: "The column name specifies a numeric metric in milliseconds. 'BAD_SIGNAL' is appended OCR/log noise. The true target format is strictly digits."
+        Regex: "^\\d+$"
 
-        Skip free text columns (names, addresses, comments).
+        Column: "Asset_Tag"
+        Samples: ["AST-101", "AST-102", "AST-103"]
+        Reasoning: "Even though this small sample appears uniform, generic asset identifiers vary in length and separators across systems. I will use a broad identifier pattern."
+        Regex: "^[\\w\\s.,/-]+$"
+
+        Column: "System_Log_Level"
+        Samples: ["[CRITICAL] Server CPU Overheat", "[NORMAL] Disk usage at 40%"]
+        Reasoning: "Hybrid data: strict log bracket tag followed by free-form narrative text. Enforce the bracketed tag strictly, then allow '.*' for the rest."
+        Regex: "^\\[(CRITICAL|NORMAL|WARNING)\\]\\s+.*$"
 
         Sample data:
         ${formattedSample}`,
@@ -467,12 +483,12 @@ export default {
         'Identify structural format masks for the provided columns.'
       );
       const parsed = JSON.parse(result.response.text());
-
+      console.log(parsed);
       if (parsed.formats && Array.isArray(parsed.formats)) {
         parsed.formats.forEach((f: any) => {
-          if (f.column && f.structuralMask) {
+          if (f.column) {
             // Convert Gemini mask to safe JS regex locally
-            finalRegexMap[f.column] = maskToRegex(f.structuralMask, Boolean(f.isVariableLength));
+            finalRegexMap[f.column] = f.isFreeText ? '.*' : f.regex;
           }
         });
       }

@@ -2,6 +2,15 @@ import { useCallback, useState, type RefObject } from 'react';
 import type { ExtractedPage } from '../models/TableData';
 import { getOverlayIdForField } from '../utils/tableOperations';
 
+// Shallow-equal check for string[]. Lets callers pass a freshly-created array
+// each render/call without forcing a state update (and downstream re-render)
+// when the actual contents haven't changed.
+function sameIds(a: string[], b: string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every((id, i) => id === b[i]);
+}
+
 interface UseFieldHoverNavigation {
   // Ref to the currently-displayed page index, read synchronously so
   // handleSlideChange never acts on a stale value.
@@ -28,9 +37,14 @@ export function useFieldHover(
   // call time or the hook's defaultData if none is given.
   const handleHover = useCallback(
     (fieldId: string | null, data: ExtractedPage | null | undefined = defaultData) => {
-      setHoveredTableFieldIds(fieldId ? [fieldId] : []);
+      const nextFieldIds = fieldId ? [fieldId] : [];
+      setHoveredTableFieldIds((prev) => (sameIds(prev, nextFieldIds) ? prev : nextFieldIds));
+
       const overlayId = fieldId ? getOverlayIdForField(data, fieldId) : null;
-      setHoveredDocumentOverlayIds(overlayId ? [overlayId] : []);
+      const nextOverlayIds = overlayId ? [overlayId] : [];
+      setHoveredDocumentOverlayIds((prev) =>
+        sameIds(prev, nextOverlayIds) ? prev : nextOverlayIds
+      );
     },
     [defaultData]
   );
@@ -39,18 +53,19 @@ export function useFieldHover(
   // possibly on a page other than the currently-displayed one).
   const handleMultiHover = useCallback(
     (fieldIds: string[], data: ExtractedPage | null | undefined = defaultData) => {
-      setHoveredTableFieldIds(fieldIds);
+      setHoveredTableFieldIds((prev) => (sameIds(prev, fieldIds) ? prev : fieldIds));
+
       const overlayIds = fieldIds
         .map((id) => getOverlayIdForField(data, id))
         .filter((id): id is string => Boolean(id));
-      setHoveredDocumentOverlayIds(overlayIds);
+      setHoveredDocumentOverlayIds((prev) => (sameIds(prev, overlayIds) ? prev : overlayIds));
     },
     [defaultData]
   );
 
   const clearHover = useCallback(() => {
-    setHoveredTableFieldIds([]);
-    setHoveredDocumentOverlayIds([]);
+    setHoveredTableFieldIds((prev) => (prev.length === 0 ? prev : []));
+    setHoveredDocumentOverlayIds((prev) => (prev.length === 0 ? prev : []));
   }, []);
 
   // Carousel-driven navigation: a slide reports which fields it highlights

@@ -1,13 +1,13 @@
 // backend/src/integration/upload.integration.test.ts
-import { describe, it, expect, vi, afterAll } from 'vitest';
+import { describe, it, expect, vi, afterAll, beforeAll } from 'vitest';
 import request from 'supertest';
 import fs from 'fs';
 import path from 'path';
 import app from '../app';
 
 // The one real external boundary this flow hits.
-vi.mock('../services/ocr/utils/utils_table_extraction_new.js', () => ({
-  analyse_result: vi.fn().mockResolvedValue([
+vi.mock('../services/ocr/mockOcrFixture.js', () => ({
+  getMockOcrResult: vi.fn().mockReturnValue([
     { id: 'comp_1', text: 'Invoice total: $42.00', confidence: 0.97 },
   ]),
 }));
@@ -20,6 +20,18 @@ vi.mock('@google-cloud/vision', () => ({
 
 describe('upload -> process integration', () => {
   const agent = request.agent(app); // keeps the session cookie across requests
+
+  const originalOcrMode = process.env.OCR_MODE;
+  beforeAll(() => {
+    process.env.OCR_MODE = 'mock';
+  });
+  afterAll(() => {
+    if (originalOcrMode) {
+      process.env.OCR_MODE = originalOcrMode;
+    } else {
+      delete process.env.OCR_MODE;
+    }
+  });
 
   it('uploads a page, processes it, and persists the result to the real session', async () => {
     const documentId = 'itest-doc-1';

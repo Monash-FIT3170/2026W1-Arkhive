@@ -9,7 +9,6 @@ import path from 'path';
 declare module 'express-session' {
   interface SessionData {
     extraction?: {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ocrData: any[];
       processedImages?: string[];
       createdAt: number;
