@@ -132,7 +132,7 @@ export const Navbar = () => {
               <button
                 type="button"
                 onClick={handleHomeClick}
-                className={`btn btn-ghost btn-sm gap-1.5 rounded-none border-b-2 ${
+                className={`btn btn-ghost btn-sm gap-1.5 border-b-2 ${
                   isOnHome
                     ? 'border-primary text-primary'
                     : 'border-transparent text-base-content/70'
@@ -144,7 +144,7 @@ export const Navbar = () => {
               <button
                 type="button"
                 onClick={handleUploadClick}
-                className={`btn btn-ghost btn-sm gap-1.5 rounded-none border-b-2 ${
+                className={`btn btn-ghost btn-sm gap-1.5 border-b-2 ${
                   isOnUpload
                     ? 'border-primary text-primary'
                     : 'border-transparent text-base-content/70'
