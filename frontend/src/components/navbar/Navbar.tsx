@@ -66,6 +66,10 @@ export const Navbar = () => {
   // Validation step progress bar doesn't apply there either.
   const isOnHome = location.pathname === '/';
 
+  // Check if current route is the Upload page itself (the nav tab stays
+  // active there regardless of the ?step= query the step-progress bar uses).
+  const isOnUpload = location.pathname === '/upload';
+
   // Check if current route is anywhere under /projects — the guest-only
   // step progress bar (Upload/Preview/Validation) doesn't apply there.
   const isOnProjects = location.pathname.startsWith('/projects');
@@ -102,6 +106,10 @@ export const Navbar = () => {
     navigate('/');
   }
 
+  function handleUploadClick() {
+    navigate('/upload');
+  }
+
   return (
     <div>
       <div className="navbar bg-base-200 text-base-content px-17 py-2 border-b border-base-300">
@@ -114,10 +122,11 @@ export const Navbar = () => {
             Arkhive
           </button>
 
-          {/* Home + Projects tabs — only shown once someone's past the login
-              gate (real user or guest). Projects itself still requires a
-              real user; guests see Home only and get bounced to /login if
-              they pick "Create a Project" there (handled by RequireUser). */}
+          {/* Home + Upload + Projects tabs — only shown once someone's past
+              the login gate (real user or guest). Projects itself still
+              requires a real user; guests see Home/Upload only and get
+              bounced to /login if they pick "Create a Project" there
+              (handled by RequireUser). */}
           {(user || isGuest) && !isOnLogin && (
             <div className="ml-4 flex items-center gap-2">
               <button
@@ -131,6 +140,18 @@ export const Navbar = () => {
               >
                 <HomeIcon className="w-4 h-4" />
                 Home
+              </button>
+              <button
+                type="button"
+                onClick={handleUploadClick}
+                className={`btn btn-ghost btn-sm gap-1.5 rounded-none border-b-2 ${
+                  isOnUpload
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-base-content/70'
+                }`}
+              >
+                <Upload className="w-4 h-4" />
+                Upload
               </button>
               {user && (
                 <button
