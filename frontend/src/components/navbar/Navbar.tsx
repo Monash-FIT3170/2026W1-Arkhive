@@ -113,7 +113,11 @@ export const Navbar = () => {
             <button
               type="button"
               onClick={handleProjectsClick}
-              className={`btn btn-sm gap-1.5 ml-4 ${isOnProjects ? 'btn-primary' : 'btn-ghost'}`}
+              className={`btn btn-ghost btn-sm gap-1.5 ml-4 rounded-none border-b-2 ${
+                isOnProjects
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-base-content/70'
+              }`}
             >
               <FolderKanban className="w-4 h-4" />
               Projects
