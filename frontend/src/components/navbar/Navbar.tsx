@@ -1,7 +1,7 @@
 import {
   Sun,
   Moon,
-  Upload,
+  ScanLine,
   LayoutGrid,
   Columns2,
   ChevronLeft,
@@ -39,9 +39,9 @@ export const Navbar = () => {
   const stepConfig = [
     {
       step: 0,
-      label: 'Upload',
+      label: 'Quick Scan',
       path: '/upload',
-      icon: <Upload className="w-4 h-4" />,
+      icon: <ScanLine className="w-4 h-4" />,
     },
     {
       step: 1,
@@ -62,16 +62,17 @@ export const Navbar = () => {
   // Check if current route is the login page
   const isOnLogin = location.pathname === '/login';
 
-  // Check if current route is the landing page — the Upload/Preview/
+  // Check if current route is the landing page — the Quick Scan/Preview/
   // Validation step progress bar doesn't apply there either.
   const isOnHome = location.pathname === '/';
 
-  // Check if current route is the Upload page itself (the nav tab stays
-  // active there regardless of the ?step= query the step-progress bar uses).
+  // Check if current route is the Quick Scan (standalone upload) page itself
+  // (the nav tab stays active there regardless of the ?step= query the
+  // step-progress bar uses).
   const isOnUpload = location.pathname === '/upload';
 
   // Check if current route is anywhere under /projects — the guest-only
-  // step progress bar (Upload/Preview/Validation) doesn't apply there.
+  // step progress bar (Quick Scan/Preview/Validation) doesn't apply there.
   const isOnProjects = location.pathname.startsWith('/projects');
 
   // Global auth state: access user identity, guest status, and sign-out action
@@ -122,9 +123,9 @@ export const Navbar = () => {
             Arkhive
           </button>
 
-          {/* Home + Upload + Projects tabs — only shown once someone's past
-              the login gate (real user or guest). Projects itself still
-              requires a real user; guests see Home/Upload only and get
+          {/* Home + Quick Scan + Projects tabs — only shown once someone's
+              past the login gate (real user or guest). Projects itself still
+              requires a real user; guests see Home/Quick Scan only and get
               bounced to /login if they pick "Create a Project" there
               (handled by RequireUser). */}
           {(user || isGuest) && !isOnLogin && (
@@ -150,8 +151,8 @@ export const Navbar = () => {
                     : 'border-transparent text-base-content/70'
                 }`}
               >
-                <Upload className="w-4 h-4" />
-                Upload
+                <ScanLine className="w-4 h-4" />
+                Quick Scan
               </button>
               {user && (
                 <button
