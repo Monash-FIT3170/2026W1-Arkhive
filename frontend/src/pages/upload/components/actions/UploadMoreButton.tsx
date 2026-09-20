@@ -30,11 +30,11 @@ function UploadMoreButton({ onFilesSelected }: UploadMoreButtonProps) {
         className="hidden"
         onChange={handleUploadMoreChange}
       />
-      <button
+      <button className="btn btn-sm btn-outline"
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="btn btn-outline w-full rounded-xl"
       >
+
         Upload More
       </button>
     </>
