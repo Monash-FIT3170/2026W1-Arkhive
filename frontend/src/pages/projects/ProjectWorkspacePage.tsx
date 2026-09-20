@@ -663,20 +663,30 @@ export default function ProjectWorkspacePage() {
                     .map((page) => {
                       const key = pageKey(doc.id, page.page_index);
                       const imageUrl = imageUrlMap[key];
+                      const isBeingProcessed = isProcessing && selectedKeys.has(key);
                       return (
                         <div
                           key={key}
-                          className="group w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden"
+                          className={`group w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden transition-opacity ${
+                            isBeingProcessed ? 'animate-pulse opacity-80' : ''
+                          }`}
                         >
                           <div
-                            className="relative h-[120px] bg-base-300 cursor-pointer"
-                            onClick={() => toggleSelected(doc.id, page.page_index)}
+                            className={`relative h-[120px] bg-base-300 ${
+                              isBeingProcessed ? 'cursor-not-allowed' : 'cursor-pointer'
+                            }`}
+                            onClick={() => {
+                              if (isBeingProcessed) return;
+                              toggleSelected(doc.id, page.page_index);
+                            }}
                           >
                             {imageUrl ? (
                               <img
                                 src={imageUrl}
                                 alt={`Page ${page.page_index + 1}`}
-                                className="w-full h-full object-cover"
+                                className={`w-full h-full object-cover transition-[filter] ${
+                                  isBeingProcessed ? 'grayscale' : ''
+                                }`}
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
@@ -690,6 +700,7 @@ export default function ProjectWorkspacePage() {
                                 selectedKeys.has(key) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                               }`}
                               checked={selectedKeys.has(key)}
+                              disabled={isBeingProcessed}
                               onChange={() => toggleSelected(doc.id, page.page_index)}
                               onClick={(e) => e.stopPropagation()}
                             />
@@ -697,6 +708,7 @@ export default function ProjectWorkspacePage() {
                               type="button"
                               className="btn btn-ghost btn-xs btn-circle absolute top-2 right-2 bg-base-100/80 text-error opacity-0 transition-opacity group-hover:opacity-100"
                               title="Delete page"
+                              disabled={isBeingProcessed}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setDeleteTarget({
