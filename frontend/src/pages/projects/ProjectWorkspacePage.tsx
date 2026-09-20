@@ -74,6 +74,7 @@ export default function ProjectWorkspacePage() {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingKeys, setProcessingKeys] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
   const [showReprocessConfirm, setShowReprocessConfirm] = useState(false);
 
@@ -387,6 +388,7 @@ export default function ProjectWorkspacePage() {
     if (selectedKeys.size === 0 || isProcessing) return;
     setShowReprocessConfirm(false);
     setIsProcessing(true);
+    setProcessingKeys(new Set(selectedKeys));
     setActionError(null);
 
     try {
@@ -435,6 +437,7 @@ export default function ProjectWorkspacePage() {
       setActionError(err instanceof Error ? err.message : 'Failed to process pages.');
     } finally {
       setIsProcessing(false);
+      setProcessingKeys(new Set());
     }
   }
 
@@ -663,7 +666,7 @@ export default function ProjectWorkspacePage() {
                     .map((page) => {
                       const key = pageKey(doc.id, page.page_index);
                       const imageUrl = imageUrlMap[key];
-                      const isBeingProcessed = isProcessing && selectedKeys.has(key);
+                      const isBeingProcessed = processingKeys.has(key);
                       return (
                         <div
                           key={key}
