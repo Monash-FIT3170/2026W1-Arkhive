@@ -161,29 +161,36 @@ export const Navbar = () => {
             </button>
           )}
 
-          {/* Authenticated State: Display user name or email + sign out button */}
+          {/* Authenticated State: profile menu — click the user icon to reveal
+              the account name (display-only) and sign out. */}
           {user && (
-            <div className="flex items-center gap-3 text-sm">
-              <span
-                className="flex items-center gap-1.5 font-medium text-base-content/80 max-w-40 truncate"
+            <div className="dropdown dropdown-end">
+              <button
+                tabIndex={0}
+                type="button"
+                className="btn btn-ghost btn-sm btn-circle"
                 title={
                   user.user_metadata?.display_name || user.user_metadata?.full_name || user.email
                 }
               >
-                <UserIcon className="w-4 h-4 shrink-0 text-primary" />
-                <span className="truncate">
-                  {user.user_metadata?.display_name || user.user_metadata?.full_name || user.email}
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="btn btn-ghost btn-sm text-error gap-1.5"
-                title="Sign out of your account"
-              >
-                <LogOut className="w-4 h-4" />
-                Sign Out
+                <UserIcon className="w-5 h-5 text-primary" />
               </button>
+              <ul
+                tabIndex={0}
+                className="dropdown-content menu z-50 mt-2 w-56 rounded-box bg-base-100 p-2 shadow-md"
+              >
+                <li className="disabled">
+                  <span className="truncate text-sm font-medium text-base-content/80">
+                    {user.user_metadata?.display_name || user.user_metadata?.full_name || user.email}
+                  </span>
+                </li>
+                <li>
+                  <button type="button" onClick={handleSignOut} className="text-error">
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </button>
+                </li>
+              </ul>
             </div>
           )}
 
