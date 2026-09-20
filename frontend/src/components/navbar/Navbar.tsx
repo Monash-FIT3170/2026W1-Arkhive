@@ -157,7 +157,7 @@ export const Navbar = () => {
                 <button
                   type="button"
                   onClick={handleProjectsClick}
-                  className={`btn btn-ghost btn-sm gap-1.5 rounded-none border-b-2 ${
+                  className={`btn btn-ghost btn-sm gap-1.5 border-b-2 ${
                     isOnProjects
                       ? 'border-primary text-primary'
                       : 'border-transparent text-base-content/70'
