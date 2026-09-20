@@ -106,6 +106,14 @@ export default function ProjectWorkspacePage() {
         if (!isMounted) return;
         setProject(data);
         setDocuments(data.documents || []);
+        // Seed hasEnteredValidate from already-processed pages (e.g. reopening
+        // a project from a previous session) — otherwise it only ever flips on
+        // after a successful in-session "Process" call, leaving the Validate
+        // tab blank for documents that were already processed earlier.
+        const hasProcessedPages = (data.documents || []).some((doc) =>
+          (doc.pages || []).some((page) => page.raw_ocr_result || page.extracted_data)
+        );
+        if (hasProcessedPages) setHasEnteredValidate(true);
       })
       .catch((err) => {
         if (isMounted) setLoadError(err instanceof Error ? err.message : 'Failed to load project.');
