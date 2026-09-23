@@ -2,57 +2,70 @@ import LlamaCloud from "@llamaindex/llama-cloud";
 import fs from "fs";
 
 // Initialize client (reads LLAMA_CLOUD_API_KEY from environment)
-const client = new LlamaCloud({ apiKey: process.env.LLAMA_CLOUD_API_KEY });
+const client = new LlamaCloud({ apiKey: process.env.LLAMA_CLOUD_API_KEY});
 
 const rules = [
   {
-    type: "Invoice",
-    description: "",
+    type: "Complex table",
+    description: "\"If a document is a price list or catalog organized with multi-level item breakdowns in grid form, classify it as a complex table.\"",
   },
   {
-    type: "",
-    description: "",
+    type: "invoice",
+    description: "Business invoice containing itemized charges, tax information, payment terms, and vendor details",
   },
   {
-    type: "",
-    description: "",
+    type: "receipt",
+    description: "Proof of payment document showing transaction details, amount paid, and purchase confirmation",
   },
   {
-    type: "",
-    description: "",
+    type: "purchase-order",
+    description: "Business document requesting specific goods or services with quantities, prices, and delivery terms",
   },
   {
-    type: "",
-    description: "",
+    type: "bank-statement",
+    description: "Financial record showing account transactions, balances, deposits, withdrawals, and fees over a period",
+  },
+  {
+    type: "product-catalogue",
+    description: "product catalogue",
   },
 ]
 
-async function main() {
+async function classifyDocument(buffer: Buffer) {
   // Upload
+  const blob = new File([buff], "document.pdf", { type: "application/pdf" }); 
   const fileObj = await client.files.create({
-    file: fs.createReadStream("./document.pdf"),
+    file: blob,
     purpose: "classify",
   });
 
-  const result = await client.classifier.classify({
-    file_ids: [fileObj.id],
-    rules,
+  const job = await client.classify.run({
+    file_input: fileObj.id, // Must be 'file_input' (singular string ID)
+  configuration: {
+    rules: rules, // The classification rules array goes inside 'configuration'
     mode: "FAST",
     parsing_configuration: {
-    max_pages: 5,
+      max_pages: 5,
+    },
   },
   });
 
-  for (const item of result.items) {
-    if (item.result) {
-      console.log(`File: ${item.file_id}`);
-      console.log(`Type: ${item.result.type}`);
-      console.log(`Confidence: ${item.result.confidence}`);
-      console.log(`Reasoning: ${item.result.reasoning}`);
-    } else {
-      console.log(`Classification failed for ${item.file_id}`);
-    }
+  let jobState = await client.classify.get(job.id);
+
+  while (jobState.status === "PENDING" || jobState.status === "RUNNING") {
+    // Wait 2 seconds between updates so you don't rate-limit your keys
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    
+    // Re-fetch the current status
+    jobState = await client.classify.get(job.id);
+    console.log(`Current status: ${jobState.status}`);
   }
+
+  const result = job.result
+
+  console.log(result)
+
 }
 
-main().catch(console.error);
+const buff = fs.readFileSync("C:/Users/harsh/Arkhive_FIT3170_semester_1_2026/2026W1-Arkhive/backend/src/services/ocr/sample-file-1_page-0001.jpg")
+await classifyDocument(buff).catch(console.error);
