@@ -72,9 +72,11 @@ export function useReviewQueue({
 
       if (pending.length === 0) return;
 
+      pending.forEach(({ key }) => processedPageKeysRef.current.add(key));
+
       let newIssues: OcrIssue[] = [];
 
-      for (const { page: pageContext, idx: pageIdx, key } of pending) {
+      for (const { page: pageContext, idx: pageIdx } of pending) {
         const fields = detectReviewFields(pageContext);
         const confidenceIssues: OcrIssue[] = fields.map((f) => ({
           fieldId: `${f.rowId}:${f.column}`,
@@ -144,7 +146,6 @@ export function useReviewQueue({
         });
 
         newIssues = newIssues.concat(confidenceIssues, formatIssues);
-        processedPageKeysRef.current.add(key);
       }
 
       if (newIssues.length > 0) {
@@ -162,7 +163,9 @@ export function useReviewQueue({
         const next = [...prev];
         updates.forEach(({ fieldId, newValue }) => {
           const [rowId, column] = fieldId.split(':');
-          const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
+          const issue = flaggedIssues.find(
+            (i) => i.fieldId === fieldId && i.pageIndex === currentPageIndex
+          );
           const pageIdx = issue?.pageIndex ?? currentPageIndex;
           next[pageIdx] = {
             ...next[pageIdx],
@@ -176,7 +179,9 @@ export function useReviewQueue({
 
       updates.forEach(({ fieldId, newValue }) => {
         const [rowId, column] = fieldId.split(':');
-        const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
+        const issue = flaggedIssues.find(
+          (i) => i.fieldId === fieldId && i.pageIndex === currentPageIndex
+        );
         const pageIdx = issue?.pageIndex ?? currentPageIndex;
 
         const currentRow = extractedPagesRef.current[pageIdx]?.rows.find(
@@ -197,7 +202,11 @@ export function useReviewQueue({
 
       onPersist(extractedPagesRef.current);
       const fieldIds = updates.map(({ fieldId }) => fieldId);
-      setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
+      setFlaggedIssues((prev) =>
+        prev.filter(
+          (issue) => !(fieldIds.includes(issue.fieldId) && issue.pageIndex === currentPageIndex)
+        )
+      );
     },
     [flaggedIssues, currentPageIndex, extractedPagesRef, onPagesChange, onPersist, addHistoryEntry]
   );
@@ -205,20 +214,26 @@ export function useReviewQueue({
   const handleCarouselReject = useCallback(
     (fieldIds: string[]) => {
       fieldIds.forEach((fieldId) => {
-        const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
+        const issue = flaggedIssues.find(
+          (i) => i.fieldId === fieldId && i.pageIndex === currentPageIndex
+        );
         addHistoryEntry({
           type: 'skip',
-          pageIndex: issue?.pageIndex,
+          pageIndex: issue?.pageIndex ?? currentPageIndex,
           fieldId,
           column: issue?.fieldName,
           oldValue: issue?.ocrValue,
-          description: `Skipped "${issue?.fieldName}" on page ${(issue?.pageIndex ?? 0) + 1}: "${issue?.ocrValue}"`,
+          description: `Skipped "${issue?.fieldName}" on page ${(issue?.pageIndex ?? currentPageIndex) + 1}: "${issue?.ocrValue}"`,
         });
       });
 
-      setFlaggedIssues((prev) => prev.filter((issue) => !fieldIds.includes(issue.fieldId)));
+      setFlaggedIssues((prev) =>
+        prev.filter(
+          (issue) => !(fieldIds.includes(issue.fieldId) && issue.pageIndex === currentPageIndex)
+        )
+      );
     },
-    [flaggedIssues, addHistoryEntry]
+    [flaggedIssues, addHistoryEntry, currentPageIndex]
   );
 
   const handleCarouselManualEdit = useCallback(
@@ -226,7 +241,9 @@ export function useReviewQueue({
       pushUndo?.(extractedPagesRef.current);
 
       const [rowId, column] = fieldId.split(':');
-      const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
+      const issue = flaggedIssues.find(
+        (i) => i.fieldId === fieldId && i.pageIndex === currentPageIndex
+      );
       const pageIdx = issue?.pageIndex ?? currentPageIndex;
 
       const currentRow = extractedPagesRef.current[pageIdx]?.rows.find(
@@ -275,7 +292,9 @@ export function useReviewQueue({
       const documentContext = extractedPages[currentPageIndex];
       if (!documentContext) return null;
       const [rowId, column] = fieldId.split(':');
-      const issue = flaggedIssues.find((i) => i.fieldId === fieldId);
+      const issue = flaggedIssues.find(
+        (i) => i.fieldId === fieldId && i.pageIndex === currentPageIndex
+      );
       if (!issue) return null;
 
       const field: ReviewField = {
@@ -318,7 +337,9 @@ export function useReviewQueue({
       if (!documentContext) return null;
 
       const reviewFields: ReviewField[] = fields.map((f) => {
-        const issue = flaggedIssues.find((i) => i.fieldId === f.fieldId);
+        const issue = flaggedIssues.find(
+          (i) => i.fieldId === f.fieldId && i.pageIndex === currentPageIndex
+        );
         return {
           rowId: f.rowId,
           column,

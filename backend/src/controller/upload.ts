@@ -9,7 +9,7 @@ import path from 'path';
 declare module 'express-session' {
   interface SessionData {
     extraction?: {
-       
+
       ocrData: any[];
       processedImages?: string[];
       createdAt: number;

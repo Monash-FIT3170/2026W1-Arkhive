@@ -36,6 +36,6 @@ export interface BatchProgressEvent {
   maxRetries?: number;
   confidence?: number;
   message?: string;
-   
+
   data?: any;
 }

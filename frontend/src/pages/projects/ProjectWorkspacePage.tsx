@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, FileText, Trash2, Columns2 } from 'lucide-react';
 import { getProject } from '../../services/projectService';
 import {
   uploadPageToR2,
   getDownloadUrl,
   processPages,
   saveExtractedData,
+  deletePage,
+  deleteDocument,
 } from '../../services/documentService';
 import { buildPreviewItemsForFiles } from '../upload/components/preview/previewHelpers';
 import EmptyUploadView from '../upload/components/EmptyUploadView';
@@ -72,7 +74,16 @@ export default function ProjectWorkspacePage() {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingKeys, setProcessingKeys] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showReprocessConfirm, setShowReprocessConfirm] = useState(false);
+
+  // Delete confirmation covers both a single hover-triggered card delete and
+  // the toolbar's bulk "Delete Selected" action, sharing one modal/handler.
+  const [deleteTarget, setDeleteTarget] = useState<
+    { type: 'single'; documentId: string; pageIndex: number } | { type: 'bulk' } | null
+  >(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [mode, setMode] = useState<'files' | 'validate'>('files');
 
@@ -96,6 +107,14 @@ export default function ProjectWorkspacePage() {
         if (!isMounted) return;
         setProject(data);
         setDocuments(data.documents || []);
+        // Seed hasEnteredValidate from already-processed pages (e.g. reopening
+        // a project from a previous session) — otherwise it only ever flips on
+        // after a successful in-session "Process" call, leaving the Validate
+        // tab blank for documents that were already processed earlier.
+        const hasProcessedPages = (data.documents || []).some((doc) =>
+          (doc.pages || []).some((page) => page.raw_ocr_result || page.extracted_data)
+        );
+        if (hasProcessedPages) setHasEnteredValidate(true);
       })
       .catch((err) => {
         if (isMounted) setLoadError(err instanceof Error ? err.message : 'Failed to load project.');
@@ -152,6 +171,21 @@ export default function ProjectWorkspacePage() {
         });
     });
     return list;
+  }, [documents]);
+
+  const fileMetadata = useMemo(() => {
+    return documents
+      .map((doc) => {
+        const count = (doc.pages || []).filter(
+          (page) => page.raw_ocr_result || page.extracted_data
+        ).length;
+        return {
+          fileId: doc.id,
+          fileName: doc.filename,
+          pageCount: count,
+        };
+      })
+      .filter((m) => m.pageCount > 0);
   }, [documents]);
 
   useEffect(() => {
@@ -323,9 +357,38 @@ export default function ProjectWorkspacePage() {
   }
 
   // ── Process ────────────────────────────────────────────────────────────
+  // Counts how many currently-selected pages are already 'done' — used to
+  // decide whether processing needs an "are you sure" confirmation, since
+  // reprocessing overwrites their existing extracted data.
+  function countSelectedAlreadyProcessed(): number {
+    let count = 0;
+    documents.forEach((doc) => {
+      (doc.pages || []).forEach((page) => {
+        if (selectedKeys.has(pageKey(doc.id, page.page_index)) && page.status === 'done') {
+          count++;
+        }
+      });
+    });
+    return count;
+  }
+
+  // Entry point for the "Process" button — routes through a confirmation
+  // modal first if any selected page would be reprocessed (overwriting
+  // existing data), otherwise processes immediately like before.
+  function handleProcessClick() {
+    if (selectedKeys.size === 0 || isProcessing) return;
+    if (countSelectedAlreadyProcessed() > 0) {
+      setShowReprocessConfirm(true);
+    } else {
+      handleProcessSelected();
+    }
+  }
+
   async function handleProcessSelected() {
     if (selectedKeys.size === 0 || isProcessing) return;
+    setShowReprocessConfirm(false);
     setIsProcessing(true);
+    setProcessingKeys(new Set(selectedKeys));
     setActionError(null);
 
     try {
@@ -336,8 +399,10 @@ export default function ProjectWorkspacePage() {
         byDoc.get(documentId)!.push(Number(pageIndexStr));
       });
 
+      // force:true is a no-op for pages that aren't already 'done', so it's
+      // safe to set unconditionally — it only matters for the reprocess case.
       const selections: PageSelection[] = Array.from(byDoc.entries()).map(
-        ([documentId, pageIndices]) => ({ documentId, pageIndices })
+        ([documentId, pageIndices]) => ({ documentId, pageIndices, force: true })
       );
 
       const { results } = await processPages(selections);
@@ -372,6 +437,65 @@ export default function ProjectWorkspacePage() {
       setActionError(err instanceof Error ? err.message : 'Failed to process pages.');
     } finally {
       setIsProcessing(false);
+      setProcessingKeys(new Set());
+    }
+  }
+
+  // ── Delete ─────────────────────────────────────────────────────────────
+  // Removes deleted pages from `documents`, dropping a document entirely once
+  // its last page is gone so the Files view doesn't show an empty section.
+  function removePagesFromState(keys: Set<string>) {
+    setDocuments((prev) =>
+      prev
+        .map((doc) => ({
+          ...doc,
+          pages: (doc.pages || []).filter((page) => !keys.has(pageKey(doc.id, page.page_index))),
+        }))
+        .filter((doc) => (doc.pages || []).length > 0)
+    );
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      keys.forEach((key) => next.delete(key));
+      return next;
+    });
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    setActionError(null);
+
+    try {
+      const keys =
+        deleteTarget.type === 'single'
+          ? [pageKey(deleteTarget.documentId, deleteTarget.pageIndex)]
+          : Array.from(selectedKeys);
+
+      const byDoc = new Map<string, number[]>();
+      keys.forEach((key) => {
+        const [documentId, pageIndexStr] = key.split(':');
+        if (!byDoc.has(documentId)) byDoc.set(documentId, []);
+        byDoc.get(documentId)!.push(Number(pageIndexStr));
+      });
+
+      await Promise.all(
+        Array.from(byDoc.entries()).map(([documentId, pageIndices]) => {
+          const totalPages = documents.find((d) => d.id === documentId)?.pages?.length ?? 0;
+          // Deleting every page of a document removes the document row too,
+          // instead of leaving an empty orphan that resurfaces on reload.
+          if (totalPages > 0 && pageIndices.length === totalPages) {
+            return deleteDocument(documentId);
+          }
+          return Promise.all(pageIndices.map((pageIndex) => deletePage(documentId, pageIndex)));
+        })
+      );
+
+      removePagesFromState(new Set(keys));
+      setDeleteTarget(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to delete page(s).');
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -397,24 +521,27 @@ export default function ProjectWorkspacePage() {
 
   const header = (
     <div className="flex items-center justify-between px-6 h-12 border-b border-base-300 shrink-0">
-      <div className="flex items-center gap-3 min-w-0">
-        <button className="btn btn-ghost btn-sm gap-1.5" onClick={() => navigate('/projects')}>
+      <div className="flex items-center gap-2 min-w-0">
+        <button className="btn btn-ghost btn-sm gap-1.0 p-1.0" onClick={() => navigate('/projects')}>
           <ArrowLeft className="w-4 h-4" /> Projects
         </button>
-        <span className="font-semibold truncate">{project.name}</span>
+        <span className="text-base-content/40 p-0">/</span>
+        <span className="text-xs font-semibold truncate">{project.name}</span>
       </div>
       {validationList.length > 0 && (
         <div className="join">
           <button
-            className={`btn btn-sm join-item ${mode === 'files' ? 'btn-active' : ''}`}
+            className={`btn btn-sm join-item gap-1.5 ${mode === 'files' ? 'btn-active' : ''}`}
             onClick={() => setMode('files')}
           >
+            <FileText className="w-4 h-4" />
             Files
           </button>
           <button
-            className={`btn btn-sm join-item ${mode === 'validate' ? 'btn-active' : ''}`}
+            className={`btn btn-sm join-item gap-1.5 ${mode === 'validate' ? 'btn-active' : ''}`}
             onClick={() => setMode('validate')}
           >
+            <Columns2 className="w-4 h-4" />
             Validate
           </button>
         </div>
@@ -467,30 +594,50 @@ export default function ProjectWorkspacePage() {
       )}
       {/* FILE VIEW AND UPLOAD */}
       <div className={mode === 'files' ? 'flex-1 flex flex-col' : 'hidden'}>
-        <div className="flex items-center justify-between px-6 py-3 border-b border-base-300 gap-3">
-          <div className="flex items-center gap-2">
-            <button className="btn btn-sm btn-outline" onClick={selectAll}>
-              Select all
-            </button>
-            <button className="btn btn-sm btn-outline" onClick={deselectAll}>
-              Deselect all
-            </button>
+        <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg bg-base-200/40 px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            {selectedKeys.size > 0 ? (
+              <>
+                <span className="text-sm font-medium text-base-content/70">
+                  selected ({selectedKeys.size})
+                </span>
+                <button className="btn btn-ghost btn-xs" onClick={deselectAll}>
+                  Clear
+                </button>
+              </>
+            ) : (
+              <button className="btn btn-ghost btn-sm" onClick={selectAll}>
+                Select all
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2">
+            {selectedKeys.size > 0 && (
+              <>
+                <button
+                  className="btn btn-sm btn-error btn-outline gap-1.5"
+                  disabled={isProcessing || isDeleting}
+                  onClick={() => setDeleteTarget({ type: 'bulk' })}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  {`Delete (${selectedKeys.size})`}
+                </button>
+                <button
+                  className="btn btn-sm btn-primary"
+                  disabled={isProcessing || isDeleting}
+                  onClick={handleProcessClick}
+                >
+                  {isProcessing ? (
+                    <span className="loading loading-spinner loading-sm" />
+                  ) : (
+                    `Process (${selectedKeys.size})`
+                  )}
+                </button>
+              </>
+            )}
             <div className="w-40">
               <UploadMoreButton onFilesSelected={handleFilesCaptured} />
             </div>
-            <button
-              className="btn btn-sm btn-primary"
-              disabled={selectedKeys.size === 0 || isProcessing}
-              onClick={handleProcessSelected}
-            >
-              {isProcessing ? (
-                <span className="loading loading-spinner loading-sm" />
-              ) : (
-                `Process Selected (${selectedKeys.size})`
-              )}
-            </button>
           </div>
         </div>
 
@@ -502,7 +649,9 @@ export default function ProjectWorkspacePage() {
 
         <div className="flex-1 overflow-y-auto p-6">
           <div className="flex flex-col gap-6">
-            {documents.map((doc) => (
+            {documents
+              .filter((doc) => (doc.pages || []).length > 0)
+              .map((doc) => (
               <section
                 key={doc.id}
                 className="rounded-lg border border-base-300 bg-base-200/40 p-4"
@@ -517,33 +666,63 @@ export default function ProjectWorkspacePage() {
                     .map((page) => {
                       const key = pageKey(doc.id, page.page_index);
                       const imageUrl = imageUrlMap[key];
+                      const isBeingProcessed = processingKeys.has(key);
                       return (
                         <div
                           key={key}
-                          className="w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden"
+                          className={`group w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden transition-opacity ${
+                            isBeingProcessed ? 'animate-pulse opacity-80' : ''
+                          }`}
                         >
                           <div
-                            className="relative h-[120px] bg-base-300 cursor-pointer"
-                            onClick={() => toggleSelected(doc.id, page.page_index)}
+                            className={`relative h-[120px] bg-base-300 ${
+                              isBeingProcessed ? 'cursor-not-allowed' : 'cursor-pointer'
+                            }`}
+                            onClick={() => {
+                              if (isBeingProcessed) return;
+                              toggleSelected(doc.id, page.page_index);
+                            }}
                           >
                             {imageUrl ? (
                               <img
                                 src={imageUrl}
                                 alt={`Page ${page.page_index + 1}`}
-                                className="w-full h-full object-cover"
+                                className={`w-full h-full object-cover transition-[filter] ${
+                                  isBeingProcessed ? 'grayscale' : ''
+                                }`}
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
                                 <span className="loading loading-spinner loading-sm" />
                               </div>
                             )}
+                            <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/25" />
                             <input
                               type="checkbox"
-                              className="checkbox checkbox-sm checkbox-primary absolute top-2 left-2"
+                              className={`checkbox checkbox-sm checkbox-primary absolute border-2 top-2 left-2 transition-opacity ${
+                                selectedKeys.has(key) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                              }`}
                               checked={selectedKeys.has(key)}
+                              disabled={isBeingProcessed}
                               onChange={() => toggleSelected(doc.id, page.page_index)}
                               onClick={(e) => e.stopPropagation()}
                             />
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs btn-circle absolute top-2 right-2 bg-base-100/80 text-error opacity-0 transition-opacity group-hover:opacity-100"
+                              title="Delete page"
+                              disabled={isBeingProcessed}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteTarget({
+                                  type: 'single',
+                                  documentId: doc.id,
+                                  pageIndex: page.page_index,
+                                });
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                           <div className="p-2 flex items-center justify-between text-xs">
                             <span>Page {page.page_index + 1}</span>
@@ -577,10 +756,69 @@ export default function ProjectWorkspacePage() {
             ocrPages={ocrPages}
             imageUrls={imageUrls}
             pageKeys={pageKeys}
+            fileMetadata={fileMetadata}
             syncKey={validationKeysSignature}
             onPersist={persistPages}
             heightClassName="lg:h-[calc(100vh-124px)]"
           />
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {deleteTarget && (
+        <div className="modal modal-open z-50">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">
+              {deleteTarget.type === 'single' ? 'Delete Page' : 'Delete Selected Pages'}
+            </h3>
+            <p className="py-4 text-sm">
+              {deleteTarget.type === 'single'
+                ? 'This permanently deletes this page. This cannot be undone.'
+                : `This permanently deletes ${selectedKeys.size} selected page(s). This cannot be undone.`}
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button className="btn btn-error" onClick={confirmDelete} disabled={isDeleting}>
+                {isDeleting ? <span className="loading loading-spinner loading-sm" /> : 'Delete'}
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => setDeleteTarget(null)} />
+        </div>
+      )}
+
+      {/* Reprocess confirmation */}
+      {showReprocessConfirm && (
+        <div className="modal modal-open z-50">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Reprocess Pages?</h3>
+            <p className="py-4 text-sm">
+              {`${countSelectedAlreadyProcessed()} of the ${selectedKeys.size} selected page(s) have already been processed. Reprocessing will overwrite their existing extracted data. This cannot be undone.`}
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setShowReprocessConfirm(false)}
+                disabled={isProcessing}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-warning"
+                onClick={handleProcessSelected}
+                disabled={isProcessing}
+              >
+                {isProcessing ? <span className="loading loading-spinner loading-sm" /> : 'Reprocess'}
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => setShowReprocessConfirm(false)} />
         </div>
       )}
     </div>

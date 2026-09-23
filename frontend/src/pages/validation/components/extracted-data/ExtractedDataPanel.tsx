@@ -197,10 +197,12 @@ function ExtractedDataPanel({
       onMouseEnter={() => setIsMouseInside(true)}
       onMouseLeave={() => setIsMouseInside(false)}
     >
-      {/* Download Button & Notifications */}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h2 className="text-xl font-semibold text-base-content">EXTRACTED DATA</h2>
+      {/* Table Toolbar & Notifications */}
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h2 className="text-base font-bold text-base-content tracking-wide uppercase">
+            EXTRACTED DATA
+          </h2>
           {showSuccessMessage && (
             <span className="text-success text-xs font-semibold animate-fade-in-out flex items-center gap-1">
               <Check className="w-3.5 h-3.5" />
@@ -265,7 +267,7 @@ function ExtractedDataPanel({
       {/*Acknowledgement: AI (Google Gemini) was used while coding the
             manual corrections*/}
       {/* Table */}
-      <div className="flex-1 overflow-auto min-h-0 max-w-full">
+      <div className="flex-1 overflow-auto min-h-0 max-w-full pb-20">
         <table className="table table-fixed w-full border border-base-300 text-[10px]">
           {/* Table Header */}
           <thead>
