@@ -164,4 +164,40 @@ describe('ValidationWorkspace - File Separation & Adaptive View Modes', () => {
     fireEvent.click(splitModeBtn);
     expect(screen.getByText('EXTRACTED DATA')).toBeInTheDocument();
   });
+
+  it('allows renaming a column header in edit mode and persists the update', () => {
+    render(
+      <ValidationWorkspace
+        pages={mockPages}
+        ocrPages={mockOcrPages}
+        imageUrls={mockImageUrls}
+        fileMetadata={mockFileMetadata}
+        onPersist={mockPersist}
+      />
+    );
+
+    // Toggle edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    // Find Rename Column button
+    const renameBtns = screen.getAllByTitle('Rename Column');
+    fireEvent.click(renameBtns[0]);
+
+    // Modal input opens
+    const input = screen.getByPlaceholderText('Column name');
+    expect(input).toHaveValue('ITEM');
+
+    fireEvent.change(input, { target: { value: 'PRODUCT_NAME' } });
+
+    // Confirm rename
+    const confirmBtns = screen.getAllByRole('button', { name: 'Rename Column' });
+    fireEvent.click(confirmBtns[confirmBtns.length - 1]);
+
+    // Verify onPersist is called
+    expect(mockPersist).toHaveBeenCalled();
+    const persistedPages: ExtractedPage[] = mockPersist.mock.calls[0][0];
+    expect(persistedPages[0].columns).toContain('PRODUCT_NAME');
+    expect(persistedPages[0].columns).not.toContain('ITEM');
+    expect(persistedPages[0].rows[0].PRODUCT_NAME).toBe('Item 1A');
+  });
 });

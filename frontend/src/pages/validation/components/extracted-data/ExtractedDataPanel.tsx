@@ -63,6 +63,7 @@ function ExtractedDataPanel({
   onRowOutdent,
   onColumnAdd,
   onColumnDelete,
+  onColumnRename,
   onRowMove,
   onColumnReorder,
   isEditMode,
@@ -81,6 +82,7 @@ function ExtractedDataPanel({
   onRowOutdent?: (rowId: string | number) => void;
   onColumnAdd?: (columnName: string) => void;
   onColumnDelete?: (columnName: string) => void;
+  onColumnRename?: (oldName: string, newName: string) => void;
   onRowMove?: (rowId: string | number, direction: 'up' | 'down') => void;
   onColumnReorder?: (newColumns: string[]) => void;
   isEditMode?: boolean;
@@ -98,9 +100,14 @@ function ExtractedDataPanel({
   const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
   const [showDiscardMessage, setShowDiscardMessage] = useState<boolean>(false);
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
+  const [renamingColumn, setRenamingColumn] = useState<string | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportedFormat, setExportedFormat] = useState<boolean>(false);
   const [columnDeleteToast, setColumnDeleteToast] = useState<string | null>(null);
+  const [columnRenameToast, setColumnRenameToast] = useState<{
+    oldName: string;
+    newName: string;
+  } | null>(null);
   const [rowDeleteToast, setRowDeleteToast] = useState(false);
 
   // Column re-ordering
@@ -189,6 +196,36 @@ function ExtractedDataPanel({
       setEditValue(nextValue);
       setInitialEditValue(nextValue);
     }
+  };
+
+  const handleColumnRename = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    if (extractedData.columns.includes(trimmed)) return;
+
+    setLocalEdits((prev) => {
+      const next: Record<string, string> = {};
+      const oldSuffix = `:${oldName}`;
+      const newSuffix = `:${trimmed}`;
+      for (const [key, val] of Object.entries(prev)) {
+        if (key.endsWith(oldSuffix)) {
+          const rowId = key.slice(0, key.length - oldSuffix.length);
+          next[`${rowId}${newSuffix}`] = val;
+        } else {
+          next[key] = val;
+        }
+      }
+      return next;
+    });
+
+    onColumnRename?.(oldName, trimmed);
+    setRowDeleteToast(false);
+    setColumnDeleteToast(null);
+    setColumnRenameToast({ oldName, newName: trimmed });
+    setShowSuccessMessage(true);
+    setTimeout(() => {
+      setShowSuccessMessage(false);
+    }, 2000);
   };
 
   return (
@@ -320,21 +357,52 @@ function ExtractedDataPanel({
                       </div>
                     )}
 
-                    <span className="text-left w-full flex-grow">{column.replace(/_/g, ' ')}</span>
+                    <span
+                      className={`text-left w-full flex-grow ${
+                        isEditMode && onColumnRename ? 'cursor-pointer hover:underline' : ''
+                      }`}
+                      title={isEditMode && onColumnRename ? 'Click to rename column' : undefined}
+                      onClick={(e) => {
+                        if (isEditMode && onColumnRename) {
+                          e.stopPropagation();
+                          setRenamingColumn(column);
+                        }
+                      }}
+                    >
+                      {column.replace(/_/g, ' ')}
+                    </span>
 
-                    {isEditMode && onColumnDelete && (
+                    {isEditMode && (onColumnRename || onColumnDelete) && (
                       <div className="flex items-center justify-center gap-1 w-full bg-base-300/30 rounded px-1 py-0.5">
-                        <button
-                          className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-error opacity-60 hover:opacity-100 hover:bg-error/20"
-                          title="Delete Column"
-                          onClick={() => {
-                            onColumnDelete(column);
-                            setRowDeleteToast(false);
-                            setColumnDeleteToast(column);
-                          }}
-                        >
-                          <Trash className="w-3 h-3" />
-                        </button>
+                        {onColumnRename && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-base-content/70 opacity-60 hover:opacity-100 hover:bg-base-content/10"
+                            title="Rename Column"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRenamingColumn(column);
+                            }}
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                        )}
+                        {onColumnDelete && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-error opacity-60 hover:opacity-100 hover:bg-error/20"
+                            title="Delete Column"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onColumnDelete(column);
+                              setRowDeleteToast(false);
+                              setColumnRenameToast(null);
+                              setColumnDeleteToast(column);
+                            }}
+                          >
+                            <Trash className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -528,11 +596,53 @@ function ExtractedDataPanel({
         description="Enter a name for the new column."
         placeholder="Column name"
         confirmLabel="Add Column"
+        validate={(name) => {
+          const trimmed = name.trim();
+          if (!trimmed) return null;
+          if (extractedData.columns.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+            return 'A column with this name already exists';
+          }
+          return null;
+        }}
         onConfirm={(name) => {
           onColumnAdd?.(name);
           setShowAddColumnModal(false);
         }}
         onCancel={() => setShowAddColumnModal(false)}
+      />
+
+      {/* Rename Column Modal */}
+      <TextInputModal
+        key={renamingColumn ?? 'none'}
+        open={renamingColumn !== null}
+        title="Rename Column"
+        description={
+          renamingColumn
+            ? `Enter a new name for column "${renamingColumn.replace(/_/g, ' ')}".`
+            : 'Enter a new column name.'
+        }
+        placeholder="Column name"
+        initialValue={renamingColumn ?? ''}
+        confirmLabel="Rename Column"
+        validate={(name) => {
+          const trimmed = name.trim();
+          if (!trimmed) return null;
+          if (
+            renamingColumn &&
+            trimmed.toLowerCase() !== renamingColumn.toLowerCase() &&
+            extractedData.columns.some((c) => c.toLowerCase() === trimmed.toLowerCase())
+          ) {
+            return 'A column with this name already exists';
+          }
+          return null;
+        }}
+        onConfirm={(newName) => {
+          if (renamingColumn) {
+            handleColumnRename(renamingColumn, newName);
+          }
+          setRenamingColumn(null);
+        }}
+        onCancel={() => setRenamingColumn(null)}
       />
 
       {/* Row Delete Toast */}
@@ -553,6 +663,19 @@ function ExtractedDataPanel({
         actionLabel="Undo"
         onAction={onUndoLast}
         onDismiss={() => setColumnDeleteToast(null)}
+      />
+
+      {/* Column Rename Toast */}
+      <Toast
+        open={columnRenameToast !== null}
+        message={
+          columnRenameToast
+            ? `Column renamed to "${columnRenameToast.newName.replace(/_/g, ' ')}"`
+            : ''
+        }
+        actionLabel="Undo"
+        onAction={onUndoLast}
+        onDismiss={() => setColumnRenameToast(null)}
       />
 
       <ExportModal
