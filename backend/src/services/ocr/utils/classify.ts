@@ -31,7 +31,7 @@ const rules = [
   },
 ]
 
-async function classifyDocument(buffer: Buffer) {
+export async function classifyDocument(buff: Buffer) {
   // Upload
   const blob = new File([buff], "document.pdf", { type: "application/pdf" }); 
   const fileObj = await client.files.create({
@@ -63,9 +63,6 @@ async function classifyDocument(buffer: Buffer) {
 
   const result = job.result
 
-  console.log(result)
+  return result
 
 }
-
-const buff = fs.readFileSync("C:/Users/harsh/Arkhive_FIT3170_semester_1_2026/2026W1-Arkhive/backend/src/services/ocr/sample-file-1_page-0001.jpg")
-await classifyDocument(buff).catch(console.error);
