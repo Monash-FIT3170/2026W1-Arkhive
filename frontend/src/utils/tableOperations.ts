@@ -75,6 +75,51 @@ export function reorderColumns(data: ExtractedPage, newColumns: string[]): Extra
   return { ...data, columns: newColumns };
 }
 
+export function renameColumn(
+  data: ExtractedPage,
+  oldName: string,
+  newName: string
+): ExtractedPage {
+  const trimmedNew = newName.trim();
+  if (!trimmedNew || oldName === trimmedNew) return data;
+  if (!data.columns.includes(oldName)) return data;
+  if (data.columns.includes(trimmedNew)) return data;
+
+  const newColumns = data.columns.map((c) => (c === oldName ? trimmedNew : c));
+
+  const newRows = data.rows.map((r) => {
+    const newRow = { ...r };
+    if (oldName in newRow) {
+      newRow[trimmedNew] = newRow[oldName];
+      delete newRow[oldName];
+    } else {
+      newRow[trimmedNew] = '';
+    }
+    if (newRow._cellKeyMap && oldName in newRow._cellKeyMap) {
+      newRow._cellKeyMap = {
+        ...newRow._cellKeyMap,
+        [trimmedNew]: newRow._cellKeyMap[oldName],
+      };
+      delete newRow._cellKeyMap[oldName];
+    }
+    if (newRow._cellConfidence && oldName in newRow._cellConfidence) {
+      newRow._cellConfidence = {
+        ...newRow._cellConfidence,
+        [trimmedNew]: newRow._cellConfidence[oldName],
+      };
+      delete newRow._cellConfidence[oldName];
+    }
+    return newRow;
+  });
+
+  return {
+    ...data,
+    columns: newColumns,
+    rows: newRows,
+    itemColumnKey: data.itemColumnKey === oldName ? trimmedNew : data.itemColumnKey,
+  };
+}
+
 export function parseFieldId(fieldId: string): { rowId: string; column: string } {
   const [rowId, column] = fieldId.split(':');
   return { rowId, column };

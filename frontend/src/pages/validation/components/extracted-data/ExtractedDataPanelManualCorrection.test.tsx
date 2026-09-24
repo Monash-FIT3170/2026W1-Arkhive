@@ -266,6 +266,117 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     expect(onColumnDeleteMock).toHaveBeenCalledWith('Field1');
   });
 
+  it('triggers onColumnRename when Rename Column button is clicked and a new name is confirmed', () => {
+    const onColumnRenameMock = vi.fn();
+    render(
+      <ControlledPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onColumnRename={onColumnRenameMock}
+      />
+    );
+
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    const renameBtns = screen.getAllByTitle('Rename Column');
+    expect(renameBtns.length).toBe(2);
+
+    fireEvent.click(renameBtns[0]);
+
+    // Modal opens with existing name
+    const input = screen.getByPlaceholderText('Column name') as HTMLInputElement;
+    expect(input.value).toBe('Field1');
+
+    fireEvent.change(input, { target: { value: 'Renamed_Field' } });
+
+    const confirmBtns = screen.getAllByRole('button', { name: 'Rename Column' });
+    const confirmBtn = confirmBtns[confirmBtns.length - 1];
+    fireEvent.click(confirmBtn);
+
+    expect(onColumnRenameMock).toHaveBeenCalledWith('Field1', 'Renamed_Field');
+  });
+
+  it('triggers onColumnRename when column header text is clicked in edit mode', () => {
+    const onColumnRenameMock = vi.fn();
+    render(
+      <ControlledPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onColumnRename={onColumnRenameMock}
+      />
+    );
+
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    const headerTitle = screen.getByText('Field2');
+    fireEvent.click(headerTitle);
+
+    const input = screen.getByPlaceholderText('Column name') as HTMLInputElement;
+    expect(input.value).toBe('Field2');
+
+    fireEvent.change(input, { target: { value: 'New_Field2' } });
+
+    const confirmBtns = screen.getAllByRole('button', { name: 'Rename Column' });
+    const confirmBtn = confirmBtns[confirmBtns.length - 1];
+    fireEvent.click(confirmBtn);
+
+    expect(onColumnRenameMock).toHaveBeenCalledWith('Field2', 'New_Field2');
+  });
+
+  it('does not trigger onColumnRename when modal is cancelled', () => {
+    const onColumnRenameMock = vi.fn();
+    render(
+      <ControlledPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onColumnRename={onColumnRenameMock}
+      />
+    );
+
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    const renameBtns = screen.getAllByTitle('Rename Column');
+    fireEvent.click(renameBtns[0]);
+
+    const input = screen.getByPlaceholderText('Column name');
+    fireEvent.change(input, { target: { value: 'WillCancel' } });
+
+    fireEvent.click(screen.getByText('Cancel'));
+
+    expect(onColumnRenameMock).not.toHaveBeenCalled();
+  });
+
+  it('shows error and disables submit when new name conflicts with an existing column', () => {
+    const onColumnRenameMock = vi.fn();
+    render(
+      <ControlledPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onColumnRename={onColumnRenameMock}
+      />
+    );
+
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    const renameBtns = screen.getAllByTitle('Rename Column');
+    fireEvent.click(renameBtns[0]);
+
+    const input = screen.getByPlaceholderText('Column name');
+    fireEvent.change(input, { target: { value: 'Field2' } });
+
+    expect(screen.getByText('A column with this name already exists')).toBeDefined();
+    const confirmBtns = screen.getAllByRole('button', { name: 'Rename Column' });
+    const confirmBtn = confirmBtns[confirmBtns.length - 1] as HTMLButtonElement;
+    expect(confirmBtn.disabled).toBe(true);
+
+    fireEvent.click(confirmBtn);
+    expect(onColumnRenameMock).not.toHaveBeenCalled();
+  });
+
   it('triggers onRowMove with up/down directions when move buttons are clicked', () => {
     const onRowMoveMock = vi.fn();
     render(
