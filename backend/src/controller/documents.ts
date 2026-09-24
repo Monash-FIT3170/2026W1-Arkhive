@@ -12,6 +12,7 @@ import {
 import { parseTableWithRetries } from '../services/ocr/ocr';
 import type { ExtractedPage } from '../models/TableData';
 import type { PageSelection, ProcessedPageResult } from '../models/Project.ts';
+import { classifyDocument } from "../services/ocr/utils/classify"
 
 /**
  * Verifies the caller owns the project that (transitively) owns `documentId`,
@@ -28,6 +29,99 @@ async function getOwnedDocument(documentId: string, ownerId: string) {
 
   if (error || !document) return null;
   return document;
+}
+
+
+
+
+
+
+
+async function processPage(selection: PageSelection, ownerId: string){
+  const { documentId, pageIndices, force } = selection;
+
+  const document = await getOwnedDocument(documentId, ownerId);
+  if (!document) {
+    for (const pageIndex of pageIndices) {
+      return {
+        documentId,
+        pageIndex,
+        status: 'error',
+        errorMessage: 'Document not found or access denied.',
+      };
+    }
+  }
+
+  const { data: pageRows, error: pagesError } = await supabase
+    .from('document_pages')
+    .select('*')
+    .eq('document_id', documentId)
+    .in('page_index', pageIndices);
+
+  if (pagesError) {
+    console.error('Failed to fetch document_pages for processing:', pagesError);
+    for (const pageIndex of pageIndices) {
+      return {
+        documentId,
+        pageIndex,
+        status: 'error',
+        errorMessage: pagesError.message,
+      };
+    }
+  }
+
+  const pageByIndex = new Map((pageRows || []).map((p) => [p.page_index, p]));
+
+  for (const pageIndex of pageIndices) {
+    const pageRow = pageByIndex.get(pageIndex);
+
+    // Skip pages already validated, unless the caller forces a redo.
+    if (pageRow && pageRow.status === 'done' && !force) {
+      return {
+        documentId,
+        pageIndex,
+        status: 'done',
+        rawResult: pageRow.raw_ocr_result,
+        skipped: true,
+      };
+    }
+
+    await supabase
+      .from('document_pages')
+      .update({ status: 'processing' })
+      .eq('document_id', documentId)
+      .eq('page_index', pageIndex);
+
+    try {
+      const key = `${document.storage_path}/page-${pageIndex}.png`;
+      const buffer = await getObjectBuffer(key);
+      const rawResult = await parseTableWithRetries(buffer);
+
+      // Persist immediately — this is the fix for "crash mid-validation
+      // means re-OCR everything." Status goes back to 'pending' (not
+      // 'done') because raw OCR output still needs user validation
+      // before it's trustworthy.
+      await supabase
+        .from('document_pages')
+        .update({ status: 'done', raw_ocr_result: rawResult, error_message: null })
+        .eq('document_id', documentId)
+        .eq('page_index', pageIndex);
+
+      return { documentId, pageIndex, status: 'done', rawResult };
+    } catch (ocrError: any) {
+      const errorMessage =
+        ocrError?.message || 'OCR processing failed. Check credentials and document format.';
+      console.error(`OCR failed for ${documentId} page ${pageIndex}:`, ocrError);
+
+      await supabase
+        .from('document_pages')
+        .update({ status: 'error', error_message: errorMessage })
+        .eq('document_id', documentId)
+        .eq('page_index', pageIndex);
+
+      return { documentId, pageIndex, status: 'error', errorMessage };
+    }
+  }
 }
 
 export default {
@@ -244,98 +338,7 @@ export default {
         return;
       }
 
-      const results: ProcessedPageResult[] = [];
-
-      for (const selection of selections) {
-        const { documentId, pageIndices, force } = selection;
-
-        const document = await getOwnedDocument(documentId, ownerId);
-        if (!document) {
-          for (const pageIndex of pageIndices) {
-            results.push({
-              documentId,
-              pageIndex,
-              status: 'error',
-              errorMessage: 'Document not found or access denied.',
-            });
-          }
-          continue;
-        }
-
-        const { data: pageRows, error: pagesError } = await supabase
-          .from('document_pages')
-          .select('*')
-          .eq('document_id', documentId)
-          .in('page_index', pageIndices);
-
-        if (pagesError) {
-          console.error('Failed to fetch document_pages for processing:', pagesError);
-          for (const pageIndex of pageIndices) {
-            results.push({
-              documentId,
-              pageIndex,
-              status: 'error',
-              errorMessage: pagesError.message,
-            });
-          }
-          continue;
-        }
-
-        const pageByIndex = new Map((pageRows || []).map((p) => [p.page_index, p]));
-
-        for (const pageIndex of pageIndices) {
-          const pageRow = pageByIndex.get(pageIndex);
-
-          // Skip pages already validated, unless the caller forces a redo.
-          if (pageRow && pageRow.status === 'done' && !force) {
-            results.push({
-              documentId,
-              pageIndex,
-              status: 'done',
-              rawResult: pageRow.raw_ocr_result,
-              skipped: true,
-            });
-            continue;
-          }
-
-          await supabase
-            .from('document_pages')
-            .update({ status: 'processing' })
-            .eq('document_id', documentId)
-            .eq('page_index', pageIndex);
-
-          try {
-            const key = `${document.storage_path}/page-${pageIndex}.png`;
-            const buffer = await getObjectBuffer(key);
-            const rawResult = await parseTableWithRetries(buffer);
-
-            // Persist immediately — this is the fix for "crash mid-validation
-            // means re-OCR everything." Status goes back to 'pending' (not
-            // 'done') because raw OCR output still needs user validation
-            // before it's trustworthy.
-            await supabase
-              .from('document_pages')
-              .update({ status: 'done', raw_ocr_result: rawResult, error_message: null })
-              .eq('document_id', documentId)
-              .eq('page_index', pageIndex);
-
-            results.push({ documentId, pageIndex, status: 'done', rawResult });
-          } catch (ocrError: any) {
-            const errorMessage =
-              ocrError?.message || 'OCR processing failed. Check credentials and document format.';
-            console.error(`OCR failed for ${documentId} page ${pageIndex}:`, ocrError);
-
-            await supabase
-              .from('document_pages')
-              .update({ status: 'error', error_message: errorMessage })
-              .eq('document_id', documentId)
-              .eq('page_index', pageIndex);
-
-            results.push({ documentId, pageIndex, status: 'error', errorMessage });
-          }
-        }
-      }
-
+      const results = Promise.allSettled(selections.map(selection => processPage(selection, ownerId)))
       res.json({ success: true, results });
     } catch (err: any) {
       console.error('Error processing documents:', err);
