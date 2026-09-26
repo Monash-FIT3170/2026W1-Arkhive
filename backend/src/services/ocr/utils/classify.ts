@@ -10,25 +10,18 @@ const rules = [
     description: "\"If a document is a price list or catalog organized with multi-level item breakdowns in grid form, classify it as a complex table.\"",
   },
   {
-    type: "invoice",
+    type: "Simple table",
     description: "Business invoice containing itemized charges, tax information, payment terms, and vendor details",
   },
   {
-    type: "receipt",
-    description: "Proof of payment document showing transaction details, amount paid, and purchase confirmation",
+    type: "blank page",
+    description: "Is essentially blank and has nothing in it",
   },
   {
-    type: "purchase-order",
-    description: "Business document requesting specific goods or services with quantities, prices, and delivery terms",
+    type: "Other",
+    description: "No detected tables in the document",
   },
-  {
-    type: "bank-statement",
-    description: "Financial record showing account transactions, balances, deposits, withdrawals, and fees over a period",
-  },
-  {
-    type: "product-catalogue",
-    description: "product catalogue",
-  },
+
 ]
 
 export async function classifyDocument(buff: Buffer) {
