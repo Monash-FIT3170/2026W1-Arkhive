@@ -32,12 +32,13 @@ async function getOwnedDocument(documentId: string, ownerId: string) {
 }
 
 
+const chunk = (size: number) => (arr: any[]) =>
+  Array.from({ length: Math.ceil(arr.length / size) }, (_: any, i: number) =>
+    arr.slice(i * size, i * size + size)
+  );
 
 
-
-
-
-async function processPage(selection: PageSelection, ownerId: string){
+async function processPage(selection: PageSelection, ownerId: string): Promise<ProcessedPageResult>{
   const { documentId, pageIndices, force } = selection;
 
   const document = await getOwnedDocument(documentId, ownerId);
@@ -122,6 +123,7 @@ async function processPage(selection: PageSelection, ownerId: string){
       return { documentId, pageIndex, status: 'error', errorMessage };
     }
   }
+  throw new Error(`Unhandled page processing path for selection`);
 }
 
 export default {
@@ -337,8 +339,16 @@ export default {
         res.status(400).json({ error: 'selections must be a non-empty array.' });
         return;
       }
+      
+      const MAX_CHUNK_SIZE = 5
+      const chunks = chunk(MAX_CHUNK_SIZE)(selections)
+      const results:ProcessedPageResult[][] = await chunks.reduce<Promise<ProcessedPageResult[][]>>(async (acc, chnk) => {
+        const accResolved = await acc
+        const chunkRes = await Promise.all(chnk.map(selctin => processPage(selctin, ownerId)));
+        accResolved.push(chunkRes);
+        return acc
+      }, Promise.resolve([]))
 
-      const results = Promise.allSettled(selections.map(selection => processPage(selection, ownerId)))
       res.json({ success: true, results });
     } catch (err: any) {
       console.error('Error processing documents:', err);
