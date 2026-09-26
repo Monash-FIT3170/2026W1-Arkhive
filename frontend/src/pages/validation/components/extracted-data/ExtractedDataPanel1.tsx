@@ -19,7 +19,6 @@ import { exportExtractedDataAsTXT } from '../../../../services/txtDownloadServic
 import { exportExtractedDataAsXLSX } from '../../../../services/xlsxDownloadService'; // NEW: Excel export service (US-4.5)
 import TextInputModal from '../modals/TextInputModal';
 import Toast from '../modals/Toast';
-import { TablePanel } from './subcomponents/TablePanel';
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
@@ -313,24 +312,250 @@ function ExtractedDataPanel({
       {/*Acknowledgement: AI (Google Gemini) was used while coding the
             manual corrections*/}
       {/* Table */}
-      <TablePanel
-        onHover={onHover}
-        extractedData={extractedData}
-        hoveredOverlayIds={hoveredOverlayIds}
-        onCellEdit={onCellEdit}
-        onRowAdd={onRowAdd}
-        onRowDelete={onRowDelete}
-        onRowIndent={onRowIndent}
-        onRowOutdent={onRowOutdent}
-        onColumnAdd={onColumnAdd}
-        onColumnDelete={onColumnDelete}
-        onRowMove={onRowMove}
-        onColumnReorder={onColumnReorder}
-        isEditMode={isEditMode}
-        onEditModeChange={onEditModeChange}
-        editedCells={editedCells}
-        onUndoLast={onUndoLast}
-      ></TablePanel>
+      <div className="flex-1 overflow-auto min-h-0 max-w-full pb-20">
+        <table className="table table-fixed w-full border border-base-300 text-[10px]">
+          {/* Table Header */}
+          <thead>
+            <tr className="text-base-content/70">
+              {/* Existing columns (unchanged) */}
+              {extractedData.columns.map((column) => (
+                <th
+                  key={column}
+                  className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${
+                    isEditMode && dragOverColumn === column && draggedColumn !== column
+                      ? 'bg-primary/20'
+                      : ''
+                  }`}
+                  style={{ height: '1px' }}
+                  draggable={isEditMode}
+                  onDragStart={() => {
+                    if (!isEditMode) {
+                      return;
+                    }
+                    setDraggedColumn(column);
+                  }}
+                  onDragOver={(e) => {
+                    if (!isEditMode) {
+                      return;
+                    }
+                    e.preventDefault();
+                    setDragOverColumn(column);
+                  }}
+                  onDragLeave={() => {
+                    setDragOverColumn(null);
+                  }}
+                  onDrop={() => {
+                    if (!isEditMode || !draggedColumn || draggedColumn === column) {
+                      return;
+                    }
+                    const cols = [...extractedData.columns];
+                    const fromIdx = cols.indexOf(draggedColumn);
+                    const toIdx = cols.indexOf(column);
+                    cols.splice(fromIdx, 1);
+                    cols.splice(toIdx, 0, draggedColumn);
+                    onColumnReorder?.(cols);
+                    setDraggedColumn(null);
+                    setDragOverColumn(null);
+                  }}
+                >
+                  <div className="flex flex-col items-center justify-between h-full gap-2">
+                    {/* drag handle icon only shown in edit mode */}
+                    {isEditMode && (
+                      <div className="cursor-grab text-base-content/40 hover:text-base-content/80 w-full flex justify-center">
+                        ⠿
+                      </div>
+                    )}
+
+                    <span className="text-left w-full flex-grow">{column.replace(/_/g, ' ')}</span>
+
+                    {isEditMode && onColumnDelete && (
+                      <div className="flex items-center justify-center gap-1 w-full bg-base-300/30 rounded px-1 py-0.5">
+                        <button
+                          className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-error opacity-60 hover:opacity-100 hover:bg-error/20"
+                          title="Delete Column"
+                          onClick={() => {
+                            onColumnDelete(column);
+                            setRowDeleteToast(false);
+                            setColumnDeleteToast(column);
+                          }}
+                        >
+                          <Trash className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </th>
+              ))}
+
+              {/* NEW: Confidence column header added at the end of the table */}
+              <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal break-words w-[120px]">
+                CONFIDENCE SCORE
+              </th>
+              {isEditMode && (onRowDelete || onRowMove) && (
+                <th className="p-3 border-b border-base-300 w-24"></th>
+              )}
+            </tr>
+          </thead>
+
+          {/* Body */}
+          <tbody>
+            {extractedData.rows.map((row) => {
+              const tier = getConfidenceTier(row._confidence ?? 1);
+
+              return (
+                <tr
+                  key={row._id}
+                  className={`border-b border-base-300 hover:bg-base-300/40 ${
+                    tier.isLow ? 'bg-error/10' : ''
+                  }`}
+                >
+                  {extractedData.columns.map((column) => {
+                    const fieldId = `${String(row._id)}:${column}`;
+                    const isCellHighlighted = hoveredOverlayIds
+                      ? hoveredOverlayIds.includes(fieldId)
+                      : false;
+                    const safeId = fieldId.replace(/:/g, '-');
+
+                    const isEditing = editingCellId === fieldId;
+                    const displayValue =
+                      localEdits[fieldId] !== undefined
+                        ? localEdits[fieldId]
+                        : String(row[column] || '');
+
+                    return (
+                      <td
+                        key={column}
+                        id={`cell-${safeId}`}
+                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 text-base-content text-[13px] transition-colors ${
+                          isEditMode ? 'cursor-pointer' : ''
+                        } ${
+                          //yellow tint
+                          isCellHighlighted && !isEditing
+                            ? 'bg-primary text-primary-content font-bold rounded shadow-inner'
+                            : editedCells?.has(fieldId)
+                              ? 'bg-warning/15'
+                              : ''
+                        }`}
+                        onMouseEnter={() => onHover(fieldId)}
+                        onMouseLeave={() => onHover(null)}
+                        onClick={() => {
+                          if (!isEditing) {
+                            handleCellClick(fieldId, displayValue);
+                          }
+                        }}
+                      >
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            className="input input-xs input-bordered w-full max-w-xs bg-base-100 text-base-content"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onBlur={() => handleCellBlur(fieldId)}
+                            onKeyDown={(e) => handleCellKeyDown(e, fieldId)}
+                            autoFocus
+                          />
+                        ) : (
+                          //pencil icon
+                          <div className="relative">
+                            {editedCells?.has(fieldId) && (
+                              <Edit2 className="w-2.5 h-2.5 text-warning absolute top-0 right-0 opacity-60" />
+                            )}
+                            {displayValue}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+
+                  {/* NEW: Confidence score cell added at the end of each row
+										Shows a DaisyUI badge with the score percentage
+										Green >=85%, Amber 70-84%, Red <70%
+										Low confidence rows also show a warning icon from lucide-react */}
+                  {/* UPDATED: Capsule shape with solid background colours for high visibility */}
+                  {/* Alert icon on left only for low confidence rows with hover tooltip */}
+                  <td className="p-2">
+                    <div className="flex items-center gap-1">
+                      {tier.isLow && (
+                        <span title="please check this output">
+                          <AlertTriangle className="w-3 h-3 text-error cursor-pointer flex-shrink-0" />
+                        </span>
+                      )}
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                          tier.badgeClass === 'badge-success'
+                            ? 'border-success text-success bg-[var(--color-base-100)]'
+                            : tier.badgeClass === 'badge-warning'
+                              ? 'border-warning text-warning bg-[var(--color-base-100)]'
+                              : ' border-error text-error bg-[var(--color-base-100)]'
+                        }`}
+                      >
+                        {tier.label}
+                      </span>
+                    </div>
+                  </td>
+                  {isEditMode && (onRowDelete || onRowMove || onRowIndent || onRowOutdent) && (
+                    <td className="p-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {(onRowIndent || onRowOutdent) && (
+                          <div className="flex flex-col">
+                            <button
+                              className="btn btn-ghost btn-[0.5rem] min-h-0 h-4 px-1 text-base-content opacity-50 hover:opacity-100"
+                              title="Indent (make child of previous row)"
+                              disabled={(row._indentLevel ?? 0) === 0 && false /* see note below */}
+                              onClick={() => onRowIndent?.(row._id)}
+                            >
+                              <ChevronRight className="w-3 h-3" />
+                            </button>
+                            <button
+                              className="btn btn-ghost btn-[0.5rem] min-h-0 h-4 px-1 text-base-content opacity-50 hover:opacity-100"
+                              title="Outdent"
+                              disabled={(row._indentLevel ?? 0) === 0}
+                              onClick={() => onRowOutdent?.(row._id)}
+                            >
+                              <ChevronLeft className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                        {onRowMove && (
+                          <div className="flex flex-col">
+                            <button
+                              className="btn btn-ghost btn-[0.5rem] min-h-0 h-4 px-1 text-base-content opacity-50 hover:opacity-100"
+                              title="Move Row Up"
+                              onClick={() => onRowMove(row._id, 'up')}
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              className="btn btn-ghost btn-[0.5rem] min-h-0 h-4 px-1 text-base-content opacity-50 hover:opacity-100"
+                              title="Move Row Down"
+                              onClick={() => onRowMove(row._id, 'down')}
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                        {onRowDelete && (
+                          <button
+                            className="btn btn-ghost btn-xs btn-square text-error opacity-50 hover:opacity-100"
+                            title="Delete Row"
+                            onClick={() => {
+                              onRowDelete(row._id);
+                              setColumnDeleteToast(null);
+                              setRowDeleteToast(true);
+                            }}
+                          >
+                            <Trash className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {/* Add Row Button */}
       {isEditMode && onRowAdd && (
