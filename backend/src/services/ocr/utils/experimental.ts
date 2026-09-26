@@ -172,7 +172,8 @@ function hydrateOutput(
         let matchedCell = azureCells.find(
           (ac) =>
             ac.columnIndex === colIndex &&
-            (ac.text === cleanText || ac.text.includes(cleanText) || cleanText.includes(ac.text))
+            (ac.text === cleanText || ac.text.includes(cleanText) || cleanText.includes(ac.text)) 
+            && component.y <= ac.vertices[0].y 
         );
 
         // Fallback Lookup: Match strictly by column index position if text differs slightly
@@ -264,9 +265,8 @@ const mapTablesToOCRComponents =
       ...comp,
       boundingBoxes: comp.boundingBoxes ? toColumnDict(comp.boundingBoxes) : {},
     }));
-    const hydratedData = hydrateOutput(transformedComponents, prunedOCR, OCRResponse)
+    const hydratedData = hydrateOutput(transformedComponents, prunedOCR)
     fs.writeFileSync("primeHydrati1on.txt", JSON.stringify(hydratedData, null, 2))
-    console.log(hydratedData)
 
     return hydratedData;
   };
