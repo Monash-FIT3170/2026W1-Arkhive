@@ -433,7 +433,33 @@ export default {
         console.error('Failed to delete document_pages row:', deleteError);
       }
 
-      res.json({ success: true, documentId: id, pageIndex: Number(pageIndex) });
+      // Deleting a page can leave the document with zero pages (e.g. the
+      // caller's own page count was stale). Clean up the now-orphaned
+      // document here rather than relying on the caller to have deleted it
+      // via deleteDocument instead.
+      const { count: remainingPages } = await supabase
+        .from('document_pages')
+        .select('*', { count: 'exact', head: true })
+        .eq('document_id', id);
+
+      let documentDeleted = false;
+      if (remainingPages === 0) {
+        try {
+          await deletePrefix(`${document.storage_path}/`);
+          await deleteObject(document.storage_path);
+        } catch (r2Err) {
+          console.error('Failed to delete objects from R2:', r2Err);
+        }
+
+        const { error: deleteDocError } = await supabase.from('documents').delete().eq('id', id);
+        if (deleteDocError) {
+          console.error('Failed to delete now-empty document row:', deleteDocError);
+        } else {
+          documentDeleted = true;
+        }
+      }
+
+      res.json({ success: true, documentId: id, pageIndex: Number(pageIndex), documentDeleted });
     } catch (err: any) {
       console.error('Error deleting page:', err);
       res.status(500).json({ error: err.message || 'Internal server error.' });
