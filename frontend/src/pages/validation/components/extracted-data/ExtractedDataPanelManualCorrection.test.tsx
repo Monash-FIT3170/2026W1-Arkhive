@@ -64,6 +64,25 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     expect(screen.getByText('Value2')).toBeDefined();
   });
 
+  it('renders confidence score column with AI Metric badge, tooltip, and visual separation', () => {
+    render(<ControlledPanel onHover={onHoverMock} extractedData={mockExtractedData} />);
+    const header = screen.getByTestId('confidence-header');
+    expect(header).toBeInTheDocument();
+    expect(screen.getByText('AI Metric')).toBeInTheDocument();
+    expect(screen.getByText('CONFIDENCE')).toBeInTheDocument();
+    expect(
+      screen.getByTitle(
+        'Confidence score is an AI extraction metric and is not part of the exported table data.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('displays read-only metric label in confidence header during edit mode', () => {
+    render(<ControlledPanel onHover={onHoverMock} extractedData={mockExtractedData} />);
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+    expect(screen.getByText('Read-only metric')).toBeInTheDocument();
+  });
+
   it('turns a cell into an input field when clicked in edit mode', async () => {
     render(<ControlledPanel onHover={onHoverMock} extractedData={mockExtractedData} />);
 

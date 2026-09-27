@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
+  Info,
 } from 'lucide-react'; // NEW: Importing icons for confidence badges and export button
 import React, { useState, useEffect } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
@@ -341,9 +342,33 @@ function ExtractedDataPanel({
                 </th>
               ))}
 
-              {/* NEW: Confidence column header added at the end of the table */}
-              <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal break-words w-[120px]">
-                CONFIDENCE SCORE
+              {/* Confidence column header: visually distinguished as system metadata */}
+              <th
+                className="p-2.5 text-left border-b border-base-300 border-l-2 border-base-300 bg-base-200/60 whitespace-normal break-words w-[135px] select-none align-top"
+                data-testid="confidence-header"
+              >
+                <div className="flex flex-col h-full justify-between gap-1.5">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="badge badge-neutral badge-xs text-[9px] font-semibold tracking-wider uppercase opacity-75 px-1.5 py-0.5">
+                      AI Metric
+                    </span>
+                    <span
+                      className="tooltip tooltip-left cursor-help"
+                      data-tip="Confidence score is an AI extraction metric and is not part of the exported table data."
+                      title="Confidence score is an AI extraction metric and is not part of the exported table data."
+                    >
+                      <Info className="w-3.5 h-3.5 text-base-content/40 hover:text-base-content transition-colors" />
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-base-content/80 tracking-wide uppercase">
+                    CONFIDENCE
+                  </span>
+                  {isEditMode && (
+                    <span className="text-[9px] text-base-content/40 italic">
+                      Read-only metric
+                    </span>
+                  )}
+                </div>
               </th>
               {isEditMode && (onRowDelete || onRowMove) && (
                 <th className="p-3 border-b border-base-300 w-24"></th>
@@ -419,13 +444,10 @@ function ExtractedDataPanel({
                     );
                   })}
 
-                  {/* NEW: Confidence score cell added at the end of each row
-										Shows a DaisyUI badge with the score percentage
-										Green >=85%, Amber 70-84%, Red <70%
-										Low confidence rows also show a warning icon from lucide-react */}
-                  {/* UPDATED: Capsule shape with solid background colours for high visibility */}
-                  {/* Alert icon on left only for low confidence rows with hover tooltip */}
-                  <td className="p-2">
+                  {/* Confidence score cell: visually distinguished with divider border and subtle tint */}
+                  <td
+                    className={`p-2 border-l-2 border-base-300 ${tier.isLow ? 'bg-error/15' : 'bg-base-200/40'}`}
+                  >
                     <div className="flex items-center gap-1">
                       {tier.isLow && (
                         <span title="please check this output">
