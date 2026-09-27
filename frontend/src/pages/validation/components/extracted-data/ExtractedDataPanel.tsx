@@ -342,34 +342,31 @@ function ExtractedDataPanel({
                 </th>
               ))}
 
-              {/* Confidence column header: visually distinguished as system metadata */}
-              <th
-                className="p-2.5 text-left border-b border-base-300 border-l-2 border-base-300 bg-base-200/60 whitespace-normal break-words w-[135px] select-none align-top"
-                data-testid="confidence-header"
-              >
-                <div className="flex flex-col h-full justify-between gap-1.5">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="badge badge-neutral badge-xs text-[9px] font-semibold tracking-wider uppercase opacity-75 px-1.5 py-0.5">
-                      AI Metric
-                    </span>
-                    <span
-                      className="tooltip tooltip-left cursor-help"
-                      data-tip="Confidence score is an AI extraction metric and is not part of the exported table data."
-                      title="Confidence score is an AI extraction metric and is not part of the exported table data."
-                    >
-                      <Info className="w-3.5 h-3.5 text-base-content/40 hover:text-base-content transition-colors" />
+              {/* Confidence column header: shown in view mode, auto-hidden in edit mode */}
+              {!isEditMode && (
+                <th
+                  className="p-2.5 text-left border-b border-base-300 border-l-2 border-base-300 bg-base-200/60 whitespace-normal break-words w-[135px] select-none align-top"
+                  data-testid="confidence-header"
+                >
+                  <div className="flex flex-col h-full justify-between gap-1.5">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="badge badge-neutral badge-xs text-[9px] font-semibold tracking-wider uppercase opacity-75 px-1.5 py-0.5">
+                        AI Metric
+                      </span>
+                      <span
+                        className="tooltip tooltip-left cursor-help"
+                        data-tip="Confidence score is an AI extraction metric and is not part of the exported table data."
+                        title="Confidence score is an AI extraction metric and is not part of the exported table data."
+                      >
+                        <Info className="w-3.5 h-3.5 text-base-content/40 hover:text-base-content transition-colors" />
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-bold text-base-content/80 tracking-wide uppercase">
+                      CONFIDENCE
                     </span>
                   </div>
-                  <span className="text-[11px] font-bold text-base-content/80 tracking-wide uppercase">
-                    CONFIDENCE
-                  </span>
-                  {isEditMode && (
-                    <span className="text-[9px] text-base-content/40 italic">
-                      Read-only metric
-                    </span>
-                  )}
-                </div>
-              </th>
+                </th>
+              )}
               {isEditMode && (onRowDelete || onRowMove) && (
                 <th className="p-3 border-b border-base-300 w-24"></th>
               )}
@@ -444,31 +441,39 @@ function ExtractedDataPanel({
                     );
                   })}
 
-                  {/* Confidence score cell: visually distinguished with divider border and subtle tint */}
-                  <td
-                    className={`p-2 border-l-2 border-base-300 ${tier.isLow ? 'bg-error/15' : 'bg-base-200/40'}`}
-                  >
-                    <div className="flex items-center gap-1">
-                      {tier.isLow && (
-                        <span title="please check this output">
-                          <AlertTriangle className="w-3 h-3 text-error cursor-pointer flex-shrink-0" />
+                  {/* Confidence score cell: shown in view mode, auto-hidden in edit mode */}
+                  {!isEditMode && (
+                    <td
+                      className={`p-2 border-l-2 border-base-300 ${tier.isLow ? 'bg-error/15' : 'bg-base-200/40'}`}
+                      data-testid={`confidence-cell-${row._id}`}
+                    >
+                      <div className="flex items-center gap-1">
+                        {tier.isLow && (
+                          <span title="please check this output">
+                            <AlertTriangle className="w-3 h-3 text-error cursor-pointer flex-shrink-0" />
+                          </span>
+                        )}
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === 'badge-success'
+                              ? 'border-success text-success bg-[var(--color-base-100)]'
+                              : tier.badgeClass === 'badge-warning'
+                                ? 'border-warning text-warning bg-[var(--color-base-100)]'
+                                : ' border-error text-error bg-[var(--color-base-100)]'
+                            }`}
+                        >
+                          {tier.label}
                         </span>
-                      )}
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === 'badge-success'
-                            ? 'border-success text-success bg-[var(--color-base-100)]'
-                            : tier.badgeClass === 'badge-warning'
-                              ? 'border-warning text-warning bg-[var(--color-base-100)]'
-                              : ' border-error text-error bg-[var(--color-base-100)]'
-                          }`}
-                      >
-                        {tier.label}
-                      </span>
-                    </div>
-                  </td>
+                      </div>
+                    </td>
+                  )}
                   {isEditMode && (onRowDelete || onRowMove || onRowIndent || onRowOutdent) && (
                     <td className="p-2 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {tier.isLow && (
+                          <span title="Low confidence row (please check values)" className="mr-1">
+                            <AlertTriangle className="w-3.5 h-3.5 text-error flex-shrink-0" />
+                          </span>
+                        )}
                         {(onRowIndent || onRowOutdent) && (
                           <div className="flex flex-col">
                             <button

@@ -77,10 +77,15 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     ).toBeInTheDocument();
   });
 
-  it('displays read-only metric label in confidence header during edit mode', () => {
+  it('auto-hides confidence score column in edit mode to avoid confusion with table data', () => {
     render(<ControlledPanel onHover={onHoverMock} extractedData={mockExtractedData} />);
+    expect(screen.getByTestId('confidence-header')).toBeInTheDocument();
+    expect(screen.getByTestId('confidence-cell-row1')).toBeInTheDocument();
+
     fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
-    expect(screen.getByText('Read-only metric')).toBeInTheDocument();
+
+    expect(screen.queryByTestId('confidence-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('confidence-cell-row1')).not.toBeInTheDocument();
   });
 
   it('turns a cell into an input field when clicked in edit mode', async () => {
