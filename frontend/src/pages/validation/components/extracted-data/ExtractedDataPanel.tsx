@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
+  Info,
 } from 'lucide-react'; // NEW: Importing icons for confidence badges and export button
 import React, { useState, useEffect } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
@@ -114,8 +115,6 @@ function ExtractedDataPanel({
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
-
-
   useEffect(() => {
     if (hoveredOverlayIds && hoveredOverlayIds.length > 0 && !isMouseInside) {
       // hoveredOverlayIds are fieldIds (e.g. comp_4:SUB_ITEM_2)
@@ -155,7 +154,8 @@ function ExtractedDataPanel({
   };
 
   const handleCellKeyDown = (e: React.KeyboardEvent, fieldId: string) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       handleCellBlur(fieldId);
     } else if (e.key === 'Escape') {
       if (editValue !== initialEditValue) {
@@ -284,8 +284,9 @@ function ExtractedDataPanel({
           )}
           <button
             onClick={() => setShowExportModal(true)}
-            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${exportedFormat ? 'btn-success' : 'btn-primary'
-              }`}
+            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${
+              exportedFormat ? 'btn-success' : 'btn-primary'
+            }`}
           >
             {exportedFormat ? (
               <>
@@ -313,10 +314,11 @@ function ExtractedDataPanel({
               {extractedData.columns.map((column) => (
                 <th
                   key={column}
-                  className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${isEditMode && dragOverColumn === column && draggedColumn !== column
+                  className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${
+                    isEditMode && dragOverColumn === column && draggedColumn !== column
                       ? 'bg-primary/20'
                       : ''
-                    }`}
+                  }`}
                   style={{ height: '1px' }}
                   draggable={isEditMode}
                   onDragStart={() => {
@@ -409,10 +411,31 @@ function ExtractedDataPanel({
                 </th>
               ))}
 
-              {/* NEW: Confidence column header added at the end of the table */}
-              <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal break-words w-[120px]">
-                CONFIDENCE SCORE
-              </th>
+              {/* Confidence column header: shown in view mode, auto-hidden in edit mode */}
+              {!isEditMode && (
+                <th
+                  className="p-2.5 text-left border-b border-base-300 border-l-2 border-base-300 bg-base-200/60 whitespace-normal break-words w-[135px] select-none align-top"
+                  data-testid="confidence-header"
+                >
+                  <div className="flex flex-col h-full justify-between gap-1.5">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="badge badge-neutral badge-xs text-[9px] font-semibold tracking-wider uppercase opacity-75 px-1.5 py-0.5">
+                        AI Metric
+                      </span>
+                      <span
+                        className="tooltip tooltip-left cursor-help"
+                        data-tip="Confidence score is an AI extraction metric and is not part of the exported table data."
+                        title="Confidence score is an AI extraction metric and is not part of the exported table data."
+                      >
+                        <Info className="w-3.5 h-3.5 text-base-content/40 hover:text-base-content transition-colors" />
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-bold text-base-content/80 tracking-wide uppercase">
+                      CONFIDENCE
+                    </span>
+                  </div>
+                </th>
+              )}
               {isEditMode && (onRowDelete || onRowMove) && (
                 <th className="p-3 border-b border-base-300 w-24"></th>
               )}
@@ -427,8 +450,9 @@ function ExtractedDataPanel({
               return (
                 <tr
                   key={row._id}
-                  className={`border-b border-base-300 hover:bg-base-300/40 ${tier.isLow ? 'bg-error/10' : ''
-                    }`}
+                  className={`border-b border-base-300 hover:bg-base-300/40 ${
+                    tier.isLow ? 'bg-error/10' : ''
+                  }`}
                 >
                   {extractedData.columns.map((column) => {
                     const fieldId = `${String(row._id)}:${column}`;
@@ -447,15 +471,16 @@ function ExtractedDataPanel({
                       <td
                         key={column}
                         id={`cell-${safeId}`}
-                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 text-base-content text-[13px] transition-colors ${isEditMode ? 'cursor-pointer' : ''
-                          } ${
+                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 text-base-content text-[13px] transition-colors ${
+                          isEditMode ? 'cursor-pointer' : ''
+                        } ${
                           //yellow tint
                           isCellHighlighted && !isEditing
                             ? 'bg-primary text-primary-content font-bold rounded shadow-inner'
                             : editedCells?.has(fieldId)
                               ? 'bg-warning/15'
                               : ''
-                          }`}
+                        }`}
                         onMouseEnter={() => onHover(fieldId)}
                         onMouseLeave={() => onHover(null)}
                         onClick={() => {
@@ -465,14 +490,27 @@ function ExtractedDataPanel({
                         }}
                       >
                         {isEditing ? (
-                          <input
-                            type="text"
-                            className="input input-xs input-bordered w-full max-w-xs bg-base-100 text-base-content"
+                          <textarea
+                            className="textarea textarea-xs textarea-bordered w-full min-w-[8rem] resize-none bg-base-100 text-base-content leading-snug"
+                            rows={1}
                             value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
+                            onChange={(e) => {
+                              setEditValue(e.target.value);
+                              // auto-grow to fit content
+                              const el = e.target as HTMLTextAreaElement;
+                              el.style.height = 'auto';
+                              el.style.height = `${el.scrollHeight}px`;
+                            }}
                             onBlur={() => handleCellBlur(fieldId)}
                             onKeyDown={(e) => handleCellKeyDown(e, fieldId)}
                             autoFocus
+                            ref={(el) => {
+                              // set initial height on mount to fit existing content
+                              if (el) {
+                                el.style.height = 'auto';
+                                el.style.height = `${el.scrollHeight}px`;
+                              }
+                            }}
                           />
                         ) : (
                           //pencil icon
@@ -487,34 +525,40 @@ function ExtractedDataPanel({
                     );
                   })}
 
-                  {/* NEW: Confidence score cell added at the end of each row
-										Shows a DaisyUI badge with the score percentage
-										Green >=85%, Amber 70-84%, Red <70%
-										Low confidence rows also show a warning icon from lucide-react */}
-                  {/* UPDATED: Capsule shape with solid background colours for high visibility */}
-                  {/* Alert icon on left only for low confidence rows with hover tooltip */}
-                  <td className="p-2">
-                    <div className="flex items-center gap-1">
-                      {tier.isLow && (
-                        <span title="please check this output">
-                          <AlertTriangle className="w-3 h-3 text-error cursor-pointer flex-shrink-0" />
-                        </span>
-                      )}
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === 'badge-success'
-                            ? 'border-success text-success bg-[var(--color-base-100)]'
-                            : tier.badgeClass === 'badge-warning'
-                              ? 'border-warning text-warning bg-[var(--color-base-100)]'
-                              : ' border-error text-error bg-[var(--color-base-100)]'
+                  {/* Confidence score cell: shown in view mode, auto-hidden in edit mode */}
+                  {!isEditMode && (
+                    <td
+                      className={`p-2 border-l-2 border-base-300 ${tier.isLow ? 'bg-error/15' : 'bg-base-200/40'}`}
+                      data-testid={`confidence-cell-${row._id}`}
+                    >
+                      <div className="flex items-center gap-1">
+                        {tier.isLow && (
+                          <span title="please check this output">
+                            <AlertTriangle className="w-3 h-3 text-error cursor-pointer flex-shrink-0" />
+                          </span>
+                        )}
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                            tier.badgeClass === 'badge-success'
+                              ? 'border-success text-success bg-[var(--color-base-100)]'
+                              : tier.badgeClass === 'badge-warning'
+                                ? 'border-warning text-warning bg-[var(--color-base-100)]'
+                                : ' border-error text-error bg-[var(--color-base-100)]'
                           }`}
-                      >
-                        {tier.label}
-                      </span>
-                    </div>
-                  </td>
+                        >
+                          {tier.label}
+                        </span>
+                      </div>
+                    </td>
+                  )}
                   {isEditMode && (onRowDelete || onRowMove || onRowIndent || onRowOutdent) && (
                     <td className="p-2 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {tier.isLow && (
+                          <span title="Low confidence row (please check values)" className="mr-1">
+                            <AlertTriangle className="w-3.5 h-3.5 text-error flex-shrink-0" />
+                          </span>
+                        )}
                         {(onRowIndent || onRowOutdent) && (
                           <div className="flex flex-col">
                             <button
