@@ -108,8 +108,6 @@ function ExtractedDataPanel({
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
-
-
   useEffect(() => {
     if (hoveredOverlayIds && hoveredOverlayIds.length > 0 && !isMouseInside) {
       // hoveredOverlayIds are fieldIds (e.g. comp_4:SUB_ITEM_2)
@@ -149,7 +147,8 @@ function ExtractedDataPanel({
   };
 
   const handleCellKeyDown = (e: React.KeyboardEvent, fieldId: string) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       handleCellBlur(fieldId);
     } else if (e.key === 'Escape') {
       if (editValue !== initialEditValue) {
@@ -248,8 +247,9 @@ function ExtractedDataPanel({
           )}
           <button
             onClick={() => setShowExportModal(true)}
-            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${exportedFormat ? 'btn-success' : 'btn-primary'
-              }`}
+            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${
+              exportedFormat ? 'btn-success' : 'btn-primary'
+            }`}
           >
             {exportedFormat ? (
               <>
@@ -277,10 +277,11 @@ function ExtractedDataPanel({
               {extractedData.columns.map((column) => (
                 <th
                   key={column}
-                  className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${isEditMode && dragOverColumn === column && draggedColumn !== column
+                  className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${
+                    isEditMode && dragOverColumn === column && draggedColumn !== column
                       ? 'bg-primary/20'
                       : ''
-                    }`}
+                  }`}
                   style={{ height: '1px' }}
                   draggable={isEditMode}
                   onDragStart={() => {
@@ -381,8 +382,9 @@ function ExtractedDataPanel({
               return (
                 <tr
                   key={row._id}
-                  className={`border-b border-base-300 hover:bg-base-300/40 ${tier.isLow ? 'bg-error/10' : ''
-                    }`}
+                  className={`border-b border-base-300 hover:bg-base-300/40 ${
+                    tier.isLow ? 'bg-error/10' : ''
+                  }`}
                 >
                   {extractedData.columns.map((column) => {
                     const fieldId = `${String(row._id)}:${column}`;
@@ -401,15 +403,16 @@ function ExtractedDataPanel({
                       <td
                         key={column}
                         id={`cell-${safeId}`}
-                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 text-base-content text-[13px] transition-colors ${isEditMode ? 'cursor-pointer' : ''
-                          } ${
+                        className={`p-2 break-words whitespace-normal hover:bg-warning/10 text-base-content text-[13px] transition-colors ${
+                          isEditMode ? 'cursor-pointer' : ''
+                        } ${
                           //yellow tint
                           isCellHighlighted && !isEditing
                             ? 'bg-primary text-primary-content font-bold rounded shadow-inner'
                             : editedCells?.has(fieldId)
                               ? 'bg-warning/15'
                               : ''
-                          }`}
+                        }`}
                         onMouseEnter={() => onHover(fieldId)}
                         onMouseLeave={() => onHover(null)}
                         onClick={() => {
@@ -419,14 +422,27 @@ function ExtractedDataPanel({
                         }}
                       >
                         {isEditing ? (
-                          <input
-                            type="text"
-                            className="input input-xs input-bordered w-full max-w-xs bg-base-100 text-base-content"
+                          <textarea
+                            className="textarea textarea-xs textarea-bordered w-full min-w-[8rem] resize-none bg-base-100 text-base-content leading-snug"
+                            rows={1}
                             value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
+                            onChange={(e) => {
+                              setEditValue(e.target.value);
+                              // auto-grow to fit content
+                              const el = e.target as HTMLTextAreaElement;
+                              el.style.height = 'auto';
+                              el.style.height = `${el.scrollHeight}px`;
+                            }}
                             onBlur={() => handleCellBlur(fieldId)}
                             onKeyDown={(e) => handleCellKeyDown(e, fieldId)}
                             autoFocus
+                            ref={(el) => {
+                              // set initial height on mount to fit existing content
+                              if (el) {
+                                el.style.height = 'auto';
+                                el.style.height = `${el.scrollHeight}px`;
+                              }
+                            }}
                           />
                         ) : (
                           //pencil icon
@@ -454,12 +470,13 @@ function ExtractedDataPanel({
                           </span>
                         )}
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${tier.badgeClass === 'badge-success'
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                            tier.badgeClass === 'badge-success'
                               ? 'border-success text-success bg-[var(--color-base-100)]'
                               : tier.badgeClass === 'badge-warning'
                                 ? 'border-warning text-warning bg-[var(--color-base-100)]'
                                 : ' border-error text-error bg-[var(--color-base-100)]'
-                            }`}
+                          }`}
                         >
                           {tier.label}
                         </span>
