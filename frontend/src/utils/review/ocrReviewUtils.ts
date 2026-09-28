@@ -1,6 +1,6 @@
 // Acknowledgement: Google Gemini was used to help generate this file
 
-import type { OcrIssue, ReviewSlide } from '../models/IssueReview';
+import type { OcrIssue, ReviewSlide } from '../../models/IssueReview';
 
 // Function that turns each OCR Issue to a equivalent ReviewSlide format
 export function buildSlides(issues: OcrIssue[]): ReviewSlide[] {
