@@ -16,7 +16,6 @@ import type { ExtractedData } from '../../../../models/TableData';
 import { ExportModal } from './ExportModal'; // NEW: Excel export service (US-4.5)
 import TextInputModal from '../modals/TextInputModal';
 import Toast from '../modals/Toast';
-import { TablePanel } from './subcomponents/TablePanel';
 
 // NEW update: Helper function helps to determine the confidence tier of a row
 // Returns the appropriate DaisyUI badge class and label based on the score
