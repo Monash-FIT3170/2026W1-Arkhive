@@ -9,7 +9,7 @@ import OcrReviewWidget from './OcrReviewWidget';
 
 import type { HistoryEntry } from '../../../../models/HistoryEntry';
 import type { OcrIssue } from '../../../../models/IssueReview';
-import { buildSlides } from '../../../../utils/ocrReviewUtils';
+import { buildSlides } from '../../../../utils/review/ocrReviewUtils';
 
 function ChatPanel({
   isOpen,
@@ -29,8 +29,9 @@ function ChatPanel({
   onFetchBulkSuggestion,
   activeTab,
   onTabChange,
-  onResolveIssues,
-  resolvedIssueIds,
+  onRescan,
+  isRescanning,
+  formatCheckFailed,
   history = [],
 }: {
   isOpen: boolean;
@@ -45,7 +46,7 @@ function ChatPanel({
   onCarouselAccept?: (updates: { fieldId: string; newValue: string }[]) => void;
   onCarouselReject?: (fieldIds: string[]) => void;
   onCarouselManualEdit?: (fieldId: string, newValue: string) => void;
-  onSlideChange?: (fieldIds: string[]) => void;
+  onSlideChange?: (fieldIds: string[], pageIndex?: number) => void;
   onFetchSuggestion?: (fieldId: string) => Promise<string | null>;
   onFetchBulkSuggestion?: (
     column: string,
@@ -55,8 +56,11 @@ function ChatPanel({
   activeTab?: 'chat' | 'review' | 'history';
   onTabChange?: (tab: 'chat' | 'review' | 'history') => void;
 
-  resolvedIssueIds?: Set<string>;
-  onResolveIssues?: (ids: string[]) => void;
+  /** Re-scans the page currently in view, discarding its review state. */
+  onRescan?: () => void;
+  isRescanning?: boolean;
+  /** True when the LLM format check failed for the current page. */
+  formatCheckFailed?: boolean;
 
   history?: HistoryEntry[];
 }) {
@@ -65,12 +69,9 @@ function ChatPanel({
   const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const unresolvedSlideCount = useMemo(() => {
-    const unresolved = flaggedIssues.filter(
-      (issue) => !resolvedIssueIds?.has(issue.fieldId)
-    );
-    return buildSlides(unresolved).length;
-  }, [flaggedIssues, resolvedIssueIds]);
+  // `flaggedIssues` only ever contains open issues now; resolved ones are
+  // tracked (and persisted) by useReviewQueue and never reach this component.
+  const unresolvedSlideCount = useMemo(() => buildSlides(flaggedIssues).length, [flaggedIssues]);
 
   useEffect(() => {
     //whenever messages changes it scrolls to the button of the chat
@@ -245,8 +246,9 @@ function ChatPanel({
                 onSlideChange={onSlideChange}
                 onFetchSuggestion={onFetchSuggestion}
                 onFetchBulkSuggestion={onFetchBulkSuggestion}
-                resolvedIds={resolvedIssueIds}
-                onResolveIds={onResolveIssues}
+                onRescan={onRescan}
+                isRescanning={isRescanning}
+                formatCheckFailed={formatCheckFailed}
               />
             </div>
           ) : activeTab === 'chat' ? (
