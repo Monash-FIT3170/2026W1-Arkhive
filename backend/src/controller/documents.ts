@@ -12,7 +12,7 @@ import {
 import { parseTableWithRetries } from '../services/ocr/ocr';
 import type { ExtractedPage } from '../models/TableData';
 import type { PageSelection, ProcessedPageResult } from '../models/Project.ts';
-import { classifyDocument } from "../services/ocr/utils/classify"
+//import { classifyDocument } from "../services/ocr/utils/classify"
 
 /**
  * Verifies the caller owns the project that (transitively) owns `documentId`,
