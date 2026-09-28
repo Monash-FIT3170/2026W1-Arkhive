@@ -1,6 +1,6 @@
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 /**
  * Login & Registration Page Placeholder.
@@ -12,6 +12,7 @@ type Mode = 'login' | 'register';
 export const LoginPage = () => {
   const {
     user,
+    isGuest,
     isLoading,
     signInWithPassword,
     signUp,
@@ -20,7 +21,15 @@ export const LoginPage = () => {
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const destination = (location.state as { from?: { pathname?: string } })?.from?.pathname || '/';
+  const fromPath = (location.state as { from?: { pathname?: string } })?.from?.pathname;
+  // Signed-in users land on Home by default; guests skip straight to the
+  // Upload flow instead, since they can't use the Projects section anyway.
+  const destination = fromPath || '/';
+  // Guests can never satisfy RequireUser, so if `fromPath` points into
+  // /projects (e.g. they were bounced here from "Create a Project"),
+  // honoring it would send a guest straight back into another redirect
+  // loop to /login. Fall back to /upload in that case.
+  const guestDestination = fromPath && !fromPath.startsWith('/projects') ? fromPath : '/upload';
 
   const [mode, setMode] = useState<Mode>('login');
   const [displayName, setDisplayName] = useState('');
@@ -32,6 +41,17 @@ export const LoginPage = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showGuestWarning, setShowGuestWarning] = useState(false);
+  const [guestConfirmed, setGuestConfirmed] = useState(false);
+
+  // Wait for `isGuest` to actually land in a completed render before
+  // navigating — firing navigate() in the same click as continueAsGuest()
+  // could race AuthGuard's check on the destination route against a
+  // not-yet-settled context value.
+  useEffect(() => {
+    if (guestConfirmed && isGuest) {
+      navigate(guestDestination, { replace: true });
+    }
+  }, [guestConfirmed, isGuest, guestDestination, navigate]);
 
   // Redirect if already authenticated as a signed-in user
   if (!isLoading && user) {
@@ -264,7 +284,7 @@ export const LoginPage = () => {
                 onClick={() => {
                   setShowGuestWarning(false);
                   continueAsGuest();
-                  navigate(destination, { replace: true });
+                  setGuestConfirmed(true);
                 }}
               >
                 Continue as Guest

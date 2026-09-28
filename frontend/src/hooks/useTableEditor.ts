@@ -15,13 +15,13 @@ interface UseTableEditorOptions {
   // don't carry per-field UI state (edited-cell highlighting, flagged-issue
   // clearing) the way a single cell edit does.
   onCellEdited?: (fieldId: string) => void;
+  onColumnRenamed?: (oldName: string, newName: string) => void;
 }
 
-// Replaces the six near-identical onCellEdit/onRowAdd/onRowDelete/onColumnAdd/
-// onColumnDelete/onRowMove/onColumnReorder handlers that used to be written
-// inline in ExtractedDataPanel's props. Only cell edits log a history entry
-// with old/new values — that matched the original page's behavior, where row
-// and column structural changes weren't tracked in history.
+// Replaces the near-identical onCellEdit/onRowAdd/onRowDelete/onColumnAdd/
+// onColumnDelete/onColumnRename/onRowMove/onColumnReorder handlers that used
+// to be written inline in ExtractedDataPanel's props. Cell edits and column
+// renames log history entries with old/new values.
 export function useTableEditor({
   currentPageIndexRef,
   extractedPagesRef,
@@ -30,6 +30,7 @@ export function useTableEditor({
   addHistoryEntry,
   pushUndo,
   onCellEdited,
+  onColumnRenamed,
 }: UseTableEditorOptions) {
   const mutatePage = usePageMutation({
     currentPageIndexRef,
@@ -90,6 +91,26 @@ export function useTableEditor({
     [mutatePage]
   );
 
+  const renameColumn = useCallback(
+    (oldName: string, newName: string) => {
+      const trimmedNew = newName.trim();
+      const result = mutatePage((page) => tableOps.renameColumn(page, oldName, trimmedNew));
+      if (!result) return;
+
+      addHistoryEntry({
+        type: 'edit',
+        pageIndex: result.pageIndex,
+        column: trimmedNew,
+        oldValue: oldName,
+        newValue: trimmedNew,
+        description: `Renamed column "${oldName}" to "${trimmedNew}" on page ${result.pageIndex + 1}`,
+      });
+
+      onColumnRenamed?.(oldName, trimmedNew);
+    },
+    [mutatePage, addHistoryEntry, onColumnRenamed]
+  );
+
   const moveRow = useCallback(
     (rowId: string | number, direction: 'up' | 'down') => {
       mutatePage((page) => tableOps.moveRow(page, rowId, direction));
@@ -104,5 +125,5 @@ export function useTableEditor({
     [mutatePage]
   );
 
-  return { editCell, addRow, deleteRow, addColumn, deleteColumn, moveRow, reorderColumns };
+  return { editCell, addRow, deleteRow, addColumn, deleteColumn, renameColumn, moveRow, reorderColumns };
 }
