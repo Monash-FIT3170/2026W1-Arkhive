@@ -50,7 +50,7 @@ function pruneOCROutput(
   };
 
   return {
-    content: OCRResponse.analyzeResult?.content!, // scoped to this page, not the whole doc
+    content: OCRResponse.analyzeResult!.content!, // scoped to this page, not the whole doc
     tables: tablesInPage.map((table) => ({
       rowCount: table.rowCount,
       columnCount: table.columnCount,
