@@ -1,5 +1,3 @@
-// backend/src/models/QrSession.ts
-
 export type QrSessionStatus = 'pending' | 'uploaded' | 'expired';
 
 export interface QrSession {

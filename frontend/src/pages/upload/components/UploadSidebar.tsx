@@ -5,9 +5,13 @@
 //
 // UPDATED: SelectionActions now also receives bulk remove/replace handlers
 // so it can render "Replace Selected" / "Remove Selected" actions.
+//
+// UPDATED: Also renders a "Scan QR to upload" button under the mini dropzone
+// (only when onQrUploaded is provided).
 
 import SelectionActions from './actions/SelectionActions';
 import ProcessDocumentsButton from './actions/ProcessDocumentsButton';
+import ScanQrButton from './actions/ScanQrButton'; // NEW
 import DropZone from './dropzone/DropZone';
 
 type Props = {
@@ -21,6 +25,7 @@ type Props = {
   onError?: (msg: string | null) => void;
   onBulkRemove: () => void;                     // triggers bulk-remove confirmation
   onBulkReplaceFiles: (files: File[]) => void;   // triggers bulk-replace confirmation
+  onQrUploaded?: () => void;                     // NEW: called when a phone upload (via QR code) lands in the session
 };
 
 export default function UploadSidebar({
@@ -34,6 +39,7 @@ export default function UploadSidebar({
   onError,
   onBulkRemove,
   onBulkReplaceFiles,
+  onQrUploaded, // NEW
 }: Props) {
   return (
     <aside className="border-base-300 bg-base-100 flex w-80 shrink-0 flex-col gap-2 border-l px-4 py-4 overflow-y-auto">
@@ -62,6 +68,11 @@ export default function UploadSidebar({
         </p>
         <DropZone onFilesCaptured={onFilesCaptured} onError={onError} />
       </div>
+
+      {/* NEW: Scan a QR code to add a photo from your phone */}
+      {onQrUploaded && (
+        <ScanQrButton onUploaded={onQrUploaded} className="btn btn-outline btn-sm w-full" />
+      )}
 
       {/* Process button — pinned to the bottom */}
       <div className="mt-auto">
