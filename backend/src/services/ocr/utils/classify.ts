@@ -1,5 +1,4 @@
 import LlamaCloud from "@llamaindex/llama-cloud";
-import fs from "fs";
 
 // Initialize client (reads LLAMA_CLOUD_API_KEY from environment)
 const client = new LlamaCloud({ apiKey: process.env.LLAMA_CLOUD_API_KEY});
