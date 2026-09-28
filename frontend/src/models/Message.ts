@@ -1,4 +1,4 @@
-import type { ExtractedData } from './TableData';
+import type { ExtractedData, ExtractedPage } from './TableData';
 
 export interface Message {
   role: 'user' | 'model';
@@ -23,7 +23,7 @@ export interface ChatRequest {
 export interface ChatResponse {
   response: string; // the AI's human readable reply
   intent: Intent | null;
-  updatedContext?: ExtractedData; // AI returns the modified table data
+  updatedContext?: ExtractedPage; // AI returns the modified table data
 }
 
 export interface Intent {
