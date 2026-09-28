@@ -1,14 +1,12 @@
 import {
   AnalyzeResultOutput,
-  DocumentLineOutput,
-  DocumentTableCellOutput,
   type DocumentPageOutput,
   type DocumentTableOutput,
 } from '@azure-rest/ai-document-intelligence';
 import {
   type AnalyzeOperationOutput,
 } from '@azure-rest/ai-document-intelligence';
-import { GoogleGenAI, Schema, ThinkingLevel } from '@google/genai';
+import { GoogleGenAI, Schema } from '@google/genai';
 import {
   OCRComponent,
   OCRBoundingBoxes,
@@ -17,10 +15,8 @@ import {
   OCRColumnBoundingBoxes,
   Pages,
   Page,
-  OCRBoundingBox,
 } from '../types/boundingBoxTypes';
 import { OpenRedaction } from "openredaction";
-import fs from "fs"
 
 const redactor = new OpenRedaction();
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
