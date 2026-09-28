@@ -20,7 +20,7 @@ documentsRouter.post('/process', documentsController.processDocument);
 // Save is now page-scoped: one document can have some pages 'done' and
 // others still pending, so the save target has to be a specific page.
 documentsRouter.patch('/:id/pages/:pageIndex/data', documentsController.saveExtractedData);
-
+documentsRouter.patch('/:id/pages/:pageIndex/review', documentsController.saveReviewState);
 documentsRouter.delete('/:id/pages/:pageIndex', documentsController.deletePage);
 documentsRouter.delete('/:id', documentsController.deleteDocument);
 
