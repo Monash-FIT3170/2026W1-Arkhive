@@ -60,7 +60,7 @@ function pruneOCROutput(
         content: cell.content,
         kind: cell.kind,
         boundingRegions: cell.boundingRegions,
-        words: wordsInSpan(cell.spans?.[0]),
+        words: wordsInSpan(cell.spans!.[0]),
       })),
     })),
     pages: [
