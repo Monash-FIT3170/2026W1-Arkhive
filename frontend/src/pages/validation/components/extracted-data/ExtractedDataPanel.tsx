@@ -56,7 +56,6 @@ function getConfidenceTier(confidence: number): {
 function ExtractedDataPanel({
   onHover,
   extractedData,
-  allExtractedData,
   fileGroups,
   currentGlobalIndex,
   hoveredOverlayIds,
@@ -77,7 +76,6 @@ function ExtractedDataPanel({
 }: {
   onHover: (id: string | null) => void;
   extractedData: ExtractedData;
-  allExtractedData?: ExtractedData[];
   fileGroups?: ValidationFileGroup[];
   currentGlobalIndex?: number;
   hoveredOverlayIds?: string[];
@@ -731,7 +729,6 @@ function ExtractedDataPanel({
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
         extractedData={extractedData}
-        allExtractedData={allExtractedData}
         fileGroups={fileGroups}
         currentGlobalIndex={currentGlobalIndex}
         onExport={() => {

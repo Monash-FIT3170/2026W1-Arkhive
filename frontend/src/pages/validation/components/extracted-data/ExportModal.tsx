@@ -4,13 +4,11 @@ import type { ValidationFileGroup } from '../../../../utils/fileGrouping';
 import { exportExtractedDataAsCSV, exportExtractedDataAsSimpleCSV } from '../../../../services/csvDownloadService';
 import { exportExtractedDataAsJSON } from '../../../../services/jsonDownloadService';
 import { exportExtractedDataAsTXT } from '../../../../services/txtDownloadService';
-import { exportExtractedDataAsXLSX } from '../../../../services/xlsxDownloadService';
-
+import { exportExtractedDataAsXLSX, downloadBulkXLSX, type BulkExportItem } from '../../../../services/xlsxDownloadService';
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   extractedData: ExtractedData;
-  allExtractedData?: ExtractedData[];
   fileGroups?: ValidationFileGroup[];
   currentGlobalIndex?: number;
   onExport?: () => void;
@@ -33,6 +31,7 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
   const [mergeStrategy, setMergeStrategy] = useState<'single' | 'per-file' | 'per-page'>('single');
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set(currentGlobalIndex !== undefined ? [currentGlobalIndex] : []));
   
+  const [exportError, setExportError] = useState<string | null>(null);
   const [selectedTemplates, setSelectedTemplates] = useState({
     csv_default: true,
     csv_simple: false,
@@ -79,66 +78,74 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
   };
 
   const handleExtract = () => {
-    if (!fileGroups) {
-      // Fallback
-      if (selectedPages.has(currentGlobalIndex ?? 0)) {
-        const base = customFilename.trim() || 'export';
-        if (selectedTemplates.csv_default) exportExtractedDataAsCSV(extractedData, `${base}_default.csv`);
-        if (selectedTemplates.csv_simple) exportExtractedDataAsSimpleCSV(extractedData, `${base}_simple.csv`);
-        if (selectedTemplates.txt_default) exportExtractedDataAsTXT(extractedData, `${base}_default.txt`);
-        if (selectedTemplates.xlsx_default) exportExtractedDataAsXLSX(extractedData, `${base}_default.xlsx`);
-        if (selectedTemplates.json_default) exportExtractedDataAsJSON(extractedData, `${base}_default.json`);
-      }
-      if (onExport) onExport();
-      onClose();
-      return;
-    }
-
+    const xlsxItems: BulkExportItem[] = [];
     const baseFilename = customFilename.trim() || 'export';
 
     const performExport = (data: ExtractedData, suffix: string) => {
       if (selectedTemplates.csv_default) exportExtractedDataAsCSV(data, `${baseFilename}${suffix}_default.csv`);
       if (selectedTemplates.csv_simple) exportExtractedDataAsSimpleCSV(data, `${baseFilename}${suffix}_simple.csv`);
       if (selectedTemplates.txt_default) exportExtractedDataAsTXT(data, `${baseFilename}${suffix}_default.txt`);
-      if (selectedTemplates.xlsx_default) exportExtractedDataAsXLSX(data, `${baseFilename}${suffix}_default.xlsx`);
       if (selectedTemplates.json_default) exportExtractedDataAsJSON(data, `${baseFilename}${suffix}_default.json`);
-    };
-
-    const getGroupName = (group: ValidationFileGroup) => {
-      let name = customFileNames[group.fileId] || group.fileName;
-      name = name.replace(/\.[^/.]+$/, ""); // remove extension
-      return name.replace(/[\\/:*?"<>|]+/g, "_").replace(/^_+|_+$/g, ""); // replace illegal characters cleanly
-    };
-
-    if (mergeStrategy === 'single') {
-      const allSelectedPages = fileGroups
-        .flatMap(g => g.pages)
-        .filter(p => selectedPages.has(p.globalIndex))
-        .map(p => p.extractedPage);
-      if (allSelectedPages.length > 0) {
-        performExport(mergeExtractedData(allSelectedPages), '');
+      if (selectedTemplates.xlsx_default) {
+        xlsxItems.push({ name: `${baseFilename}${suffix}_default`, data });
       }
-    } else if (mergeStrategy === 'per-file') {
-      fileGroups.forEach((group) => {
-        const groupPages = group.pages
+    };
+
+    if (!fileGroups) {
+      // Fallback
+      if (selectedPages.has(currentGlobalIndex ?? 0)) {
+        performExport(extractedData, '');
+      }
+    } else {
+      const getGroupName = (group: ValidationFileGroup) => {
+        let name = customFileNames[group.fileId] || group.fileName;
+        name = name.replace(/\.[^/.]+$/, ""); // remove extension
+        return name.replace(/[\\/:*?"<>|]+/g, "_").replace(/^_+|_+$/g, ""); // replace illegal characters cleanly
+      };
+
+      if (mergeStrategy === 'single') {
+        const allSelectedPages = fileGroups
+          .flatMap(g => g.pages)
           .filter(p => selectedPages.has(p.globalIndex))
           .map(p => p.extractedPage);
-        if (groupPages.length > 0) {
-          const cleanName = getGroupName(group);
-          const suffix = `_${cleanName}`;
-          performExport(mergeExtractedData(groupPages), suffix);
+        if (allSelectedPages.length > 0) {
+          performExport(mergeExtractedData(allSelectedPages), '');
         }
-      });
-    } else if (mergeStrategy === 'per-page') {
-      fileGroups.forEach((group) => {
-        group.pages.forEach((page) => {
-          if (selectedPages.has(page.globalIndex)) {
+      } else if (mergeStrategy === 'per-file') {
+        fileGroups.forEach((group) => {
+          const groupPages = group.pages
+            .filter(p => selectedPages.has(p.globalIndex))
+            .map(p => p.extractedPage);
+          if (groupPages.length > 0) {
             const cleanName = getGroupName(group);
-            const suffix = `_${cleanName}_Page${page.pageIndexInFile + 1}`;
-            performExport(page.extractedPage, suffix);
+            const suffix = `_${cleanName}`;
+            performExport(mergeExtractedData(groupPages), suffix);
           }
         });
-      });
+      } else if (mergeStrategy === 'per-page') {
+        fileGroups.forEach((group) => {
+          group.pages.forEach((page) => {
+            if (selectedPages.has(page.globalIndex)) {
+              const cleanName = getGroupName(group);
+              const suffix = `_${cleanName}_Page${page.pageIndexInFile + 1}`;
+              performExport(page.extractedPage, suffix);
+            }
+          });
+        });
+      }
+    }
+
+    if (selectedTemplates.xlsx_default && xlsxItems.length > 0) {
+      try {
+        if (xlsxItems.length === 1) {
+          exportExtractedDataAsXLSX(xlsxItems[0].data, `${xlsxItems[0].name}.xlsx`);
+        } else {
+          downloadBulkXLSX(xlsxItems);
+        }
+      } catch (err) {
+        setExportError(err instanceof Error ? err.message : 'Could not generate the Excel download.');
+        return;
+      }
     }
 
     if (onExport) onExport();
@@ -170,7 +177,7 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
     <div className="modal modal-open z-[100] bg-base-300/80 backdrop-blur-sm">
       <div className="modal-box max-w-6xl p-6 bg-base-100 shadow-2xl rounded-2xl flex flex-col max-h-[95vh] h-[800px]">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6 flex-shrink-0">
+        <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <div>
             <h3 className="font-extrabold text-2xl text-base-content">Export Data</h3>
             <p className="text-base-content/60 text-xs mt-0.5">Select your desired formats and customize the output.</p>
@@ -179,6 +186,10 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
+
+        {exportError && (
+          <div className="alert alert-error text-sm mb-4 py-2">{exportError}</div>
+        )}
 
         {/* Two Column Layout */}
         <div className="flex flex-col md:flex-row gap-8 overflow-hidden flex-1">
