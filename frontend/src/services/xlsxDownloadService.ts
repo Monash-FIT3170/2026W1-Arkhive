@@ -49,9 +49,12 @@ function textEncode(str: string): Uint8Array {
 
 // Fixed DOS date/time stamp doesn't need to be accurate, ZIP readers
 // just require a valid-looking value.
+// General purpose flag bit 11: file names are UTF-8 (needed for bulk export,
+// where entry names come from user file names and may contain non-ASCII characters)
+
 const DOS_TIME = 0;
 const DOS_DATE = 0x5821;
-
+const ZIP_UTF8_FLAG = 0x0800;
 function buildZip(entries: ZipEntry[]): Uint8Array {
 	const localParts: Uint8Array[] = [];
 	const centralParts: Uint8Array[] = [];
@@ -66,7 +69,7 @@ function buildZip(entries: ZipEntry[]): Uint8Array {
 		const lv = new DataView(localHeader.buffer);
 		lv.setUint32(0, 0x04034b50, true); // local file header signature
 		lv.setUint16(4, 20, true); // version needed to extract
-		lv.setUint16(6, 0, true); // general purpose flag
+		lv.setUint16(6, ZIP_UTF8_FLAG, true); // general purpose flag
 		lv.setUint16(8, 0, true); // compression method: 0 = store
 		lv.setUint16(10, DOS_TIME, true);
 		lv.setUint16(12, DOS_DATE, true);
@@ -84,7 +87,7 @@ function buildZip(entries: ZipEntry[]): Uint8Array {
 		cv.setUint32(0, 0x02014b50, true); // central directory header signature
 		cv.setUint16(4, 20, true); // version made by
 		cv.setUint16(6, 20, true); // version needed to extract
-		cv.setUint16(8, 0, true); // general purpose flag
+		cv.setUint16(8, ZIP_UTF8_FLAG, true); // general purpose flag
 		cv.setUint16(10, 0, true); // compression method
 		cv.setUint16(12, DOS_TIME, true);
 		cv.setUint16(14, DOS_DATE, true);
