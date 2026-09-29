@@ -26,7 +26,7 @@ const rules = [
 
 export async function classifyDocument(buff: Buffer) {
   // Upload
-  const blob = new File([buff], "document.pdf", { type: "application/pdf" }); 
+  const blob = new File([buff as BlobPart], "document.pdf", { type: "application/pdf" }); 
   const fileObj = await client.files.create({
     file: blob,
     purpose: "classify",
