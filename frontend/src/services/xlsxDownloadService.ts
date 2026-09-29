@@ -281,6 +281,7 @@ export type BulkExportItem = {
 function toSafeFileBase(name: string): string {
 	const cleaned = name
 		.replace(/\.(png|jpe?g|pdf|heic|heif|tiff?)$/i, "") // drop the source-file extension
+		// eslint-disable-next-line no-control-regex -- intentionally stripping control characters from user-supplied file names for safety
 		.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_") // characters not allowed in file names
 		.replace(/\s+/g, " ")
 		.trim();
