@@ -26,7 +26,10 @@ function mergeExtractedData(pages: ExtractedData[]): ExtractedData {
 }
 
 export function ExportModal({ isOpen, onClose, extractedData, fileGroups, currentGlobalIndex, onExport }: ExportModalProps) {
-  const [customFilename, setCustomFilename] = useState('arkhive-extracted-data');
+  const [customFilename, setCustomFilename] = useState('export');
+  const [customFileNames, setCustomFileNames] = useState<Record<string, string>>({});
+  const [editingFileId, setEditingFileId] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [mergeStrategy, setMergeStrategy] = useState<'single' | 'per-file' | 'per-page'>('single');
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set(currentGlobalIndex !== undefined ? [currentGlobalIndex] : []));
   
@@ -79,7 +82,7 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
     if (!fileGroups) {
       // Fallback
       if (selectedPages.has(currentGlobalIndex ?? 0)) {
-        const base = customFilename.trim() || 'arkhive-extracted-data';
+        const base = customFilename.trim() || 'export';
         if (selectedTemplates.csv_default) exportExtractedDataAsCSV(extractedData, `${base}_default.csv`);
         if (selectedTemplates.csv_simple) exportExtractedDataAsSimpleCSV(extractedData, `${base}_simple.csv`);
         if (selectedTemplates.txt_default) exportExtractedDataAsTXT(extractedData, `${base}_default.txt`);
@@ -91,7 +94,7 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
       return;
     }
 
-    const baseFilename = customFilename.trim() || 'arkhive-extracted-data';
+    const baseFilename = customFilename.trim() || 'export';
 
     const performExport = (data: ExtractedData, suffix: string) => {
       if (selectedTemplates.csv_default) exportExtractedDataAsCSV(data, `${baseFilename}${suffix}_default.csv`);
@@ -99,6 +102,12 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
       if (selectedTemplates.txt_default) exportExtractedDataAsTXT(data, `${baseFilename}${suffix}_default.txt`);
       if (selectedTemplates.xlsx_default) exportExtractedDataAsXLSX(data, `${baseFilename}${suffix}_default.xlsx`);
       if (selectedTemplates.json_default) exportExtractedDataAsJSON(data, `${baseFilename}${suffix}_default.json`);
+    };
+
+    const getGroupName = (group: ValidationFileGroup) => {
+      let name = customFileNames[group.fileId] || group.fileName;
+      name = name.replace(/\.[^/.]+$/, ""); // remove extension
+      return name.replace(/[\\/:*?"<>|]+/g, "_").replace(/^_+|_+$/g, ""); // replace illegal characters cleanly
     };
 
     if (mergeStrategy === 'single') {
@@ -110,20 +119,22 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
         performExport(mergeExtractedData(allSelectedPages), '');
       }
     } else if (mergeStrategy === 'per-file') {
-      fileGroups.forEach((group, idx) => {
+      fileGroups.forEach((group) => {
         const groupPages = group.pages
           .filter(p => selectedPages.has(p.globalIndex))
           .map(p => p.extractedPage);
         if (groupPages.length > 0) {
-          const suffix = fileGroups.length > 1 ? `_doc${idx + 1}` : '';
+          const cleanName = getGroupName(group);
+          const suffix = `_${cleanName}`;
           performExport(mergeExtractedData(groupPages), suffix);
         }
       });
     } else if (mergeStrategy === 'per-page') {
-      fileGroups.forEach((group, gIdx) => {
-        group.pages.forEach((page, pIdx) => {
+      fileGroups.forEach((group) => {
+        group.pages.forEach((page) => {
           if (selectedPages.has(page.globalIndex)) {
-            const suffix = `_doc${gIdx + 1}_page${pIdx + 1}`;
+            const cleanName = getGroupName(group);
+            const suffix = `_${cleanName}_Page${page.pageIndexInFile + 1}`;
             performExport(page.extractedPage, suffix);
           }
         });
@@ -144,6 +155,16 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
   const countForSingle = templatesCount * 1;
   const countForPerFile = templatesCount * numGroupsSelected;
   const countForPerPage = templatesCount * numPagesSelected;
+
+  const currentCount = mergeStrategy === 'single' ? countForSingle : mergeStrategy === 'per-file' ? countForPerFile : countForPerPage;
+
+  const handleDownloadClick = () => {
+    if (currentCount > 5) {
+      setShowConfirmModal(true);
+    } else {
+      handleExtract();
+    }
+  };
 
   return (
     <div className="modal modal-open z-[100] bg-base-300/80 backdrop-blur-sm">
@@ -170,16 +191,16 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
               <label className="label px-0 pt-0 pb-1">
                 <span className="label-text font-bold text-base-content/80 text-xs uppercase tracking-wider">Export Filename</span>
               </label>
-              <div className="relative">
+              <div className="flex flex-col">
                 <input
                   type="text"
                   className={`input input-bordered input-sm w-full font-medium shadow-sm transition-colors ${!isFilenameValid ? 'input-error bg-error/5' : 'focus:border-primary'}`}
                   value={customFilename}
                   onChange={(e) => setCustomFilename(e.target.value)}
-                  placeholder="arkhive-extracted-data"
+                  placeholder="export"
                 />
                 {!isFilenameValid && (
-                  <span className="text-[10px] text-error font-medium absolute -bottom-4 left-0">
+                  <span className="text-[10px] text-error font-medium mt-1">
                     Invalid characters: \ / : * ? &quot; &lt; &gt; |
                   </span>
                 )}
@@ -187,16 +208,16 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
             </div>
 
             {/* Formats List - Horizontal Rows */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               
               {/* CSV Row */}
-              <div className="bg-base-200/30 p-4 rounded-xl border border-base-200 flex flex-row items-center gap-6">
-                <div className="flex flex-col items-center gap-2 opacity-80 min-w-[60px]">
-                  <img src="/export_images/csv.png" alt="CSV" className="w-8 h-8 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
-                  <span className="text-xs font-bold uppercase tracking-widest">CSV</span>
+              <div className="bg-base-200/30 p-2.5 rounded-xl border border-base-200 flex flex-row items-center gap-4">
+                <div className="flex flex-col items-center gap-1.5 opacity-80 min-w-[50px]">
+                  <img src="/export_images/csv.png" alt="CSV" className="w-7 h-7 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">CSV</span>
                 </div>
-                <div className="w-px h-16 bg-base-300"></div>
-                <div className="flex gap-3 overflow-x-auto flex-1 pb-1">
+                <div className="w-px h-12 bg-base-300"></div>
+                <div className="flex gap-2 overflow-x-auto flex-1 pb-0.5 scrollbar-thin">
                   <TemplateCard
                     title="Default Template"
                     imageSrc="/export_images/sample1.png"
@@ -213,13 +234,13 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
               </div>
 
               {/* JSON Row */}
-              <div className="bg-base-200/30 p-4 rounded-xl border border-base-200 flex flex-row items-center gap-6">
-                <div className="flex flex-col items-center gap-2 opacity-80 min-w-[60px]">
-                  <img src="/export_images/json.png" alt="JSON" className="w-8 h-8 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
-                  <span className="text-xs font-bold uppercase tracking-widest">JSON</span>
+              <div className="bg-base-200/30 p-2.5 rounded-xl border border-base-200 flex flex-row items-center gap-4">
+                <div className="flex flex-col items-center gap-1.5 opacity-80 min-w-[50px]">
+                  <img src="/export_images/json.png" alt="JSON" className="w-7 h-7 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">JSON</span>
                 </div>
-                <div className="w-px h-16 bg-base-300"></div>
-                <div className="flex gap-3 overflow-x-auto flex-1 pb-1">
+                <div className="w-px h-12 bg-base-300"></div>
+                <div className="flex gap-2 overflow-x-auto flex-1 pb-0.5 scrollbar-thin">
                   <TemplateCard
                     title="Default Template"
                     imageSrc="/export_images/sample3.png"
@@ -230,13 +251,13 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
               </div>
 
               {/* TXT Row */}
-              <div className="bg-base-200/30 p-4 rounded-xl border border-base-200 flex flex-row items-center gap-6">
-                <div className="flex flex-col items-center gap-2 opacity-80 min-w-[60px]">
-                  <img src="/export_images/txt.png" alt="TXT" className="w-8 h-8 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
-                  <span className="text-xs font-bold uppercase tracking-widest">TXT</span>
+              <div className="bg-base-200/30 p-2.5 rounded-xl border border-base-200 flex flex-row items-center gap-4">
+                <div className="flex flex-col items-center gap-1.5 opacity-80 min-w-[50px]">
+                  <img src="/export_images/txt.png" alt="TXT" className="w-7 h-7 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">TXT</span>
                 </div>
-                <div className="w-px h-16 bg-base-300"></div>
-                <div className="flex gap-3 overflow-x-auto flex-1 pb-1">
+                <div className="w-px h-12 bg-base-300"></div>
+                <div className="flex gap-2 overflow-x-auto flex-1 pb-0.5 scrollbar-thin">
                   <TemplateCard
                     title="Default Template"
                     imageSrc="/export_images/sample1.png"
@@ -247,13 +268,13 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
               </div>
 
               {/* XLSX Row */}
-              <div className="bg-base-200/30 p-4 rounded-xl border border-base-200 flex flex-row items-center gap-6">
-                <div className="flex flex-col items-center gap-2 opacity-80 min-w-[60px]">
-                  <img src="/export_images/xls.png" alt="XLSX" className="w-8 h-8 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
-                  <span className="text-xs font-bold uppercase tracking-widest">XLSX</span>
+              <div className="bg-base-200/30 p-2.5 rounded-xl border border-base-200 flex flex-row items-center gap-4">
+                <div className="flex flex-col items-center gap-1.5 opacity-80 min-w-[50px]">
+                  <img src="/export_images/xls.png" alt="XLSX" className="w-7 h-7 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">XLSX</span>
                 </div>
-                <div className="w-px h-16 bg-base-300"></div>
-                <div className="flex gap-3 overflow-x-auto flex-1 pb-1">
+                <div className="w-px h-12 bg-base-300"></div>
+                <div className="flex gap-2 overflow-x-auto flex-1 pb-0.5 scrollbar-thin">
                   <TemplateCard
                     title="Default Template"
                     imageSrc="/export_images/sample3.png"
@@ -283,15 +304,40 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
                 const someSelected = group.pages.some(p => selectedPages.has(p.globalIndex));
                 return (
                   <div key={group.fileId} className="mb-4 last:mb-0">
-                    <label className="flex items-center gap-2 cursor-pointer font-bold text-sm text-base-content hover:text-primary transition-colors">
+                    <label className="flex items-center gap-2 font-bold text-sm text-base-content hover:text-primary transition-colors">
                       <input 
                         type="checkbox" 
-                        className="checkbox checkbox-sm checkbox-primary rounded-md" 
+                        className="checkbox checkbox-sm checkbox-primary rounded-md cursor-pointer" 
                         checked={allSelected} 
                         ref={input => { if (input) input.indeterminate = !allSelected && someSelected; }}
                         onChange={() => toggleFileSelection(group)} 
                       />
-                      <span className="truncate">{group.fileName}</span>
+                      {editingFileId === group.fileId ? (
+                        <input
+                          type="text"
+                          className="input input-xs input-primary w-full max-w-xs font-normal shadow-sm"
+                          autoFocus
+                          defaultValue={customFileNames[group.fileId] || group.fileName}
+                          onBlur={(e) => {
+                            setCustomFileNames(prev => ({ ...prev, [group.fileId]: e.target.value || group.fileName }));
+                            setEditingFileId(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur();
+                          }}
+                        />
+                      ) : (
+                        <span 
+                          className="truncate border-b border-dashed border-base-content/30 cursor-text group-hover:border-primary/50"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setEditingFileId(group.fileId);
+                          }}
+                          title="Click to rename"
+                        >
+                          {customFileNames[group.fileId] || group.fileName}
+                        </span>
+                      )}
                     </label>
                     <div className="ml-6 flex flex-col gap-2 mt-3">
                       {group.pages.map(page => (
@@ -316,26 +362,35 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
             {/* Output Structure */}
             <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl flex-shrink-0 shadow-sm">
               <h4 className="font-bold uppercase tracking-widest text-primary/80 text-[10px] mb-3">Output Structure</h4>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2.5">
                 <label className="flex items-start gap-3 cursor-pointer text-sm font-semibold text-base-content hover:text-primary transition-colors">
                   <input type="radio" name="mergeStrategy" className="radio radio-sm radio-primary mt-0.5" checked={mergeStrategy === 'single'} onChange={() => setMergeStrategy('single')} />
-                  <div className="flex flex-col gap-0.5">
-                    <span>Merge into a single file</span>
-                    <span className="text-xs font-normal opacity-70">Combines into {countForSingle} file{countForSingle !== 1 ? 's' : ''}.</span>
+                  <div className="flex flex-col flex-1 w-full">
+                    <span className="flex items-center justify-between w-full">
+                      <span>Merge into a single file</span>
+                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Output: {countForSingle} file{countForSingle !== 1 ? 's' : ''}</span>
+                    </span>
+                    <span className="text-[11px] font-normal opacity-70 leading-none mt-0.5">All data combined into one file.</span>
                   </div>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer text-sm font-semibold text-base-content hover:text-primary transition-colors">
                   <input type="radio" name="mergeStrategy" className="radio radio-sm radio-primary mt-0.5" checked={mergeStrategy === 'per-file'} onChange={() => setMergeStrategy('per-file')} />
-                  <div className="flex flex-col gap-0.5">
-                    <span>Export per document</span>
-                    <span className="text-xs font-normal opacity-70">Creates {countForPerFile} separate file{countForPerFile !== 1 ? 's' : ''}.</span>
+                  <div className="flex flex-col flex-1 w-full">
+                    <span className="flex items-center justify-between w-full">
+                      <span>Export per document</span>
+                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Output: {countForPerFile} file{countForPerFile !== 1 ? 's' : ''}</span>
+                    </span>
+                    <span className="text-[11px] font-normal opacity-70 leading-none mt-0.5">One file per source document.</span>
                   </div>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer text-sm font-semibold text-base-content hover:text-primary transition-colors">
                   <input type="radio" name="mergeStrategy" className="radio radio-sm radio-primary mt-0.5" checked={mergeStrategy === 'per-page'} onChange={() => setMergeStrategy('per-page')} />
-                  <div className="flex flex-col gap-0.5">
-                    <span>Export per page</span>
-                    <span className="text-xs font-normal opacity-70">Creates {countForPerPage} separate file{countForPerPage !== 1 ? 's' : ''}.</span>
+                  <div className="flex flex-col flex-1 w-full">
+                    <span className="flex items-center justify-between w-full">
+                      <span>Export per page</span>
+                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Output: {countForPerPage} file{countForPerPage !== 1 ? 's' : ''}</span>
+                    </span>
+                    <span className="text-[11px] font-normal opacity-70 leading-none mt-0.5">One file for every single page.</span>
                   </div>
                 </label>
               </div>
@@ -344,7 +399,8 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
         </div>
 
         {/* Footer Actions */}
-        <div className="modal-action mt-6 pt-4 border-t border-base-200 flex justify-end gap-3 flex-shrink-0">
+        <div className="modal-action mt-6 pt-4 border-t border-base-200 flex items-center justify-between gap-3 flex-shrink-0">
+          <div className="flex-1"></div>
           <button className="btn btn-ghost font-semibold px-6 hover:bg-base-200" onClick={onClose}>Cancel</button>
           <button
             className="btn btn-primary font-bold px-8 shadow-lg shadow-primary/30"
@@ -353,13 +409,37 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
               !isFilenameValid ||
               selectedPages.size === 0
             }
-            onClick={handleExtract}
+            onClick={handleDownloadClick}
           >
             Download
           </button>
         </div>
       </div>
       <div className="modal-backdrop bg-base-300/50" onClick={onClose}></div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="modal modal-open modal-bottom sm:modal-middle z-[9999]">
+          <div className="modal-box bg-base-100 shadow-2xl rounded-3xl p-6 md:p-8 max-w-sm border border-base-200">
+            <h3 className="font-extrabold text-xl text-base-content mb-3 flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+              Confirm Download
+            </h3>
+            <p className="text-sm text-base-content/80 mb-6 leading-relaxed">
+              You are about to generate and download <strong className="text-base-content font-bold">{currentCount} files</strong>. This might take a few moments. Do you wish to proceed?
+            </p>
+            <div className="modal-action mt-2">
+              <button className="btn btn-ghost font-semibold hover:bg-base-200" onClick={() => setShowConfirmModal(false)}>Cancel</button>
+              <button className="btn btn-primary font-bold shadow-lg shadow-primary/30" onClick={() => { setShowConfirmModal(false); handleExtract(); }}>
+                Yes, download
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop bg-base-300/80 backdrop-blur-[2px]" onClick={() => setShowConfirmModal(false)}>
+            <button className="cursor-default">close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -368,17 +448,17 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
 function TemplateCard({ title, imageSrc, selected, onClick }: { title: string, imageSrc: string, selected: boolean, onClick: () => void }) {
   return (
     <div
-      className={`relative cursor-pointer rounded-xl border-2 overflow-hidden transition-all duration-200 w-32 flex-shrink-0 flex flex-col ${
+      className={`relative cursor-pointer rounded-xl border-2 overflow-hidden transition-all duration-200 w-36 flex-shrink-0 flex flex-col ${
         selected 
           ? 'border-primary ring-2 ring-primary/20 bg-primary/10 shadow-md' 
           : 'border-base-300 hover:border-primary/50 hover:bg-base-200/50 shadow-sm'
       }`}
       onClick={onClick}
     >
-      <div className="w-full aspect-square bg-base-100 flex items-center justify-center overflow-hidden">
+      <div className="w-full aspect-video bg-base-100 flex items-center justify-center overflow-hidden">
         <img src={imageSrc} alt={title} className="w-full h-full object-cover transition-transform duration-300 hover:scale-105" onError={(e) => e.currentTarget.style.display = 'none'} />
       </div>
-      <div className="p-2 border-t border-base-200 bg-base-100 flex items-center justify-between gap-1 flex-1">
+      <div className="p-1.5 border-t border-base-200 bg-base-100 flex items-center justify-between gap-1 flex-1">
         <span className="font-semibold text-[10px] leading-tight text-base-content truncate" title={title}>{title}</span>
         <div className={`w-4 h-4 flex-shrink-0 rounded-full flex items-center justify-center border transition-all ${
           selected ? 'bg-primary border-primary text-primary-content' : 'border-base-300 bg-base-200 text-transparent'
