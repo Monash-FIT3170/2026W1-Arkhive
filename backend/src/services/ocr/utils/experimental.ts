@@ -54,8 +54,9 @@ function pruneOCROutput(
   };
 
   return {
-    content: OCRResponse.analyzeResult?.content!, // scoped to this page, not the whole doc
-    tables: tablesInPage.map((table) => ({
+    content: OCRResponse.analyzeResult!.content!,
+    tables: tablesInPage.map((table) => (
+      {
       rowCount: table.rowCount,
       columnCount: table.columnCount,
       cells: table.cells.map((cell) => ({
@@ -64,7 +65,7 @@ function pruneOCROutput(
         content: cell.content,
         kind: cell.kind,
         boundingRegions: cell.boundingRegions,
-        words: wordsInSpan(cell.spans?.[0]),
+        words: wordsInSpan(cell.spans![0]),
       })),
     })),
     pages: [
@@ -266,7 +267,6 @@ const mapTablesToOCRComponents =
       boundingBoxes: comp.boundingBoxes ? toColumnDict(comp.boundingBoxes) : {},
     }));
     const hydratedData = hydrateOutput(transformedComponents, prunedOCR)
-    fs.writeFileSync("primeHydrati1on.txt", JSON.stringify(hydratedData, null, 2))
 
     return hydratedData;
   };

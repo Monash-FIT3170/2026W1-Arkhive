@@ -72,34 +72,6 @@ export async function testOCR() {
   };
 }
 
-/**
-
-
-function for getting bounding boxes for all words detected
- @author Harsha Sharma (33879303)
-*/
-//Seemingly unused func
-// async function parseTableLegacy(imageBuffer: Buffer) {
-//   const [response] = await client.documentTextDetection(imageBuffer);
-//   const fullTextAnnotation = response.fullTextAnnotation;
-//   console.log('OCR response:', {
-//     hasFullTextAnnotation: !!response.fullTextAnnotation,
-//     hasPages: !!response.fullTextAnnotation?.pages,
-//     text: response.fullTextAnnotation?.text,
-//     pageCount: response.fullTextAnnotation?.pages?.length,
-//   });
-//   if (!fullTextAnnotation || !fullTextAnnotation.pages) {
-//     throw new Error(
-//       'NoTextDetectedError: OCR did not detect any text. Please double check or reupload your document.'
-//     );
-//   }
-//   return extractStructuredComponents(fullTextAnnotation.pages);
-// }
-
-export async function parseTableWithRetriesLegacy(imageBuffer: Buffer) {
-  return await withRetry(() => parseTable(imageBuffer));
-}
-
 /** 
  @author Harsha Sharma (33879303)
 */
@@ -119,17 +91,9 @@ export async function parseTableWithRetries(
   imageBuffer: Buffer,
   onRetry?: (attempt: number, maxRetries: number) => void
 ) {
-  return await withRetry(() => parseTable(imageBuffer), 3, 3000, onRetry);
+  return await withRetry(() => parseTable(imageBuffer), 1, 3000, onRetry);
 }
 
-// function for getting overall averaged confidence score
-/*
-const jsonOut = JSON.stringify(
- await parseTable(fs.readFileSync("sample-file-1_page-0001.jpg")),
- null,
-  2
-);
-
-fs.writeFileSync("boundingBox1.json", jsonOut, "utf-8");
-
-await parseTableWithRetries(fs.readFileSync("c:/Users/harsh/OneDrive/Pictures/sample-file-1.pdf")) */
+export async function batchProcessingOCR(){
+  
+}
