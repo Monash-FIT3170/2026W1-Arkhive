@@ -157,6 +157,7 @@ function ValidationWorkspace({
     [extractedPages, ocrPages, imageUrls, pageKeys, fileMetadata]
   );
 
+
   const { fileIndex: activeFileIndex, pageIndexInFile: activePageIndexInFile } = useMemo(
     () => getFileAndLocalPage(fileGroups, currentPageIndex),
     [fileGroups, currentPageIndex]
@@ -680,6 +681,8 @@ function ValidationWorkspace({
                 handleHover(id);
               }}
               extractedData={documentContext}
+              fileGroups={fileGroups}
+              currentGlobalIndex={currentPageIndex}
               hoveredOverlayIds={hoveredTableFieldIds}
               onRowIndent={handleRowIndent}
               onRowOutdent={handleRowOutdent}
