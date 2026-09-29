@@ -299,23 +299,62 @@ function ValidationWorkspace({
   });
 
   // Cell/row/column CRUD for the table itself
-  const { editCell, addRow, deleteRow, addColumn, deleteColumn, moveRow, reorderColumns } =
-    useTableEditor({
-      currentPageIndexRef,
-      extractedPagesRef,
-      onPagesChange: handlePagesChange,
-      onPersist,
-      addHistoryEntry,
-      pushUndo,
-      onCellEdited: (fieldId) => {
-        setEditedCells((prev) => new Set(prev).add(fieldId));
-        setFlaggedIssues((prev) =>
-          prev.filter(
-            (issue) => !(issue.fieldId === fieldId && issue.pageIndex === currentPageIndexRef.current)
-          )
-        );
-      },
-    });
+  const {
+    editCell,
+    addRow,
+    deleteRow,
+    addColumn,
+    deleteColumn,
+    renameColumn,
+    moveRow,
+    reorderColumns,
+  } = useTableEditor({
+    currentPageIndexRef,
+    extractedPagesRef,
+    onPagesChange: handlePagesChange,
+    onPersist,
+    addHistoryEntry,
+    pushUndo,
+    onCellEdited: (fieldId) => {
+      setEditedCells((prev) => new Set(prev).add(fieldId));
+      setFlaggedIssues((prev) =>
+        prev.filter(
+          (issue) => !(issue.fieldId === fieldId && issue.pageIndex === currentPageIndexRef.current)
+        )
+      );
+    },
+    onColumnRenamed: (oldName, newName) => {
+      setEditedCells((prev) => {
+        const next = new Set<string>();
+        const oldSuffix = `:${oldName}`;
+        const newSuffix = `:${newName}`;
+        for (const cellId of prev) {
+          if (cellId.endsWith(oldSuffix)) {
+            const rowId = cellId.slice(0, cellId.length - oldSuffix.length);
+            next.add(`${rowId}${newSuffix}`);
+          } else {
+            next.add(cellId);
+          }
+        }
+        return next;
+      });
+      setFlaggedIssues((prev) =>
+        prev.map((issue) => {
+          if (
+            issue.fieldName === oldName &&
+            (issue.pageIndex === undefined || issue.pageIndex === currentPageIndexRef.current)
+          ) {
+            return {
+              ...issue,
+              fieldName: newName,
+              fieldId: `${String(issue.rowId)}:${newName}`,
+            };
+          }
+          return issue;
+        })
+      );
+    },
+  });
 
   if (!documentContext) {
     return (
@@ -631,6 +670,7 @@ function ValidationWorkspace({
               onRowDelete={deleteRow}
               onColumnAdd={addColumn}
               onColumnDelete={deleteColumn}
+              onColumnRename={renameColumn}
               onRowMove={moveRow}
               onColumnReorder={reorderColumns}
             />

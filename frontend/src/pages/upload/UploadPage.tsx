@@ -80,7 +80,7 @@ export default function UploadPage() {
 
   useEffect(() => {
     if (previewItems.length > 0) {
-      navigate('/?step=preview', { replace: true });
+      navigate('/upload?step=preview', { replace: true });
     } else {
       // Reset counters so the next files start from 1 again, keeping the UI numbering simple!
       nextFileIndexRef.current = 0;
@@ -241,7 +241,7 @@ export default function UploadPage() {
           );
         }
 
-        if (next.length === 0) navigate('/', { replace: true });
+        if (next.length === 0) navigate('/upload', { replace: true });
         setSelectedPages((prevSel) => {
           const nextSel = new Set<number>();
           for (const idx of prevSel) {
@@ -288,7 +288,7 @@ export default function UploadPage() {
       })();
 
       const next = prev.filter((_, idx) => !toRemove.has(idx));
-      if (next.length === 0) navigate('/', { replace: true });
+      if (next.length === 0) navigate('/upload', { replace: true });
       return next;
     });
     setSelectedPages(new Set());

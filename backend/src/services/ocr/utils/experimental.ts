@@ -1,14 +1,12 @@
 import {
   AnalyzeResultOutput,
-  DocumentLineOutput,
-  DocumentTableCellOutput,
   type DocumentPageOutput,
   type DocumentTableOutput,
 } from '@azure-rest/ai-document-intelligence';
 import {
   type AnalyzeOperationOutput,
 } from '@azure-rest/ai-document-intelligence';
-import { GoogleGenAI, Schema, ThinkingLevel } from '@google/genai';
+import { GoogleGenAI, Schema } from '@google/genai';
 import {
   OCRComponent,
   OCRBoundingBoxes,
@@ -17,10 +15,8 @@ import {
   OCRColumnBoundingBoxes,
   Pages,
   Page,
-  OCRBoundingBox,
 } from '../types/boundingBoxTypes';
 import { OpenRedaction } from "openredaction";
-import fs from "fs"
 
 const redactor = new OpenRedaction();
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
@@ -54,6 +50,8 @@ function pruneOCROutput(
   };
 
   return {
+    content: OCRResponse.analyzeResult!.content!, // scoped to this page, not the whole doc
+    tables: tablesInPage.map((table) => ({
     content: OCRResponse.analyzeResult!.content!,
     tables: tablesInPage.map((table) => (
       {
@@ -65,6 +63,7 @@ function pruneOCROutput(
         content: cell.content,
         kind: cell.kind,
         boundingRegions: cell.boundingRegions,
+        words: wordsInSpan(cell.spans![0]),
         words: wordsInSpan(cell.spans![0]),
       })),
     })),
