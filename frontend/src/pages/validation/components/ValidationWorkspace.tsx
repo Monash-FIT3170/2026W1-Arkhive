@@ -151,6 +151,18 @@ function ValidationWorkspace({
     () => groupPagesByFiles(extractedPages, ocrPages, imageUrls, pageKeys, fileMetadata),
     [extractedPages, ocrPages, imageUrls, pageKeys, fileMetadata]
   );
+  const allExtractedDataNames = useMemo(() => {
+  const names: string[] = new Array(extractedPages.length).fill('');
+  fileGroups.forEach((group) => {
+    group.pages.forEach((p) => {
+      names[p.globalIndex] =
+        group.pages.length > 1
+          ? `${group.fileName} (page ${p.pageIndexInFile + 1})`
+          : group.fileName;
+    });
+  });
+  return names;
+}, [fileGroups, extractedPages.length]);
 
   const { fileIndex: activeFileIndex, pageIndexInFile: activePageIndexInFile } = useMemo(
     () => getFileAndLocalPage(fileGroups, currentPageIndex),
@@ -662,6 +674,8 @@ function ValidationWorkspace({
                 handleHover(id);
               }}
               extractedData={documentContext}
+              allExtractedData={extractedPages}
+              allExtractedDataNames={allExtractedDataNames}
               hoveredOverlayIds={hoveredTableFieldIds}
               onRowIndent={handleRowIndent}
               onRowOutdent={handleRowOutdent}
