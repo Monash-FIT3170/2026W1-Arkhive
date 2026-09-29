@@ -4,17 +4,19 @@ import { exportExtractedDataAsCSV } from '../../../../services/csvDownloadServic
 import { exportExtractedDataAsJSON } from '../../../../services/jsonDownloadService';
 import { exportExtractedDataAsTXT } from '../../../../services/txtDownloadService';
 import { exportExtractedDataAsXLSX } from '../../../../services/xlsxDownloadService';
-
+import { downloadBulkXLSX, type BulkExportItem } from '../../../../services/xlsxDownloadService';
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   extractedData: ExtractedData;
   allExtractedData?: ExtractedData[];
+  allExtractedDataNames?: string[];
   onExport?: () => void;
 }
 
-export function ExportModal({ isOpen, onClose, extractedData, allExtractedData, onExport }: ExportModalProps) {
+export function ExportModal({ isOpen, onClose, extractedData, allExtractedData, allExtractedDataNames, onExport }: ExportModalProps) {
   const [exportScope, setExportScope] = useState<'current' | 'all'>('current');
+  const [exportError, setExportError] = useState<string | null>(null);
   const [selectedTemplates, setSelectedTemplates] = useState({
     csv_default: true,
     csv_future: false,
@@ -32,7 +34,22 @@ export function ExportModal({ isOpen, onClose, extractedData, allExtractedData, 
     if (selectedTemplates.csv_default) exportExtractedDataAsCSV(csvData);
     if (selectedTemplates.csv_future) { /* future logic */ }
     if (selectedTemplates.txt_default) exportExtractedDataAsTXT(extractedData);
-    if (selectedTemplates.xlsx_default) exportExtractedDataAsXLSX(extractedData);
+        if (selectedTemplates.xlsx_default) {
+      try {
+        if (exportScope === 'all' && allExtractedData && allExtractedData.length > 0) {
+          const items: BulkExportItem[] = allExtractedData.map((data, i) => ({
+            name: allExtractedDataNames?.[i] || `Document ${i + 1}`,
+            data
+          }));
+          downloadBulkXLSX(items);
+        } else {
+          exportExtractedDataAsXLSX(extractedData);
+        }
+      } catch (err) {
+        setExportError(err instanceof Error ? err.message : 'Could not generate the Excel download.');
+        return;
+      }
+    }
     if (selectedTemplates.json_default) exportExtractedDataAsJSON(extractedData);
 
     if (onExport) onExport();
@@ -43,6 +60,10 @@ export function ExportModal({ isOpen, onClose, extractedData, allExtractedData, 
     <div className="modal modal-open z-[100]">
       <div className="modal-box max-w-3xl">
         <h3 className="font-bold text-xl mb-6">Export Data</h3>
+
+        {exportError && (
+          <div className="alert alert-error text-sm mb-4">{exportError}</div>
+        )}
 
         {/* Scope selection */}
         <div className="flex gap-2 mb-6">
