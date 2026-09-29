@@ -188,6 +188,7 @@ function ValidationWorkspace({
   const confidencePercent = Math.round(averageConfidence * 100);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historyRedo, setRedoHistory] = useState<HistoryEntry[]>([]);
 
   const addHistoryEntry = useCallback((entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
     setHistory((prev) => [
@@ -198,7 +199,38 @@ function ValidationWorkspace({
       },
       ...prev,
     ]);
+    setRedoHistory([]);
   }, []);
+
+  const undoRedoHistoryEntry = useCallback(
+    (direction: 'undo' | 'redo') => {
+      if (direction === 'undo') {
+        const undoChange = history[0];
+
+        if (!undoChange) return;
+
+        setHistory((prev) => prev.slice(1));
+
+        setRedoHistory((prev) => [undoChange, ...prev]);
+      } else {
+        const redoChange = historyRedo[0];
+
+        if (!redoChange) return;
+
+        setRedoHistory((prev) => prev.slice(1));
+
+        setHistory((prev) => [
+          {
+            ...redoChange,
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
+      }
+    },
+    [history, historyRedo]
+  );
 
   // UNDO/REDO PIPELINE — stack + keyboard shortcuts live in the hook; we
   // just say what "apply a snapshot" means for this workspace's state.
@@ -208,10 +240,11 @@ function ValidationWorkspace({
       onPersist(updatedPages);
       setEditedCells(new Set());
       setTableKey((k) => k + 1);
-      addHistoryEntry({
-        type: direction,
-        description: direction === 'undo' ? 'Undid last change' : 'Redid last change',
-      });
+      // addHistoryEntry({
+      //   type: direction,
+      //   description: direction === 'undo' ? 'Undid last change' : 'Redid last change',
+      // });
+      undoRedoHistoryEntry(direction);
     },
   });
 
