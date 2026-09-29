@@ -662,6 +662,8 @@ function ValidationWorkspace({
                 handleHover(id);
               }}
               extractedData={documentContext}
+              fileGroups={fileGroups}
+              currentGlobalIndex={currentPageIndex}
               hoveredOverlayIds={hoveredTableFieldIds}
               onRowIndent={handleRowIndent}
               onRowOutdent={handleRowOutdent}

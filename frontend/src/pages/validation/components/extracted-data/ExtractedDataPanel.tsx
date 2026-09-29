@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'; // NEW: Importing icons for confidence badges and export button
 import React, { useState, useEffect } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
+import type { ValidationFileGroup } from '../../../../utils/fileGrouping';
 import { ExportModal } from './ExportModal'; // NEW: Excel export service (US-4.5)
 import TextInputModal from '../modals/TextInputModal';
 import Toast from '../modals/Toast';
@@ -56,6 +57,8 @@ function ExtractedDataPanel({
   onHover,
   extractedData,
   allExtractedData,
+  fileGroups,
+  currentGlobalIndex,
   hoveredOverlayIds,
   onCellEdit,
   onRowAdd,
@@ -75,6 +78,8 @@ function ExtractedDataPanel({
   onHover: (id: string | null) => void;
   extractedData: ExtractedData;
   allExtractedData?: ExtractedData[];
+  fileGroups?: ValidationFileGroup[];
+  currentGlobalIndex?: number;
   hoveredOverlayIds?: string[];
   onCellEdit?: (fieldId: string, newValue: string) => void;
   onRowAdd?: () => void;
@@ -727,6 +732,8 @@ function ExtractedDataPanel({
         onClose={() => setShowExportModal(false)}
         extractedData={extractedData}
         allExtractedData={allExtractedData}
+        fileGroups={fileGroups}
+        currentGlobalIndex={currentGlobalIndex}
         onExport={() => {
           setExportedFormat(true);
           setTimeout(() => setExportedFormat(false), 2500);
