@@ -9,6 +9,7 @@ import {
   saveExtractedData,
   deletePage,
   deleteDocument,
+  saveReviewState,
 } from '../../services/documentService';
 import { buildPreviewItemsForFiles } from '../upload/components/preview/previewHelpers';
 import EmptyUploadView from '../upload/components/EmptyUploadView';
@@ -23,6 +24,8 @@ import type {
 } from '../../models/Project';
 import type { ExtractedPage } from '../../models/TableData';
 import type { OCRComponent } from '../../models/OCRComponent';
+import { makePageKey, parsePageKey } from '../../utils/keys';
+import type { PageReview } from '../../models/IssueReview';
 
 // The OCR backend stores one page's result per document_pages row, but the
 // real Azure/Gemini pipeline wraps it as `Pages` — [{ page_num, components }]
@@ -56,10 +59,6 @@ function statusBadgeClass(status: PageStatus): string {
     default:
       return 'badge-ghost';
   }
-}
-
-function pageKey(documentId: string, pageIndex: number): string {
-  return `${documentId}:${pageIndex}`;
 }
 
 export default function ProjectWorkspacePage() {
@@ -197,13 +196,13 @@ export default function ProjectWorkspacePage() {
   // pages are added/removed — not on every edit (edits flow the other way,
   // through persistPages, so they aren't clobbered by this effect).
   const validationKeysSignature = validationList
-    .map((entry) => pageKey(entry.documentId, entry.pageIndex))
+    .map((entry) => makePageKey(entry.documentId, entry.pageIndex))
     .join('|');
 
   // Lazily resolve a viewable image URL for every known page.
   useEffect(() => {
     allPages.forEach(({ document, pageIndex }) => {
-      const key = pageKey(document.id, pageIndex);
+      const key = makePageKey(document.id, pageIndex);
       if (imageUrlMap[key]) return;
       getDownloadUrl(document.id, pageIndex)
         .then((url) => setImageUrlMap((prev) => (prev[key] ? prev : { ...prev, [key]: url })))
@@ -339,7 +338,7 @@ export default function ProjectWorkspacePage() {
 
   // ── Selection ──────────────────────────────────────────────────────────
   function toggleSelected(documentId: string, pageIndex: number) {
-    const key = pageKey(documentId, pageIndex);
+    const key = makePageKey(documentId, pageIndex);
     setSelectedKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -349,7 +348,7 @@ export default function ProjectWorkspacePage() {
   }
 
   function selectAll() {
-    setSelectedKeys(new Set(allPages.map((p) => pageKey(p.document.id, p.pageIndex))));
+    setSelectedKeys(new Set(allPages.map((p) => makePageKey(p.document.id, p.pageIndex))));
   }
 
   function deselectAll() {
@@ -364,7 +363,7 @@ export default function ProjectWorkspacePage() {
     let count = 0;
     documents.forEach((doc) => {
       (doc.pages || []).forEach((page) => {
-        if (selectedKeys.has(pageKey(doc.id, page.page_index)) && page.status === 'done') {
+        if (selectedKeys.has(makePageKey(doc.id, page.page_index)) && page.status === 'done') {
           count++;
         }
       });
@@ -449,7 +448,9 @@ export default function ProjectWorkspacePage() {
       prev
         .map((doc) => ({
           ...doc,
-          pages: (doc.pages || []).filter((page) => !keys.has(pageKey(doc.id, page.page_index))),
+          pages: (doc.pages || []).filter(
+            (page) => !keys.has(makePageKey(doc.id, page.page_index))
+          ),
         }))
         .filter((doc) => (doc.pages || []).length > 0)
     );
@@ -468,7 +469,7 @@ export default function ProjectWorkspacePage() {
     try {
       const keys =
         deleteTarget.type === 'single'
-          ? [pageKey(deleteTarget.documentId, deleteTarget.pageIndex)]
+          ? [makePageKey(deleteTarget.documentId, deleteTarget.pageIndex)]
           : Array.from(selectedKeys);
 
       const byDoc = new Map<string, number[]>();
@@ -499,6 +500,26 @@ export default function ProjectWorkspacePage() {
     }
   }
 
+  const initialReviews = useMemo(
+    () =>
+      Object.fromEntries(
+        (project?.documents ?? []).flatMap((doc) =>
+          (doc.pages ?? [])
+            .filter((p) => p.review_state)
+            .map((p) => [makePageKey(doc.id, p.page_index), p.review_state!] as const)
+        )
+      ),
+    [project]
+  );
+
+  const handleReviewChange = useCallback((pageKey: string, review: PageReview) => {
+    const parsed = parsePageKey(pageKey);
+    if (!parsed) return;
+    saveReviewState(parsed.documentId, parsed.pageIndex, review).catch((err) =>
+      console.error('Failed to save review state', err)
+    );
+  }, []);
+
   // ── Render ─────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
@@ -522,7 +543,10 @@ export default function ProjectWorkspacePage() {
   const header = (
     <div className="flex items-center justify-between px-6 h-12 border-b border-base-300 shrink-0">
       <div className="flex items-center gap-2 min-w-0">
-        <button className="btn btn-ghost btn-sm gap-1.0 p-1.0" onClick={() => navigate('/projects')}>
+        <button
+          className="btn btn-ghost btn-sm gap-1.0 p-1.0"
+          onClick={() => navigate('/projects')}
+        >
           <ArrowLeft className="w-4 h-4" /> Projects
         </button>
         <span className="text-base-content/40 p-0">/</span>
@@ -574,12 +598,12 @@ export default function ProjectWorkspacePage() {
       )
     : [];
   const imageUrls = hasEnteredValidate
-    ? validationList.map((e) => imageUrlMap[pageKey(e.documentId, e.pageIndex)] || '')
+    ? validationList.map((e) => imageUrlMap[makePageKey(e.documentId, e.pageIndex)] || '')
     : [];
   // stable per-page identity for useReviewQueue, so appending pages later
   // doesn't retrigger detection on pages already processed
   const pageKeys = hasEnteredValidate
-    ? validationList.map((e) => pageKey(e.documentId, e.pageIndex))
+    ? validationList.map((e) => makePageKey(e.documentId, e.pageIndex))
     : [];
 
   // ── Files/Validation view ─────────────────────────────────────────────────────────
@@ -652,98 +676,100 @@ export default function ProjectWorkspacePage() {
             {documents
               .filter((doc) => (doc.pages || []).length > 0)
               .map((doc) => (
-              <section
-                key={doc.id}
-                className="rounded-lg border border-base-300 bg-base-200/40 p-4"
-              >
-                <h3 className="mb-3 text-sm font-semibold text-base-content/70 flex items-center gap-2">
-                  <FileText className="w-4 h-4" /> {doc.filename}
-                </h3>
-                <div className="flex flex-wrap gap-4">
-                  {(doc.pages || [])
-                    .slice()
-                    .sort((a, b) => a.page_index - b.page_index)
-                    .map((page) => {
-                      const key = pageKey(doc.id, page.page_index);
-                      const imageUrl = imageUrlMap[key];
-                      const isBeingProcessed = processingKeys.has(key);
-                      return (
-                        <div
-                          key={key}
-                          className={`group w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden transition-opacity ${
-                            isBeingProcessed ? 'animate-pulse opacity-80' : ''
-                          }`}
-                        >
+                <section
+                  key={doc.id}
+                  className="rounded-lg border border-base-300 bg-base-200/40 p-4"
+                >
+                  <h3 className="mb-3 text-sm font-semibold text-base-content/70 flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> {doc.filename}
+                  </h3>
+                  <div className="flex flex-wrap gap-4">
+                    {(doc.pages || [])
+                      .slice()
+                      .sort((a, b) => a.page_index - b.page_index)
+                      .map((page) => {
+                        const key = makePageKey(doc.id, page.page_index);
+                        const imageUrl = imageUrlMap[key];
+                        const isBeingProcessed = processingKeys.has(key);
+                        return (
                           <div
-                            className={`relative h-[120px] bg-base-300 ${
-                              isBeingProcessed ? 'cursor-not-allowed' : 'cursor-pointer'
+                            key={key}
+                            className={`group w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden transition-opacity ${
+                              isBeingProcessed ? 'animate-pulse opacity-80' : ''
                             }`}
-                            onClick={() => {
-                              if (isBeingProcessed) return;
-                              toggleSelected(doc.id, page.page_index);
-                            }}
                           >
-                            {imageUrl ? (
-                              <img
-                                src={imageUrl}
-                                alt={`Page ${page.page_index + 1}`}
-                                className={`w-full h-full object-cover transition-[filter] ${
-                                  isBeingProcessed ? 'grayscale' : ''
-                                }`}
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span className="loading loading-spinner loading-sm" />
-                              </div>
-                            )}
-                            <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/25" />
-                            <input
-                              type="checkbox"
-                              className={`checkbox checkbox-sm checkbox-primary absolute border-2 top-2 left-2 transition-opacity ${
-                                selectedKeys.has(key) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                            <div
+                              className={`relative h-[120px] bg-base-300 ${
+                                isBeingProcessed ? 'cursor-not-allowed' : 'cursor-pointer'
                               }`}
-                              checked={selectedKeys.has(key)}
-                              disabled={isBeingProcessed}
-                              onChange={() => toggleSelected(doc.id, page.page_index)}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-xs btn-circle absolute top-2 right-2 bg-base-100/80 text-error opacity-0 transition-opacity group-hover:opacity-100"
-                              title="Delete page"
-                              disabled={isBeingProcessed}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteTarget({
-                                  type: 'single',
-                                  documentId: doc.id,
-                                  pageIndex: page.page_index,
-                                });
+                              onClick={() => {
+                                if (isBeingProcessed) return;
+                                toggleSelected(doc.id, page.page_index);
                               }}
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                          <div className="p-2 flex items-center justify-between text-xs">
-                            <span>Page {page.page_index + 1}</span>
-                            <span className={`badge badge-xs ${statusBadgeClass(page.status)}`}>
-                              {page.status}
-                            </span>
-                          </div>
-                          {page.error_message && (
-                            <div
-                              className="px-2 pb-2 text-xs text-error truncate"
-                              title={page.error_message}
-                            >
-                              {page.error_message}
+                              {imageUrl ? (
+                                <img
+                                  src={imageUrl}
+                                  alt={`Page ${page.page_index + 1}`}
+                                  className={`w-full h-full object-cover transition-[filter] ${
+                                    isBeingProcessed ? 'grayscale' : ''
+                                  }`}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <span className="loading loading-spinner loading-sm" />
+                                </div>
+                              )}
+                              <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/25" />
+                              <input
+                                type="checkbox"
+                                className={`checkbox checkbox-sm checkbox-primary absolute border-2 top-2 left-2 transition-opacity ${
+                                  selectedKeys.has(key)
+                                    ? 'opacity-100'
+                                    : 'opacity-0 group-hover:opacity-100'
+                                }`}
+                                checked={selectedKeys.has(key)}
+                                disabled={isBeingProcessed}
+                                onChange={() => toggleSelected(doc.id, page.page_index)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-xs btn-circle absolute top-2 right-2 bg-base-100/80 text-error opacity-0 transition-opacity group-hover:opacity-100"
+                                title="Delete page"
+                                disabled={isBeingProcessed}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTarget({
+                                    type: 'single',
+                                    documentId: doc.id,
+                                    pageIndex: page.page_index,
+                                  });
+                                }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                </div>
-              </section>
-            ))}
+                            <div className="p-2 flex items-center justify-between text-xs">
+                              <span>Page {page.page_index + 1}</span>
+                              <span className={`badge badge-xs ${statusBadgeClass(page.status)}`}>
+                                {page.status}
+                              </span>
+                            </div>
+                            {page.error_message && (
+                              <div
+                                className="px-2 pb-2 text-xs text-error truncate"
+                                title={page.error_message}
+                              >
+                                {page.error_message}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </section>
+              ))}
           </div>
         </div>
       </div>
@@ -756,6 +782,8 @@ export default function ProjectWorkspacePage() {
             ocrPages={ocrPages}
             imageUrls={imageUrls}
             pageKeys={pageKeys}
+            initialReviews={initialReviews}
+            onReviewChange={handleReviewChange}
             fileMetadata={fileMetadata}
             syncKey={validationKeysSignature}
             onPersist={persistPages}
@@ -814,7 +842,11 @@ export default function ProjectWorkspacePage() {
                 onClick={handleProcessSelected}
                 disabled={isProcessing}
               >
-                {isProcessing ? <span className="loading loading-spinner loading-sm" /> : 'Reprocess'}
+                {isProcessing ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  'Reprocess'
+                )}
               </button>
             </div>
           </div>

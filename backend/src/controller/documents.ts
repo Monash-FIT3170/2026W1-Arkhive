@@ -12,6 +12,7 @@ import {
 import { parseTableWithRetries } from '../services/ocr/ocr';
 import type { ExtractedPage } from '../models/TableData';
 import type { PageSelection, ProcessedPageResult } from '../models/Project.ts';
+import { PageReview } from '../models/IssueReview';
 
 /**
  * Verifies the caller owns the project that (transitively) owns `documentId`,
@@ -315,7 +316,12 @@ export default {
             // before it's trustworthy.
             await supabase
               .from('document_pages')
-              .update({ status: 'done', raw_ocr_result: rawResult, error_message: null })
+              .update({
+                status: 'done',
+                raw_ocr_result: rawResult,
+                error_message: null,
+                review_state: null,
+              })
               .eq('document_id', documentId)
               .eq('page_index', pageIndex);
 
@@ -393,7 +399,61 @@ export default {
       res.status(500).json({ error: err.message || 'Internal server error.' });
     }
   },
+  /**
+   * PATCH /api/documents/:id/pages/:pageIndex/review
+   * Persists which issues were flagged on a page and which the user resolved.
+   * Body: { reviewState: PageReview | null }   (null clears it, forcing a fresh scan)
+   */
+  saveReviewState: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { id, pageIndex } = req.params as { id: string; pageIndex: string };
+      const { reviewState } = req.body as { reviewState?: PageReview | null };
+      const ownerId = req.userId;
 
+      if (!ownerId) {
+        res.status(401).json({ error: 'Unauthorized.' });
+        return;
+      }
+
+      const isValid =
+        reviewState === null ||
+        (typeof reviewState === 'object' &&
+          !Array.isArray(reviewState) &&
+          reviewState.version === 1 &&
+          typeof reviewState.scannedAt === 'string' &&
+          Array.isArray(reviewState.issues));
+
+      if (!isValid) {
+        res.status(400).json({ error: 'reviewState must be a PageReview object or null.' });
+        return;
+      }
+
+      const document = await getOwnedDocument(id, ownerId);
+      if (!document) {
+        res.status(404).json({ error: 'Document not found or access denied.' });
+        return;
+      }
+
+      const { data: updatedPage, error: updateError } = await supabase
+        .from('document_pages')
+        .update({ review_state: reviewState })
+        .eq('document_id', id)
+        .eq('page_index', Number(pageIndex))
+        .select()
+        .single();
+
+      if (updateError || !updatedPage) {
+        console.error('Failed to save review state:', updateError);
+        res.status(500).json({ error: updateError?.message || 'Failed to persist review state.' });
+        return;
+      }
+
+      res.json({ success: true, documentId: id, page: updatedPage });
+    } catch (err: any) {
+      console.error('Error saving review state:', err);
+      res.status(500).json({ error: err.message || 'Internal server error.' });
+    }
+  },
   /**
    * DELETE /api/documents/:id/pages/:pageIndex
    * Removes the page image from R2 and deletes its document_pages row
