@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react';
 import type { OCRComponent } from '../../../../models/OCRComponent';
-// NEW update: Calculating real average confidence from OCR data
 function calculateAverageConfidence(data: OCRComponent[]): number {
   const componentsWithConfidence = data.filter((comp) => typeof comp.confidence === 'number');
   if (componentsWithConfidence.length === 0) return 0;
@@ -15,6 +14,8 @@ function DocumentPanel({
   imageUrls = [],
   currentPageIndex = 0,
   onPageChange,
+  hideThumbnails = false,
+  compactMode = false,
 }: {
   hoveredOverlayIds: string[];
   documentImageUrl: string | undefined;
@@ -22,6 +23,8 @@ function DocumentPanel({
   imageUrls?: string[];
   currentPageIndex?: number;
   onPageChange?: (index: number) => void;
+  hideThumbnails?: boolean;
+  compactMode?: boolean;
 }) {
   const [zoom, setZoom] = useState(1);
   const [viewBox, setViewBox] = useState('0 0 1000 1000'); // default
@@ -76,25 +79,62 @@ function DocumentPanel({
 
   return (
     <>
-      <div className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col">
-        {/* Row 1: Title */}
-        <h2 className="mb-4 text-xl font-semibold text-base-content">DOCUMENT PANEL</h2>
-        {/* Row 2: Zoom buttoms*/}
-        <div className="mb-2 flex gap-2">
-          <button className="btn btn-sm" onClick={() => setZoom((z) => Math.max(1, z - 0.25))}>
-            −
-          </button>
+      <div
+        className={`h-full w-full rounded-lg text-left flex flex-col ${
+          compactMode
+            ? 'p-0 bg-transparent border-0'
+            : 'border border-base-300 bg-base-200 p-3 shadow-sm'
+        }`}
+      >
+        {/* Legacy header shown only when hideThumbnails is false and not in compactMode */}
+        {!hideThumbnails && !compactMode && (
+          <>
+            <h2 className="mb-2 text-lg font-semibold text-base-content">DOCUMENT PANEL</h2>
+            <div className="mb-2 flex gap-2">
+              <button className="btn btn-sm" onClick={() => setZoom((z) => Math.max(1, z - 0.25))}>
+                −
+              </button>
+              <button className="btn btn-sm" onClick={() => setZoom((z) => Math.min(4, z + 0.25))}>
+                +
+              </button>
+              <button className="btn btn-sm" onClick={() => setZoom(1)}>
+                Reset
+              </button>
+            </div>
+          </>
+        )}
 
-          <button className="btn btn-sm" onClick={() => setZoom((z) => Math.min(4, z + 0.25))}>
-            +
-          </button>
-
-          <button className="btn btn-sm" onClick={() => setZoom(1)}>
-            Reset
-          </button>
-        </div>
-        {/* Row 3: Image & Overlay Container */}
-        <div className="flex-1 relative min-h-[250px] border border-base-300 overflow-hidden group">
+        {/* Image & Overlay Container */}
+        <div className="flex-1 relative min-h-[250px] border border-base-300 rounded-lg overflow-hidden group bg-base-100">
+          {/* Floating Zoom Controls (Modern streamlined UI) */}
+          {!compactMode && hideThumbnails && (
+            <div className="absolute top-3 right-3 z-20 flex items-center gap-1 bg-base-100/90 backdrop-blur-md rounded-xl border border-base-300 p-1 shadow-md">
+              <button
+                className="btn btn-ghost btn-xs btn-square font-bold text-sm h-6 w-6 min-h-0"
+                onClick={() => setZoom((z) => Math.max(1, z - 0.25))}
+                title="Zoom out"
+              >
+                −
+              </button>
+              <span className="text-[11px] font-semibold px-1 text-base-content/80 min-w-[36px] text-center">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                className="btn btn-ghost btn-xs btn-square font-bold text-sm h-6 w-6 min-h-0"
+                onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
+                title="Zoom in"
+              >
+                +
+              </button>
+              <button
+                className="btn btn-ghost btn-xs px-2 text-[11px] h-6 min-h-0 rounded-lg"
+                onClick={() => setZoom(1)}
+                title="Reset Zoom to 100%"
+              >
+                Reset
+              </button>
+            </div>
+          )}
           {/* Previous Page Button */}
           {imageUrls && imageUrls.length > 1 && currentPageIndex > 0 && (
             <button
@@ -228,7 +268,7 @@ function DocumentPanel({
         </div>
 
         {/* Thumbnail Carousel */}
-        {imageUrls && imageUrls.length > 1 && (
+        {!hideThumbnails && imageUrls && imageUrls.length > 1 && (
           <div className="flex gap-2 overflow-x-auto py-3 border-t mt-3 shrink-0">
             {imageUrls.map((url, idx) => (
               <button
@@ -249,23 +289,23 @@ function DocumentPanel({
           </div>
         )}
 
-        {/* Row 4: Confidence Score, updated to show real score instead of hardcoded value, made the colours a little brighter for the document panel */}
-        {/* UPDATED: Replaced plain coloured text with capsule matching the right panel style */}
-        <div className="border-t pt-3 mt-3 text-sm text-base-content/70 flex items-center gap-2">
-          Confidence Score:
-          {/* UPDATED: Matching outlined badge style to keep confidence score as secondary info */}
-          <span
-            className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-              confidencePercent >= 85
-                ? 'border-success text-successbg-[var(--color-base-100)]'
-                : confidencePercent >= 70
-                  ? 'border-warning text-warning bg-[var(--color-base-100)]'
-                  : ' border-error text-error bg-[var(--color-base-100)]'
-            }`}
-          >
-            {confidencePercent}%
-          </span>
-        </div>
+        {/* Confidence Score footer bar (only shown in legacy layout) */}
+        {!hideThumbnails && (
+          <div className="border-t pt-3 mt-3 text-sm text-base-content/70 flex items-center gap-2">
+            Confidence Score:
+            <span
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                confidencePercent >= 85
+                  ? 'border-success text-success bg-[var(--color-base-100)]'
+                  : confidencePercent >= 70
+                    ? 'border-warning text-warning bg-[var(--color-base-100)]'
+                    : ' border-error text-error bg-[var(--color-base-100)]'
+              }`}
+            >
+              {confidencePercent}%
+            </span>
+          </div>
+        )}
       </div>
     </>
   );

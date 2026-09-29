@@ -10,13 +10,11 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
+  Info,
 } from 'lucide-react'; // NEW: Importing icons for confidence badges and export button
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
-import { exportExtractedDataAsCSV } from '../../../../services/csvDownloadService';
-import { exportExtractedDataAsJSON } from '../../../../services/jsonDownloadService';
-import { exportExtractedDataAsTXT } from '../../../../services/txtDownloadService'; // NEW: TXT export service
-import { exportExtractedDataAsXLSX } from '../../../../services/xlsxDownloadService'; // NEW: Excel export service (US-4.5)
+import { ExportModal } from './ExportModal'; // NEW: Excel export service (US-4.5)
 import TextInputModal from '../modals/TextInputModal';
 import Toast from '../modals/Toast';
 
@@ -57,6 +55,7 @@ function getConfidenceTier(confidence: number): {
 function ExtractedDataPanel({
   onHover,
   extractedData,
+  allExtractedData,
   hoveredOverlayIds,
   onCellEdit,
   onRowAdd,
@@ -65,6 +64,7 @@ function ExtractedDataPanel({
   onRowOutdent,
   onColumnAdd,
   onColumnDelete,
+  onColumnRename,
   onRowMove,
   onColumnReorder,
   isEditMode,
@@ -74,6 +74,7 @@ function ExtractedDataPanel({
 }: {
   onHover: (id: string | null) => void;
   extractedData: ExtractedData;
+  allExtractedData?: ExtractedData[];
   hoveredOverlayIds?: string[];
   onCellEdit?: (fieldId: string, newValue: string) => void;
   onRowAdd?: () => void;
@@ -82,6 +83,7 @@ function ExtractedDataPanel({
   onRowOutdent?: (rowId: string | number) => void;
   onColumnAdd?: (columnName: string) => void;
   onColumnDelete?: (columnName: string) => void;
+  onColumnRename?: (oldName: string, newName: string) => void;
   onRowMove?: (rowId: string | number, direction: 'up' | 'down') => void;
   onColumnReorder?: (newColumns: string[]) => void;
   isEditMode?: boolean;
@@ -89,12 +91,6 @@ function ExtractedDataPanel({
   editedCells?: Set<string>;
   onUndoLast?: () => void;
 }) {
-  // used to check if file exported, and which format was last exported
-  // UPDATED: was a plain boolean for CSV only; now tracks which format
-  // (csv/txt/xlsx) was exported so a single button/dropdown can serve all three
-  const [exportedFormat, setExportedFormat] = useState<null | 'csv' | 'txt' | 'xlsx' | 'json'>(
-    null
-  );
   const [isMouseInside, setIsMouseInside] = useState(false);
 
   // Editing state
@@ -105,33 +101,19 @@ function ExtractedDataPanel({
   const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
   const [showDiscardMessage, setShowDiscardMessage] = useState<boolean>(false);
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
+  const [renamingColumn, setRenamingColumn] = useState<string | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportedFormat, setExportedFormat] = useState<boolean>(false);
   const [columnDeleteToast, setColumnDeleteToast] = useState<string | null>(null);
+  const [columnRenameToast, setColumnRenameToast] = useState<{
+    oldName: string;
+    newName: string;
+  } | null>(null);
   const [rowDeleteToast, setRowDeleteToast] = useState(false);
 
   // Column re-ordering
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
-
-  // function to import csv/txt/xlsx/json download services and trigger the download
-  // for whichever format the user picked from the dropdown
-  // UPDATED: replaces the old handleExportCSV, now handles all export formats
-  function handleExport(format: 'csv' | 'txt' | 'xlsx' | 'json') {
-    if (format === 'csv') {
-      exportExtractedDataAsCSV(extractedData);
-    } else if (format === 'txt') {
-      exportExtractedDataAsTXT(extractedData);
-    } else if (format === 'xlsx') {
-      exportExtractedDataAsXLSX(extractedData);
-    } else if (format === 'json') {
-      exportExtractedDataAsJSON(extractedData);
-    }
-
-    setExportedFormat(format);
-    setTimeout(() => setExportedFormat(null), 2500);
-
-    // close the dropdown menu after a selection is made
-    (document.activeElement as HTMLElement)?.blur();
-  }
 
   useEffect(() => {
     if (hoveredOverlayIds && hoveredOverlayIds.length > 0 && !isMouseInside) {
@@ -172,7 +154,8 @@ function ExtractedDataPanel({
   };
 
   const handleCellKeyDown = (e: React.KeyboardEvent, fieldId: string) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       handleCellBlur(fieldId);
     } else if (e.key === 'Escape') {
       if (editValue !== initialEditValue) {
@@ -215,16 +198,48 @@ function ExtractedDataPanel({
     }
   };
 
+  const handleColumnRename = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    if (extractedData.columns.includes(trimmed)) return;
+
+    setLocalEdits((prev) => {
+      const next: Record<string, string> = {};
+      const oldSuffix = `:${oldName}`;
+      const newSuffix = `:${trimmed}`;
+      for (const [key, val] of Object.entries(prev)) {
+        if (key.endsWith(oldSuffix)) {
+          const rowId = key.slice(0, key.length - oldSuffix.length);
+          next[`${rowId}${newSuffix}`] = val;
+        } else {
+          next[key] = val;
+        }
+      }
+      return next;
+    });
+
+    onColumnRename?.(oldName, trimmed);
+    setRowDeleteToast(false);
+    setColumnDeleteToast(null);
+    setColumnRenameToast({ oldName, newName: trimmed });
+    setShowSuccessMessage(true);
+    setTimeout(() => {
+      setShowSuccessMessage(false);
+    }, 2000);
+  };
+
   return (
     <div
       className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col"
       onMouseEnter={() => setIsMouseInside(true)}
       onMouseLeave={() => setIsMouseInside(false)}
     >
-      {/* Download Button & Notifications */}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h2 className="text-xl font-semibold text-base-content">EXTRACTED DATA</h2>
+      {/* Table Toolbar & Notifications */}
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h2 className="text-base font-bold text-base-content tracking-wide uppercase">
+            EXTRACTED DATA
+          </h2>
           {showSuccessMessage && (
             <span className="text-success text-xs font-semibold animate-fade-in-out flex items-center gap-1">
               <Check className="w-3.5 h-3.5" />
@@ -267,50 +282,30 @@ function ExtractedDataPanel({
               Add Column
             </button>
           )}
-          <div className="dropdown dropdown-end">
-            <button
-              tabIndex={0}
-              className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${
-                exportedFormat ? 'btn-success' : 'btn-primary'
-              }`}
-            >
-              {exportedFormat ? (
-                <>
-                  <Check className="w-3.5 h-3.5" />
-                  Downloaded!
-                </>
-              ) : (
-                <>
-                  <Download className="w-3.5 h-3.5" />
-                  Download
-                </>
-              )}
-            </button>
-            <ul
-              tabIndex={0}
-              className="dropdown-content menu bg-base-100 rounded-box z-10 w-45 p-2 shadow-md border border-base-300"
-            >
-              <li>
-                <a onClick={() => handleExport('csv')}>Download as CSV</a>
-              </li>
-              <li>
-                <a onClick={() => handleExport('txt')}>Download as TXT</a>
-              </li>
-              {/* NEW: Excel export option (US-4.5) */}
-              <li>
-                <a onClick={() => handleExport('xlsx')}>Download as Excel</a>
-              </li>
-              <li>
-                <a onClick={() => handleExport('json')}>Download as JSON</a>
-              </li>
-            </ul>
-          </div>
+          <button
+            onClick={() => setShowExportModal(true)}
+            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${
+              exportedFormat ? 'btn-success' : 'btn-primary'
+            }`}
+          >
+            {exportedFormat ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                Exported!
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5" />
+                Export
+              </>
+            )}
+          </button>
         </div>
       </div>
       {/*Acknowledgement: AI (Google Gemini) was used while coding the
             manual corrections*/}
       {/* Table */}
-      <div className="flex-1 overflow-auto min-h-0 max-w-full">
+      <div className="flex-1 overflow-auto min-h-0 max-w-full pb-20">
         <table className="table table-fixed w-full border border-base-300 text-[10px]">
           {/* Table Header */}
           <thead>
@@ -364,31 +359,83 @@ function ExtractedDataPanel({
                       </div>
                     )}
 
-                    <span className="text-left w-full flex-grow">{column.replace(/_/g, ' ')}</span>
+                    <span
+                      className={`text-left w-full flex-grow ${
+                        isEditMode && onColumnRename ? 'cursor-pointer hover:underline' : ''
+                      }`}
+                      title={isEditMode && onColumnRename ? 'Click to rename column' : undefined}
+                      onClick={(e) => {
+                        if (isEditMode && onColumnRename) {
+                          e.stopPropagation();
+                          setRenamingColumn(column);
+                        }
+                      }}
+                    >
+                      {column.replace(/_/g, ' ')}
+                    </span>
 
-                    {isEditMode && onColumnDelete && (
+                    {isEditMode && (onColumnRename || onColumnDelete) && (
                       <div className="flex items-center justify-center gap-1 w-full bg-base-300/30 rounded px-1 py-0.5">
-                        <button
-                          className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-error opacity-60 hover:opacity-100 hover:bg-error/20"
-                          title="Delete Column"
-                          onClick={() => {
-                            onColumnDelete(column);
-                            setRowDeleteToast(false);
-                            setColumnDeleteToast(column);
-                          }}
-                        >
-                          <Trash className="w-3 h-3" />
-                        </button>
+                        {onColumnRename && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-base-content/70 opacity-60 hover:opacity-100 hover:bg-base-content/10"
+                            title="Rename Column"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRenamingColumn(column);
+                            }}
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                        )}
+                        {onColumnDelete && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-error opacity-60 hover:opacity-100 hover:bg-error/20"
+                            title="Delete Column"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onColumnDelete(column);
+                              setRowDeleteToast(false);
+                              setColumnRenameToast(null);
+                              setColumnDeleteToast(column);
+                            }}
+                          >
+                            <Trash className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
                 </th>
               ))}
 
-              {/* NEW: Confidence column header added at the end of the table */}
-              <th className="p-3 text-left text-[12px] font-bold border-b border-base-300 whitespace-normal break-words w-[120px]">
-                CONFIDENCE SCORE
-              </th>
+              {/* Confidence column header: shown in view mode, auto-hidden in edit mode */}
+              {!isEditMode && (
+                <th
+                  className="p-2.5 text-left border-b border-base-300 border-l-2 border-base-300 bg-base-200/60 whitespace-normal break-words w-[135px] select-none align-top"
+                  data-testid="confidence-header"
+                >
+                  <div className="flex flex-col h-full justify-between gap-1.5">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="badge badge-neutral badge-xs text-[9px] font-semibold tracking-wider uppercase opacity-75 px-1.5 py-0.5">
+                        AI Metric
+                      </span>
+                      <span
+                        className="tooltip tooltip-left cursor-help"
+                        data-tip="Confidence score is an AI extraction metric and is not part of the exported table data."
+                        title="Confidence score is an AI extraction metric and is not part of the exported table data."
+                      >
+                        <Info className="w-3.5 h-3.5 text-base-content/40 hover:text-base-content transition-colors" />
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-bold text-base-content/80 tracking-wide uppercase">
+                      CONFIDENCE
+                    </span>
+                  </div>
+                </th>
+              )}
               {isEditMode && (onRowDelete || onRowMove) && (
                 <th className="p-3 border-b border-base-300 w-24"></th>
               )}
@@ -443,14 +490,27 @@ function ExtractedDataPanel({
                         }}
                       >
                         {isEditing ? (
-                          <input
-                            type="text"
-                            className="input input-xs input-bordered w-full max-w-xs bg-base-100 text-base-content"
+                          <textarea
+                            className="textarea textarea-xs textarea-bordered w-full min-w-[8rem] resize-none bg-base-100 text-base-content leading-snug"
+                            rows={1}
                             value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
+                            onChange={(e) => {
+                              setEditValue(e.target.value);
+                              // auto-grow to fit content
+                              const el = e.target as HTMLTextAreaElement;
+                              el.style.height = 'auto';
+                              el.style.height = `${el.scrollHeight}px`;
+                            }}
                             onBlur={() => handleCellBlur(fieldId)}
                             onKeyDown={(e) => handleCellKeyDown(e, fieldId)}
                             autoFocus
+                            ref={(el) => {
+                              // set initial height on mount to fit existing content
+                              if (el) {
+                                el.style.height = 'auto';
+                                el.style.height = `${el.scrollHeight}px`;
+                              }
+                            }}
                           />
                         ) : (
                           //pencil icon
@@ -465,35 +525,40 @@ function ExtractedDataPanel({
                     );
                   })}
 
-                  {/* NEW: Confidence score cell added at the end of each row
-										Shows a DaisyUI badge with the score percentage
-										Green >=85%, Amber 70-84%, Red <70%
-										Low confidence rows also show a warning icon from lucide-react */}
-                  {/* UPDATED: Capsule shape with solid background colours for high visibility */}
-                  {/* Alert icon on left only for low confidence rows with hover tooltip */}
-                  <td className="p-2">
-                    <div className="flex items-center gap-1">
-                      {tier.isLow && (
-                        <span title="please check this output">
-                          <AlertTriangle className="w-3 h-3 text-error cursor-pointer flex-shrink-0" />
+                  {/* Confidence score cell: shown in view mode, auto-hidden in edit mode */}
+                  {!isEditMode && (
+                    <td
+                      className={`p-2 border-l-2 border-base-300 ${tier.isLow ? 'bg-error/15' : 'bg-base-200/40'}`}
+                      data-testid={`confidence-cell-${row._id}`}
+                    >
+                      <div className="flex items-center gap-1">
+                        {tier.isLow && (
+                          <span title="please check this output">
+                            <AlertTriangle className="w-3 h-3 text-error cursor-pointer flex-shrink-0" />
+                          </span>
+                        )}
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                            tier.badgeClass === 'badge-success'
+                              ? 'border-success text-success bg-[var(--color-base-100)]'
+                              : tier.badgeClass === 'badge-warning'
+                                ? 'border-warning text-warning bg-[var(--color-base-100)]'
+                                : ' border-error text-error bg-[var(--color-base-100)]'
+                          }`}
+                        >
+                          {tier.label}
                         </span>
-                      )}
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-                          tier.badgeClass === 'badge-success'
-                            ? 'border-success text-success bg-[var(--color-base-100)]'
-                            : tier.badgeClass === 'badge-warning'
-                              ? 'border-warning text-warning bg-[var(--color-base-100)]'
-                              : ' border-error text-error bg-[var(--color-base-100)]'
-                        }`}
-                      >
-                        {tier.label}
-                      </span>
-                    </div>
-                  </td>
+                      </div>
+                    </td>
+                  )}
                   {isEditMode && (onRowDelete || onRowMove || onRowIndent || onRowOutdent) && (
                     <td className="p-2 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {tier.isLow && (
+                          <span title="Low confidence row (please check values)" className="mr-1">
+                            <AlertTriangle className="w-3.5 h-3.5 text-error flex-shrink-0" />
+                          </span>
+                        )}
                         {(onRowIndent || onRowOutdent) && (
                           <div className="flex flex-col">
                             <button
@@ -575,11 +640,53 @@ function ExtractedDataPanel({
         description="Enter a name for the new column."
         placeholder="Column name"
         confirmLabel="Add Column"
+        validate={(name) => {
+          const trimmed = name.trim();
+          if (!trimmed) return null;
+          if (extractedData.columns.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+            return 'A column with this name already exists';
+          }
+          return null;
+        }}
         onConfirm={(name) => {
           onColumnAdd?.(name);
           setShowAddColumnModal(false);
         }}
         onCancel={() => setShowAddColumnModal(false)}
+      />
+
+      {/* Rename Column Modal */}
+      <TextInputModal
+        key={renamingColumn ?? 'none'}
+        open={renamingColumn !== null}
+        title="Rename Column"
+        description={
+          renamingColumn
+            ? `Enter a new name for column "${renamingColumn.replace(/_/g, ' ')}".`
+            : 'Enter a new column name.'
+        }
+        placeholder="Column name"
+        initialValue={renamingColumn ?? ''}
+        confirmLabel="Rename Column"
+        validate={(name) => {
+          const trimmed = name.trim();
+          if (!trimmed) return null;
+          if (
+            renamingColumn &&
+            trimmed.toLowerCase() !== renamingColumn.toLowerCase() &&
+            extractedData.columns.some((c) => c.toLowerCase() === trimmed.toLowerCase())
+          ) {
+            return 'A column with this name already exists';
+          }
+          return null;
+        }}
+        onConfirm={(newName) => {
+          if (renamingColumn) {
+            handleColumnRename(renamingColumn, newName);
+          }
+          setRenamingColumn(null);
+        }}
+        onCancel={() => setRenamingColumn(null)}
       />
 
       {/* Row Delete Toast */}
@@ -600,6 +707,30 @@ function ExtractedDataPanel({
         actionLabel="Undo"
         onAction={onUndoLast}
         onDismiss={() => setColumnDeleteToast(null)}
+      />
+
+      {/* Column Rename Toast */}
+      <Toast
+        open={columnRenameToast !== null}
+        message={
+          columnRenameToast
+            ? `Column renamed to "${columnRenameToast.newName.replace(/_/g, ' ')}"`
+            : ''
+        }
+        actionLabel="Undo"
+        onAction={onUndoLast}
+        onDismiss={() => setColumnRenameToast(null)}
+      />
+
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        extractedData={extractedData}
+        allExtractedData={allExtractedData}
+        onExport={() => {
+          setExportedFormat(true);
+          setTimeout(() => setExportedFormat(false), 2500);
+        }}
       />
     </div>
   );

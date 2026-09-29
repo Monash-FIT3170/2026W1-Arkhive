@@ -1,6 +1,6 @@
 import type { DocumentJob } from '../models/Job';
 import type { ExtractedData } from '../models/TableData';
-import { flatten } from '../pages/validation/components/extracted-data/flattener';
+import { flatten } from '../utils/flattener';
 
 type ZipEntry = {
   name: string;
@@ -202,13 +202,20 @@ function getJobExtractedData(job: DocumentJob): ExtractedData {
   if (job.ocrData && job.ocrData.length > 0) {
     return flatten(job.ocrData);
   }
-  return { columns: ['Document', 'Status'], itemColumnKey: 'Document', rows: [{ _id: '1', Document: job.fileName, Status: job.status, _cellConfidence: {} }] };
+  return {
+    columns: ['Document', 'Status'],
+    itemColumnKey: 'Document',
+    rows: [{ _id: '1', Document: job.fileName, Status: job.status, _cellConfidence: {} }],
+  };
 }
 
 /**
  * Export all document jobs in the batch as a multi-sheet Excel workbook (.xlsx).
  */
-export function exportBatchAsXLSX(jobs: DocumentJob[], filename = 'arkhive-batch-export.xlsx'): void {
+export function exportBatchAsXLSX(
+  jobs: DocumentJob[],
+  filename = 'arkhive-batch-export.xlsx'
+): void {
   if (!jobs || jobs.length === 0) return;
 
   const usedNames = new Set<string>();
@@ -239,7 +246,9 @@ export function exportBatchAsXLSX(jobs: DocumentJob[], filename = 'arkhive-batch
 </Relationships>`;
 
   const workbookSheetsXml = sheetItems
-    .map((s) => `<sheet name="${escapeXml(s.sheetName)}" sheetId="${s.sheetId}" r:id="${s.relId}"/>`)
+    .map(
+      (s) => `<sheet name="${escapeXml(s.sheetName)}" sheetId="${s.sheetId}" r:id="${s.relId}"/>`
+    )
     .join('');
 
   const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -264,13 +273,13 @@ export function exportBatchAsXLSX(jobs: DocumentJob[], filename = 'arkhive-batch
     { name: 'xl/_rels/workbook.xml.rels', data: textEncode(workbookRelsXml) },
     ...sheetItems.map((s) => ({
       name: `xl/worksheets/sheet${s.sheetId}.xml`,
-      data: textEncode(buildSheetXml(s.data))
-    }))
+      data: textEncode(buildSheetXml(s.data)),
+    })),
   ];
 
   const zipBytes = buildZip(entries);
   const blob = new Blob([zipBytes as BlobPart], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
   triggerDownload(blob, filename);
 }
@@ -307,7 +316,10 @@ export function exportBatchAsCSV(jobs: DocumentJob[], filename = 'arkhive-batch-
 /**
  * Export all document jobs in the batch as a structured JSON file.
  */
-export function exportBatchAsJSON(jobs: DocumentJob[], filename = 'arkhive-batch-export.json'): void {
+export function exportBatchAsJSON(
+  jobs: DocumentJob[],
+  filename = 'arkhive-batch-export.json'
+): void {
   if (!jobs || jobs.length === 0) return;
 
   const batchPayload = jobs.map((job) => ({
@@ -317,7 +329,7 @@ export function exportBatchAsJSON(jobs: DocumentJob[], filename = 'arkhive-batch
     confidence: job.confidence,
     extractedData: getJobExtractedData(job),
     createdAt: job.createdAt,
-    updatedAt: job.updatedAt
+    updatedAt: job.updatedAt,
   }));
 
   const jsonStr = JSON.stringify(batchPayload, null, 2);

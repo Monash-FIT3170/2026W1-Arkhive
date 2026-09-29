@@ -7,6 +7,7 @@ function TextInputModal({
   placeholder,
   initialValue = '',
   confirmLabel = 'Confirm',
+  validate,
   onConfirm,
   onCancel,
 }: {
@@ -16,6 +17,7 @@ function TextInputModal({
   placeholder?: string;
   initialValue?: string;
   confirmLabel?: string;
+  validate?: (value: string) => string | null;
   onConfirm: (value: string) => void;
   onCancel: () => void;
 }) {
@@ -30,9 +32,12 @@ function TextInputModal({
 
   if (!open) return null;
 
+  const validationError = validate ? validate(value) : null;
+  const isInvalid = Boolean(validationError);
+
   const handleConfirm = () => {
     const trimmed = value.trim();
-    if (trimmed !== '') onConfirm(trimmed);
+    if (trimmed !== '' && !isInvalid) onConfirm(trimmed);
   };
 
   return (
@@ -43,7 +48,7 @@ function TextInputModal({
         <input
           type="text"
           autoFocus
-          className="input input-sm input-bordered w-full mt-3"
+          className={`input input-sm input-bordered w-full mt-3 ${isInvalid ? 'input-error' : ''}`}
           placeholder={placeholder}
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -52,13 +57,16 @@ function TextInputModal({
             if (e.key === 'Escape') onCancel();
           }}
         />
+        {validationError && (
+          <p className="text-xs text-error mt-1">{validationError}</p>
+        )}
         <div className="modal-action">
           <button className="btn btn-sm btn-ghost" onClick={onCancel}>
             Cancel
           </button>
           <button
             className="btn btn-sm btn-primary"
-            disabled={value.trim() === ''}
+            disabled={value.trim() === '' || isInvalid}
             onClick={handleConfirm}
           >
             {confirmLabel}
