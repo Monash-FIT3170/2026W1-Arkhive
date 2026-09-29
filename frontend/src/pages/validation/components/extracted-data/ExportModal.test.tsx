@@ -32,8 +32,8 @@ describe('ExportModal Component', () => {
       />
     );
     expect(screen.getByText('Export Data')).toBeInTheDocument();
-    expect(screen.getByText('All Pages')).toBeInTheDocument();
-    expect(screen.getByText('Current Page')).toBeInTheDocument();
+    expect(screen.getByText('Export Filename')).toBeInTheDocument();
+    expect(screen.getByText('CSV')).toBeInTheDocument();
   });
 
   it('calls onClose when Cancel button is clicked', () => {

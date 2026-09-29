@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
 import type { ValidationFileGroup } from '../../../../utils/fileGrouping';
 import { exportExtractedDataAsCSV, exportExtractedDataAsSimpleCSV } from '../../../../services/csvDownloadService';
