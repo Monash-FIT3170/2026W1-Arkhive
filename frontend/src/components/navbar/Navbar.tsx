@@ -118,9 +118,14 @@ export const Navbar = () => {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="text-xl font-bold text-primary cursor-pointer bg-transparent border-0 p-0"
+            className="flex items-center gap-2 text-xl font-bold text-primary cursor-pointer bg-transparent border-0 p-0"
           >
-            Arkhive
+            <img
+              src="/favicon.svg"
+              alt="Arkhive logo"
+              className="w-7 h-7 shrink-0"
+            />
+            <span>Arkhive</span>
           </button>
 
           {/* Home + Quick Scan + Projects tabs — only shown once someone's
