@@ -56,6 +56,7 @@ function ExtractedDataPanel({
   onHover,
   extractedData,
   allExtractedData,
+  allExtractedDataNames,
   hoveredOverlayIds,
   onCellEdit,
   onRowAdd,
@@ -75,6 +76,7 @@ function ExtractedDataPanel({
   onHover: (id: string | null) => void;
   extractedData: ExtractedData;
   allExtractedData?: ExtractedData[];
+  allExtractedDataNames?: string[];
   hoveredOverlayIds?: string[];
   onCellEdit?: (fieldId: string, newValue: string) => void;
   onRowAdd?: () => void;
@@ -727,6 +729,7 @@ function ExtractedDataPanel({
         onClose={() => setShowExportModal(false)}
         extractedData={extractedData}
         allExtractedData={allExtractedData}
+        allExtractedDataNames={allExtractedDataNames}
         onExport={() => {
           setExportedFormat(true);
           setTimeout(() => setExportedFormat(false), 2500);
