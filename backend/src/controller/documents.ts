@@ -43,15 +43,16 @@ async function processPage(selection: PageSelection, ownerId: string): Promise<P
 
   const document = await getOwnedDocument(documentId, ownerId);
   if (!document) {
-    for (const pageIndex of pageIndices) {
+    return Promise.all(pageIndices.map(async (pageIndex)=>{
       return {
         documentId,
         pageIndex,
         status: 'error',
         errorMessage: 'Document not found or access denied.',
-      };
+      }
+      }
+    ));
     }
-  }
 
   const { data: pageRows, error: pagesError } = await supabase
     .from('document_pages')
@@ -61,14 +62,16 @@ async function processPage(selection: PageSelection, ownerId: string): Promise<P
 
   if (pagesError) {
     console.error('Failed to fetch document_pages for processing:', pagesError);
-    for (const pageIndex of pageIndices) {
-      return {
-        documentId,
-        pageIndex,
-        status: 'error',
-        errorMessage: pagesError.message,
-      };
-    }
+    return Promise.all(pageIndices.map(async (pageIndex)=>{
+          return {
+            documentId,
+            pageIndex,
+            status: 'error',
+            errorMessage: pagesError.message,
+          };
+        }
+      )
+    )
   }
 
   const pageByIndex = new Map((pageRows || []).map((p) => [p.page_index, p]));
