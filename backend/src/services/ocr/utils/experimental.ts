@@ -17,6 +17,7 @@ import {
   Page,
 } from '../types/boundingBoxTypes';
 import { OpenRedaction } from "openredaction";
+import fs from "fs"
 
 const redactor = new OpenRedaction();
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
@@ -52,9 +53,6 @@ function pruneOCROutput(
   return {
     content: OCRResponse.analyzeResult!.content!, // scoped to this page, not the whole doc
     tables: tablesInPage.map((table) => ({
-    content: OCRResponse.analyzeResult!.content!,
-    tables: tablesInPage.map((table) => (
-      {
       rowCount: table.rowCount,
       columnCount: table.columnCount,
       cells: table.cells.map((cell) => ({
@@ -63,8 +61,7 @@ function pruneOCROutput(
         content: cell.content,
         kind: cell.kind,
         boundingRegions: cell.boundingRegions,
-        words: wordsInSpan(cell.spans![0]),
-        words: wordsInSpan(cell.spans![0]),
+        words: wordsInSpan(cell.spans?.[0]),
       })),
     })),
     pages: [
@@ -266,6 +263,8 @@ const mapTablesToOCRComponents =
       boundingBoxes: comp.boundingBoxes ? toColumnDict(comp.boundingBoxes) : {},
     }));
     const hydratedData = hydrateOutput(transformedComponents, prunedOCR)
+    // write to file to debug hydrated output for debugging purposes
+    fs.writeFileSync("hydrated_ocr_output.json", JSON.stringify(hydratedData, null, 2))
 
     return hydratedData;
   };
