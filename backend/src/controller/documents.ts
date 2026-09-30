@@ -38,7 +38,7 @@ const chunk = (size: number) => (arr: any[]) =>
   );
 
 
-async function processPage(selection: PageSelection, ownerId: string): Promise<ProcessedPageResult>{
+async function processPage(selection: PageSelection, ownerId: string): Promise<ProcessedPageResult[]>{
   const { documentId, pageIndices, force } = selection;
 
   const document = await getOwnedDocument(documentId, ownerId);
@@ -73,7 +73,7 @@ async function processPage(selection: PageSelection, ownerId: string): Promise<P
 
   const pageByIndex = new Map((pageRows || []).map((p) => [p.page_index, p]));
 
-  for (const pageIndex of pageIndices) {
+  const t: Promise<ProcessedPageResult[]> = Promise.all(pageIndices.map(async (pageIndex)=>{
     const pageRow = pageByIndex.get(pageIndex);
 
     // Skip pages already validated, unless the caller forces a redo.
@@ -122,8 +122,8 @@ async function processPage(selection: PageSelection, ownerId: string): Promise<P
 
       return { documentId, pageIndex, status: 'error', errorMessage };
     }
-  }
-  throw new Error(`Unhandled page processing path for selection`);
+  }))
+  return t
 }
 
 export default {
@@ -345,7 +345,7 @@ export default {
       const resultsMatrix:ProcessedPageResult[][] = await chunks.reduce<Promise<ProcessedPageResult[][]>>(async (acc, chnk) => {
         const accResolved = await acc
         const chunkRes = await Promise.all(chnk.map(selctin => processPage(selctin, ownerId)));
-        accResolved.push(chunkRes);
+        accResolved.push(chunkRes.flat());
         return acc
       }, Promise.resolve([]))
 
