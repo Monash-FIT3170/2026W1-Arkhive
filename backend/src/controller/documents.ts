@@ -342,12 +342,14 @@ export default {
       
       const MAX_CHUNK_SIZE = 5
       const chunks = chunk(MAX_CHUNK_SIZE)(selections)
-      const results:ProcessedPageResult[][] = await chunks.reduce<Promise<ProcessedPageResult[][]>>(async (acc, chnk) => {
+      const resultsMatrix:ProcessedPageResult[][] = await chunks.reduce<Promise<ProcessedPageResult[][]>>(async (acc, chnk) => {
         const accResolved = await acc
         const chunkRes = await Promise.all(chnk.map(selctin => processPage(selctin, ownerId)));
         accResolved.push(chunkRes);
         return acc
       }, Promise.resolve([]))
+
+      const results: ProcessedPageResult[] = resultsMatrix.flatMap(_ => _)
 
       res.json({ success: true, results });
     } catch (err: any) {
