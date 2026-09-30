@@ -1,12 +1,8 @@
-import { openredactionMiddleware } from 'openredaction';
 import llmController from '../controller/llm';
 import { Router } from 'express';
 const router = Router();
 
-
-router.use(openredactionMiddleware)
-
-router.post('/chat',  llmController.chatWithModel);
+router.post('/chat', llmController.chatWithModel);
 router.post('/chat/review-field', llmController.reviewField);
 router.post('/chat/review-field-bulk', llmController.reviewBulk);
 router.post('/chat/detect-format', llmController.detectFormat);

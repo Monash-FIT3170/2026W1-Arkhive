@@ -1,13 +1,11 @@
 import { Router } from 'express';
 import documentsController from '../controller/documents';
 import { requireAuth } from '../middleware/auth';
-import { openredactionMiddleware } from 'openredaction';
 
 const documentsRouter = Router();
 
 // Apply auth middleware to all document routes
 documentsRouter.use(requireAuth);
-documentsRouter.use(openredactionMiddleware)
 
 documentsRouter.post('/upload-url', documentsController.getUploadUrl);
 documentsRouter.get('/:id/download-url', documentsController.getDownloadUrl);
