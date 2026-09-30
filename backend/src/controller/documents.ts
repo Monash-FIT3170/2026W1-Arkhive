@@ -107,7 +107,7 @@ async function processPage(selection: PageSelection, ownerId: string): Promise<P
       // before it's trustworthy.
       await supabase
         .from('document_pages')
-        .update({ status: 'done', raw_ocr_result: rawResult, error_message: null })
+        .update({ status: 'done', raw_ocr_result: rawResult, error_message: null, review_state: null })
         .eq('document_id', documentId)
         .eq('page_index', pageIndex);
 
