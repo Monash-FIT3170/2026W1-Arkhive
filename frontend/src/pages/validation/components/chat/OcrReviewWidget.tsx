@@ -9,11 +9,12 @@ import {
   CheckCircle2,
   Bot,
   Sparkle,
+  RefreshCw,
 } from 'lucide-react';
 
 // Acknowledgement: Google Gemini was used to help generate this file
 
-import { buildSlides } from '../../../../utils/ocrReviewUtils';
+import { buildSlides } from '../../../../utils/review/ocrReviewUtils';
 import type { OcrIssue } from '../../../../models/IssueReview';
 
 interface OcrReviewWidgetProps {
@@ -28,9 +29,18 @@ interface OcrReviewWidgetProps {
     fields: { fieldId: string; rowId: string | number; ocrValue: string }[],
     formatRegex?: string
   ) => Promise<Record<string, string> | null>;
-  resolvedIds?: Set<string>;
-  onResolveIds?: (ids: string[]) => void;
+  /** Re-scans the page currently in view, discarding its review state. */
+  onRescan?: () => void;
+  isRescanning?: boolean;
+  /** True when the LLM format check failed for the current page. */
+  formatCheckFailed?: boolean;
 }
+
+// fieldId (`rowId:column`) is only unique per page, so cache suggestions by
+// page + field + value. Otherwise page 2 reuses page 1's suggestion, and a
+// re-scan could serve a suggestion for a value that has since changed.
+const suggestionKey = (issue: OcrIssue) =>
+  `${issue.pageIndex ?? ''}:${issue.fieldId}:${issue.ocrValue}`;
 
 export default function OcrReviewWidget({
   issues,
@@ -40,8 +50,9 @@ export default function OcrReviewWidget({
   onSlideChange,
   onFetchSuggestion,
   onFetchBulkSuggestion,
-  resolvedIds,
-  onResolveIds,
+  onRescan,
+  isRescanning,
+  formatCheckFailed,
 }: OcrReviewWidgetProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [manualValue, setManualValue] = useState('');
@@ -50,11 +61,9 @@ export default function OcrReviewWidget({
   const [suggestions, setSuggestions] = useState<Record<string, string | null>>({});
   const [fetchingId, setFetchingId] = useState<string | null>(null);
 
-  // Filter out issues that have already been resolved
-  const unresolvedIssues = useMemo(
-    () => issues.filter((issue) => !resolvedIds?.has(issue.fieldId)),
-    [issues, resolvedIds]
-  );
+  // The parent only ever passes open issues; resolved ones are tracked and
+  // persisted by useReviewQueue.
+  const unresolvedIssues = issues;
 
   // Make review slide per ocr issue
   const slides = useMemo(() => buildSlides(unresolvedIssues), [unresolvedIssues]);
@@ -78,7 +87,7 @@ export default function OcrReviewWidget({
 
   // Whenever the slide list shrinks (or changes) for any reason — resolving an
   // issue, the parent updating `issues`, — make sure currentIndex still
-  // points at a real slide instead of relying on markResolved's one-off math.
+  // points at a real slide instead of relying on one-off index math at each call site.
   useEffect(() => {
     if (slides.length === 0) return;
     if (currentIndex > slides.length - 1) {
@@ -89,29 +98,30 @@ export default function OcrReviewWidget({
 
   // OCR ISSUE - SINGLE FIELD - ISSUE/SUGGESTION
   const currentSingle = currentSlide?.kind === 'single' ? currentSlide.issue : undefined; // If issue is single -> current issues
-  const currentSuggestion = currentSingle ? suggestions[currentSingle.fieldId] : undefined; // If issue is signle -> current suggestion
-  const isFetchingCurrent = currentSingle ? fetchingId === currentSingle.fieldId : false; // If issue is signel -> is suggestion being fetched?
+  const currentSuggestion = currentSingle ? suggestions[suggestionKey(currentSingle)] : undefined; // If issue is signle -> current suggestion
+  const isFetchingCurrent = currentSingle ? fetchingId === suggestionKey(currentSingle) : false; // If issue is signel -> is suggestion being fetched?
 
   // Trigger a fetch for the current issue
   const handleRequestSuggestion = () => {
     if (!currentSingle || !onFetchSuggestion) return;
-    const fieldId = currentSingle.fieldId;
-    if (suggestions[fieldId] !== undefined || fetchingId === fieldId) return;
+    const { fieldId } = currentSingle;
+    const key = suggestionKey(currentSingle);
+    if (suggestions[key] !== undefined || fetchingId === key) return;
 
-    setFetchingId(fieldId);
+    setFetchingId(key);
     onFetchSuggestion(fieldId)
       .then((val) => {
-        setSuggestions((s) => ({ ...s, [fieldId]: val }));
-        setFetchingId((current) => (current === fieldId ? null : current));
+        setSuggestions((s) => ({ ...s, [key]: val }));
+        setFetchingId((current) => (current === key ? null : current));
       })
-      .catch(() => setFetchingId((current) => (current === fieldId ? null : current)));
+      .catch(() => setFetchingId((current) => (current === key ? null : current)));
   };
 
   // BULK OCR ISSUE - CURRENT GROUP - SUGGESTION
   const currentGroup = currentSlide?.kind === 'group' ? currentSlide : undefined; // If group --> current slide
   const isFetchingGroup = currentGroup ? fetchingId === currentGroup.groupId : false; // if group --> is fetching suggestion?
   const groupSuggestionsFetched =
-    !!currentGroup && currentGroup.issues.every((i) => suggestions[i.fieldId] !== undefined); // Boolean on whether it has been fetched (only if every issue in group has been fetched)
+    !!currentGroup && currentGroup.issues.every((i) => suggestions[suggestionKey(i)] !== undefined); // Boolean on whether it has been fetched (only if every issue in group has been fetched)
 
   const handleRequestBulkSuggestion = () => {
     if (!currentGroup || !onFetchBulkSuggestion) return;
@@ -137,7 +147,7 @@ export default function OcrReviewWidget({
           groupIssues.forEach((i) => {
             // Per-row fallback: if this specific row wasn't in the map, mark it
             // null so the UI falls back to the original OCR value for just that row.
-            next[i.fieldId] = map[String(i.rowId)] ?? null;
+            next[suggestionKey(i)] = map[String(i.rowId)] ?? null;
           });
           return next;
         });
@@ -164,11 +174,6 @@ export default function OcrReviewWidget({
     setManualValue('');
   };
 
-  const markResolved = (fieldIds: string[]) => {
-    onResolveIds?.(fieldIds);
-    resetEditState();
-  };
-
   // Handlers matching requirements
   const handleAcceptClick = () => {
     if (!currentSlide) return;
@@ -178,17 +183,18 @@ export default function OcrReviewWidget({
         ? [
             {
               fieldId: currentSlide.issue.fieldId,
-              newValue: suggestions[currentSlide.issue.fieldId] || currentSlide.issue.ocrValue,
+              newValue:
+                suggestions[suggestionKey(currentSlide.issue)] || currentSlide.issue.ocrValue,
             },
           ]
         : currentSlide.issues.map((issue) => ({
             fieldId: issue.fieldId,
-            newValue: suggestions[issue.fieldId] || issue.ocrValue,
+            newValue: suggestions[suggestionKey(issue)] || issue.ocrValue,
           }));
 
     onAccept(updates);
 
-    markResolved(updates.map((update) => update.fieldId));
+    resetEditState();
   };
 
   const handleRejectClick = () => {
@@ -201,18 +207,38 @@ export default function OcrReviewWidget({
 
     onReject(fieldIds);
 
-    markResolved(fieldIds);
+    resetEditState();
   };
 
   const handleManualSubmit = () => {
     if (!currentSingle || !manualValue.trim()) return;
     onManualEdit(currentSingle.fieldId, manualValue.trim());
-    markResolved([currentSingle.fieldId]);
+    resetEditState();
   };
 
   return (
     <div className="flex-1 flex flex-col h-full bg-base-200/30 overflow-hidden font-sans min-w-0">
       <div className="p-4 h-full flex flex-col relative min-w-0">
+        {onRescan && (
+          <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+            <span className="text-xs text-warning">
+              {formatCheckFailed ? 'Format check failed on this page. Re-scan to retry.' : ''}
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs gap-1.5"
+              onClick={onRescan}
+              disabled={isRescanning}
+            >
+              {isRescanning ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <RefreshCw size={12} />
+              )}
+              Re-scan page
+            </button>
+          </div>
+        )}
         {unresolvedIssues.length === 0 ? (
           // Success State
           <div className="flex-1 flex flex-col items-center justify-center text-success gap-4 animate-in fade-in zoom-in duration-500">
@@ -340,7 +366,7 @@ export default function OcrReviewWidget({
                             "{item.ocrValue}"
                           </span>
                           <span className="text-sm font-bold text-primary break-all">
-                            "{suggestions[item.fieldId] || item.ocrValue}"
+                            "{suggestions[suggestionKey(item)] || item.ocrValue}"
                           </span>
                         </div>
                       ))}
@@ -439,7 +465,9 @@ export default function OcrReviewWidget({
                         resetEditState();
                       }}
                       className={`h-2 flex-shrink-0 rounded-full transition-all duration-300 p-0 border-0 cursor-pointer ${
-                        idx === currentIndex ? 'w-6 bg-primary' : 'w-2 bg-base-300 hover:bg-base-content/40'
+                        idx === currentIndex
+                          ? 'w-6 bg-primary'
+                          : 'w-2 bg-base-300 hover:bg-base-content/40'
                       }`}
                     />
                   ))

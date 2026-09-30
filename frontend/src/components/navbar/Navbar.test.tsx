@@ -113,4 +113,34 @@ describe('Navbar', () => {
     expect(screen.getByText('Alex')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument();
   });
+
+  it('renders the brand logo and label and navigates to / on click', () => {
+    mockUseAuth.mockReturnValue({
+      user: null,
+      session: null,
+      isGuest: false,
+      isLoading: false,
+      signInWithGoogle: vi.fn(),
+      signInWithPassword: vi.fn(),
+      signUp: vi.fn(),
+      continueAsGuest: vi.fn(),
+      signOut: vi.fn(),
+      getAccessToken: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/upload']}>
+        <Navbar />
+      </MemoryRouter>
+    );
+
+    const logo = screen.getByAltText('Arkhive logo');
+    expect(logo).toBeInTheDocument();
+    expect(logo).toHaveAttribute('src', '/favicon.svg');
+
+    const brandBtn = screen.getByRole('button', { name: /arkhive/i });
+    expect(brandBtn).toBeInTheDocument();
+    fireEvent.click(brandBtn);
+    expect(mockNavigate).toHaveBeenCalledWith('/');
+  });
 });

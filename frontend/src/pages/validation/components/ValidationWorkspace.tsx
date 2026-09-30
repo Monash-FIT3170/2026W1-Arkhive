@@ -20,7 +20,7 @@ import { useFieldHover } from '../../../hooks/useFieldHover';
 import { useChatSuggestionFlow } from '../../../hooks/useChat';
 import { useRowIndent } from '../../../hooks/useRowIndent';
 import { useTableEditor } from '../../../hooks/useTableEditor';
-import { useReviewQueue } from '../../../hooks/useReviewQueue';
+import { useReviewQueue } from '../../../hooks/review/useReviewQueue';
 import {
   groupPagesByFiles,
   getGlobalIndex,
@@ -28,6 +28,7 @@ import {
   calculateAverageConfidence,
   type FileMetadataInput,
 } from '../../../utils/fileGrouping';
+import type { PageReview, ReviewsByPage } from '../../../models/IssueReview';
 
 function useIsLargeScreen() {
   const [isLarge, setIsLarge] = useState(window.innerWidth >= 1024);
@@ -64,6 +65,10 @@ export interface ValidationWorkspaceProps {
    * newly-added ones across resyncs.
    */
   pageKeys?: string[];
+  /** Persisted reviews to hydrate from. Keep the reference stable (useMemo). */
+  initialReviews?: ReviewsByPage;
+  /** Called with a page's new review whenever it changes. */
+  onReviewChange?: (pageKey: string, review: PageReview) => void;
   /**
    * Changes whenever the *set* of pages changes shape (a page was added or
    * removed) — NOT on every parent re-render. When it changes, `pages` is
@@ -85,6 +90,8 @@ function ValidationWorkspace({
   onPersist,
   heightClassName = 'lg:h-[calc(100vh-72px)]',
   pageKeys,
+  initialReviews,
+  onReviewChange,
   syncKey,
   fileMetadata,
 }: ValidationWorkspaceProps) {
@@ -131,11 +138,9 @@ function ValidationWorkspace({
   }, [currentPageIndex]);
 
   const handlePagesChange = useCallback((action: React.SetStateAction<ExtractedPage[]>) => {
-    setExtractedPages((prev) => {
-      const next = typeof action === 'function' ? action(prev) : action;
-      extractedPagesRef.current = next; // <-- Instantly update the Ref!
-      return next;
-    });
+    const next = typeof action === 'function' ? action(extractedPagesRef.current) : action;
+    extractedPagesRef.current = next;
+    setExtractedPages(next);
   }, []);
 
   const handlePageIndexChange = useCallback((action: React.SetStateAction<number>) => {
@@ -151,6 +156,7 @@ function ValidationWorkspace({
     () => groupPagesByFiles(extractedPages, ocrPages, imageUrls, pageKeys, fileMetadata),
     [extractedPages, ocrPages, imageUrls, pageKeys, fileMetadata]
   );
+
 
   const { fileIndex: activeFileIndex, pageIndexInFile: activePageIndexInFile } = useMemo(
     () => getFileAndLocalPage(fileGroups, currentPageIndex),
@@ -183,6 +189,7 @@ function ValidationWorkspace({
   const confidencePercent = Math.round(averageConfidence * 100);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historyRedo, setRedoHistory] = useState<HistoryEntry[]>([]);
 
   const addHistoryEntry = useCallback((entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
     setHistory((prev) => [
@@ -193,7 +200,38 @@ function ValidationWorkspace({
       },
       ...prev,
     ]);
+    setRedoHistory([]);
   }, []);
+
+  const undoRedoHistoryEntry = useCallback(
+    (direction: 'undo' | 'redo') => {
+      if (direction === 'undo') {
+        const undoChange = history[0];
+
+        if (!undoChange) return;
+
+        setHistory((prev) => prev.slice(1));
+
+        setRedoHistory((prev) => [undoChange, ...prev]);
+      } else {
+        const redoChange = historyRedo[0];
+
+        if (!redoChange) return;
+
+        setRedoHistory((prev) => prev.slice(1));
+
+        setHistory((prev) => [
+          {
+            ...redoChange,
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
+      }
+    },
+    [history, historyRedo]
+  );
 
   // UNDO/REDO PIPELINE — stack + keyboard shortcuts live in the hook; we
   // just say what "apply a snapshot" means for this workspace's state.
@@ -203,10 +241,11 @@ function ValidationWorkspace({
       onPersist(updatedPages);
       setEditedCells(new Set());
       setTableKey((k) => k + 1);
-      addHistoryEntry({
-        type: direction,
-        description: direction === 'undo' ? 'Undid last change' : 'Redid last change',
-      });
+      // addHistoryEntry({
+      //   type: direction,
+      //   description: direction === 'undo' ? 'Undid last change' : 'Redid last change',
+      // });
+      undoRedoHistoryEntry(direction);
     },
   });
 
@@ -214,17 +253,19 @@ function ValidationWorkspace({
   // and AI suggestion fetches. See src/hooks/useReviewQueue.ts.
   const {
     flaggedIssues,
-    setFlaggedIssues,
-    resolvedIssueIds,
-    handleResolveIssues,
+    currentPageStatus,
+    rescanCurrentPage,
     handleCarouselAccept,
     handleCarouselReject,
     handleCarouselManualEdit,
+    handleCellEdited,
+    handleColumnRenamed,
     handleFetchSuggestion,
     handleFetchBulkSuggestion,
   } = useReviewQueue({
     extractedPages,
     currentPageIndex,
+    currentPageIndexRef,
     extractedPagesRef,
     onPagesChange: handlePagesChange,
     onPersist,
@@ -232,6 +273,8 @@ function ValidationWorkspace({
     pushUndo,
     onIssuesDetected: () => setChatActiveTab('review'),
     pageKeys,
+    initialReviews,
+    onReviewChange,
   });
 
   // Resizing Functions for Split View
@@ -317,42 +360,20 @@ function ValidationWorkspace({
     pushUndo,
     onCellEdited: (fieldId) => {
       setEditedCells((prev) => new Set(prev).add(fieldId));
-      setFlaggedIssues((prev) =>
-        prev.filter(
-          (issue) => !(issue.fieldId === fieldId && issue.pageIndex === currentPageIndexRef.current)
-        )
-      );
+      handleCellEdited(fieldId);
     },
     onColumnRenamed: (oldName, newName) => {
       setEditedCells((prev) => {
         const next = new Set<string>();
         const oldSuffix = `:${oldName}`;
-        const newSuffix = `:${newName}`;
         for (const cellId of prev) {
-          if (cellId.endsWith(oldSuffix)) {
-            const rowId = cellId.slice(0, cellId.length - oldSuffix.length);
-            next.add(`${rowId}${newSuffix}`);
-          } else {
-            next.add(cellId);
-          }
+          next.add(
+            cellId.endsWith(oldSuffix) ? `${cellId.slice(0, -oldSuffix.length)}:${newName}` : cellId
+          );
         }
         return next;
       });
-      setFlaggedIssues((prev) =>
-        prev.map((issue) => {
-          if (
-            issue.fieldName === oldName &&
-            (issue.pageIndex === undefined || issue.pageIndex === currentPageIndexRef.current)
-          ) {
-            return {
-              ...issue,
-              fieldName: newName,
-              fieldId: `${String(issue.rowId)}:${newName}`,
-            };
-          }
-          return issue;
-        })
-      );
+      handleColumnRenamed(oldName, newName);
     },
   });
 
@@ -504,9 +525,7 @@ function ValidationWorkspace({
                 </button>
               </>
             ) : (
-              <span className="font-semibold text-xs px-1 text-base-content/80">
-                1 of 1
-              </span>
+              <span className="font-semibold text-xs px-1 text-base-content/80">1 of 1</span>
             )}
           </div>
 
@@ -662,6 +681,8 @@ function ValidationWorkspace({
                 handleHover(id);
               }}
               extractedData={documentContext}
+              fileGroups={fileGroups}
+              currentGlobalIndex={currentPageIndex}
               hoveredOverlayIds={hoveredTableFieldIds}
               onRowIndent={handleRowIndent}
               onRowOutdent={handleRowOutdent}
@@ -709,8 +730,9 @@ function ValidationWorkspace({
         onFetchBulkSuggestion={handleFetchBulkSuggestion}
         activeTab={chatActiveTab}
         onTabChange={setChatActiveTab}
-        resolvedIssueIds={resolvedIssueIds}
-        onResolveIssues={handleResolveIssues}
+        onRescan={rescanCurrentPage}
+        isRescanning={currentPageStatus.scanning}
+        formatCheckFailed={!currentPageStatus.formatCheckOk}
         history={history}
       />
     </div>
