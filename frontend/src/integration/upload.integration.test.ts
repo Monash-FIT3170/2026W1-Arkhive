@@ -15,7 +15,10 @@ describe('upload -> process integration', () => {
   const documentId = 'itest-doc-1';
 
   it('uploads a page, processes it, and persists the OCR result to the real session', async () => {
-    const fakePng = new Blob(['fake-bytes'], { type: 'image/png' });
+    const pngHeader = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
+    ]);
+    const fakePng = new Blob([pngHeader], { type: 'image/png' });
     const pageSrc = URL.createObjectURL(fakePng);
 
     // Upload: proves the frontend's multipart request actually reaches

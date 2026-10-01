@@ -4,6 +4,8 @@
  * Do not rely only on the MIME type supplied during upload — the client
  * can spoof that label. These "magic bytes" are the real file signature.
  */
+export const INVALID_FILE_CONTENTS_ERROR = 'Invalid or mismatched file contents detected.';
+
 export function hasValidFileSignature(buffer: Uint8Array, mimetype: string): boolean {
   if (buffer.length < 12) {
     return false;

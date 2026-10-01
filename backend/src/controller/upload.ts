@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
 import { parseTableWithRetries } from '../services/ocr/ocr';
 import { DocumentJob } from '../models/Job';
+import {
+  hasValidFileSignature,
+  INVALID_FILE_CONTENTS_ERROR,
+} from '../services/security/fileValidation';
 import 'express-session';
 import 'multer';
 import fs from 'fs';
@@ -43,6 +47,27 @@ export default {
 
     if (!file || !documentId || !pageIndex) {
       res.status(400).json({ error: 'Missing file, documentId, or pageIndex.' });
+      return;
+    }
+
+    // Multer already wrote the file. Check the real bytes before we keep it.
+    let contents: Buffer;
+    try {
+      contents = fs.readFileSync(file.path);
+    } catch {
+      res.status(400).json({ error: INVALID_FILE_CONTENTS_ERROR });
+      return;
+    }
+
+    if (!hasValidFileSignature(contents, file.mimetype)) {
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      } catch {
+        // Best-effort cleanup; still reject the upload.
+      }
+      res.status(400).json({ error: INVALID_FILE_CONTENTS_ERROR });
       return;
     }
 

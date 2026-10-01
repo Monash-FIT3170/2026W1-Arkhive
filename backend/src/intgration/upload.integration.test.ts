@@ -4,6 +4,12 @@ import request from 'supertest';
 import fs from 'fs';
 import path from 'path';
 import app from '../app';
+import { INVALID_FILE_CONTENTS_ERROR } from '../services/security/fileValidation';
+
+/** 12-byte PNG signature so the new magic-byte check accepts the fixture. */
+const PNG_HEADER = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
+]);
 
 // The one real external boundary this flow hits.
 vi.mock('../services/ocr/mockOcrFixture.js', () => ({
@@ -38,7 +44,7 @@ describe('upload -> process integration', () => {
 
     const uploadRes = await agent
       .post(`/api/upload/page?documentId=${documentId}&pageIndex=0`)
-      .attach('page', Buffer.from('fake-image-bytes'), {
+      .attach('page', PNG_HEADER, {
         filename: 'page-0.png',
         contentType: 'image/png',
       });
@@ -60,6 +66,25 @@ describe('upload -> process integration', () => {
     const extractionRes = await agent.get('/api/extraction');
     expect(extractionRes.status).toBe(200);
     expect(extractionRes.body[0].text).toBe('Invoice total: $42.00');
+  });
+
+  it('rejects a page whose contents do not match the claimed PNG type', async () => {
+    const documentId = 'itest-doc-fake';
+
+    const uploadRes = await agent
+      .post(`/api/upload/page?documentId=${documentId}&pageIndex=0`)
+      .attach('page', Buffer.from('fake-image-bytes'), {
+        filename: 'page-0.png',
+        contentType: 'image/png',
+      });
+
+    expect(uploadRes.status).toBe(400);
+    expect(uploadRes.body.error).toBe(INVALID_FILE_CONTENTS_ERROR);
+
+    const docsRes = await agent.get('/api/upload/documents');
+    expect(docsRes.status).toBe(200);
+    const fakeDoc = docsRes.body.find((doc: { documentId: string }) => doc.documentId === documentId);
+    expect(fakeDoc).toBeUndefined();
   });
 
   afterAll(() => {
