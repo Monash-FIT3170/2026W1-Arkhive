@@ -3,8 +3,11 @@ import {
   History as HistoryIcon,
   ListChecks,
   MessageSquare,
+  Minus,
+  PanelRight,
   PanelRightClose,
   PanelRightOpen,
+  PictureInPicture2,
   Send,
   X,
 } from 'lucide-react';
@@ -13,6 +16,7 @@ import MessageItem from './MessageItem';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { sendMessage } from '../../../../services/llmService';
 import type { ExtractedPage } from '../../../../models/TableData';
+import { useFloatingWindow, type ResizeDirection } from '../../../../hooks/useFloatingWindow';
 
 import OcrReviewWidget from './OcrReviewWidget';
 
@@ -22,13 +26,35 @@ import { buildSlides } from '../../../../utils/review/ocrReviewUtils';
 
 type Tab = 'chat' | 'review' | 'history';
 
+/** `docked` = side panel that takes layout space; `floating` = movable window over the page. */
+export type DockMode = 'docked' | 'floating';
+export type AssistantDockMode = DockMode;
+
+// Docked panel sizing
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
 const DEFAULT_WIDTH = 384;
 const KEYBOARD_STEP = 24;
 const WIDTH_STORAGE_KEY = 'arkhive.assistantPanelWidth';
 
-/** Keeps the panel from eating more than 60% of the viewport. */
+// Floating window sizing
+const FLOAT_STORAGE_KEY = 'arkhive.assistantFloatingRect';
+const FLOAT_DEFAULT_SIZE = { width: 400, height: 560 };
+const FLOAT_MIN_SIZE = { width: 320, height: 380 };
+
+/** Edge and corner hit areas for the floating window (mirrors DocumentPreviewPiP). */
+const RESIZE_HANDLES: { direction: ResizeDirection; className: string }[] = [
+  { direction: 'nw', className: 'top-0 left-0 w-3 h-3 cursor-nwse-resize' },
+  { direction: 'ne', className: 'top-0 right-0 w-3 h-3 cursor-nesw-resize' },
+  { direction: 'sw', className: 'bottom-0 left-0 w-3 h-3 cursor-nesw-resize' },
+  { direction: 'se', className: 'bottom-0 right-0 w-4 h-4 cursor-nwse-resize' },
+  { direction: 'n', className: 'top-0 left-3 right-3 h-1.5 cursor-ns-resize' },
+  { direction: 's', className: 'bottom-0 left-3 right-3 h-1.5 cursor-ns-resize' },
+  { direction: 'w', className: 'top-3 bottom-3 left-0 w-1.5 cursor-ew-resize' },
+  { direction: 'e', className: 'top-3 bottom-3 right-0 w-1.5 cursor-ew-resize' },
+];
+
+/** Keeps the docked panel from eating more than 60% of the viewport. */
 const clampWidth = (w: number) => {
   const viewportCap = typeof window !== 'undefined' ? window.innerWidth * 0.6 : MAX_WIDTH;
   return Math.round(Math.min(Math.max(w, MIN_WIDTH), Math.min(MAX_WIDTH, viewportCap)));
@@ -45,21 +71,20 @@ const readStoredWidth = () => {
 };
 
 /**
- * Docked AI assistant.
+ * AI assistant with two layouts, like the document preview:
  *
- * Renders as a flex sibling of the document view (not an overlay), so the
- * document and the assistant sit side by side. The panel can be:
- *   - expanded and resized by dragging its left edge (or ArrowLeft/ArrowRight
- *     when the handle is focused, double-click to reset)
- *   - collapsed to a slim rail that keeps the review badge visible
- * Below the `md` breakpoint there isn't room for two columns, so it falls
- * back to a full-width drawer.
- *
- * Props are unchanged: `isOpen` now means "expanded" (vs. collapsed rail).
+ *  - docked:   a side panel beside the document/table. Resizable by dragging
+ *              its left edge (or ←/→ when the handle is focused, double-click
+ *              to reset), collapsible to a slim rail.
+ *  - floating: a window you can drag by its header and resize from any edge
+ *              or corner. It takes no layout space, so the document and table
+ *              get the full width. Collapsing it leaves a round button.
  */
 function ChatPanel({
   isOpen,
   onToggle,
+  dockMode = 'docked',
+  onDockModeChange,
   messages,
   onAddMessage,
   documentContext,
@@ -82,6 +107,8 @@ function ChatPanel({
 }: {
   isOpen: boolean;
   onToggle: () => void;
+  dockMode?: DockMode;
+  onDockModeChange?: (mode: DockMode) => void;
   messages: ChatMessage[];
   onAddMessage: (msg: ChatMessage) => void;
   documentContext: ExtractedPage;
@@ -115,7 +142,9 @@ function ChatPanel({
   const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // --- panel sizing -------------------------------------------------------
+  const isFloating = dockMode === 'floating';
+
+  // --- docked sizing ------------------------------------------------------
   const [width, setWidth] = useState<number>(readStoredWidth);
   const [isDragging, setDragging] = useState(false);
   const dragStart = useRef({ x: 0, width: DEFAULT_WIDTH });
@@ -166,6 +195,19 @@ function ChatPanel({
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // --- floating window ----------------------------------------------------
+  const {
+    rect,
+    isInteracting,
+    dragProps,
+    resizeProps,
+    reset: resetFloating,
+  } = useFloatingWindow({
+    storageKey: FLOAT_STORAGE_KEY,
+    defaultSize: FLOAT_DEFAULT_SIZE,
+    minSize: FLOAT_MIN_SIZE,
+  });
 
   // --- review badge -------------------------------------------------------
   // `flaggedIssues` only ever contains open issues now; resolved ones are
@@ -251,13 +293,181 @@ function ChatPanel({
         : 'border-transparent text-base-content/60 hover:text-base-content'
     }`;
 
+  // Header buttons must not start a window drag.
+  const stopDrag = (e: React.PointerEvent) => e.stopPropagation();
+
+  // --- shared body: tabs + tab content (identical in both layouts) --------
+  const tabsBar = (
+    <div role="tablist" className="flex px-4 gap-6 mt-1">
+      <button
+        role="tab"
+        aria-selected={activeTab === 'chat'}
+        className={tabClass('chat')}
+        onClick={() => onTabChange?.('chat')}
+      >
+        Chat
+      </button>
+      <button
+        role="tab"
+        aria-selected={activeTab === 'review'}
+        className={tabClass('review')}
+        onClick={() => onTabChange?.('review')}
+      >
+        Review
+        {unresolvedSlideCount > 0 && (
+          <span className="badge badge-error badge-sm text-white">{unresolvedSlideCount}</span>
+        )}
+      </button>
+      <button
+        role="tab"
+        aria-selected={activeTab === 'history'}
+        className={tabClass('history')}
+        onClick={() => onTabChange?.('history')}
+      >
+        History
+        {history.length > 0 && (
+          <span className="badge badge-neutral badge-sm">{history.length}</span>
+        )}
+      </button>
+    </div>
+  );
+
+  const tabContent =
+    activeTab === 'review' ? (
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <OcrReviewWidget
+          issues={flaggedIssues}
+          onAccept={onCarouselAccept!}
+          onReject={onCarouselReject!}
+          onManualEdit={onCarouselManualEdit!}
+          onSlideChange={onSlideChange}
+          onFetchSuggestion={onFetchSuggestion}
+          onFetchBulkSuggestion={onFetchBulkSuggestion}
+          onRescan={onRescan}
+          isRescanning={isRescanning}
+          formatCheckFailed={formatCheckFailed}
+        />
+      </div>
+    ) : activeTab === 'chat' ? (
+      <>
+        {/* messages area */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
+          <div className="chat chat-start">
+            <div className="chat-image avatar">
+              <div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
+                <Bot className="w-7 h-7 text-primary" />
+              </div>
+            </div>
+            <div className="chat-header text-xs opacity-50 mb-1">AI Assistant</div>
+            <div
+              className="chat-bubble chat-bubble-primary text-primary-content"
+              style={{ boxShadow: 'var(--color-secondary)' }}
+            >
+              Hi there, I'm Arkhive's Virtual Assistant. What would you like to do today?
+            </div>
+          </div>
+          {messages.map((msg) => (
+            <MessageItem key={msg.id} msg={msg} onAccept={onAccept} onReject={onReject} />
+          ))}
+          {isLoading && (
+            <div className="chat chat-start">
+              <div className="chat-image avatar">
+                <div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
+                  <Bot className="w-7 h-7 text-primary" />
+                </div>
+              </div>
+              <div className="chat-header text-xs opacity-50 mb-1">AI Assistant</div>
+              <div
+                className="chat-bubble chat-bubble-primary text-primary-content"
+                style={{ boxShadow: 'var(--color-secondary)' }}
+              >
+                <span>Just a moment</span>
+                <span className="loading loading-dots loading-sm ml-1.5"></span>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* text input area */}
+        <div className="p-4 border-t border-base-300 bg-base-300/30 shrink-0">
+          <div className="flex gap-2 items-center">
+            <textarea
+              className="textarea textarea-bordered w-full resize-none h-12 min-h-[1rem] rounded-xl bg-base-100 border border-base-300 focus:border-primary transition-[border-color,box-shadow] duration-200 ease-out focus:outline-none"
+              placeholder="Type your message here"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading}
+            ></textarea>
+            <button
+              className="btn btn-primary btn-square"
+              title="Send message"
+              aria-label="Send message"
+              onClick={handleSend}
+              disabled={isLoading}
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </>
+    ) : (
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
+        {history.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-base-content/40 gap-2 mt-20">
+            <p className="font-semibold">No changes yet</p>
+            <p className="text-xs">Changes you make will appear here</p>
+          </div>
+        ) : (
+          history.map((entry) => (
+            <div
+              key={entry.id}
+              className="bg-base-100 rounded-xl p-3 border border-base-300 flex flex-col gap-1"
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className={`text-xs font-bold uppercase tracking-wider ${
+                    entry.type === 'edit'
+                      ? 'text-primary'
+                      : entry.type === 'accept'
+                        ? 'text-success'
+                        : entry.type === 'skip'
+                          ? 'text-warning'
+                          : entry.type === 'undo'
+                            ? 'text-error'
+                            : 'text-info'
+                  }`}
+                >
+                  {entry.type}
+                </span>
+                <span className="text-xs text-base-content/40">
+                  {new Date(entry.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                  })}
+                </span>
+              </div>
+              <p className="text-sm text-base-content">{entry.description}</p>
+            </div>
+          ))
+        )}
+      </div>
+    );
+
+  const showFab = isFloating && !isOpen;
+
   return (
     <>
       {/* Error toast (visible even when the panel is collapsed) */}
       {chatError && (
         <div
           role="alert"
-          className="fixed bottom-6 right-6 z-[60] w-72 animate-in fade-in slide-in-from-bottom-5 duration-300"
+          className={`fixed right-6 z-[60] w-72 animate-in fade-in slide-in-from-bottom-5 duration-300 ${
+            showFab ? 'bottom-24' : 'bottom-6'
+          }`}
         >
           <div className="alert alert-error p-3 text-sm rounded-xl flex items-start gap-2 shadow-lg">
             <svg
@@ -285,8 +495,99 @@ function ChatPanel({
         </div>
       )}
 
-      {!isOpen ? (
-        /* ---------- Collapsed rail ---------- */
+      {/* ---------- Floating + collapsed: round button ---------- */}
+      {showFab && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className="indicator">
+            {unresolvedSlideCount > 0 && (
+              <span className="indicator-item badge badge-error badge-sm w-3.5 h-3.5 p-0 border-2 border-base-100 rounded-full shadow-sm mt-1 mr-1"></span>
+            )}
+            <button
+              onClick={onToggle}
+              className="btn btn-primary btn-circle btn-lg shadow-md"
+              title="Open AI Assistant"
+              aria-label="Open AI Assistant"
+            >
+              <Bot className="w-9 h-9" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- Floating + expanded: movable window ---------- */}
+      {isFloating && isOpen && (
+        <div
+          role="dialog"
+          aria-label="AI Assistant"
+          style={
+            {
+              '--fx': `${rect.x}px`,
+              '--fy': `${rect.y}px`,
+              '--fw': `${rect.width}px`,
+              '--fh': `${rect.height}px`,
+            } as React.CSSProperties
+          }
+          className={`
+            fixed z-50 flex flex-col overflow-hidden bg-base-200 border border-base-300 shadow-2xl
+            max-md:inset-0 max-md:rounded-none
+            md:rounded-xl md:left-[var(--fx)] md:top-[var(--fy)] md:w-[var(--fw)] md:h-[var(--fh)]
+            ${isInteracting ? 'select-none' : ''}
+          `}
+        >
+          {/* Header: drag handle */}
+          <div className="flex flex-col border-b border-base-300 bg-base-200/50 shrink-0">
+            <div
+              {...dragProps}
+              onDoubleClick={resetFloating}
+              title="Drag to move · double-click to reset position"
+              className="flex items-center justify-between p-4 pb-2 md:cursor-grab md:active:cursor-grabbing touch-none"
+            >
+              <div className="flex items-center gap-2 min-w-0 pointer-events-none">
+                <Bot className="w-7 h-7 text-primary shrink-0" />
+                <h2 className="font-semibold text-lg truncate">AI Assistant</h2>
+              </div>
+              <div className="flex items-center gap-1">
+                {onDockModeChange && (
+                  <button
+                    onPointerDown={stopDrag}
+                    onClick={() => onDockModeChange('docked')}
+                    className="btn btn-ghost btn-sm btn-circle"
+                    title="Dock to side"
+                    aria-label="Dock to side"
+                  >
+                    <PanelRight className="w-5 h-5" />
+                  </button>
+                )}
+                <button
+                  onPointerDown={stopDrag}
+                  onClick={onToggle}
+                  className="btn btn-ghost btn-sm btn-circle"
+                  title="Minimize"
+                  aria-label="Minimize"
+                >
+                  <Minus className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            {tabsBar}
+          </div>
+
+          {tabContent}
+
+          {/* Resize handles (desktop only) */}
+          {RESIZE_HANDLES.map(({ direction, className }) => (
+            <div
+              key={direction}
+              {...resizeProps(direction)}
+              className={`max-md:hidden absolute z-30 touch-none ${className}`}
+              aria-hidden="true"
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ---------- Docked + collapsed: rail ---------- */}
+      {!isFloating && !isOpen && (
         <aside
           aria-label="AI Assistant (collapsed)"
           className="shrink-0 w-12 h-full flex flex-col items-center gap-2 py-3 border-l border-base-300 bg-base-200"
@@ -336,8 +637,10 @@ function ChatPanel({
             <HistoryIcon className="w-5 h-5" />
           </button>
         </aside>
-      ) : (
-        /* ---------- Docked panel ---------- */
+      )}
+
+      {/* ---------- Docked + expanded: side panel ---------- */}
+      {!isFloating && isOpen && (
         <aside
           aria-label="AI Assistant"
           style={{ ['--panel-w' as string]: `${width}px` }}
@@ -378,177 +681,31 @@ function ChatPanel({
                 <Bot className="w-7 h-7 text-primary shrink-0" />
                 <h2 className="font-semibold text-lg truncate">AI Assistant</h2>
               </div>
-              <button
-                onClick={onToggle}
-                className="btn btn-ghost btn-sm btn-circle"
-                title="Collapse panel"
-                aria-label="Collapse panel"
-              >
-                <PanelRightClose className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Tabs */}
-            <div role="tablist" className="flex px-4 gap-6 mt-1">
-              <button
-                role="tab"
-                aria-selected={activeTab === 'chat'}
-                className={tabClass('chat')}
-                onClick={() => onTabChange?.('chat')}
-              >
-                Chat
-              </button>
-              <button
-                role="tab"
-                aria-selected={activeTab === 'review'}
-                className={tabClass('review')}
-                onClick={() => onTabChange?.('review')}
-              >
-                Review
-                {unresolvedSlideCount > 0 && (
-                  <span className="badge badge-error badge-sm text-white">
-                    {unresolvedSlideCount}
-                  </span>
+              <div className="flex items-center gap-1">
+                {onDockModeChange && (
+                  <button
+                    onClick={() => onDockModeChange('floating')}
+                    className="btn btn-ghost btn-sm btn-circle max-md:hidden"
+                    title="Pop out as floating window"
+                    aria-label="Pop out as floating window"
+                  >
+                    <PictureInPicture2 className="w-5 h-5" />
+                  </button>
                 )}
-              </button>
-              <button
-                role="tab"
-                aria-selected={activeTab === 'history'}
-                className={tabClass('history')}
-                onClick={() => onTabChange?.('history')}
-              >
-                History
-                {history.length > 0 && (
-                  <span className="badge badge-neutral badge-sm">{history.length}</span>
-                )}
-              </button>
+                <button
+                  onClick={onToggle}
+                  className="btn btn-ghost btn-sm btn-circle"
+                  title="Collapse panel"
+                  aria-label="Collapse panel"
+                >
+                  <PanelRightClose className="w-5 h-5" />
+                </button>
+              </div>
             </div>
+            {tabsBar}
           </div>
 
-          {/* Tab content */}
-          {activeTab === 'review' ? (
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <OcrReviewWidget
-                issues={flaggedIssues}
-                onAccept={onCarouselAccept!}
-                onReject={onCarouselReject!}
-                onManualEdit={onCarouselManualEdit!}
-                onSlideChange={onSlideChange}
-                onFetchSuggestion={onFetchSuggestion}
-                onFetchBulkSuggestion={onFetchBulkSuggestion}
-                onRescan={onRescan}
-                isRescanning={isRescanning}
-                formatCheckFailed={formatCheckFailed}
-              />
-            </div>
-          ) : activeTab === 'chat' ? (
-            <>
-              {/* messages area */}
-              <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
-                <div className="chat chat-start">
-                  <div className="chat-image avatar">
-                    <div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
-                      <Bot className="w-7 h-7 text-primary" />
-                    </div>
-                  </div>
-                  <div className="chat-header text-xs opacity-50 mb-1">AI Assistant</div>
-                  <div
-                    className="chat-bubble chat-bubble-primary text-primary-content"
-                    style={{ boxShadow: 'var(--color-secondary)' }}
-                  >
-                    Hi there, I'm Arkhive's Virtual Assistant. What would you like to do today?
-                  </div>
-                </div>
-                {messages.map((msg) => (
-                  <MessageItem key={msg.id} msg={msg} onAccept={onAccept} onReject={onReject} />
-                ))}
-                {isLoading && (
-                  <div className="chat chat-start">
-                    <div className="chat-image avatar">
-                      <div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
-                        <Bot className="w-7 h-7 text-primary" />
-                      </div>
-                    </div>
-                    <div className="chat-header text-xs opacity-50 mb-1">AI Assistant</div>
-                    <div
-                      className="chat-bubble chat-bubble-primary text-primary-content"
-                      style={{ boxShadow: 'var(--color-secondary)' }}
-                    >
-                      <span>Just a moment</span>
-                      <span className="loading loading-dots loading-sm ml-1.5"></span>
-                    </div>
-                  </div>
-                )}
-
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* text input area */}
-              <div className="p-4 border-t border-base-300 bg-base-300/30 shrink-0">
-                <div className="flex gap-2 items-center">
-                  <textarea
-                    className="textarea textarea-bordered w-full resize-none h-12 min-h-[1rem] rounded-xl bg-base-100 border border-base-300 focus:border-primary transition-[border-color,box-shadow] duration-200 ease-out focus:outline-none"
-                    placeholder="Type your message here"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    disabled={isLoading}
-                  ></textarea>
-                  <button
-                    className="btn btn-primary btn-square"
-                    title="Send message"
-                    aria-label="Send message"
-                    onClick={handleSend}
-                    disabled={isLoading}
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
-              {history.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-base-content/40 gap-2 mt-20">
-                  <p className="font-semibold">No changes yet</p>
-                  <p className="text-xs">Changes you make will appear here</p>
-                </div>
-              ) : (
-                history.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="bg-base-100 rounded-xl p-3 border border-base-300 flex flex-col gap-1"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`text-xs font-bold uppercase tracking-wider ${
-                          entry.type === 'edit'
-                            ? 'text-primary'
-                            : entry.type === 'accept'
-                              ? 'text-success'
-                              : entry.type === 'skip'
-                                ? 'text-warning'
-                                : entry.type === 'undo'
-                                  ? 'text-error'
-                                  : 'text-info'
-                        }`}
-                      >
-                        {entry.type}
-                      </span>
-                      <span className="text-xs text-base-content/40">
-                        {new Date(entry.timestamp).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                        })}
-                      </span>
-                    </div>
-                    <p className="text-sm text-base-content">{entry.description}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
+          {tabContent}
         </aside>
       )}
     </>
