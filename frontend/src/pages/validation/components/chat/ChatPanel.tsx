@@ -42,6 +42,13 @@ const FLOAT_STORAGE_KEY = 'arkhive.assistantFloatingRect';
 const FLOAT_DEFAULT_SIZE = { width: 400, height: 560 };
 const FLOAT_MIN_SIZE = { width: 320, height: 380 };
 
+/**
+ * Distance from the viewport's bottom/right edge to the centre of the round
+ * button (24px offset + half of the 64px button). The window shrinks toward,
+ * and grows out of, this point.
+ */
+const FAB_CENTER_OFFSET = 56;
+
 /** Edge and corner hit areas for the floating window (mirrors DocumentPreviewPiP). */
 const RESIZE_HANDLES: { direction: ResizeDirection; className: string }[] = [
   { direction: 'nw', className: 'top-0 left-0 w-3 h-3 cursor-nwse-resize' },
@@ -209,6 +216,47 @@ function ChatPanel({
     minSize: FLOAT_MIN_SIZE,
   });
 
+  // --- minimize / restore animation --------------------------------------
+  // `out`: window shrinks into the round button, then the parent collapses it.
+  // `in`:  window grows back out of the button. Skipped for reduced motion.
+  const [floatAnim, setFloatAnim] = useState<'in' | 'out' | null>(null);
+  const [fabPop, setFabPop] = useState(false);
+
+  const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const finishMinimize = useCallback(() => {
+    setFabPop(true);
+    setFloatAnim(null);
+    onToggle();
+  }, [onToggle]);
+
+  const minimizeFloating = () => {
+    if (prefersReducedMotion()) {
+      onToggle();
+      return;
+    }
+    setFloatAnim('out');
+  };
+
+  const openFromFab = () => {
+    if (!prefersReducedMotion()) setFloatAnim('in');
+    onToggle();
+  };
+
+  const handleFloatAnimationEnd = (e: React.AnimationEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return; // ignore animations on child elements
+    if (floatAnim === 'out') finishMinimize();
+    else if (floatAnim === 'in') setFloatAnim(null);
+  };
+
+  // Safety net: if the animationend event never fires (tab in background,
+  // animations disabled), still collapse instead of leaving a dead window.
+  useEffect(() => {
+    if (floatAnim !== 'out') return;
+    const timer = window.setTimeout(finishMinimize, 450);
+    return () => window.clearTimeout(timer);
+  }, [floatAnim, finishMinimize]);
+
   // --- review badge -------------------------------------------------------
   // `flaggedIssues` only ever contains open issues now; resolved ones are
   // tracked (and persisted) by useReviewQueue and never reach this component.
@@ -292,6 +340,25 @@ function ChatPanel({
         ? 'border-primary text-primary'
         : 'border-transparent text-base-content/60 hover:text-base-content'
     }`;
+
+  // Window position/size as CSS variables (desktop) plus the genie animation,
+  // whose transform origin is the round button, expressed in window coordinates.
+  const isDesktop = window.innerWidth >= 768;
+  const originX = window.innerWidth - FAB_CENTER_OFFSET - (isDesktop ? rect.x : 0);
+  const originY = window.innerHeight - FAB_CENTER_OFFSET - (isDesktop ? rect.y : 0);
+  const floatStyle = {
+    '--fx': `${rect.x}px`,
+    '--fy': `${rect.y}px`,
+    '--fw': `${rect.width}px`,
+    '--fh': `${rect.height}px`,
+    transformOrigin: `${originX}px ${originY}px`,
+    animation:
+      floatAnim === 'out'
+        ? 'assistant-genie-out 240ms cubic-bezier(0.4, 0, 1, 1) forwards'
+        : floatAnim === 'in'
+          ? 'assistant-genie-in 300ms cubic-bezier(0.16, 1, 0.3, 1)'
+          : undefined,
+  } as React.CSSProperties;
 
   // Header buttons must not start a window drag.
   const stopDrag = (e: React.PointerEvent) => e.stopPropagation();
@@ -461,6 +528,24 @@ function ChatPanel({
 
   return (
     <>
+      <style>{`
+        @keyframes assistant-genie-out {
+          0%   { transform: scale(1);    opacity: 1; }
+          60%  { opacity: 0.85; }
+          100% { transform: scale(0.05); opacity: 0; }
+        }
+        @keyframes assistant-genie-in {
+          0%   { transform: scale(0.05); opacity: 0; }
+          40%  { opacity: 0.9; }
+          100% { transform: scale(1);    opacity: 1; }
+        }
+        @keyframes assistant-fab-pop {
+          0%   { transform: scale(0.6); }
+          55%  { transform: scale(1.18); }
+          100% { transform: scale(1); }
+        }
+      `}</style>
+
       {/* Error toast (visible even when the panel is collapsed) */}
       {chatError && (
         <div
@@ -497,13 +582,23 @@ function ChatPanel({
 
       {/* ---------- Floating + collapsed: round button ---------- */}
       {showFab && (
-        <div className="fixed bottom-6 right-6 z-50">
+        <div
+          className="fixed bottom-6 right-6 z-50"
+          style={
+            fabPop
+              ? { animation: 'assistant-fab-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1)' }
+              : undefined
+          }
+          onAnimationEnd={(e) => {
+            if (e.target === e.currentTarget) setFabPop(false);
+          }}
+        >
           <div className="indicator">
             {unresolvedSlideCount > 0 && (
               <span className="indicator-item badge badge-error badge-sm w-3.5 h-3.5 p-0 border-2 border-base-100 rounded-full shadow-sm mt-1 mr-1"></span>
             )}
             <button
-              onClick={onToggle}
+              onClick={openFromFab}
               className="btn btn-primary btn-circle btn-lg shadow-md"
               title="Open AI Assistant"
               aria-label="Open AI Assistant"
@@ -519,19 +614,14 @@ function ChatPanel({
         <div
           role="dialog"
           aria-label="AI Assistant"
-          style={
-            {
-              '--fx': `${rect.x}px`,
-              '--fy': `${rect.y}px`,
-              '--fw': `${rect.width}px`,
-              '--fh': `${rect.height}px`,
-            } as React.CSSProperties
-          }
+          style={floatStyle}
+          onAnimationEnd={handleFloatAnimationEnd}
           className={`
             fixed z-50 flex flex-col overflow-hidden bg-base-200 border border-base-300 shadow-2xl
             max-md:inset-0 max-md:rounded-none
             md:rounded-xl md:left-[var(--fx)] md:top-[var(--fy)] md:w-[var(--fw)] md:h-[var(--fh)]
             ${isInteracting ? 'select-none' : ''}
+            ${floatAnim === 'out' ? 'pointer-events-none' : ''}
           `}
         >
           {/* Header: drag handle */}
@@ -560,7 +650,7 @@ function ChatPanel({
                 )}
                 <button
                   onPointerDown={stopDrag}
-                  onClick={onToggle}
+                  onClick={minimizeFloating}
                   className="btn btn-ghost btn-sm btn-circle"
                   title="Minimize"
                   aria-label="Minimize"

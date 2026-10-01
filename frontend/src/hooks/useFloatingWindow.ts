@@ -119,7 +119,16 @@ export function useFloatingWindow({ storageKey, defaultSize, minSize, margin = 2
     e.preventDefault();
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
-    startRef.current = { mode, pointerX: e.clientX, pointerY: e.clientY, rect: rectRef.current };
+
+    const currentRect = rectRef.current;
+
+    startRef.current = {
+      mode,
+      pointerX: e.clientX,
+      pointerY: e.clientY,
+      rect: currentRect,
+    };
+
     setInteracting(true);
   };
 
