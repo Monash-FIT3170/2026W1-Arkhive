@@ -114,23 +114,22 @@ export function useFloatingWindow({ storageKey, defaultSize, minSize, margin = 2
     [storageKey]
   );
 
-  const begin = (mode: InteractionMode) => (e: React.PointerEvent<HTMLElement>) => {
+  const begin = useCallback((mode: InteractionMode, e: React.PointerEvent<HTMLElement>) => {
     if (e.button !== 0) return;
+
     e.preventDefault();
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
-
-    const currentRect = rectRef.current;
 
     startRef.current = {
       mode,
       pointerX: e.clientX,
       pointerY: e.clientY,
-      rect: currentRect,
+      rect: rectRef.current,
     };
 
     setInteracting(true);
-  };
+  }, []);
 
   const move = (e: React.PointerEvent<HTMLElement>) => {
     const start = startRef.current;
@@ -205,10 +204,13 @@ export function useFloatingWindow({ storageKey, defaultSize, minSize, margin = 2
     isInteracting,
     reset,
     /** Spread onto the element that should move the window (the header). */
-    dragProps: { onPointerDown: begin('drag'), ...shared },
+    dragProps: {
+      onPointerDown: (e: React.PointerEvent<HTMLElement>) => begin('drag', e),
+      ...shared,
+    },
     /** Spread onto an edge/corner element: `{...resizeProps('se')}`. */
     resizeProps: (direction: ResizeDirection) => ({
-      onPointerDown: begin(direction),
+      onPointerDown: (e: React.PointerEvent<HTMLElement>) => begin(direction, e),
       ...shared,
     }),
   };
