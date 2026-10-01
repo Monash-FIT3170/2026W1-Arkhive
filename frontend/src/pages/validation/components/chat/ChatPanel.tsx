@@ -25,6 +25,7 @@ import type { OcrIssue } from '../../../../models/IssueReview';
 import { buildSlides } from '../../../../utils/review/ocrReviewUtils';
 
 type Tab = 'chat' | 'review' | 'history';
+type FloatingRectLike = { x: number; y: number; width: number; height: number };
 
 /** `docked` = side panel that takes layout space; `floating` = movable window over the page. */
 export type DockMode = 'docked' | 'floating';
@@ -35,6 +36,8 @@ const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
 const DEFAULT_WIDTH = 384;
 const KEYBOARD_STEP = 24;
+/** Width of the collapsed docked rail. */
+const RAIL_WIDTH = 48;
 const WIDTH_STORAGE_KEY = 'arkhive.assistantPanelWidth';
 
 // Floating window sizing
@@ -249,6 +252,99 @@ function ChatPanel({
     else if (floatAnim === 'in') setFloatAnim(null);
   };
 
+  // --- dock open/close + fly-to-dock --------------------------------------
+  // The docked panel's contents stay mounted while it animates closed, then
+  // unmount (so a collapsed panel doesn't keep review/chat effects running).
+  const [dockMounted, setDockMounted] = useState(isOpen);
+  if (isFloating) {
+    if (dockMounted) setDockMounted(false);
+  } else if (isOpen && !dockMounted) {
+    setDockMounted(true);
+  }
+  const showDockContent = !isFloating && (isOpen || dockMounted);
+
+  useEffect(() => {
+    if (isFloating || isOpen || !dockMounted) return;
+    const timer = window.setTimeout(() => setDockMounted(false), 350);
+    return () => window.clearTimeout(timer);
+  }, [isFloating, isOpen, dockMounted]);
+
+  // While floating, a zero-width slot sits where the dock will be, so we can
+  // measure exactly where the window should land.
+  const dockSlotRef = useRef<HTMLDivElement>(null);
+  const [dockFly, setDockFly] = useState<FloatingRectLike | null>(null);
+
+  // Docked -> floating: the window starts exactly on the docked panel's box
+  // (`start`), then glides to its own position and size (`run`).
+  const dockedRef = useRef<HTMLElement>(null);
+  const [popFly, setPopFly] = useState<{
+    from: FloatingRectLike;
+    phase: 'start' | 'run';
+  } | null>(null);
+
+  const popOutWithAnimation = () => {
+    if (!onDockModeChange) return;
+    const el = dockedRef.current;
+    if (prefersReducedMotion() || !el || window.innerWidth < 768 || popFly) {
+      onDockModeChange('floating');
+      return;
+    }
+    // Measure before the mode flips, while the dock is still on screen.
+    const r = el.getBoundingClientRect();
+    setPopFly({ from: { x: r.left, y: r.top, width: r.width, height: r.height }, phase: 'start' });
+    onDockModeChange('floating');
+  };
+
+  // Let the browser paint the window at the dock's box first, then switch to
+  // `run` so the box transitions to the window's real position.
+  useEffect(() => {
+    if (popFly?.phase !== 'start') return;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setPopFly((p) => (p ? { ...p, phase: 'run' } : p)));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [popFly?.phase]);
+
+  // Safety net: if the transitionend event never fires, still finish.
+  useEffect(() => {
+    if (!popFly) return;
+    const timer = window.setTimeout(() => setPopFly(null), 450);
+    return () => window.clearTimeout(timer);
+  }, [popFly]);
+
+  const finishDock = useCallback(() => {
+    setDockFly(null);
+    onDockModeChange?.('docked');
+  }, [onDockModeChange]);
+
+  const dockWithAnimation = () => {
+    const slot = dockSlotRef.current;
+    if (!onDockModeChange) return;
+    if (prefersReducedMotion() || !slot || window.innerWidth < 768 || floatAnim || popFly) {
+      onDockModeChange('docked');
+      return;
+    }
+    const slotRect = slot.getBoundingClientRect();
+    setDockFly({ x: slotRect.right - width, y: slotRect.top, width, height: slotRect.height });
+  };
+
+  const handleFloatTransitionEnd = (e: React.TransitionEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (!['left', 'top', 'width', 'height'].includes(e.propertyName)) return;
+    if (dockFly) finishDock();
+    else if (popFly?.phase === 'run') setPopFly(null);
+  };
+
+  useEffect(() => {
+    if (!dockFly) return;
+    const timer = window.setTimeout(finishDock, 450);
+    return () => window.clearTimeout(timer);
+  }, [dockFly, finishDock]);
+
   // Safety net: if the animationend event never fires (tab in background,
   // animations disabled), still collapse instead of leaving a dead window.
   useEffect(() => {
@@ -346,11 +442,13 @@ function ChatPanel({
   const isDesktop = window.innerWidth >= 768;
   const originX = window.innerWidth - FAB_CENTER_OFFSET - (isDesktop ? rect.x : 0);
   const originY = window.innerHeight - FAB_CENTER_OFFSET - (isDesktop ? rect.y : 0);
+  const target = dockFly ?? (popFly?.phase === 'start' ? popFly.from : rect);
+  const FLY_EASE = '280ms cubic-bezier(0.32, 0.72, 0, 1)';
   const floatStyle = {
-    '--fx': `${rect.x}px`,
-    '--fy': `${rect.y}px`,
-    '--fw': `${rect.width}px`,
-    '--fh': `${rect.height}px`,
+    '--fx': `${target.x}px`,
+    '--fy': `${target.y}px`,
+    '--fw': `${target.width}px`,
+    '--fh': `${target.height}px`,
     transformOrigin: `${originX}px ${originY}px`,
     animation:
       floatAnim === 'out'
@@ -358,6 +456,15 @@ function ChatPanel({
         : floatAnim === 'in'
           ? 'assistant-genie-in 300ms cubic-bezier(0.16, 1, 0.3, 1)'
           : undefined,
+    // Flying into the dock: glide to the dock's box and lose the window chrome.
+    // Popping out of the dock: start chromeless on the dock's box, then glide to
+    // the window's box while the radius and shadow fade back in.
+    ...(dockFly || popFly?.phase === 'run'
+      ? {
+          transition: `left ${FLY_EASE}, top ${FLY_EASE}, width ${FLY_EASE}, height ${FLY_EASE}, border-radius ${FLY_EASE}, box-shadow ${FLY_EASE}`,
+        }
+      : {}),
+    ...(dockFly || popFly?.phase === 'start' ? { borderRadius: 0, boxShadow: 'none' } : {}),
   } as React.CSSProperties;
 
   // Header buttons must not start a window drag.
@@ -616,12 +723,13 @@ function ChatPanel({
           aria-label="AI Assistant"
           style={floatStyle}
           onAnimationEnd={handleFloatAnimationEnd}
+          onTransitionEnd={handleFloatTransitionEnd}
           className={`
             fixed z-50 flex flex-col overflow-hidden bg-base-200 border border-base-300 shadow-2xl
             max-md:inset-0 max-md:rounded-none
             md:rounded-xl md:left-[var(--fx)] md:top-[var(--fy)] md:w-[var(--fw)] md:h-[var(--fh)]
             ${isInteracting ? 'select-none' : ''}
-            ${floatAnim === 'out' ? 'pointer-events-none' : ''}
+            ${floatAnim === 'out' || dockFly || popFly ? 'pointer-events-none' : ''}
           `}
         >
           {/* Header: drag handle */}
@@ -640,7 +748,7 @@ function ChatPanel({
                 {onDockModeChange && (
                   <button
                     onPointerDown={stopDrag}
-                    onClick={() => onDockModeChange('docked')}
+                    onClick={dockWithAnimation}
                     className="btn btn-ghost btn-sm btn-circle"
                     title="Dock to side"
                     aria-label="Dock to side"
@@ -676,127 +784,170 @@ function ChatPanel({
         </div>
       )}
 
-      {/* ---------- Docked + collapsed: rail ---------- */}
-      {!isFloating && !isOpen && (
+      {/* ---------- Docked: one container whose width animates between rail and panel ---------- */}
+      {!isFloating && (
         <aside
-          aria-label="AI Assistant (collapsed)"
-          className="shrink-0 w-12 h-full flex flex-col items-center gap-2 py-3 border-l border-base-300 bg-base-200"
+          ref={dockedRef}
+          aria-label="AI Assistant"
+          style={{
+            ['--panel-w' as string]: `${width}px`,
+            ['--dock-w' as string]: `${isOpen ? width : RAIL_WIDTH}px`,
+          }}
+          onTransitionEnd={(e) => {
+            if (e.target === e.currentTarget && e.propertyName === 'width' && !isOpen) {
+              setDockMounted(false);
+            }
+          }}
+          className={`
+            relative shrink-0 h-full overflow-hidden bg-base-200 border-l border-base-300
+            md:w-[var(--dock-w)]
+            ${
+              isOpen
+                ? 'max-md:fixed max-md:inset-y-0 max-md:right-0 max-md:z-50 max-md:w-full max-md:shadow-2xl'
+                : 'max-md:w-12'
+            }
+            ${isDragging ? '' : 'md:transition-[width] md:duration-200 md:ease-out motion-reduce:transition-none'}
+          `}
         >
-          <button
-            onClick={onToggle}
-            className="btn btn-ghost btn-sm btn-square"
-            title="Open AI Assistant"
-            aria-label="Open AI Assistant"
+          {/* Resize handle (desktop, expanded only) */}
+          {isOpen && (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize AI Assistant panel"
+              aria-valuenow={width}
+              aria-valuemin={MIN_WIDTH}
+              aria-valuemax={MAX_WIDTH}
+              tabIndex={0}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+              onKeyDown={handleResizeKeyDown}
+              onDoubleClick={resetWidth}
+              title="Drag to resize · double-click to reset"
+              className={`
+                max-md:hidden absolute inset-y-0 left-0 w-1.5 z-10 cursor-col-resize touch-none
+                transition-colors hover:bg-primary/30 focus-visible:bg-primary/40 focus-visible:outline-none
+                ${isDragging ? 'bg-primary/40' : ''}
+              `}
+            />
+          )}
+
+          {/* Collapsed rail (fades out as the panel opens) */}
+          <div
+            className={`
+              absolute inset-y-0 right-0 w-11 flex flex-col items-center gap-2 py-3
+              transition-[opacity,visibility] duration-150
+              ${isOpen ? 'opacity-0 invisible pointer-events-none' : 'opacity-100 visible delay-100'}
+            `}
           >
-            <PanelRightOpen className="w-5 h-5" />
-          </button>
-
-          <div className="divider my-0" />
-
-          <button
-            onClick={() => openTab('chat')}
-            className="btn btn-ghost btn-sm btn-square"
-            title="Chat"
-            aria-label="Open chat"
-          >
-            <MessageSquare className="w-5 h-5" />
-          </button>
-
-          <div className="indicator">
-            {unresolvedSlideCount > 0 && (
-              <span className="indicator-item badge badge-error badge-xs text-white">
-                {unresolvedSlideCount}
-              </span>
-            )}
             <button
-              onClick={() => openTab('review')}
+              onClick={onToggle}
               className="btn btn-ghost btn-sm btn-square"
-              title={`Review (${unresolvedSlideCount} open)`}
-              aria-label={`Open review, ${unresolvedSlideCount} open`}
+              title="Open AI Assistant"
+              aria-label="Open AI Assistant"
             >
-              <ListChecks className="w-5 h-5" />
+              <PanelRightOpen className="w-5 h-5" />
+            </button>
+
+            <div className="divider my-0" />
+
+            <button
+              onClick={() => openTab('chat')}
+              className="btn btn-ghost btn-sm btn-square"
+              title="Chat"
+              aria-label="Open chat"
+            >
+              <MessageSquare className="w-5 h-5" />
+            </button>
+
+            <div className="indicator">
+              {unresolvedSlideCount > 0 && (
+                <span className="indicator-item badge badge-error badge-xs text-white">
+                  {unresolvedSlideCount}
+                </span>
+              )}
+              <button
+                onClick={() => openTab('review')}
+                className="btn btn-ghost btn-sm btn-square"
+                title={`Review (${unresolvedSlideCount} open)`}
+                aria-label={`Open review, ${unresolvedSlideCount} open`}
+              >
+                <ListChecks className="w-5 h-5" />
+              </button>
+            </div>
+
+            <button
+              onClick={() => openTab('history')}
+              className="btn btn-ghost btn-sm btn-square"
+              title="History"
+              aria-label="Open history"
+            >
+              <HistoryIcon className="w-5 h-5" />
             </button>
           </div>
 
-          <button
-            onClick={() => openTab('history')}
-            className="btn btn-ghost btn-sm btn-square"
-            title="History"
-            aria-label="Open history"
-          >
-            <HistoryIcon className="w-5 h-5" />
-          </button>
+          {/* Panel: fixed width, pinned to the left edge so it slides out with the aside */}
+          {showDockContent && (
+            <div
+              className={`
+                absolute inset-y-0 left-0 flex flex-col w-[var(--panel-w)] max-md:w-full
+                transition-[opacity,visibility] duration-150
+                ${isOpen ? 'opacity-100 visible delay-75' : 'opacity-0 invisible pointer-events-none'}
+              `}
+            >
+              <div className="flex flex-col border-b border-base-300 bg-base-200/50 shrink-0">
+                <div className="flex items-center justify-between p-4 pb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Bot className="w-7 h-7 text-primary shrink-0" />
+                    <h2 className="font-semibold text-lg truncate">AI Assistant</h2>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {onDockModeChange && (
+                      <button
+                        onClick={popOutWithAnimation}
+                        className="btn btn-ghost btn-sm btn-circle max-md:hidden"
+                        title="Pop out as floating window"
+                        aria-label="Pop out as floating window"
+                      >
+                        <PictureInPicture2 className="w-5 h-5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={onToggle}
+                      className="btn btn-ghost btn-sm btn-circle"
+                      title="Collapse panel"
+                      aria-label="Collapse panel"
+                    >
+                      <PanelRightClose className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+                {tabsBar}
+              </div>
+
+              {tabContent}
+            </div>
+          )}
         </aside>
       )}
 
-      {/* ---------- Docked + expanded: side panel ---------- */}
-      {!isFloating && isOpen && (
-        <aside
-          aria-label="AI Assistant"
-          style={{ ['--panel-w' as string]: `${width}px` }}
-          className={`
-            relative shrink-0 h-full flex flex-col bg-base-200 border-l border-base-300
-            max-md:fixed max-md:inset-y-0 max-md:right-0 max-md:z-50 max-md:w-full max-md:shadow-2xl
-            md:w-[var(--panel-w)]
-            ${isDragging ? '' : 'md:transition-[width] md:duration-150'}
-          `}
-        >
-          {/* Resize handle (desktop only) */}
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize AI Assistant panel"
-            aria-valuenow={width}
-            aria-valuemin={MIN_WIDTH}
-            aria-valuemax={MAX_WIDTH}
-            tabIndex={0}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            onKeyDown={handleResizeKeyDown}
-            onDoubleClick={resetWidth}
-            title="Drag to resize · double-click to reset"
-            className={`
-              max-md:hidden absolute inset-y-0 -left-1 w-2 z-10 cursor-col-resize touch-none
-              transition-colors hover:bg-primary/30 focus-visible:bg-primary/40 focus-visible:outline-none
-              ${isDragging ? 'bg-primary/40' : ''}
-            `}
-          />
-
-          {/* Header */}
-          <div className="flex flex-col border-b border-base-300 bg-base-200/50 shrink-0">
-            <div className="flex items-center justify-between p-4 pb-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <Bot className="w-7 h-7 text-primary shrink-0" />
-                <h2 className="font-semibold text-lg truncate">AI Assistant</h2>
-              </div>
-              <div className="flex items-center gap-1">
-                {onDockModeChange && (
-                  <button
-                    onClick={() => onDockModeChange('floating')}
-                    className="btn btn-ghost btn-sm btn-circle max-md:hidden"
-                    title="Pop out as floating window"
-                    aria-label="Pop out as floating window"
-                  >
-                    <PictureInPicture2 className="w-5 h-5" />
-                  </button>
-                )}
-                <button
-                  onClick={onToggle}
-                  className="btn btn-ghost btn-sm btn-circle"
-                  title="Collapse panel"
-                  aria-label="Collapse panel"
-                >
-                  <PanelRightClose className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            {tabsBar}
-          </div>
-
-          {tabContent}
-        </aside>
+      {/* Floating: marks where the dock will be, so the window can fly to it */}
+      {isFloating && (
+        <div
+          ref={dockSlotRef}
+          aria-hidden="true"
+          className="shrink-0 w-0 h-full"
+          style={
+            popFly
+              ? {
+                  width: popFly.phase === 'start' ? popFly.from.width : 0,
+                  transition: popFly.phase === 'run' ? `width ${FLY_EASE}` : 'none',
+                }
+              : undefined
+          }
+        />
       )}
     </>
   );
