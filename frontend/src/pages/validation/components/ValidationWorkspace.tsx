@@ -11,7 +11,7 @@ import {
 import DocumentPanel from './document/DocumentPanel';
 import DocumentPreviewPiP from './document/DocumentPreviewPiP';
 import ExtractedDataPanel from './extracted-data/ExtractedDataPanel';
-import ChatPanel from './chat/ChatPanel';
+import ChatPanel, { type AssistantDockMode } from './chat/ChatPanel';
 import type { OCRComponent } from '../../../models/OCRComponent';
 import type { ExtractedPage } from '../../../models/TableData';
 import type { HistoryEntry } from '../../../models/HistoryEntry';
@@ -29,6 +29,12 @@ import {
   type FileMetadataInput,
 } from '../../../utils/fileGrouping';
 import type { PageReview, ReviewsByPage } from '../../../models/IssueReview';
+
+type ViewMode = 'split' | 'document' | 'table';
+type ChatTab = 'chat' | 'review' | 'history';
+
+/** Remembers whether the assistant was docked or floating. */
+const DOCK_MODE_STORAGE_KEY = 'arkhive.assistantDockMode';
 
 /** Below this body width the document and table stack instead of sitting side by side. */
 const SPLIT_MIN_WIDTH = 720;
@@ -109,7 +115,7 @@ function ValidationWorkspace({
 }: ValidationWorkspaceProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [splitPercent, setSplitPercent] = useState(50);
-  const [viewMode, setViewMode] = useState<'split' | 'document' | 'table'>('split');
+  const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [isPiPOpen, setIsPiPOpen] = useState(true);
 
   const [extractedPages, setExtractedPages] = useState<ExtractedPage[]>(pages);
@@ -127,7 +133,26 @@ function ValidationWorkspace({
   const [tableKey, setTableKey] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
-  const [chatActiveTab, setChatActiveTab] = useState<'chat' | 'review' | 'history'>('chat');
+  const [chatActiveTab, setChatActiveTab] = useState<ChatTab>('chat');
+
+  // Docked = side panel that takes layout space. Floating = movable window
+  // over the page that takes none. Remembered between sessions.
+  const [dockMode, setDockMode] = useState<AssistantDockMode>(() => {
+    try {
+      return localStorage.getItem(DOCK_MODE_STORAGE_KEY) === 'floating' ? 'floating' : 'docked';
+    } catch {
+      return 'docked';
+    }
+  });
+
+  const handleDockModeChange = useCallback((mode: AssistantDockMode) => {
+    setDockMode(mode);
+    try {
+      localStorage.setItem(DOCK_MODE_STORAGE_KEY, mode);
+    } catch {
+      /* storage unavailable: the choice just won't persist */
+    }
+  }, []);
 
   const extractedPagesRef = useRef<ExtractedPage[]>(pages);
   const currentPageIndexRef = useRef(0);
@@ -723,11 +748,12 @@ function ValidationWorkspace({
           )}
         </div>
 
-        {/* Docked, resizable, collapsible AI assistant (chat / review / history).
-          Sits beside the document + table so they can be compared side by side. */}
+        {/* AI assistant (chat / review / history). Docked: a resizable, collapsible
+          column beside the document + table. Floating: a draggable window that
+          takes no layout space. The user switches between the two. */}
         <ChatPanel
           isOpen={isChatOpen}
-          onToggle={() => setIsChatOpen(!isChatOpen)}
+          onToggle={() => setIsChatOpen((open) => !open)}
           messages={messages}
           onAddMessage={addMessage}
           documentContext={documentContext}
@@ -743,6 +769,8 @@ function ValidationWorkspace({
           onFetchBulkSuggestion={handleFetchBulkSuggestion}
           activeTab={chatActiveTab}
           onTabChange={setChatActiveTab}
+          dockMode={dockMode}
+          onDockModeChange={handleDockModeChange}
           onRescan={rescanCurrentPage}
           isRescanning={currentPageStatus.scanning}
           formatCheckFailed={!currentPageStatus.formatCheckOk}
