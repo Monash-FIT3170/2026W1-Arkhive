@@ -1,7 +1,16 @@
-import { Bot, Send, X } from 'lucide-react';
+import {
+  Bot,
+  History as HistoryIcon,
+  ListChecks,
+  MessageSquare,
+  PanelRightClose,
+  PanelRightOpen,
+  Send,
+  X,
+} from 'lucide-react';
 import type { ChatMessage } from '../../../../models/Message';
 import MessageItem from './MessageItem';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { sendMessage } from '../../../../services/llmService';
 import type { ExtractedPage } from '../../../../models/TableData';
 
@@ -11,6 +20,43 @@ import type { HistoryEntry } from '../../../../models/HistoryEntry';
 import type { OcrIssue } from '../../../../models/IssueReview';
 import { buildSlides } from '../../../../utils/review/ocrReviewUtils';
 
+type Tab = 'chat' | 'review' | 'history';
+
+const MIN_WIDTH = 320;
+const MAX_WIDTH = 720;
+const DEFAULT_WIDTH = 384;
+const KEYBOARD_STEP = 24;
+const WIDTH_STORAGE_KEY = 'arkhive.assistantPanelWidth';
+
+/** Keeps the panel from eating more than 60% of the viewport. */
+const clampWidth = (w: number) => {
+  const viewportCap = typeof window !== 'undefined' ? window.innerWidth * 0.6 : MAX_WIDTH;
+  return Math.round(Math.min(Math.max(w, MIN_WIDTH), Math.min(MAX_WIDTH, viewportCap)));
+};
+
+const readStoredWidth = () => {
+  try {
+    const raw = localStorage.getItem(WIDTH_STORAGE_KEY);
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) ? clampWidth(parsed) : DEFAULT_WIDTH;
+  } catch {
+    return DEFAULT_WIDTH;
+  }
+};
+
+/**
+ * Docked AI assistant.
+ *
+ * Renders as a flex sibling of the document view (not an overlay), so the
+ * document and the assistant sit side by side. The panel can be:
+ *   - expanded and resized by dragging its left edge (or ArrowLeft/ArrowRight
+ *     when the handle is focused, double-click to reset)
+ *   - collapsed to a slim rail that keeps the review badge visible
+ * Below the `md` breakpoint there isn't room for two columns, so it falls
+ * back to a full-width drawer.
+ *
+ * Props are unchanged: `isOpen` now means "expanded" (vs. collapsed rail).
+ */
 function ChatPanel({
   isOpen,
   onToggle,
@@ -27,7 +73,7 @@ function ChatPanel({
   onSlideChange,
   onFetchSuggestion,
   onFetchBulkSuggestion,
-  activeTab,
+  activeTab = 'chat',
   onTabChange,
   onRescan,
   isRescanning,
@@ -53,8 +99,8 @@ function ChatPanel({
     fields: { fieldId: string; rowId: string | number; ocrValue: string }[],
     formatRegex?: string
   ) => Promise<Record<string, string> | null>;
-  activeTab?: 'chat' | 'review' | 'history';
-  onTabChange?: (tab: 'chat' | 'review' | 'history') => void;
+  activeTab?: Tab;
+  onTabChange?: (tab: Tab) => void;
 
   /** Re-scans the page currently in view, discarding its review state. */
   onRescan?: () => void;
@@ -69,15 +115,69 @@ function ChatPanel({
   const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // --- panel sizing -------------------------------------------------------
+  const [width, setWidth] = useState<number>(readStoredWidth);
+  const [isDragging, setDragging] = useState(false);
+  const dragStart = useRef({ x: 0, width: DEFAULT_WIDTH });
+
+  const persistWidth = useCallback((w: number) => {
+    try {
+      localStorage.setItem(WIDTH_STORAGE_KEY, String(w));
+    } catch {
+      /* storage unavailable: width just won't persist */
+    }
+  }, []);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragStart.current = { x: e.clientX, width };
+    setDragging(true);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    // Panel is anchored right, so dragging left (smaller clientX) widens it.
+    setWidth(clampWidth(dragStart.current.width + (dragStart.current.x - e.clientX)));
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    setDragging(false);
+    persistWidth(width);
+  };
+
+  const handleResizeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const next = clampWidth(width + (e.key === 'ArrowLeft' ? KEYBOARD_STEP : -KEYBOARD_STEP));
+    setWidth(next);
+    persistWidth(next);
+  };
+
+  const resetWidth = () => {
+    setWidth(DEFAULT_WIDTH);
+    persistWidth(DEFAULT_WIDTH);
+  };
+
+  // Re-clamp when the window shrinks so the document never gets squeezed out.
+  useEffect(() => {
+    const onResize = () => setWidth((w) => clampWidth(w));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // --- review badge -------------------------------------------------------
   // `flaggedIssues` only ever contains open issues now; resolved ones are
   // tracked (and persisted) by useReviewQueue and never reach this component.
   const unresolvedSlideCount = useMemo(() => buildSlides(flaggedIssues).length, [flaggedIssues]);
 
   useEffect(() => {
-    //whenever messages changes it scrolls to the button of the chat
+    // whenever messages change, scroll to the bottom of the chat
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // --- chat ---------------------------------------------------------------
   const handleSend = async () => {
     if (!input.trim()) return;
 
@@ -99,7 +199,7 @@ function ChatPanel({
     try {
       const reply = await sendMessage(allMessages, documentContext);
 
-      //ai returns updated context
+      // ai returns updated context
       if (reply.updatedContext) {
         onContextUpdate({
           ...reply.updatedContext,
@@ -112,27 +212,25 @@ function ChatPanel({
         role: 'model',
         content: reply.response,
         timestamp: new Date().toISOString(),
-        intent: reply.intent ?? undefined, //attacth intent
+        intent: reply.intent ?? undefined, // attach intent
       });
     } catch {
+      const message =
+        'Error: Chatbot service failed. Please double check your Chatbot service credentials';
       onAddMessage({
         id: crypto.randomUUID(),
         role: 'model',
-        content:
-          'Error: Chatbot service failed. Please double check your Chatbot service credentials',
+        content: message,
         timestamp: new Date().toISOString(),
       });
-      if (isOpen) {
-        onToggle();
-      }
-      setChatError(
-        'Error: Chatbot service failed. Please double check your Chatbot service credentials'
-      );
-      // setTimeout(() => setChatError(null), 5000);
+      // The panel no longer auto-closes on error: the failure message is in
+      // the thread, and the toast covers the collapsed state.
+      setChatError(message);
     } finally {
       setLoading(false);
     }
   };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -140,12 +238,28 @@ function ChatPanel({
     }
   };
 
+  /** Rail shortcut: expand the panel straight onto a given tab. */
+  const openTab = (tab: Tab) => {
+    onTabChange?.(tab);
+    if (!isOpen) onToggle();
+  };
+
+  const tabClass = (tab: Tab) =>
+    `pb-2 font-medium border-b-2 transition-colors flex items-center gap-2 ${
+      activeTab === tab
+        ? 'border-primary text-primary'
+        : 'border-transparent text-base-content/60 hover:text-base-content'
+    }`;
+
   return (
     <>
-      {/* Error Alert */}
+      {/* Error toast (visible even when the panel is collapsed) */}
       {chatError && (
-        <div className="fixed bottom-24 right-6 z-50 w-72 animate-in fade-in slide-in-from-bottom-5 duration-300">
-          <div className="alert alert-error mb-2 p-3 text-sm rounded-xl flex items-start gap-2 shadow-lg">
+        <div
+          role="alert"
+          className="fixed bottom-6 right-6 z-[60] w-72 animate-in fade-in slide-in-from-bottom-5 duration-300"
+        >
+          <div className="alert alert-error p-3 text-sm rounded-xl flex items-start gap-2 shadow-lg">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="mt-0.5 h-4 w-4 shrink-0"
@@ -163,6 +277,7 @@ function ChatPanel({
               onClick={() => setChatError(null)}
               className="btn btn-ghost btn-xs btn-circle -mr-1 -mt-1 hover:bg-error-content/20"
               title="Dismiss"
+              aria-label="Dismiss error"
             >
               <X className="w-4 h-4" />
             </button>
@@ -170,51 +285,123 @@ function ChatPanel({
         </div>
       )}
 
-      {/* AI Button to open and close modal */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <div className="indicator">
-          {!isOpen && unresolvedSlideCount > 0 && (
-            <span className="indicator-item badge badge-error badge-sm w-3.5 h-3.5 p-0 border-2 border-base-100 rounded-full shadow-sm mt-1 mr-1"></span>
-          )}
+      {!isOpen ? (
+        /* ---------- Collapsed rail ---------- */
+        <aside
+          aria-label="AI Assistant (collapsed)"
+          className="shrink-0 w-12 h-full flex flex-col items-center gap-2 py-3 border-l border-base-300 bg-base-200"
+        >
           <button
             onClick={onToggle}
-            className="btn btn-primary btn-circle btn-lg shadow-md"
-            title={isOpen ? 'Close AI Assistant' : 'Open AI Assistant'}
+            className="btn btn-ghost btn-sm btn-square"
+            title="Open AI Assistant"
+            aria-label="Open AI Assistant"
           >
-            <Bot className="w-9 h-9" />
+            <PanelRightOpen className="w-5 h-5" />
           </button>
-        </div>
-      </div>
 
-      {/* Floating Chat Modal */}
-      {isOpen && (
-        <div className="fixed bottom-20 right-6 w-[50vw] md:w-96 h-[530px] max-h-[80vh] z-50 flex flex-col bg-base-200 border border-gray-200 rounded-xl">
-          {/* window header area */}
-          <div className="flex flex-col border-b border-gray-200 bg-base-200/50 rounded-t-xl shrink-0">
+          <div className="divider my-0" />
+
+          <button
+            onClick={() => openTab('chat')}
+            className="btn btn-ghost btn-sm btn-square"
+            title="Chat"
+            aria-label="Open chat"
+          >
+            <MessageSquare className="w-5 h-5" />
+          </button>
+
+          <div className="indicator">
+            {unresolvedSlideCount > 0 && (
+              <span className="indicator-item badge badge-error badge-xs text-white">
+                {unresolvedSlideCount}
+              </span>
+            )}
+            <button
+              onClick={() => openTab('review')}
+              className="btn btn-ghost btn-sm btn-square"
+              title={`Review (${unresolvedSlideCount} open)`}
+              aria-label={`Open review, ${unresolvedSlideCount} open`}
+            >
+              <ListChecks className="w-5 h-5" />
+            </button>
+          </div>
+
+          <button
+            onClick={() => openTab('history')}
+            className="btn btn-ghost btn-sm btn-square"
+            title="History"
+            aria-label="Open history"
+          >
+            <HistoryIcon className="w-5 h-5" />
+          </button>
+        </aside>
+      ) : (
+        /* ---------- Docked panel ---------- */
+        <aside
+          aria-label="AI Assistant"
+          style={{ ['--panel-w' as string]: `${width}px` }}
+          className={`
+            relative shrink-0 h-full flex flex-col bg-base-200 border-l border-base-300
+            max-md:fixed max-md:inset-y-0 max-md:right-0 max-md:z-50 max-md:w-full max-md:shadow-2xl
+            md:w-[var(--panel-w)]
+            ${isDragging ? '' : 'md:transition-[width] md:duration-150'}
+          `}
+        >
+          {/* Resize handle (desktop only) */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize AI Assistant panel"
+            aria-valuenow={width}
+            aria-valuemin={MIN_WIDTH}
+            aria-valuemax={MAX_WIDTH}
+            tabIndex={0}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onKeyDown={handleResizeKeyDown}
+            onDoubleClick={resetWidth}
+            title="Drag to resize · double-click to reset"
+            className={`
+              max-md:hidden absolute inset-y-0 -left-1 w-2 z-10 cursor-col-resize touch-none
+              transition-colors hover:bg-primary/30 focus-visible:bg-primary/40 focus-visible:outline-none
+              ${isDragging ? 'bg-primary/40' : ''}
+            `}
+          />
+
+          {/* Header */}
+          <div className="flex flex-col border-b border-base-300 bg-base-200/50 shrink-0">
             <div className="flex items-center justify-between p-4 pb-2">
-              <div className="flex items-center gap-2">
-                <Bot className="w-7 h-7 text-primary" />
-                <h2 className="font-semibold text-lg">AI Assistant</h2>
+              <div className="flex items-center gap-2 min-w-0">
+                <Bot className="w-7 h-7 text-primary shrink-0" />
+                <h2 className="font-semibold text-lg truncate">AI Assistant</h2>
               </div>
               <button
                 onClick={onToggle}
                 className="btn btn-ghost btn-sm btn-circle"
-                title="Close Chat"
+                title="Collapse panel"
+                aria-label="Collapse panel"
               >
-                <X className="w-6 h-6" />
+                <PanelRightClose className="w-5 h-5" />
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex px-4 gap-6 mt-1">
+            <div role="tablist" className="flex px-4 gap-6 mt-1">
               <button
-                className={`pb-2 font-medium border-b-2 transition-colors ${activeTab === 'chat' ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`}
+                role="tab"
+                aria-selected={activeTab === 'chat'}
+                className={tabClass('chat')}
                 onClick={() => onTabChange?.('chat')}
               >
                 Chat
               </button>
               <button
-                className={`pb-2 font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'review' ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`}
+                role="tab"
+                aria-selected={activeTab === 'review'}
+                className={tabClass('review')}
                 onClick={() => onTabChange?.('review')}
               >
                 Review
@@ -225,19 +412,22 @@ function ChatPanel({
                 )}
               </button>
               <button
-                className={`pb-2 font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'history' ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`}
+                role="tab"
+                aria-selected={activeTab === 'history'}
+                className={tabClass('history')}
                 onClick={() => onTabChange?.('history')}
               >
                 History
-                {history && history.length > 0 && (
+                {history.length > 0 && (
                   <span className="badge badge-neutral badge-sm">{history.length}</span>
                 )}
               </button>
             </div>
           </div>
 
+          {/* Tab content */}
           {activeTab === 'review' ? (
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
               <OcrReviewWidget
                 issues={flaggedIssues}
                 onAccept={onCarouselAccept!}
@@ -254,7 +444,7 @@ function ChatPanel({
           ) : activeTab === 'chat' ? (
             <>
               {/* messages area */}
-              <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
                 <div className="chat chat-start">
                   <div className="chat-image avatar">
                     <div className="w-10 rounded-full bg-base-300 flex items-center justify-center">
@@ -282,9 +472,7 @@ function ChatPanel({
                     <div className="chat-header text-xs opacity-50 mb-1">AI Assistant</div>
                     <div
                       className="chat-bubble chat-bubble-primary text-primary-content"
-                      style={{
-                        boxShadow: 'var(--color-secondary)',
-                      }}
+                      style={{ boxShadow: 'var(--color-secondary)' }}
                     >
                       <span>Just a moment</span>
                       <span className="loading loading-dots loading-sm ml-1.5"></span>
@@ -296,27 +484,20 @@ function ChatPanel({
               </div>
 
               {/* text input area */}
-              <div className="p-4 border-t border-gray-300 bg-base-300/30">
+              <div className="p-4 border-t border-base-300 bg-base-300/30 shrink-0">
                 <div className="flex gap-2 items-center">
                   <textarea
-                    className="
-							textarea textarea-bordered w-full resize-none h-12 min-h-[1rem]
-							rounded-xl bg-base-100
-							border border-base-300
-							focus:border-primary
-							transition-[border-color,box-shadow] duration-200 ease-out
-							focus:outline-none
-							
-						"
+                    className="textarea textarea-bordered w-full resize-none h-12 min-h-[1rem] rounded-xl bg-base-100 border border-base-300 focus:border-primary transition-[border-color,box-shadow] duration-200 ease-out focus:outline-none"
                     placeholder="Type your message here"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(e)}
+                    onKeyDown={handleKeyDown}
                     disabled={isLoading}
                   ></textarea>
                   <button
                     className="btn btn-primary btn-square"
                     title="Send message"
+                    aria-label="Send message"
                     onClick={handleSend}
                     disabled={isLoading}
                   >
@@ -325,9 +506,9 @@ function ChatPanel({
                 </div>
               </div>
             </>
-          ) : activeTab === 'history' ? (
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-              {!history || history.length === 0 ? (
+          ) : (
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
+              {history.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-base-content/40 gap-2 mt-20">
                   <p className="font-semibold">No changes yet</p>
                   <p className="text-xs">Changes you make will appear here</p>
@@ -367,10 +548,8 @@ function ChatPanel({
                 ))
               )}
             </div>
-          ) : (
-            <></>
           )}
-        </div>
+        </aside>
       )}
     </>
   );
