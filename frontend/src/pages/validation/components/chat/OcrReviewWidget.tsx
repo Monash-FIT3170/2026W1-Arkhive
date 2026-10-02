@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   Bot,
   Sparkle,
-  RefreshCw,
 } from 'lucide-react';
 
 // Acknowledgement: Google Gemini was used to help generate this file
@@ -29,9 +28,6 @@ interface OcrReviewWidgetProps {
     fields: { fieldId: string; rowId: string | number; ocrValue: string }[],
     formatRegex?: string
   ) => Promise<Record<string, string> | null>;
-  /** Re-scans the page currently in view, discarding its review state. */
-  onRescan?: () => void;
-  isRescanning?: boolean;
   /** True when the LLM format check failed for the current page. */
   formatCheckFailed?: boolean;
 }
@@ -50,8 +46,6 @@ export default function OcrReviewWidget({
   onSlideChange,
   onFetchSuggestion,
   onFetchBulkSuggestion,
-  onRescan,
-  isRescanning,
   formatCheckFailed,
 }: OcrReviewWidgetProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -219,24 +213,10 @@ export default function OcrReviewWidget({
   return (
     <div className="flex-1 flex flex-col h-full bg-base-200/30 overflow-hidden font-sans min-w-0">
       <div className="p-4 h-full flex flex-col relative min-w-0">
-        {onRescan && (
-          <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
-            <span className="text-xs text-warning">
-              {formatCheckFailed ? 'Format check failed on this page. Re-scan to retry.' : ''}
-            </span>
-            <button
-              type="button"
-              className="btn btn-ghost btn-xs gap-1.5"
-              onClick={onRescan}
-              disabled={isRescanning}
-            >
-              {isRescanning ? (
-                <span className="loading loading-spinner loading-xs" />
-              ) : (
-                <RefreshCw size={12} />
-              )}
-              Re-scan page
-            </button>
+        {formatCheckFailed && (
+          <div className="flex items-center gap-2 mb-3 p-2.5 rounded-xl bg-warning/10 border border-warning/30 text-xs text-warning shrink-0">
+            <AlertCircle size={14} className="shrink-0" />
+            <span>Format check failed on this page. Use the &quot;Re-scan Page&quot; button in the top bar to retry.</span>
           </div>
         )}
         {unresolvedIssues.length === 0 ? (
