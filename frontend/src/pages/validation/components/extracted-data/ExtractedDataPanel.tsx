@@ -494,12 +494,12 @@ function ExtractedDataPanel({
                       >
                         {isEditing ? (
                           <textarea
-                            className="textarea textarea-xs textarea-bordered w-full min-w-[8rem] resize-none bg-base-100 text-base-content leading-snug"
+                            className="w-full bg-base-100 text-base-content text-[13px] leading-snug p-1.5 rounded border border-primary ring-2 ring-primary/20 outline-none resize-none overflow-hidden shadow-sm transition-all"
                             rows={1}
                             value={editValue}
+                            onFocus={(e) => e.target.select()}
                             onChange={(e) => {
                               setEditValue(e.target.value);
-                              // auto-grow to fit content
                               const el = e.target as HTMLTextAreaElement;
                               el.style.height = 'auto';
                               el.style.height = `${el.scrollHeight}px`;
@@ -508,7 +508,6 @@ function ExtractedDataPanel({
                             onKeyDown={(e) => handleCellKeyDown(e, fieldId)}
                             autoFocus
                             ref={(el) => {
-                              // set initial height on mount to fit existing content
                               if (el) {
                                 el.style.height = 'auto';
                                 el.style.height = `${el.scrollHeight}px`;
