@@ -10,6 +10,10 @@ import {
   deletePrefix,
 } from '../services/r2Client';
 import { parseTableWithRetries } from '../services/ocr/ocr';
+import {
+  hasValidFileSignature,
+  INVALID_FILE_CONTENTS_ERROR,
+} from '../services/security/fileValidation';
 import type { ExtractedPage } from '../models/TableData';
 import type { PageSelection, ProcessedPageResult } from '../models/Project.ts';
 import { PageReview } from '../models/IssueReview';
@@ -99,6 +103,29 @@ async function processPage(selection: PageSelection, ownerId: string): Promise<P
     try {
       const key = `${document.storage_path}/page-${pageIndex}.png`;
       const buffer = await getObjectBuffer(key);
+
+      // R2 never saw the bytes at presign time. Check them before OCR.
+      if (!hasValidFileSignature(buffer, 'image/png')) {
+        try {
+          await deleteObject(key);
+        } catch {
+          // Best-effort cleanup; still reject the page.
+        }
+
+        await supabase
+          .from('document_pages')
+          .update({ status: 'error', error_message: INVALID_FILE_CONTENTS_ERROR })
+          .eq('document_id', documentId)
+          .eq('page_index', pageIndex);
+
+        return {
+          documentId,
+          pageIndex,
+          status: 'error',
+          errorMessage: INVALID_FILE_CONTENTS_ERROR,
+        };
+      }
+
       const rawResult = await parseTableWithRetries(buffer);
 
       // Persist immediately — this is the fix for "crash mid-validation

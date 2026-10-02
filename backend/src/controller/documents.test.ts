@@ -15,6 +15,11 @@ vi.mock('../services/supabaseClient', () => ({
 import { supabase } from '../services/supabaseClient';
 import * as r2Client from '../services/r2Client';
 import * as ocrService from '../services/ocr/ocr';
+import { INVALID_FILE_CONTENTS_ERROR } from '../services/security/fileValidation';
+
+const PNG_HEADER = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
+]);
 
 function createMockReqRes(
   userId: string | null = 'test-user-123',
@@ -235,7 +240,7 @@ describe('Documents Controller', () => {
 
     it('downloads from R2, runs OCR pipeline, and persists rawResult with done status', async () => {
       const update = mockOwnedDocument();
-      vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('fake-pdf-bytes'));
+      vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(PNG_HEADER);
       vi.spyOn(ocrService, 'parseTableWithRetries').mockResolvedValue(mockOcrResult as any);
 
       const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
@@ -263,7 +268,7 @@ describe('Documents Controller', () => {
       mockOwnedDocument();
       const getObjectBufferSpy = vi
         .spyOn(r2Client, 'getObjectBuffer')
-        .mockResolvedValue(Buffer.from('page'));
+        .mockResolvedValue(PNG_HEADER);
       vi.spyOn(ocrService, 'parseTableWithRetries').mockResolvedValue(mockOcrResult as any);
 
       const { req, res } = createMockReqRes('test-user-123', {
@@ -307,7 +312,7 @@ describe('Documents Controller', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const update = mockOwnedDocument();
-      vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('fake-pdf-bytes'));
+      vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(PNG_HEADER);
       vi.spyOn(ocrService, 'parseTableWithRetries').mockRejectedValue(new Error('OCR exploded'));
 
       const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
@@ -326,6 +331,34 @@ describe('Documents Controller', () => {
 
       // Restore console.error
       consoleSpy.mockRestore();
+    });
+
+    it('rejects spoofed R2 objects before OCR and deletes them', async () => {
+      const update = mockOwnedDocument();
+      vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('fake-image-bytes'));
+      const deleteSpy = vi.spyOn(r2Client, 'deleteObject').mockResolvedValue(undefined);
+      const ocrSpy = vi.spyOn(ocrService, 'parseTableWithRetries');
+
+      const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
+        selections: [{ documentId: 'doc-123', pageIndices: [0] }],
+      });
+      await documentsController.processDocument(req, res);
+
+      expect(getStatus()).toBe(200);
+      expect(getJson().results).toEqual([
+        {
+          documentId: 'doc-123',
+          pageIndex: 0,
+          status: 'error',
+          errorMessage: INVALID_FILE_CONTENTS_ERROR,
+        },
+      ]);
+      expect(deleteSpy).toHaveBeenCalledWith('user/proj/doc-123/page-0.png');
+      expect(ocrSpy).not.toHaveBeenCalled();
+      expect(update.mock.calls.map((call) => call[0])).toEqual([
+        { status: 'processing' },
+        { status: 'error', error_message: INVALID_FILE_CONTENTS_ERROR },
+      ]);
     });
   });
 
