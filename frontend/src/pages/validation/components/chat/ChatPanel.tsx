@@ -110,8 +110,6 @@ function ChatPanel({
   onFetchBulkSuggestion,
   activeTab = 'chat',
   onTabChange,
-  onRescan,
-  isRescanning,
   formatCheckFailed,
   history = [],
 }: {
@@ -138,10 +136,6 @@ function ChatPanel({
   ) => Promise<Record<string, string> | null>;
   activeTab?: Tab;
   onTabChange?: (tab: Tab) => void;
-
-  /** Re-scans the page currently in view, discarding its review state. */
-  onRescan?: () => void;
-  isRescanning?: boolean;
   /** True when the LLM format check failed for the current page. */
   formatCheckFailed?: boolean;
 
@@ -517,8 +511,6 @@ function ChatPanel({
           onSlideChange={onSlideChange}
           onFetchSuggestion={onFetchSuggestion}
           onFetchBulkSuggestion={onFetchBulkSuggestion}
-          onRescan={onRescan}
-          isRescanning={isRescanning}
           formatCheckFailed={formatCheckFailed}
         />
       </div>

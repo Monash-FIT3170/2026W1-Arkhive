@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ChevronDown,
   RotateCcw,
+  RefreshCw,
 } from 'lucide-react';
 import DocumentPanel from './document/DocumentPanel';
 import DocumentPreviewPiP from './document/DocumentPreviewPiP';
@@ -583,6 +584,39 @@ function ValidationWorkspace({
               {confidencePercent}%
             </span>
           </div>
+
+          {/* Re-scan Current Page Button */}
+          <button
+            type="button"
+            onClick={rescanCurrentPage}
+            disabled={currentPageStatus?.scanning}
+            className={`btn btn-xs h-8 min-h-0 px-2.5 rounded-xl border border-base-300 bg-base-100 shadow-sm gap-1.5 text-xs font-medium transition-all ${
+              currentPageStatus && !currentPageStatus.formatCheckOk
+                ? 'border-warning text-warning hover:bg-warning/10'
+                : 'hover:bg-base-200 text-base-content/80'
+            }`}
+            title={
+              currentPageStatus && !currentPageStatus.formatCheckOk
+                ? `Format check failed on page ${activePageIndexInFile + 1}. Click to re-scan.`
+                : `Re-scan page ${activePageIndexInFile + 1} for confidence & format issues`
+            }
+            aria-label={`Re-scan page ${activePageIndexInFile + 1}`}
+          >
+            {currentPageStatus?.scanning ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${
+                  currentPageStatus && !currentPageStatus.formatCheckOk
+                    ? 'text-warning'
+                    : 'text-base-content/70'
+                }`}
+              />
+            )}
+            <span className="hidden sm:inline">
+              {currentPageStatus?.scanning ? 'Scanning...' : 'Re-scan Page'}
+            </span>
+          </button>
         </div>
 
         {/* Right: View Mode Switcher + Global Actions */}
@@ -771,9 +805,7 @@ function ValidationWorkspace({
           onTabChange={setChatActiveTab}
           dockMode={dockMode}
           onDockModeChange={handleDockModeChange}
-          onRescan={rescanCurrentPage}
-          isRescanning={currentPageStatus.scanning}
-          formatCheckFailed={!currentPageStatus.formatCheckOk}
+          formatCheckFailed={Boolean(currentPageStatus && !currentPageStatus.formatCheckOk)}
           history={history}
         />
       </div>
