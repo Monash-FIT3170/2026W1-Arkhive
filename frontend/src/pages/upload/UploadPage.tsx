@@ -196,7 +196,70 @@ export default function UploadPage() {
         setIsProcessing(false);
       });
   }
+  // ── QR (phone) upload ──────────────────────────────────────────────────────
+  // NEW: Called by ScanQrButton once the phone's photo has landed in the session.
+  // Re-fetches the session's documents and adds any we aren't already showing,
+  // mirroring what the hydrate-on-mount effect does. Phone uploads arrive as a
+  // brand-new document, same as a fresh desktop upload.
+  async function handleQrUploaded() {
+    try {
+      const docs = await getUploadedDocuments();
+      const knownIds = new Set(previewItemsRef.current.map((item) => item.documentId));
 
+      const newItems: PreviewItem[] = [];
+      docs.forEach((doc) => {
+        if (knownIds.has(doc.documentId)) return;
+
+        const fileIndex = nextFileIndexRef.current++;
+        doc.pages.forEach((pageUrl) => {
+          const parts = pageUrl.split('/');
+          const backendPageIndex = parseInt(parts[parts.length - 1], 10);
+
+          newItems.push({
+            label: doc.label || `Mobile Upload ${fileIndex + 1}`,
+            subtitle: `Page ${backendPageIndex + 1}`,
+            previewSrc: pageUrl,
+            isImage: true,
+            hasFile: true,
+            fileIndex,
+            backendPageIndex,
+            documentId: doc.documentId,
+            isProcessed: false,
+          });
+        });
+      });
+
+      if (newItems.length === 0) return;
+
+      setPreviewItems((prev) => {
+        const startIndex = prev.length;
+        const next = [...prev, ...newItems];
+        if (prev.length === 0) {
+          unlockStep(1); // unlock step 1 (preview) after the first successful capture
+        }
+
+        // Select the new pages by default, like captureFiles does
+        setSelectedPages((prevSel) => {
+          const nextSel = new Set(prevSel);
+          newItems.forEach((item, i) => {
+            if (item.hasFile) nextSel.add(startIndex + i);
+          });
+          return nextSel;
+        });
+
+        return next;
+      });
+      // explicitly go to the preview screen once the QR photo has landed,
+      // instead of relying only on the previewItems-watching effect.
+      setTimeout(() => {
+        navigate('/upload?step=preview', { replace: true });
+      }, 1500);
+
+    } catch (err) {
+      console.error('Failed to refresh documents after QR upload', err);
+      setUploadError('Your photo was uploaded, but the page could not be refreshed. Please reload.');
+    }
+  }
   // ── Page selection ─────────────────────────────────────────────────────────
   function togglePageSelection(index: number) {
     setSelectedPages((prev) => {
@@ -681,7 +744,7 @@ export default function UploadPage() {
     return (
       <>
         {renderNotification()}
-        <EmptyUploadView onFilesCaptured={captureFiles} onError={setUploadError} />
+        <EmptyUploadView onFilesCaptured={captureFiles} onError={setUploadError} onQrUploaded={handleQrUploaded} />
       </>
     );
   }
@@ -862,6 +925,7 @@ export default function UploadPage() {
           onError={setUploadError}
           onBulkRemove={requestBulkRemove}
           onBulkReplaceFiles={handleBulkReplaceFiles}
+          onQrUploaded={handleQrUploaded} // NEW
         />
       </div>
     </div>
