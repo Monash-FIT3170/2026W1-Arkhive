@@ -90,3 +90,36 @@ export function exportExtractedDataAsCSV(
 	const csv = formatExtractedDataAsCSV(data);
 	downloadCSV(csv, filename);
 }
+
+/**
+ * A simplified CSV format for testing purposes
+ */
+export function formatExtractedDataAsSimpleCSV(data: ExtractedData | ExtractedData[]): string {
+	const dataArray = Array.isArray(data) ? data : [data];
+	if (dataArray.length === 0) return "";
+
+	const parts: string[] = [];
+	parts.push("SIMPLE CSV EXPORT");
+
+	dataArray.forEach((page) => {
+		if (!page || !page.rows) return;
+		page.rows.forEach((row) => {
+			const values = Object.entries(row)
+				.filter(([key, val]) => !key.startsWith('_') && typeof val !== 'object') 
+				.map(([_, val]) => escapeCell(val));
+			parts.push(values.join(","));
+		});
+	});
+	return parts.join("\n");
+}
+
+/**
+ * Convenience wrapper for the simple CSV export.
+ */
+export function exportExtractedDataAsSimpleCSV(
+	data: ExtractedData | ExtractedData[],
+	filename?: string
+): void {
+	const csv = formatExtractedDataAsSimpleCSV(data);
+	downloadCSV(csv, filename);
+}

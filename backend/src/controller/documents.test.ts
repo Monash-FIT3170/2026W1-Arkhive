@@ -246,11 +246,16 @@ describe('Documents Controller', () => {
 
       expect(getStatus()).toBe(200);
       expect(getJson().results).toEqual([
-        { documentId: 'doc-123', pageIndex: 0, status: 'done', rawResult: mockOcrResult },
+        {
+          documentId: 'doc-123',
+          pageIndex: 0,
+          status: 'done',
+          rawResult: mockOcrResult,
+        },
       ]);
       expect(update.mock.calls.map((call) => call[0])).toEqual([
         { status: 'processing' },
-        { status: 'done', raw_ocr_result: mockOcrResult, error_message: null },
+        { status: 'done', raw_ocr_result: mockOcrResult, review_state: null, error_message: null },
       ]);
     });
 
@@ -274,7 +279,9 @@ describe('Documents Controller', () => {
     });
 
     it('skips a page already marked done unless force is set', async () => {
-      mockOwnedDocument([{ page_index: 0, status: 'done', raw_ocr_result: mockOcrResult }]);
+      mockOwnedDocument([
+        { page_index: 0, status: 'done', review_state: null, raw_ocr_result: mockOcrResult },
+      ]);
       const getObjectBufferSpy = vi.spyOn(r2Client, 'getObjectBuffer');
       vi.spyOn(ocrService, 'parseTableWithRetries');
 

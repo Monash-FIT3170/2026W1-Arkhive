@@ -49,9 +49,12 @@ function textEncode(str: string): Uint8Array {
 
 // Fixed DOS date/time stamp doesn't need to be accurate, ZIP readers
 // just require a valid-looking value.
+// General purpose flag bit 11: file names are UTF-8 (needed for bulk export,
+// where entry names come from user file names and may contain non-ASCII characters)
+
 const DOS_TIME = 0;
 const DOS_DATE = 0x5821;
-
+const ZIP_UTF8_FLAG = 0x0800;
 function buildZip(entries: ZipEntry[]): Uint8Array {
 	const localParts: Uint8Array[] = [];
 	const centralParts: Uint8Array[] = [];
@@ -66,7 +69,7 @@ function buildZip(entries: ZipEntry[]): Uint8Array {
 		const lv = new DataView(localHeader.buffer);
 		lv.setUint32(0, 0x04034b50, true); // local file header signature
 		lv.setUint16(4, 20, true); // version needed to extract
-		lv.setUint16(6, 0, true); // general purpose flag
+		lv.setUint16(6, ZIP_UTF8_FLAG, true); // general purpose flag
 		lv.setUint16(8, 0, true); // compression method: 0 = store
 		lv.setUint16(10, DOS_TIME, true);
 		lv.setUint16(12, DOS_DATE, true);
@@ -84,7 +87,7 @@ function buildZip(entries: ZipEntry[]): Uint8Array {
 		cv.setUint32(0, 0x02014b50, true); // central directory header signature
 		cv.setUint16(4, 20, true); // version made by
 		cv.setUint16(6, 20, true); // version needed to extract
-		cv.setUint16(8, 0, true); // general purpose flag
+		cv.setUint16(8, ZIP_UTF8_FLAG, true); // general purpose flag
 		cv.setUint16(10, 0, true); // compression method
 		cv.setUint16(12, DOS_TIME, true);
 		cv.setUint16(14, DOS_DATE, true);
@@ -260,4 +263,87 @@ export function exportExtractedDataAsXLSX(
 ): void {
 	const bytes = buildExtractedDataXlsxBytes(data);
 	downloadXLSX(bytes, filename);
+}
+
+// ---------------------------------------------------------------------------
+// Bulk export (US-4.9): several processed pages/documents -> ONE zip
+// containing a separate .xlsx file for each of them
+// ---------------------------------------------------------------------------
+
+export type BulkExportItem = {
+	/** Name of the source page/document, e.g. "invoice.png" or "receipt (page 2)". Used to name its file. */
+	name: string;
+	/** The (already validated / mapped) data for that page or document. */
+	data: ExtractedData;
+};
+
+/** Turns a page/document name into a safe file name (no extension). */
+function toSafeFileBase(name: string): string {
+	const cleaned = name
+		.replace(/\.(png|jpe?g|pdf|heic|heif|tiff?)$/i, "") // drop the source-file extension
+		// eslint-disable-next-line no-control-regex -- intentionally stripping control characters from user-supplied file names for safety
+		.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_") // characters not allowed in file names
+		.replace(/\s+/g, " ")
+		.trim();
+	return cleaned.length > 0 ? cleaned : "document";
+}
+
+/** Adds "(2)", "(3)", ... when two items would end up with the same file name. */
+function makeUniqueFileName(base: string, used: Set<string>): string {
+	let candidate = `${base}.xlsx`;
+	let counter = 2;
+	while (used.has(candidate.toLowerCase())) {
+		candidate = `${base} (${counter}).xlsx`;
+		counter += 1;
+	}
+	used.add(candidate.toLowerCase());
+	return candidate;
+}
+
+/**
+ * Builds a single ZIP containing one .xlsx per item.
+ * Does not modify the items passed in (AC: "does not modify or remove the original processed files").
+ * Throws if nothing was selected.
+ */
+export function buildBulkXlsxZipBytes(items: BulkExportItem[]): Uint8Array {
+	if (items.length === 0) {
+		throw new Error("No pages or documents were selected for download.");
+	}
+
+	const usedNames = new Set<string>();
+	const entries: ZipEntry[] = items.map((item) => ({
+		name: makeUniqueFileName(toSafeFileBase(item.name), usedNames),
+		data: buildExtractedDataXlsxBytes(item.data)
+	}));
+
+	return buildZip(entries);
+}
+
+/**
+ * Builds and downloads the bulk ZIP.
+ * Throws an Error with a user-readable message if it cannot be generated
+ * (AC: "user receives an error message if the bulk download cannot be generated") 
+ * the caller should catch it and show it in the UI (e.g. the existing error toast).
+ */
+export function downloadBulkXLSX(
+	items: BulkExportItem[],
+	filename = "arkhive-bulk-export.zip"
+): void {
+	let bytes: Uint8Array;
+	try {
+		bytes = buildBulkXlsxZipBytes(items);
+	} catch (err) {
+		const reason = err instanceof Error ? err.message : "Unknown error.";
+		throw new Error(`Bulk download could not be generated. ${reason}`);
+	}
+
+	const blob = new Blob([bytes as BlobPart], { type: "application/zip" });
+	const url = URL.createObjectURL(blob);
+	const anchor = document.createElement("a");
+	anchor.href = url;
+	anchor.download = filename;
+	document.body.appendChild(anchor);
+	anchor.click();
+	document.body.removeChild(anchor);
+	URL.revokeObjectURL(url);
 }

@@ -9,6 +9,7 @@ import type {
   ProcessDocumentResponse,
 } from '../models/Project';
 import type { ExtractedPage } from '../models/TableData';
+import type { PageReview } from '../models/IssueReview';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
@@ -273,4 +274,34 @@ export async function deleteDocument(documentId: string): Promise<void> {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(errorBody.error || `Failed to delete document (${response.status})`);
   }
+}
+
+/**
+ * Persists (or clears, with null) the review state for ONE page: which issues
+ * were flagged and which the user has resolved. This is what stops a
+ * validated page from being re-flagged when the project is reopened.
+ */
+export async function saveReviewState(
+  documentId: string,
+  pageIndex: number,
+  reviewState: PageReview | null
+): Promise<DocumentPageRecord> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(
+    apiUrl(`/api/documents/${encodeURIComponent(documentId)}/pages/${pageIndex}/review`),
+    {
+      method: 'PATCH',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ reviewState }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.error || `Failed to save review state (${response.status})`);
+  }
+
+  const result = await response.json();
+  return result.page;
 }

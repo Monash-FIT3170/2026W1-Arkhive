@@ -15,7 +15,7 @@ An intelligent document processing application that converts photos of documents
 
 Ensure the following software components and cloud service accounts are set up before proceeding:
 
-- **Node.js:** `v20.19.0` or higher (`v22` recommended)
+- **Node.js:** `v22` or higher
 - **Package Manager:** `npm` (v10.0.0+)
 - **Cloud Accounts & Credentials:**
   - **Supabase Account:** For User Authentication and PostgreSQL database.

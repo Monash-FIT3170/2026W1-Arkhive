@@ -88,6 +88,35 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     expect(screen.queryByTestId('confidence-cell-row1')).not.toBeInTheDocument();
   });
 
+  it('toggles confidence score column between collapsed and expanded states', () => {
+    render(<ControlledPanel onHover={onHoverMock} extractedData={mockExtractedData} />);
+
+    // Initially expanded
+    expect(screen.getByText('CONFIDENCE')).toBeInTheDocument();
+    expect(screen.getByText('AI Metric')).toBeInTheDocument();
+    const collapseBtn = screen.getByTitle('Collapse Confidence column');
+    expect(collapseBtn).toBeInTheDocument();
+
+    // Click to collapse
+    fireEvent.click(collapseBtn);
+
+    // Collapsed state
+    expect(screen.queryByText('CONFIDENCE')).not.toBeInTheDocument();
+    expect(screen.queryByText('AI Metric')).not.toBeInTheDocument();
+    expect(screen.getByTestId('confidence-header')).toBeInTheDocument();
+    expect(screen.getByTestId('confidence-cell-row1')).toBeInTheDocument();
+    const expandBtn = screen.getByTitle('Expand Confidence column');
+    expect(expandBtn).toBeInTheDocument();
+
+    // Click to expand again
+    fireEvent.click(expandBtn);
+
+    // Expanded state restored
+    expect(screen.getByText('CONFIDENCE')).toBeInTheDocument();
+    expect(screen.getByText('AI Metric')).toBeInTheDocument();
+    expect(screen.getByTitle('Collapse Confidence column')).toBeInTheDocument();
+  });
+
   it('turns a cell into an input field when clicked in edit mode', async () => {
     render(<ControlledPanel onHover={onHoverMock} extractedData={mockExtractedData} />);
 
