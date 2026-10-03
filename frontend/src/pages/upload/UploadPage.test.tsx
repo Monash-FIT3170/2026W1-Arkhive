@@ -42,20 +42,16 @@ vi.mock('./components/EmptyUploadView', () => ({
   ),
 }));
 
-vi.mock('./components/UploadSidebar', () => ({
-  default: ({ onProcess }: any) => (
-    <div data-testid="sidebar">
-      <button onClick={onProcess}>Mock Process</button>
-    </div>
-  ),
+vi.mock('./components/actions/UploadMoreButton', () => ({
+  default: () => <div data-testid="upload-more" />,
 }));
 
 vi.mock('./components/preview/PreviewCard', () => ({
-  default: ({ isSelected, onToggle, onRemove, index }: any) => (
+  default: ({ isSelected, onToggle, onRemove }: any) => (
     <div data-testid="preview-card">
       <span data-testid="selected-state">{isSelected ? 'selected' : 'unselected'}</span>
-      <button onClick={() => onToggle(index)}>Toggle</button>
-      <button onClick={() => onRemove(index)}>Remove</button>
+      <button onClick={() => onToggle()}>Toggle</button>
+      <button onClick={() => onRemove()}>Remove</button>
     </div>
   ),
 }));

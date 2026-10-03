@@ -2,22 +2,27 @@
 // All UI is delegated to focused child components.
 //
 // To change the empty-state look  →  edit EmptyUploadView.tsx
-// To change the sidebar           →  edit UploadSidebar.tsx
 // To change PDF/canvas logic      →  edit components/preview/previewHelpers.ts
 // To change the preview cards     →  edit components/preview/PreviewCard.tsx
 //
-// UPDATED: Preview grid is now grouped into per-file sections (see "groups"
-// below) instead of one flat grid mixing pages from every file together.
+// Loaded-state layout (toolbar + grouped preview grid) is shared with
+// ProjectWorkspacePage's Files view via PageToolbar/PageGroupSection/
+// PreviewCard — each page adapts its own data (preview items vs.
+// documents/pages) into those components' generic props, the same way
+// ValidationPage/ProjectWorkspacePage adapt into <ValidationWorkspace>.
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Trash2, RefreshCw } from 'lucide-react';
 import { unlockStep } from '../../services/stepGuard.ts';
 
 import type { PreviewItem } from './types';
 import { buildPreviewItemsForFiles } from './components/preview/previewHelpers';
 import EmptyUploadView from './components/EmptyUploadView';
-import UploadSidebar from './components/UploadSidebar';
+import UploadMoreButton from './components/actions/UploadMoreButton';
 import PreviewCard from './components/preview/PreviewCard';
+import PageToolbar, { type ToolbarAction } from './components/preview/PageToolbar';
+import PageGroupSection from './components/preview/PageGroupSection';
 import {
   filterValidFiles,
   partitionBySize,
@@ -67,6 +72,7 @@ export default function UploadPage() {
   // Refs
   const previewItemsRef = useRef<PreviewItem[]>([]);
   const createdUrlsRef = useRef<string[]>([]);
+  const bulkReplaceInputRef = useRef<HTMLInputElement>(null);
 
   // NEW: tracks the next globally-unique fileIndex to hand out. Needed because
   // buildPreviewItemsForFiles now takes an offset instead of always starting
@@ -583,7 +589,7 @@ export default function UploadPage() {
   const renderNotification = () => {
     if (!uploadError && !uploadSuccess && !retryMessage) return null;
     return (
-      <div className="toast toast-top toast-center z-50 mt-16">
+      <div className="toast toast-top toast-center z-70 mt-16">
         {uploadError && (
           <div className="alert alert-error shadow-lg">
             <svg
@@ -686,7 +692,34 @@ export default function UploadPage() {
     );
   }
 
-  // Files loaded → split layout: preview grid left, sidebar right
+  const toolbarActions: ToolbarAction[] = [
+    {
+      key: 'replace',
+      label: `Replace (${selectedPages.size})`,
+      icon: <RefreshCw className="w-3.5 h-3.5" />,
+      tone: 'outline',
+      disabled: isProcessing,
+      onClick: () => bulkReplaceInputRef.current?.click(),
+    },
+    {
+      key: 'delete',
+      label: `Delete (${selectedPages.size})`,
+      icon: <Trash2 className="w-3.5 h-3.5" />,
+      tone: 'error',
+      disabled: isProcessing,
+      onClick: requestBulkRemove,
+    },
+    {
+      key: 'process',
+      label: `Process (${selectedPages.size})`,
+      tone: 'primary',
+      disabled: isProcessing,
+      isBusy: isProcessing,
+      onClick: handleProcess,
+    },
+  ];
+
+  // Files loaded → toolbar + full-width grouped preview grid
   return (
     <div className="bg-base-100 fixed top-[92px] inset-x-0 bottom-0 z-0 flex flex-col">
       <header className="bg-base-100 text-base-content flex h-12 shrink-0 items-center px-6 text-xl font-extrabold border-b border-base-300">
@@ -801,69 +834,75 @@ export default function UploadPage() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1">
-        {/* Preview grid — UPDATED: now grouped into per-file sections instead
-            of one flat grid. Each section is its own labeled box (e.g. "File 1")
-            with that file's pages laid out in a horizontal, wrapping row. */}
-        <main className="bg-base-100 flex-1 overflow-y-auto p-5">
-          <div className="flex flex-col gap-6">
-            {groups.map((group) => (
-              <section
-                key={group.fileIndex}
-                className="rounded-lg border border-base-300 bg-base-200/40 p-4"
-              >
-                <h3 className="mb-3 text-sm font-semibold text-base-content/70">
-                  File {group.groupNumber}
-                  {group.entries[0]?.item.label && (
-                    <span className="ml-2 font-normal text-base-content/50">
-                      — {group.entries[0].item.label}
-                    </span>
-                  )}
-                </h3>
-                <div className="flex flex-wrap gap-[18px]">
-                  {group.entries.map(({ item, originalIndex }) => (
-                    <div
-                      key={`${item.label}-${item.subtitle ?? ''}-${originalIndex}`}
-                      className="w-[200px] shrink-0"
-                    >
-                      <PreviewCard
-                        label={item.label}
-                        subtitle={item.subtitle}
-                        hasFile={item.hasFile}
-                        index={originalIndex}
-                        isSelected={selectedPages.has(originalIndex)}
-                        previewSrc={item.previewSrc}
-                        isImage={item.isImage}
-                        isBlurry={item.isBlurry}
-                        isDark={item.isDark}
-                        shouldWarn={item.shouldWarn}
-                        isProcessed={item.isProcessed}
-                        onToggle={togglePageSelection}
-                        onRemove={handleRemovePreview}
-                        onReplaceWithFile={handleReplaceWithFile}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        </main>
+      {/* Hidden input backing the toolbar's "Replace" action — picks one
+          replacement file per currently-selected page. */}
+      <input
+        ref={bulkReplaceInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        accept=".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif"
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = '';
+          if (files.length > 0) handleBulkReplaceFiles(files);
+        }}
+      />
 
-        {/* Sidebar */}
-        <UploadSidebar
-          selectedCount={selectedPages.size}
-          totalCount={previewItems.filter((item) => item.hasFile).length}
-          isProcessing={isProcessing}
-          onSelectAll={selectAllPages}
-          onDeselectAll={deselectAllPages}
-          onProcess={handleProcess}
-          onFilesCaptured={captureFiles}
-          onError={setUploadError}
-          onBulkRemove={requestBulkRemove}
-          onBulkReplaceFiles={handleBulkReplaceFiles}
-        />
+      <PageToolbar
+        selectedCount={selectedPages.size}
+        onSelectAll={selectAllPages}
+        onDeselectAll={deselectAllPages}
+        actions={toolbarActions}
+        trailing={
+          <div className="w-40">
+            <UploadMoreButton onFilesSelected={captureFiles} />
+          </div>
+        }
+      />
+
+      {/* Preview grid — grouped into per-file sections, each its own labeled
+          box (e.g. "name.pdf") with that file's pages in a wrapping row. */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex flex-col gap-6">
+          {groups.map((group) => (
+            <PageGroupSection
+              key={group.fileIndex}
+              label={group.entries[0]?.item.label ?? `File ${group.groupNumber}`}
+            >
+              {group.entries.map(({ item, originalIndex }, posInGroup) => {
+                const caption = item.subtitle ?? `Page ${posInGroup + 1}`;
+                return (
+                  <PreviewCard
+                    key={`${item.label}-${item.subtitle ?? ''}-${originalIndex}`}
+                    title={item.subtitle ? `${item.label} - ${item.subtitle}` : item.label}
+                    caption={caption}
+                    isSelectable={item.hasFile}
+                    isSelected={selectedPages.has(originalIndex)}
+                    thumbnailUrl={item.previewSrc}
+                    isImage={item.isImage}
+                    status={{
+                      text: item.isProcessed ? 'done' : 'pending',
+                      className: item.isProcessed ? 'badge-success' : 'badge-ghost',
+                    }}
+                    warningText={warningTextFor(item)}
+                    onToggle={() => togglePageSelection(originalIndex)}
+                    onRemove={() => handleRemovePreview(originalIndex)}
+                    onReplaceWithFile={(file) => handleReplaceWithFile(originalIndex, file)}
+                  />
+                );
+              })}
+            </PageGroupSection>
+          ))}
+        </div>
       </div>
     </div>
   );
+}
+
+function warningTextFor(item: PreviewItem): string | undefined {
+  if (!item.shouldWarn) return undefined;
+  if (item.isBlurry && item.isDark) return 'Blurry and too dark';
+  if (item.isBlurry) return 'May be blurry';
+  return 'May be too dark';
 }
