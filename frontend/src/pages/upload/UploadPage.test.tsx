@@ -47,11 +47,11 @@ vi.mock('./components/actions/UploadMoreButton', () => ({
 }));
 
 vi.mock('./components/preview/PreviewCard', () => ({
-  default: ({ isSelected, onToggle, onRemove, index }: any) => (
+  default: ({ isSelected, onToggle, onRemove }: any) => (
     <div data-testid="preview-card">
       <span data-testid="selected-state">{isSelected ? 'selected' : 'unselected'}</span>
-      <button onClick={() => onToggle(index)}>Toggle</button>
-      <button onClick={() => onRemove(index)}>Remove</button>
+      <button onClick={() => onToggle()}>Toggle</button>
+      <button onClick={() => onRemove()}>Remove</button>
     </div>
   ),
 }));

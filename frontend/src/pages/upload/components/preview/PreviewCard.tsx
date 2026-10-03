@@ -1,40 +1,53 @@
-// Styled to match the page cards in ProjectWorkspacePage's Files view:
-// compact 160px tile, hover-reveal checkbox/actions, status badge footer.
+// Shared page-thumbnail card — used by both UploadPage and
+// ProjectWorkspacePage's Files view. Deliberately knows nothing about either
+// page's data model (preview items vs. documents/pages): callers adapt their
+// own shape into these generic props, the same way pages adapt into
+// <ValidationWorkspace>'s pages/ocrPages/imageUrls props.
 
 import { useRef, useState } from "react";
 import { Trash2, RefreshCw, Eye, X } from "lucide-react";
 
 const REPLACE_INPUT_ACCEPT = ".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif";
 
+export type CardStatus = {
+  text: string;
+  /** Extra class(es) applied alongside `badge badge-xs`, e.g. "badge-success". */
+  className: string;
+};
+
 type Props = {
-  label: string;
-  subtitle?: string;
-  hasFile: boolean;
-  index: number;
+  /** Full accessible name — used for alt text, aria-labels, and tooltips. */
+  title: string;
+  /** Short footer text; falls back to `title` when omitted. */
+  caption?: string;
+  /** False renders a static, non-interactive tile (no checkbox/hover actions). Default true. */
+  isSelectable?: boolean;
   isSelected: boolean;
-  previewSrc?: string;
+  thumbnailUrl?: string;
+  /** False means "this isn't an image at all" (render the unavailable state) rather than
+   *  "still loading" — default true, since most callers always have an image. */
   isImage?: boolean;
-  isBlurry?: boolean;
-  isDark?: boolean;
-  shouldWarn?: boolean;
-  isProcessed?: boolean;
-  onToggle: (index: number) => void;
-  onRemove?: (index: number) => void;
-  onReplaceWithFile?: (index: number, file: File) => void;
+  /** Currently being processed elsewhere — disables interaction and shows a busy look. */
+  isBusy?: boolean;
+  status?: CardStatus;
+  warningText?: string;
+  errorText?: string;
+  onToggle: () => void;
+  onRemove?: () => void;
+  onReplaceWithFile?: (file: File) => void;
 };
 
 export default function PreviewCard({
-  label,
-  subtitle,
-  hasFile,
-  index,
+  title,
+  caption,
+  isSelectable = true,
   isSelected,
-  previewSrc,
-  isImage,
-  isBlurry,
-  isDark,
-  shouldWarn,
-  isProcessed,
+  thumbnailUrl,
+  isImage = true,
+  isBusy = false,
+  status,
+  warningText,
+  errorText,
   onToggle,
   onRemove,
   onReplaceWithFile,
@@ -42,56 +55,57 @@ export default function PreviewCard({
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
 
-  const displayName = subtitle ? `${label} - ${subtitle}` : label;
-  const warningMessage = shouldWarn
-    ? isBlurry && isDark
-      ? "Blurry and too dark"
-      : isBlurry
-        ? "May be blurry"
-        : "May be too dark"
-    : null;
+  const interactive = isSelectable && !isBusy;
 
   return (
-    <div className="group w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden">
+    <div
+      className={`group w-40 shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden transition-opacity ${
+        isBusy ? "animate-pulse opacity-80" : ""
+      }`}
+    >
       <div
-        className={`relative h-[120px] bg-base-300 ${hasFile ? "cursor-pointer" : "cursor-default"}`}
-        onClick={() => hasFile && onToggle(index)}
+        className={`relative h-30 bg-base-300 ${interactive ? "cursor-pointer" : "cursor-not-allowed"}`}
+        onClick={() => interactive && onToggle()}
       >
-        {hasFile && isImage && previewSrc ? (
+        {thumbnailUrl ? (
           <img
-            src={previewSrc}
-            alt={displayName}
-            className="h-full w-full object-cover"
+            src={thumbnailUrl}
+            alt={title}
+            className={`h-full w-full object-cover transition-[filter] ${isBusy ? "grayscale" : ""}`}
             draggable={false}
           />
-        ) : hasFile ? (
+        ) : isImage ? (
+          <div className="flex h-full w-full items-center justify-center">
+            <span className="loading loading-spinner loading-sm" />
+          </div>
+        ) : (
           <div className="flex h-full w-full items-center justify-center px-2 text-center text-[11px] font-semibold text-base-content/50">
             Preview unavailable
           </div>
-        ) : null}
+        )}
 
         <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/25" />
 
-        {hasFile && (
+        {interactive && (
           <input
             type="checkbox"
             className={`checkbox checkbox-sm checkbox-primary absolute border-2 top-2 left-2 transition-opacity ${
               isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             }`}
             checked={isSelected}
-            onChange={() => onToggle(index)}
+            onChange={onToggle}
             onClick={(e) => e.stopPropagation()}
           />
         )}
 
-        {hasFile && (
+        {interactive && (
           <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            {isImage && previewSrc && (
+            {thumbnailUrl && (
               <button
                 type="button"
                 className="btn btn-ghost btn-xs btn-circle bg-base-100/80"
                 title="Zoom"
-                aria-label={`Zoom in on page ${displayName}`}
+                aria-label={`Zoom in on ${title}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsZoomOpen(true);
@@ -113,14 +127,14 @@ export default function PreviewCard({
                     e.stopPropagation();
                     const file = e.target.files?.[0];
                     e.target.value = "";
-                    if (file) onReplaceWithFile(index, file);
+                    if (file) onReplaceWithFile(file);
                   }}
                 />
                 <button
                   type="button"
                   className="btn btn-ghost btn-xs btn-circle bg-base-100/80"
                   title="Replace Page"
-                  aria-label={`Replace page ${displayName}`}
+                  aria-label={`Replace ${title}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     replaceInputRef.current?.click();
@@ -136,10 +150,10 @@ export default function PreviewCard({
                 type="button"
                 className="btn btn-ghost btn-xs btn-circle bg-base-100/80 text-error"
                 title="Remove Page"
-                aria-label={`Remove page ${displayName}`}
+                aria-label={`Remove ${title}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onRemove(index);
+                  onRemove();
                 }}
               >
                 <Trash2 className="h-3.5 w-3.5" aria-hidden />
@@ -150,21 +164,27 @@ export default function PreviewCard({
       </div>
 
       <div className="flex items-center justify-between gap-1 p-2 text-xs">
-        <span className="truncate" title={displayName}>
-          {subtitle ?? label}
+        <span className="truncate" title={title}>
+          {caption ?? title}
         </span>
-        <span className={`badge badge-xs shrink-0 ${isProcessed ? "badge-success" : "badge-ghost"}`}>
-          {isProcessed ? "done" : "pending"}
-        </span>
+        {status && (
+          <span className={`badge badge-xs shrink-0 ${status.className}`}>{status.text}</span>
+        )}
       </div>
 
-      {shouldWarn && warningMessage && (
-        <div className="truncate px-2 pb-2 text-[11px] text-warning" title={warningMessage}>
-          {warningMessage}
+      {warningText && (
+        <div className="truncate px-2 pb-2 text-[11px] text-warning" title={warningText}>
+          {warningText}
         </div>
       )}
 
-      {isZoomOpen && previewSrc && (
+      {errorText && (
+        <div className="truncate px-2 pb-2 text-[11px] text-error" title={errorText}>
+          {errorText}
+        </div>
+      )}
+
+      {isZoomOpen && thumbnailUrl && (
         <div
           className="fixed inset-0 z-70 flex items-center justify-center bg-black/80 p-6"
           onClick={(e) => {
@@ -184,8 +204,8 @@ export default function PreviewCard({
             <X className="h-5 w-5" aria-hidden />
           </button>
           <img
-            src={previewSrc}
-            alt={displayName}
+            src={thumbnailUrl}
+            alt={title}
             className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />

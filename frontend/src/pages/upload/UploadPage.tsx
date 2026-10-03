@@ -5,13 +5,15 @@
 // To change PDF/canvas logic      →  edit components/preview/previewHelpers.ts
 // To change the preview cards     →  edit components/preview/PreviewCard.tsx
 //
-// Loaded-state layout (toolbar + grouped preview grid) mirrors
-// ProjectWorkspacePage's Files view, since both pages serve the same
-// "review pages before processing" purpose.
+// Loaded-state layout (toolbar + grouped preview grid) is shared with
+// ProjectWorkspacePage's Files view via PageToolbar/PageGroupSection/
+// PreviewCard — each page adapts its own data (preview items vs.
+// documents/pages) into those components' generic props, the same way
+// ValidationPage/ProjectWorkspacePage adapt into <ValidationWorkspace>.
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Trash2, RefreshCw } from 'lucide-react';
+import { Trash2, RefreshCw } from 'lucide-react';
 import { unlockStep } from '../../services/stepGuard.ts';
 
 import type { PreviewItem } from './types';
@@ -19,6 +21,8 @@ import { buildPreviewItemsForFiles } from './components/preview/previewHelpers';
 import EmptyUploadView from './components/EmptyUploadView';
 import UploadMoreButton from './components/actions/UploadMoreButton';
 import PreviewCard from './components/preview/PreviewCard';
+import PageToolbar, { type ToolbarAction } from './components/preview/PageToolbar';
+import PageGroupSection from './components/preview/PageGroupSection';
 import {
   filterValidFiles,
   partitionBySize,
@@ -688,6 +692,33 @@ export default function UploadPage() {
     );
   }
 
+  const toolbarActions: ToolbarAction[] = [
+    {
+      key: 'replace',
+      label: `Replace (${selectedPages.size})`,
+      icon: <RefreshCw className="w-3.5 h-3.5" />,
+      tone: 'outline',
+      disabled: isProcessing,
+      onClick: () => bulkReplaceInputRef.current?.click(),
+    },
+    {
+      key: 'delete',
+      label: `Delete (${selectedPages.size})`,
+      icon: <Trash2 className="w-3.5 h-3.5" />,
+      tone: 'error',
+      disabled: isProcessing,
+      onClick: requestBulkRemove,
+    },
+    {
+      key: 'process',
+      label: `Process (${selectedPages.size})`,
+      tone: 'primary',
+      disabled: isProcessing,
+      isBusy: isProcessing,
+      onClick: handleProcess,
+    },
+  ];
+
   // Files loaded → toolbar + full-width grouped preview grid
   return (
     <div className="bg-base-100 fixed top-[92px] inset-x-0 bottom-0 z-0 flex flex-col">
@@ -803,113 +834,75 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* Toolbar — mirrors ProjectWorkspacePage's Files-view toolbar:
-          selection summary on the left, bulk actions + upload-more on the right. */}
-      <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg bg-base-200/40 px-4 py-2.5">
-        <div className="flex items-center gap-3">
-          {selectedPages.size > 0 ? (
-            <>
-              <span className="text-sm font-medium text-base-content/70">
-                selected ({selectedPages.size})
-              </span>
-              <button className="btn btn-ghost btn-xs" onClick={deselectAllPages}>
-                Clear
-              </button>
-            </>
-          ) : (
-            <button className="btn btn-ghost btn-sm" onClick={selectAllPages}>
-              Select all
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {selectedPages.size > 0 && (
-            <>
-              <input
-                ref={bulkReplaceInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                accept=".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif"
-                onChange={(e) => {
-                  const files = Array.from(e.target.files ?? []);
-                  e.target.value = '';
-                  if (files.length > 0) handleBulkReplaceFiles(files);
-                }}
-              />
-              <button
-                className="btn btn-sm btn-outline gap-1.5"
-                disabled={isProcessing}
-                onClick={() => bulkReplaceInputRef.current?.click()}
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                {`Replace (${selectedPages.size})`}
-              </button>
-              <button
-                className="btn btn-sm btn-error btn-outline gap-1.5"
-                disabled={isProcessing}
-                onClick={requestBulkRemove}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                {`Delete (${selectedPages.size})`}
-              </button>
-              <button
-                className="btn btn-sm btn-primary"
-                disabled={isProcessing}
-                onClick={handleProcess}
-              >
-                {isProcessing ? (
-                  <span className="loading loading-spinner loading-sm" />
-                ) : (
-                  `Process (${selectedPages.size})`
-                )}
-              </button>
-            </>
-          )}
+      {/* Hidden input backing the toolbar's "Replace" action — picks one
+          replacement file per currently-selected page. */}
+      <input
+        ref={bulkReplaceInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        accept=".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif"
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = '';
+          if (files.length > 0) handleBulkReplaceFiles(files);
+        }}
+      />
+
+      <PageToolbar
+        selectedCount={selectedPages.size}
+        onSelectAll={selectAllPages}
+        onDeselectAll={deselectAllPages}
+        actions={toolbarActions}
+        trailing={
           <div className="w-40">
             <UploadMoreButton onFilesSelected={captureFiles} />
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Preview grid — grouped into per-file sections, each its own labeled
-          box (e.g. "File 1 — name.pdf") with that file's pages in a wrapping row. */}
+          box (e.g. "name.pdf") with that file's pages in a wrapping row. */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="flex flex-col gap-6">
           {groups.map((group) => (
-            <section
+            <PageGroupSection
               key={group.fileIndex}
-              className="rounded-lg border border-base-300 bg-base-200/40 p-4"
+              label={group.entries[0]?.item.label ?? `File ${group.groupNumber}`}
             >
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-base-content/70">
-                <FileText className="w-4 h-4" />
-                {group.entries[0]?.item.label ?? `File ${group.groupNumber}`}
-              </h3>
-              <div className="flex flex-wrap gap-4">
-                {group.entries.map(({ item, originalIndex }) => (
+              {group.entries.map(({ item, originalIndex }, posInGroup) => {
+                const caption = item.subtitle ?? `Page ${posInGroup + 1}`;
+                return (
                   <PreviewCard
                     key={`${item.label}-${item.subtitle ?? ''}-${originalIndex}`}
-                    label={item.label}
-                    subtitle={item.subtitle}
-                    hasFile={item.hasFile}
-                    index={originalIndex}
+                    title={item.subtitle ? `${item.label} - ${item.subtitle}` : item.label}
+                    caption={caption}
+                    isSelectable={item.hasFile}
                     isSelected={selectedPages.has(originalIndex)}
-                    previewSrc={item.previewSrc}
+                    thumbnailUrl={item.previewSrc}
                     isImage={item.isImage}
-                    isBlurry={item.isBlurry}
-                    isDark={item.isDark}
-                    shouldWarn={item.shouldWarn}
-                    isProcessed={item.isProcessed}
-                    onToggle={togglePageSelection}
-                    onRemove={handleRemovePreview}
-                    onReplaceWithFile={handleReplaceWithFile}
+                    status={{
+                      text: item.isProcessed ? 'done' : 'pending',
+                      className: item.isProcessed ? 'badge-success' : 'badge-ghost',
+                    }}
+                    warningText={warningTextFor(item)}
+                    onToggle={() => togglePageSelection(originalIndex)}
+                    onRemove={() => handleRemovePreview(originalIndex)}
+                    onReplaceWithFile={(file) => handleReplaceWithFile(originalIndex, file)}
                   />
-                ))}
-              </div>
-            </section>
+                );
+              })}
+            </PageGroupSection>
           ))}
         </div>
       </div>
     </div>
   );
+}
+
+function warningTextFor(item: PreviewItem): string | undefined {
+  if (!item.shouldWarn) return undefined;
+  if (item.isBlurry && item.isDark) return 'Blurry and too dark';
+  if (item.isBlurry) return 'May be blurry';
+  return 'May be too dark';
 }

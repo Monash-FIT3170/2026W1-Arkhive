@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, FileText, Trash2, Columns2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Columns2, FileText as FilesTabIcon } from 'lucide-react';
 import { getProject } from '../../services/projectService';
 import {
   uploadPageToR2,
@@ -14,6 +14,9 @@ import {
 import { buildPreviewItemsForFiles } from '../upload/components/preview/previewHelpers';
 import EmptyUploadView from '../upload/components/EmptyUploadView';
 import UploadMoreButton from '../upload/components/actions/UploadMoreButton';
+import PreviewCard from '../upload/components/preview/PreviewCard';
+import PageToolbar, { type ToolbarAction } from '../upload/components/preview/PageToolbar';
+import PageGroupSection from '../upload/components/preview/PageGroupSection';
 import ValidationWorkspace from '../validation/components/ValidationWorkspace';
 import { flatten } from '../../utils/flattener';
 import type {
@@ -558,7 +561,7 @@ export default function ProjectWorkspacePage() {
             className={`btn btn-sm join-item gap-1.5 ${mode === 'files' ? 'btn-active' : ''}`}
             onClick={() => setMode('files')}
           >
-            <FileText className="w-4 h-4" />
+            <FilesTabIcon className="w-4 h-4" />
             Files
           </button>
           <button
@@ -606,6 +609,25 @@ export default function ProjectWorkspacePage() {
     ? validationList.map((e) => makePageKey(e.documentId, e.pageIndex))
     : [];
 
+  const filesToolbarActions: ToolbarAction[] = [
+    {
+      key: 'delete',
+      label: `Delete (${selectedKeys.size})`,
+      icon: <Trash2 className="w-3.5 h-3.5" />,
+      tone: 'error',
+      disabled: isProcessing || isDeleting,
+      onClick: () => setDeleteTarget({ type: 'bulk' }),
+    },
+    {
+      key: 'process',
+      label: `Process (${selectedKeys.size})`,
+      tone: 'primary',
+      disabled: isProcessing || isDeleting,
+      isBusy: isProcessing,
+      onClick: handleProcessClick,
+    },
+  ];
+
   // ── Files/Validation view ─────────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col">
@@ -618,52 +640,17 @@ export default function ProjectWorkspacePage() {
       )}
       {/* FILE VIEW AND UPLOAD */}
       <div className={mode === 'files' ? 'flex-1 flex flex-col' : 'hidden'}>
-        <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg bg-base-200/40 px-4 py-2.5">
-          <div className="flex items-center gap-3">
-            {selectedKeys.size > 0 ? (
-              <>
-                <span className="text-sm font-medium text-base-content/70">
-                  selected ({selectedKeys.size})
-                </span>
-                <button className="btn btn-ghost btn-xs" onClick={deselectAll}>
-                  Clear
-                </button>
-              </>
-            ) : (
-              <button className="btn btn-ghost btn-sm" onClick={selectAll}>
-                Select all
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {selectedKeys.size > 0 && (
-              <>
-                <button
-                  className="btn btn-sm btn-error btn-outline gap-1.5"
-                  disabled={isProcessing || isDeleting}
-                  onClick={() => setDeleteTarget({ type: 'bulk' })}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  {`Delete (${selectedKeys.size})`}
-                </button>
-                <button
-                  className="btn btn-sm btn-primary"
-                  disabled={isProcessing || isDeleting}
-                  onClick={handleProcessClick}
-                >
-                  {isProcessing ? (
-                    <span className="loading loading-spinner loading-sm" />
-                  ) : (
-                    `Process (${selectedKeys.size})`
-                  )}
-                </button>
-              </>
-            )}
+        <PageToolbar
+          selectedCount={selectedKeys.size}
+          onSelectAll={selectAll}
+          onDeselectAll={deselectAll}
+          actions={filesToolbarActions}
+          trailing={
             <div className="w-40">
               <UploadMoreButton onFilesSelected={handleFilesCaptured} />
             </div>
-          </div>
-        </div>
+          }
+        />
 
         {isUploading && (
           <div className="px-6 py-2 text-sm text-base-content/60 flex items-center gap-2">
@@ -676,99 +663,39 @@ export default function ProjectWorkspacePage() {
             {documents
               .filter((doc) => (doc.pages || []).length > 0)
               .map((doc) => (
-                <section
-                  key={doc.id}
-                  className="rounded-lg border border-base-300 bg-base-200/40 p-4"
-                >
-                  <h3 className="mb-3 text-sm font-semibold text-base-content/70 flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> {doc.filename}
-                  </h3>
-                  <div className="flex flex-wrap gap-4">
-                    {(doc.pages || [])
-                      .slice()
-                      .sort((a, b) => a.page_index - b.page_index)
-                      .map((page) => {
-                        const key = makePageKey(doc.id, page.page_index);
-                        const imageUrl = imageUrlMap[key];
-                        const isBeingProcessed = processingKeys.has(key);
-                        return (
-                          <div
-                            key={key}
-                            className={`group w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden transition-opacity ${
-                              isBeingProcessed ? 'animate-pulse opacity-80' : ''
-                            }`}
-                          >
-                            <div
-                              className={`relative h-[120px] bg-base-300 ${
-                                isBeingProcessed ? 'cursor-not-allowed' : 'cursor-pointer'
-                              }`}
-                              onClick={() => {
-                                if (isBeingProcessed) return;
-                                toggleSelected(doc.id, page.page_index);
-                              }}
-                            >
-                              {imageUrl ? (
-                                <img
-                                  src={imageUrl}
-                                  alt={`Page ${page.page_index + 1}`}
-                                  className={`w-full h-full object-cover transition-[filter] ${
-                                    isBeingProcessed ? 'grayscale' : ''
-                                  }`}
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <span className="loading loading-spinner loading-sm" />
-                                </div>
-                              )}
-                              <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/25" />
-                              <input
-                                type="checkbox"
-                                className={`checkbox checkbox-sm checkbox-primary absolute border-2 top-2 left-2 transition-opacity ${
-                                  selectedKeys.has(key)
-                                    ? 'opacity-100'
-                                    : 'opacity-0 group-hover:opacity-100'
-                                }`}
-                                checked={selectedKeys.has(key)}
-                                disabled={isBeingProcessed}
-                                onChange={() => toggleSelected(doc.id, page.page_index)}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <button
-                                type="button"
-                                className="btn btn-ghost btn-xs btn-circle absolute top-2 right-2 bg-base-100/80 text-error opacity-0 transition-opacity group-hover:opacity-100"
-                                title="Delete page"
-                                disabled={isBeingProcessed}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteTarget({
-                                    type: 'single',
-                                    documentId: doc.id,
-                                    pageIndex: page.page_index,
-                                  });
-                                }}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                            <div className="p-2 flex items-center justify-between text-xs">
-                              <span>Page {page.page_index + 1}</span>
-                              <span className={`badge badge-xs ${statusBadgeClass(page.status)}`}>
-                                {page.status}
-                              </span>
-                            </div>
-                            {page.error_message && (
-                              <div
-                                className="px-2 pb-2 text-xs text-error truncate"
-                                title={page.error_message}
-                              >
-                                {page.error_message}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                  </div>
-                </section>
+                <PageGroupSection key={doc.id} label={doc.filename}>
+                  {(doc.pages || [])
+                    .slice()
+                    .sort((a, b) => a.page_index - b.page_index)
+                    .map((page) => {
+                      const key = makePageKey(doc.id, page.page_index);
+                      const imageUrl = imageUrlMap[key];
+                      const isBeingProcessed = processingKeys.has(key);
+                      return (
+                        <PreviewCard
+                          key={key}
+                          title={`${doc.filename} - Page ${page.page_index + 1}`}
+                          caption={`Page ${page.page_index + 1}`}
+                          isSelected={selectedKeys.has(key)}
+                          thumbnailUrl={imageUrl}
+                          isBusy={isBeingProcessed}
+                          status={{
+                            text: page.status,
+                            className: statusBadgeClass(page.status),
+                          }}
+                          errorText={page.error_message}
+                          onToggle={() => toggleSelected(doc.id, page.page_index)}
+                          onRemove={() =>
+                            setDeleteTarget({
+                              type: 'single',
+                              documentId: doc.id,
+                              pageIndex: page.page_index,
+                            })
+                          }
+                        />
+                      );
+                    })}
+                </PageGroupSection>
               ))}
           </div>
         </div>
