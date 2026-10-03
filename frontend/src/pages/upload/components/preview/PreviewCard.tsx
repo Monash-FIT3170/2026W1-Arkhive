@@ -1,3 +1,6 @@
+// Styled to match the page cards in ProjectWorkspacePage's Files view:
+// compact 160px tile, hover-reveal checkbox/actions, status badge footer.
+
 import { useRef, useState } from "react";
 import { Trash2, RefreshCw, Eye, X } from "lucide-react";
 
@@ -37,84 +40,67 @@ export default function PreviewCard({
   onReplaceWithFile,
 }: Props) {
   const replaceInputRef = useRef<HTMLInputElement>(null);
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
+
   const displayName = subtitle ? `${label} - ${subtitle}` : label;
   const warningMessage = shouldWarn
     ? isBlurry && isDark
-      ? "Image may be blurry and too dark"
+      ? "Blurry and too dark"
       : isBlurry
-        ? "Image may be blurry"
-        : "Image may be too dark"
+        ? "May be blurry"
+        : "May be too dark"
     : null;
 
-  // NEW: controls the zoomed-image lightbox modal
-  const [isZoomOpen, setIsZoomOpen] = useState(false);
-
   return (
-    <article
-      className={`relative min-h-[380px] rounded-[10px] border p-3 transition ${isSelected
-        ? "border-primary bg-primary/5 ring-1 ring-primary"
-        : "border-base-300 bg-base-200"
-        } ${hasFile ? "cursor-pointer" : "cursor-default"}`}
-      onClick={() => hasFile && onToggle(index)}
-    >
-      {hasFile && (
-        <span
-          className={`absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${isSelected
-            ? "bg-primary text-primary-content"
-            : "border border-base-content/20 bg-base-300 text-transparent"
-            }`}
-        >
-          ✓
-        </span>
-      )}
-
-      {/* NEW: Zoom button — top-right corner, opens a lightbox with the full-size image */}
-      {hasFile && isImage && previewSrc && (
-        <button
-          type="button"
-          className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-base-100/90 border border-base-300 text-base-content hover:bg-primary hover:text-primary-content transition"
-          aria-label={`Zoom in on page ${displayName}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsZoomOpen(true);
-          }}
-        >
-          <Eye className="h-3.5 w-3.5" aria-hidden />
-        </button>
-      )}
-
-      <div className="mx-auto mb-[10px] mt-4 h-[220px] w-[160px] overflow-hidden rounded-[2px] border border-base-300 bg-base-100 shadow-sm">
-        {hasFile && isImage ? (
-          <img src={previewSrc} alt={displayName} className="h-full w-full object-contain" draggable={false} />
+    <div className="group w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden">
+      <div
+        className={`relative h-[120px] bg-base-300 ${hasFile ? "cursor-pointer" : "cursor-default"}`}
+        onClick={() => hasFile && onToggle(index)}
+      >
+        {hasFile && isImage && previewSrc ? (
+          <img
+            src={previewSrc}
+            alt={displayName}
+            className="h-full w-full object-cover"
+            draggable={false}
+          />
         ) : hasFile ? (
-          <div className="flex h-full w-full items-center justify-center text-center text-xs font-semibold text-base-content/50">
+          <div className="flex h-full w-full items-center justify-center px-2 text-center text-[11px] font-semibold text-base-content/50">
             Preview unavailable
           </div>
         ) : null}
-      </div>
 
-      <div>
-        <p className="truncate text-center text-xs text-base-content">{label}</p>
-        {subtitle ? (
-          <p className="mt-1 truncate text-center text-xs text-base-content/70">{subtitle}</p>
-        ) : (
-          <p className="mt-1.5 text-center text-xs text-base-content/50">{index + 1}</p>
+        <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/25" />
+
+        {hasFile && (
+          <input
+            type="checkbox"
+            className={`checkbox checkbox-sm checkbox-primary absolute border-2 top-2 left-2 transition-opacity ${
+              isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            }`}
+            checked={isSelected}
+            onChange={() => onToggle(index)}
+            onClick={(e) => e.stopPropagation()}
+          />
         )}
 
-        {isProcessed && (
-          <div className="mt-1 flex justify-center">
-            <span className="badge badge-success badge-sm font-semibold">
-              ✓ Processed
-            </span>
-          </div>
-        )}
-      </div>
+        {hasFile && (
+          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            {isImage && previewSrc && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs btn-circle bg-base-100/80"
+                title="Zoom"
+                aria-label={`Zoom in on page ${displayName}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsZoomOpen(true);
+                }}
+              >
+                <Eye className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            )}
 
-      {/* UPDATED: Replace/Remove are now a compact icon-only row
-          instead of stacked full-width text buttons */}
-      {hasFile && (onRemove || onReplaceWithFile) && (
-        <div className="mt-3 flex flex-col items-center gap-2">
-          <div className="flex items-center justify-center gap-2">
             {onReplaceWithFile && (
               <>
                 <input
@@ -132,43 +118,52 @@ export default function PreviewCard({
                 />
                 <button
                   type="button"
-                  className="btn btn-outline btn-sm btn-square"
-                  aria-label={`Replace page ${displayName}`}
+                  className="btn btn-ghost btn-xs btn-circle bg-base-100/80"
                   title="Replace Page"
+                  aria-label={`Replace page ${displayName}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     replaceInputRef.current?.click();
                   }}
                 >
-                  <RefreshCw className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                  <RefreshCw className="h-3.5 w-3.5" aria-hidden />
                 </button>
               </>
             )}
+
             {onRemove && (
               <button
                 type="button"
-                className="btn btn-outline btn-error btn-sm btn-square"
-                aria-label={`Remove page ${displayName}`}
+                className="btn btn-ghost btn-xs btn-circle bg-base-100/80 text-error"
                 title="Remove Page"
+                aria-label={`Remove page ${displayName}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onRemove(index);
                 }}
               >
-                <Trash2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                <Trash2 className="h-3.5 w-3.5" aria-hidden />
               </button>
             )}
           </div>
+        )}
+      </div>
 
-          {shouldWarn && warningMessage && (
-            <div className="mb-2 rounded-md border border-warning/80 bg-warning/10 px-2 py-1 text-center text-[12px] text-warning font-bold">
-              {warningMessage}
-            </div>
-          )}
+      <div className="flex items-center justify-between gap-1 p-2 text-xs">
+        <span className="truncate" title={displayName}>
+          {subtitle ?? label}
+        </span>
+        <span className={`badge badge-xs shrink-0 ${isProcessed ? "badge-success" : "badge-ghost"}`}>
+          {isProcessed ? "done" : "pending"}
+        </span>
+      </div>
+
+      {shouldWarn && warningMessage && (
+        <div className="truncate px-2 pb-2 text-[11px] text-warning" title={warningMessage}>
+          {warningMessage}
         </div>
       )}
 
-      {/* NEW: Zoom lightbox — shows the full-size image over a dark backdrop */}
       {isZoomOpen && previewSrc && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
@@ -196,6 +191,6 @@ export default function PreviewCard({
           />
         </div>
       )}
-    </article>
+    </div>
   );
 }

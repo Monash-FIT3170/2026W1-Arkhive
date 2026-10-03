@@ -42,12 +42,8 @@ vi.mock('./components/EmptyUploadView', () => ({
   ),
 }));
 
-vi.mock('./components/UploadSidebar', () => ({
-  default: ({ onProcess }: any) => (
-    <div data-testid="sidebar">
-      <button onClick={onProcess}>Mock Process</button>
-    </div>
-  ),
+vi.mock('./components/actions/UploadMoreButton', () => ({
+  default: () => <div data-testid="upload-more" />,
 }));
 
 vi.mock('./components/preview/PreviewCard', () => ({

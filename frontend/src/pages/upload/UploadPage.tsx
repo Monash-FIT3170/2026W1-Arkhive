@@ -2,21 +2,22 @@
 // All UI is delegated to focused child components.
 //
 // To change the empty-state look  →  edit EmptyUploadView.tsx
-// To change the sidebar           →  edit UploadSidebar.tsx
 // To change PDF/canvas logic      →  edit components/preview/previewHelpers.ts
 // To change the preview cards     →  edit components/preview/PreviewCard.tsx
 //
-// UPDATED: Preview grid is now grouped into per-file sections (see "groups"
-// below) instead of one flat grid mixing pages from every file together.
+// Loaded-state layout (toolbar + grouped preview grid) mirrors
+// ProjectWorkspacePage's Files view, since both pages serve the same
+// "review pages before processing" purpose.
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FileText, Trash2, RefreshCw } from 'lucide-react';
 import { unlockStep } from '../../services/stepGuard.ts';
 
 import type { PreviewItem } from './types';
 import { buildPreviewItemsForFiles } from './components/preview/previewHelpers';
 import EmptyUploadView from './components/EmptyUploadView';
-import UploadSidebar from './components/UploadSidebar';
+import UploadMoreButton from './components/actions/UploadMoreButton';
 import PreviewCard from './components/preview/PreviewCard';
 import {
   filterValidFiles,
@@ -67,6 +68,7 @@ export default function UploadPage() {
   // Refs
   const previewItemsRef = useRef<PreviewItem[]>([]);
   const createdUrlsRef = useRef<string[]>([]);
+  const bulkReplaceInputRef = useRef<HTMLInputElement>(null);
 
   // NEW: tracks the next globally-unique fileIndex to hand out. Needed because
   // buildPreviewItemsForFiles now takes an offset instead of always starting
@@ -686,7 +688,7 @@ export default function UploadPage() {
     );
   }
 
-  // Files loaded → split layout: preview grid left, sidebar right
+  // Files loaded → toolbar + full-width grouped preview grid
   return (
     <div className="bg-base-100 fixed top-[92px] inset-x-0 bottom-0 z-0 flex flex-col">
       <header className="bg-base-100 text-base-content flex h-12 shrink-0 items-center px-6 text-xl font-extrabold border-b border-base-300">
@@ -801,68 +803,112 @@ export default function UploadPage() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1">
-        {/* Preview grid — UPDATED: now grouped into per-file sections instead
-            of one flat grid. Each section is its own labeled box (e.g. "File 1")
-            with that file's pages laid out in a horizontal, wrapping row. */}
-        <main className="bg-base-100 flex-1 overflow-y-auto p-5">
-          <div className="flex flex-col gap-6">
-            {groups.map((group) => (
-              <section
-                key={group.fileIndex}
-                className="rounded-lg border border-base-300 bg-base-200/40 p-4"
+      {/* Toolbar — mirrors ProjectWorkspacePage's Files-view toolbar:
+          selection summary on the left, bulk actions + upload-more on the right. */}
+      <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg bg-base-200/40 px-4 py-2.5">
+        <div className="flex items-center gap-3">
+          {selectedPages.size > 0 ? (
+            <>
+              <span className="text-sm font-medium text-base-content/70">
+                selected ({selectedPages.size})
+              </span>
+              <button className="btn btn-ghost btn-xs" onClick={deselectAllPages}>
+                Clear
+              </button>
+            </>
+          ) : (
+            <button className="btn btn-ghost btn-sm" onClick={selectAllPages}>
+              Select all
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {selectedPages.size > 0 && (
+            <>
+              <input
+                ref={bulkReplaceInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                accept=".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  e.target.value = '';
+                  if (files.length > 0) handleBulkReplaceFiles(files);
+                }}
+              />
+              <button
+                className="btn btn-sm btn-outline gap-1.5"
+                disabled={isProcessing}
+                onClick={() => bulkReplaceInputRef.current?.click()}
               >
-                <h3 className="mb-3 text-sm font-semibold text-base-content/70">
-                  File {group.groupNumber}
-                  {group.entries[0]?.item.label && (
-                    <span className="ml-2 font-normal text-base-content/50">
-                      — {group.entries[0].item.label}
-                    </span>
-                  )}
-                </h3>
-                <div className="flex flex-wrap gap-[18px]">
-                  {group.entries.map(({ item, originalIndex }) => (
-                    <div
-                      key={`${item.label}-${item.subtitle ?? ''}-${originalIndex}`}
-                      className="w-[200px] shrink-0"
-                    >
-                      <PreviewCard
-                        label={item.label}
-                        subtitle={item.subtitle}
-                        hasFile={item.hasFile}
-                        index={originalIndex}
-                        isSelected={selectedPages.has(originalIndex)}
-                        previewSrc={item.previewSrc}
-                        isImage={item.isImage}
-                        isBlurry={item.isBlurry}
-                        isDark={item.isDark}
-                        shouldWarn={item.shouldWarn}
-                        isProcessed={item.isProcessed}
-                        onToggle={togglePageSelection}
-                        onRemove={handleRemovePreview}
-                        onReplaceWithFile={handleReplaceWithFile}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))}
+                <RefreshCw className="w-3.5 h-3.5" />
+                {`Replace (${selectedPages.size})`}
+              </button>
+              <button
+                className="btn btn-sm btn-error btn-outline gap-1.5"
+                disabled={isProcessing}
+                onClick={requestBulkRemove}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {`Delete (${selectedPages.size})`}
+              </button>
+              <button
+                className="btn btn-sm btn-primary"
+                disabled={isProcessing}
+                onClick={handleProcess}
+              >
+                {isProcessing ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  `Process (${selectedPages.size})`
+                )}
+              </button>
+            </>
+          )}
+          <div className="w-40">
+            <UploadMoreButton onFilesSelected={captureFiles} />
           </div>
-        </main>
+        </div>
+      </div>
 
-        {/* Sidebar */}
-        <UploadSidebar
-          selectedCount={selectedPages.size}
-          totalCount={previewItems.filter((item) => item.hasFile).length}
-          isProcessing={isProcessing}
-          onSelectAll={selectAllPages}
-          onDeselectAll={deselectAllPages}
-          onProcess={handleProcess}
-          onFilesCaptured={captureFiles}
-          onError={setUploadError}
-          onBulkRemove={requestBulkRemove}
-          onBulkReplaceFiles={handleBulkReplaceFiles}
-        />
+      {/* Preview grid — grouped into per-file sections, each its own labeled
+          box (e.g. "File 1 — name.pdf") with that file's pages in a wrapping row. */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex flex-col gap-6">
+          {groups.map((group) => (
+            <section
+              key={group.fileIndex}
+              className="rounded-lg border border-base-300 bg-base-200/40 p-4"
+            >
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-base-content/70">
+                <FileText className="w-4 h-4" />
+                {group.entries[0]?.item.label ?? `File ${group.groupNumber}`}
+              </h3>
+              <div className="flex flex-wrap gap-4">
+                {group.entries.map(({ item, originalIndex }) => (
+                  <PreviewCard
+                    key={`${item.label}-${item.subtitle ?? ''}-${originalIndex}`}
+                    label={item.label}
+                    subtitle={item.subtitle}
+                    hasFile={item.hasFile}
+                    index={originalIndex}
+                    isSelected={selectedPages.has(originalIndex)}
+                    previewSrc={item.previewSrc}
+                    isImage={item.isImage}
+                    isBlurry={item.isBlurry}
+                    isDark={item.isDark}
+                    shouldWarn={item.shouldWarn}
+                    isProcessed={item.isProcessed}
+                    onToggle={togglePageSelection}
+                    onRemove={handleRemovePreview}
+                    onReplaceWithFile={handleReplaceWithFile}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
     </div>
   );
