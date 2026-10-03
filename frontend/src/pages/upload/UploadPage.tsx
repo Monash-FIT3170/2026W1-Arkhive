@@ -252,7 +252,7 @@ export default function UploadPage() {
       // explicitly go to the preview screen once the QR photo has landed,
       // instead of relying only on the previewItems-watching effect.
       setTimeout(() => {
-        navigate('/?step=preview', { replace: true });
+        navigate('/upload?step=preview', { replace: true });
       }, 1500);
 
     } catch (err) {
