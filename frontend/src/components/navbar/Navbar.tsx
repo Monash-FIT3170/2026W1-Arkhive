@@ -113,8 +113,8 @@ export const Navbar = () => {
 
   return (
     <div>
-      <div className="navbar bg-base-200 text-base-content px-17 py-2 border-b border-base-300">
-        <div className="ml-2 flex items-center gap-2">
+      <div className="navbar bg-base-200 text-base-content flex-wrap gap-y-2 px-3 py-2 sm:px-6 lg:px-10 border-b border-base-300">
+        <div className="ml-1 sm:ml-2 flex items-center gap-1 sm:gap-2">
           <button
             type="button"
             onClick={() => navigate('/')}
@@ -125,63 +125,67 @@ export const Navbar = () => {
               alt="Arkhive logo"
               className="w-7 h-7 shrink-0"
             />
-            <span>Arkhive</span>
+            <span className="hidden sm:inline">Arkhive</span>
           </button>
 
           {/* Home + Quick Scan + Projects tabs — only shown once someone's
               past the login gate (real user or guest). Projects itself still
               requires a real user; guests see Home/Quick Scan only and get
               bounced to /login if they pick "Create a Project" there
-              (handled by RequireUser). */}
+              (handled by RequireUser). Labels collapse to icon-only below
+              the sm breakpoint so the bar doesn't overflow on mobile. */}
           {(user || isGuest) && !isOnLogin && (
-            <div className="ml-4 flex items-center gap-2">
+            <div className="ml-1 sm:ml-4 flex items-center gap-0.5 sm:gap-2">
               <button
                 type="button"
                 onClick={handleHomeClick}
-                className={`btn btn-ghost btn-sm gap-1.5 border-b-2 ${
+                title="Home"
+                className={`btn btn-ghost btn-sm gap-1.5 border-b-2 px-2 sm:px-3 ${
                   isOnHome
                     ? 'border-primary text-primary'
                     : 'border-transparent text-base-content/70'
                 }`}
               >
                 <HomeIcon className="w-4 h-4" />
-                Home
+                <span className="hidden sm:inline">Home</span>
               </button>
               <button
                 type="button"
                 onClick={handleUploadClick}
-                className={`btn btn-ghost btn-sm gap-1.5 border-b-2 ${
+                title="Quick Scan"
+                className={`btn btn-ghost btn-sm gap-1.5 border-b-2 px-2 sm:px-3 ${
                   isOnUpload
                     ? 'border-primary text-primary'
                     : 'border-transparent text-base-content/70'
                 }`}
               >
                 <ScanLine className="w-4 h-4" />
-                Quick Scan
+                <span className="hidden sm:inline">Quick Scan</span>
               </button>
               {user && (
                 <button
                   type="button"
                   onClick={handleProjectsClick}
-                  className={`btn btn-ghost btn-sm gap-1.5 border-b-2 ${
+                  title="Projects"
+                  className={`btn btn-ghost btn-sm gap-1.5 border-b-2 px-2 sm:px-3 ${
                     isOnProjects
                       ? 'border-primary text-primary'
                       : 'border-transparent text-base-content/70'
                   }`}
                 >
                   <FolderKanban className="w-4 h-4" />
-                  Projects
+                  <span className="hidden sm:inline">Projects</span>
                 </button>
               )}
             </div>
           )}
         </div>
-        <div className="ml-auto flex items-center gap-6">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-4 lg:gap-6">
           {/* Hide the 3-step workflow progress bar when on the login page,
               the Home landing page, or anywhere in the Projects section —
               that flow doesn't apply there. */}
           {!isOnLogin && !isOnHome && !isOnProjects && (
-            <ul className="steps isolate">
+            <ul className="steps isolate steps-horizontal text-xs sm:text-sm">
               {stepConfig.map(({ step: s, label, path, icon }) => {
                 const isUnlocked = s <= maxStep;
                 const isActive = currentStep >= s;
@@ -191,9 +195,8 @@ export const Navbar = () => {
                     key={s}
                     className={`step ${isActive ? 'step-primary' : isUnlocked ? '' : 'animate-pulse'}`}
                     onClick={() => handleStepClick(s, path)}
-                    title={
-                      !isUnlocked ? `Complete the previous step to unlock ${label}` : undefined
-                    }
+                    title={!isUnlocked ? `Complete the previous step to unlock ${label}` : label}
+                    aria-label={label}
                     style={{
                       cursor: isUnlocked ? 'pointer' : 'not-allowed',
                       zIndex: 50 - s,
@@ -204,7 +207,9 @@ export const Navbar = () => {
                     >
                       {icon}
                     </span>
-                    <span className={!isUnlocked ? 'opacity-40' : undefined}>{label}</span>
+                    <span className={`hidden sm:inline ${!isUnlocked ? 'opacity-40' : ''}`}>
+                      {label}
+                    </span>
                   </li>
                 );
               })}
@@ -212,9 +217,14 @@ export const Navbar = () => {
           )}
 
           {isOnValidation && (
-            <button type="button" onClick={handleBack} className="btn btn-outline btn-sm gap-1.5">
+            <button
+              type="button"
+              onClick={handleBack}
+              title="Back"
+              className="btn btn-outline btn-sm gap-1.5 px-2 sm:px-3"
+            >
               <ChevronLeft className="w-4 h-4" />
-              Back
+              <span className="hidden sm:inline">Back</span>
             </button>
           )}
 
@@ -253,16 +263,19 @@ export const Navbar = () => {
 
           {/* Guest State: Display warning badge that data is session based + link to log in */}
           {isGuest && !isOnLogin && (
-            <div className="flex items-center gap-3 text-sm">
-              <span className="badge badge-warning badge-md">Guest Mode</span>
+            <div className="flex items-center gap-1.5 sm:gap-3 text-sm">
+              <span className="badge badge-warning badge-sm sm:badge-md whitespace-nowrap">
+                <span className="sm:hidden">Guest</span>
+                <span className="hidden sm:inline">Guest Mode</span>
+              </span>
               <button
                 type="button"
                 onClick={handleLoginClick}
-                className="btn btn-outline btn-sm gap-1.5"
+                className="btn btn-outline btn-sm gap-1.5 px-2 sm:px-3"
                 title="Sign in to save documents"
               >
                 <LogIn className="w-4 h-4" />
-                Log In
+                <span className="hidden sm:inline">Log In</span>
               </button>
             </div>
           )}
