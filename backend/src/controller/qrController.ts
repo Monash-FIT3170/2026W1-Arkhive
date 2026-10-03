@@ -1,3 +1,4 @@
+// backend/src/controller/qrController.ts
 import { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -24,6 +25,14 @@ export default {
         desktopSessionId,
         documentId
       );
+
+      // Force the session to persist into the store now. Without this,
+      // saveUninitialized:false means a session that's only ever been read
+      // from (never written to) is never actually saved, so the phone's
+      // later req.sessionStore.get() would find nothing.
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => (err ? reject(err) : resolve()));
+      });
 
       res.json({ token, qrImageDataUrl, expiresAt });
     } catch (error) {
@@ -70,10 +79,11 @@ export default {
     res.json({ valid: true });
   },
 
-  // Mobile page posts the captured/selected photo here (multer middleware runs first)
+  // Mobile page posts the captured/selected photo(s) here (multer middleware runs first)
+  // NEW: now handles multiple files in one request instead of a single file
   mobileUpload: async (req: Request, res: Response) => {
     const { token } = req.params;
-    const file = req.file;
+    const files = req.files as Express.Multer.File[] | undefined;
 
     const session = getQrSession(token);
     const desktopSessionId = getDesktopSessionId(token);
@@ -88,17 +98,14 @@ export default {
       return;
     }
 
-    if (!file) {
-      res.status(400).json({ error: 'No file received.' });
+    if (!files || files.length === 0) {
+      res.status(400).json({ error: 'No files received.' });
       return;
     }
 
     try {
       const documentId = session.batchId; // documentId was stashed in batchId when the session was created
-      const relativePath = path.join(desktopSessionId, documentId, file.filename);
 
-      // Same shape as controller/upload.ts's uploadPage, but written into the
-      // desktop's session via the shared store instead of req.session.
       const desktopSessionData = await loadDesktopSession(req.sessionStore, desktopSessionId);
 
       if (!desktopSessionData) {
@@ -113,14 +120,21 @@ export default {
       if (!desktopSessionData.documents[documentId]) {
         desktopSessionData.documents[documentId] = { pages: {} };
       }
-      desktopSessionData.documents[documentId].pages['0'] = relativePath;
+
+      // NEW: write every uploaded file in as its own page, same shape as controller/upload.ts
+      const imageUrls: string[] = [];
+      files.forEach((file, index) => {
+        const relativePath = path.join(desktopSessionId, documentId, file.filename);
+        desktopSessionData.documents[documentId].pages[String(index)] = relativePath;
+        imageUrls.push(`/api/upload/image/${documentId}/${index}`);
+      });
 
       await saveDesktopSession(req.sessionStore, desktopSessionId, desktopSessionData);
 
-      const imageUrl = `/api/upload/image/${documentId}/0`;
-      markUploaded(token, file.filename, imageUrl);
+      const summaryLabel = files.length === 1 ? files[0].filename : `${files.length} photos`;
+      markUploaded(token, summaryLabel, imageUrls[0]);
 
-      res.json({ success: true, imageUrl });
+      res.json({ success: true, imageUrls });
     } catch (error) {
       console.error('Mobile QR upload failed:', error);
       markFailed(token, 'Upload failed. Please try again.');

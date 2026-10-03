@@ -8,7 +8,8 @@ import { getDesktopSessionId, getQrSession } from '../services/qrService';
 
 // Easy-to-tweak limits for QR/mobile uploads.
 const MAX_FILE_SIZE_MB = 25;
-const MAX_PAGES_PER_QR_UPLOAD = 1; // currently one photo per QR scan, matching a single new document
+const MAX_FILES_PER_QR_UPLOAD = 10; // NEW: how many photos can be sent in one QR upload
+
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
   'image/png',
@@ -40,9 +41,18 @@ const storage = multer.diskStorage({
     }
     cb(null, uploadPath);
   },
-  filename: function (_req, file, cb) {
+  filename: function (req, file, cb) {
+    // NEW: track page index across the files in this one upload request, so
+    // multiple photos sent together land as page-0, page-1, page-2, etc.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const reqAny = req as any;
+    if (typeof reqAny._qrPageIndex !== 'number') {
+      reqAny._qrPageIndex = 0;
+    }
+    const pageIndex = reqAny._qrPageIndex++;
+
     const ext = path.extname(file.originalname);
-    cb(null, `page-0-${Date.now()}${ext}`);
+    cb(null, `page-${pageIndex}-${Date.now()}${ext}`);
   },
 });
 
@@ -71,7 +81,11 @@ qrRouter.get('/:token/status', qrController.getStatus);
 // Mobile: check the token is still valid before showing the capture UI
 qrRouter.get('/:token/validate', qrController.validateToken);
 
-// Mobile: upload the captured/selected photo
-qrRouter.post('/:token/upload', upload.single('page'), qrController.mobileUpload);
+// Mobile: upload the captured/selected photo(s). NEW: .array instead of .single
+qrRouter.post(
+  '/:token/upload',
+  upload.array('pages', MAX_FILES_PER_QR_UPLOAD),
+  qrController.mobileUpload
+);
 
 export default qrRouter;

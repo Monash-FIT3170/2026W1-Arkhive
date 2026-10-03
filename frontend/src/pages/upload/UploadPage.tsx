@@ -249,6 +249,12 @@ export default function UploadPage() {
 
         return next;
       });
+      // explicitly go to the preview screen once the QR photo has landed,
+      // instead of relying only on the previewItems-watching effect.
+      setTimeout(() => {
+        navigate('/?step=preview', { replace: true });
+      }, 1500);
+
     } catch (err) {
       console.error('Failed to refresh documents after QR upload', err);
       setUploadError('Your photo was uploaded, but the page could not be refreshed. Please reload.');

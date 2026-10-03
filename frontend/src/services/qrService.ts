@@ -66,13 +66,12 @@ export async function validateQrToken(token: string): Promise<{ valid: boolean; 
 /**
  * Uploads the captured/selected photo from the mobile page.
  */
-export async function uploadPhotoToQrSession(
+export async function uploadPhotosToQrSession(
   token: string,
-  file: Blob,
-  fileName: string
-): Promise<{ success: boolean; imageUrl: string }> {
+  files: File[]
+): Promise<{ success: boolean; imageUrls: string[] }> {
   const formData = new FormData();
-  formData.append('page', file, fileName);
+  files.forEach((file) => formData.append('pages', file, file.name));
 
   const response = await fetch(apiUrl(`/api/qr/${encodeURIComponent(token)}/upload`), {
     method: 'POST',
