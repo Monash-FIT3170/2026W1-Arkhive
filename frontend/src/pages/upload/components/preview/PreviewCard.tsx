@@ -166,7 +166,7 @@ export default function PreviewCard({
 
       {isZoomOpen && previewSrc && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+          className="fixed inset-0 z-70 flex items-center justify-center bg-black/80 p-6"
           onClick={(e) => {
             e.stopPropagation();
             setIsZoomOpen(false);

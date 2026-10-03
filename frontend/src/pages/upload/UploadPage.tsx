@@ -585,7 +585,7 @@ export default function UploadPage() {
   const renderNotification = () => {
     if (!uploadError && !uploadSuccess && !retryMessage) return null;
     return (
-      <div className="toast toast-top toast-center z-50 mt-16">
+      <div className="toast toast-top toast-center z-70 mt-16">
         {uploadError && (
           <div className="alert alert-error shadow-lg">
             <svg

@@ -181,7 +181,7 @@ export const Navbar = () => {
               the Home landing page, or anywhere in the Projects section —
               that flow doesn't apply there. */}
           {!isOnLogin && !isOnHome && !isOnProjects && (
-            <ul className="steps">
+            <ul className="steps isolate">
               {stepConfig.map(({ step: s, label, path, icon }) => {
                 const isUnlocked = s <= maxStep;
                 const isActive = currentStep >= s;
