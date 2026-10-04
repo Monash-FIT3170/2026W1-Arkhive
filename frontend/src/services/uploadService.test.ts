@@ -26,7 +26,7 @@ describe('uploadService', () => {
 
       await expect(
         uploadPageToBackend('blob:http://localhost/123', 'doc1', 0, 'test.png')
-      ).resolves.toBeUndefined();
+      ).resolves.toEqual({ success: true });
 
       expect(global.fetch).toHaveBeenCalledTimes(2);
       expect(global.fetch).toHaveBeenNthCalledWith(1, 'blob:http://localhost/123');
