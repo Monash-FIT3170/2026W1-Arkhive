@@ -23,6 +23,7 @@ import UploadMoreButton from './components/actions/UploadMoreButton';
 import PreviewCard from './components/preview/PreviewCard';
 import PageToolbar, { type ToolbarAction } from './components/preview/PageToolbar';
 import PageGroupSection from './components/preview/PageGroupSection';
+import Toast from '../validation/components/modals/Toast';
 import {
   filterValidFiles,
   partitionBySize,
@@ -34,9 +35,12 @@ import {
   processDocuments,
   getUploadedDocuments,
   getProcessedImageUrls,
+  getJobs,
 } from '../../services/uploadService';
 
-export default function UploadPage() {
+import { ErrorBoundary } from './ErrorBoundary';
+
+function UploadPageInner() {
   const navigate = useNavigate();
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -57,6 +61,7 @@ export default function UploadPage() {
     newFile: File;
     itemTitle: string;
   } | null>(null);
+  const [processConfirmWarning, setProcessConfirmWarning] = useState<boolean>(false);
 
   // bulk-remove confirmation — holds the sorted list of preview indices
   // the user wants to remove, so we can show a confirmation modal before doing it
@@ -74,9 +79,7 @@ export default function UploadPage() {
   const createdUrlsRef = useRef<string[]>([]);
   const bulkReplaceInputRef = useRef<HTMLInputElement>(null);
 
-  // NEW: tracks the next globally-unique fileIndex to hand out. Needed because
-  // buildPreviewItemsForFiles now takes an offset instead of always starting
-  // at 0, so pages added/replaced later don't collide with existing file groups.
+  // Tracks the next globally-unique fileIndex for preview items
   const nextFileIndexRef = useRef(0);
   const nextPageIndexRef = useRef(0);
   const [sessionIdSuffix] = useState(() => `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
@@ -88,7 +91,7 @@ export default function UploadPage() {
     if (previewItems.length > 0) {
       navigate('/upload?step=preview', { replace: true });
     } else {
-      // Reset counters so the next files start from 1 again, keeping the UI numbering simple!
+      // Reset counters so the next files start from 1 again
       nextFileIndexRef.current = 0;
       nextPageIndexRef.current = 0;
     }
@@ -105,16 +108,23 @@ export default function UploadPage() {
   // Hydrate session on mount: fetch already uploaded documents from the backend
   useEffect(() => {
     let isMounted = true;
-    Promise.all([getUploadedDocuments(), getProcessedImageUrls()])
-      .then(([docs, processedUrls]) => {
+    Promise.all([getUploadedDocuments(), getProcessedImageUrls(), getJobs().catch(() => ({ jobs: [] }))])
+      .then(([docs, processedUrls, jobsResponse]) => {
         if (!isMounted || docs.length === 0) return;
 
         const processedSet = new Set(processedUrls);
+        const jobs = jobsResponse.jobs || [];
         const hydratedItems: PreviewItem[] = [];
+
         docs.forEach((doc, fileIdx) => {
-          doc.pages.forEach((pageUrl) => {
+          doc.pages.forEach((pageObj) => {
+            const pageUrl = typeof pageObj === 'string' ? pageObj : pageObj.url;
+            const qualityFlags = typeof pageObj === 'object' ? pageObj.qualityFlags : undefined;
             const parts = pageUrl.split('/');
             const backendPageIndex = parseInt(parts[parts.length - 1], 10);
+
+            const job = jobs.find((j: any) => j.imageUrl === pageUrl);
+            const isFailed = job?.status === 'failed';
 
             hydratedItems.push({
               label: doc.label || `Session File ${fileIdx + 1}`,
@@ -125,7 +135,12 @@ export default function UploadPage() {
               fileIndex: fileIdx,
               backendPageIndex,
               documentId: doc.documentId,
-              isProcessed: processedSet.has(pageUrl),
+              isProcessed: isFailed ? false : processedSet.has(pageUrl),
+              errorText: isFailed ? job.errorMessage : undefined,
+              isBlurry: qualityFlags?.isBlurry,
+              isDark: qualityFlags?.isDark,
+              isInvalidSize: qualityFlags?.isInvalidSize,
+              shouldWarn: qualityFlags?.shouldWarn,
             });
 
             nextFileIndexRef.current = Math.max(nextFileIndexRef.current, fileIdx + 1);
@@ -167,11 +182,26 @@ export default function UploadPage() {
           for (const item of enhancedItems) {
             if (item.hasFile && item.previewSrc) {
               try {
-                await uploadPageToBackend(
+                const result = await uploadPageToBackend(
                   item.previewSrc,
                   item.documentId!,
                   item.backendPageIndex!,
                   item.label
+                );
+                
+                // Update the preview item with the quality flags from the backend
+                setPreviewItems((prev) => 
+                  prev.map((p) => 
+                    p.documentId === item.documentId && p.backendPageIndex === item.backendPageIndex 
+                      ? { 
+                          ...p, 
+                          isBlurry: result.qualityFlags.isBlurry,
+                          isDark: result.qualityFlags.isDark,
+                          isInvalidSize: result.qualityFlags.isInvalidSize,
+                          shouldWarn: result.qualityFlags.shouldWarn
+                        } 
+                      : p
+                  )
                 );
               } catch (err) {
                 console.error('Background upload failed:', err);
@@ -350,11 +380,26 @@ export default function UploadPage() {
           for (const item of enhancedItems) {
             if (item.hasFile && item.previewSrc) {
               try {
-                await uploadPageToBackend(
+                const result = await uploadPageToBackend(
                   item.previewSrc,
                   item.documentId!,
                   item.backendPageIndex!,
                   item.label
+                );
+                
+                // Update the preview item with the quality flags from the backend
+                setPreviewItems((prev) => 
+                  prev.map((p) => 
+                    p.documentId === item.documentId && p.backendPageIndex === item.backendPageIndex 
+                      ? { 
+                          ...p, 
+                          isBlurry: result.qualityFlags.isBlurry,
+                          isDark: result.qualityFlags.isDark,
+                          isInvalidSize: result.qualityFlags.isInvalidSize,
+                          shouldWarn: result.qualityFlags.shouldWarn
+                        } 
+                      : p
+                  )
                 );
               } catch (err) {
                 console.error('Background upload failed:', err);
@@ -526,12 +571,24 @@ export default function UploadPage() {
 
 
   // ── Process: send selected pages to OCR backend in batch, then navigate ────
-  async function handleProcess() {
+  function handleProcessClick() {
     if (selectedPages.size === 0 || isProcessing) return;
+    
+    // Check if any selected page has a warning flag
+    const hasWarnings = [...selectedPages].some(index => previewItems[index]?.shouldWarn);
+    
+    if (hasWarnings) {
+      setProcessConfirmWarning(true);
+    } else {
+      executeProcess();
+    }
+  }
+
+  async function executeProcess() {
+    setProcessConfirmWarning(false);
     setIsProcessing(true);
     setUploadError(null); // US-1.4: clear any previous error before retrying
     setRetryMessage(null);
-    //setBatchProgress(null);
     setUploadSuccess(false); // US-1.5: clear any previous success before retrying
 
     try {
@@ -555,17 +612,35 @@ export default function UploadPage() {
         pages: data.pages,
       }));
 
-      await processDocuments(selectedPayload, (msg) => {
+      const result = await processDocuments(selectedPayload, (msg) => {
         setRetryMessage(msg);
       });
+
+      let allSucceeded = true;
 
       setPreviewItems((prev) => {
         const next = [...prev];
         [...selectedPages].forEach((index) => {
-          if (next[index]) next[index] = { ...next[index], isProcessed: true };
+          if (next[index] && next[index].documentId !== undefined && next[index].backendPageIndex !== undefined) {
+            // Find job result if it exists
+            const job = result?.jobs?.find(j => 
+               j.documentId === next[index].documentId
+            );
+            if (job && job.status === 'failed') {
+               allSucceeded = false;
+               next[index] = { ...next[index], isProcessed: false, errorText: job.errorMessage || 'Processing failed' };
+            } else {
+               next[index] = { ...next[index], isProcessed: true, errorText: undefined };
+            }
+          }
         });
         return next;
       });
+
+      if (!allSucceeded) {
+         setUploadError('Some files failed to process. Please review the errors on the items.');
+         return;
+      }
 
       // US-1.5: detect successful upload and show success notification
       unlockStep(2);
@@ -587,80 +662,37 @@ export default function UploadPage() {
 
   // Helper to render global notifications
   const renderNotification = () => {
-    if (!uploadError && !uploadSuccess && !retryMessage) return null;
-    return (
-      <div className="toast toast-top toast-center z-70 mt-16">
-        {uploadError && (
-          <div className="alert alert-error shadow-lg">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6 shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <div>
-              <h3 className="font-bold">Error</h3>
-              <div className="text-xs">{uploadError}</div>
-            </div>
-            <button className="btn btn-sm btn-ghost" onClick={() => setUploadError(null)}>
-              ✕
-            </button>
-          </div>
-        )}
-        {retryMessage && (
-          <div className="alert alert-warning mb-2 p-3 text-sm rounded-xl flex items-start gap-2 shadow-lg max-w-sm">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="mt-0.5 h-4 w-4 shrink-0"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <div className="flex-1">
-              <span>{retryMessage}</span>
-            </div>
-            <button className="btn btn-xs btn-ghost" onClick={() => setRetryMessage(null)}>
-              ✕
-            </button>
-          </div>
-        )}
-        {uploadSuccess && (
-          <div className="alert alert-success shadow-lg">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6 shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <div>
-              <h3 className="font-bold">Success</h3>
-              <div className="text-xs">Redirecting to validation...</div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
+    if (uploadError) {
+      return (
+        <Toast
+          open={true}
+          message={uploadError}
+          type="error"
+          onDismiss={() => setUploadError(null)}
+        />
+      );
+    }
+    if (uploadSuccess) {
+      return (
+        <Toast
+          open={true}
+          message="Files successfully uploaded and processed! Redirecting to validation..."
+          type="success"
+          onDismiss={() => setUploadSuccess(false)}
+        />
+      );
+    }
+    if (retryMessage) {
+      return (
+        <Toast
+          open={true}
+          message={retryMessage}
+          type="warning"
+          onDismiss={() => setRetryMessage(null)}
+        />
+      );
+    }
+    return null;
   };
 
   // NEW: group previewItems by fileIndex, preserving the order each group
@@ -715,7 +747,7 @@ export default function UploadPage() {
       tone: 'primary',
       disabled: isProcessing,
       isBusy: isProcessing,
-      onClick: handleProcess,
+      onClick: handleProcessClick,
     },
   ];
 
@@ -834,8 +866,40 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* Hidden input backing the toolbar's "Replace" action — picks one
-          replacement file per currently-selected page. */}
+      {/* Hidden input for toolbar Replace action */}
+      <input
+        ref={bulkReplaceInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        accept=".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.tif"
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = '';
+          if (files.length > 0) handleBulkReplaceFiles(files);
+        }}
+      />
+      {processConfirmWarning && (
+        <div className="modal modal-open z-50">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg text-warning">Warning: Low Quality Images</h3>
+            <p className="py-4 text-sm">
+              You have selected images that are flagged for low quality (e.g. blurry, dark, or invalid size).
+              Processing these images might produce poor or unexpected OCR results.
+              Are you sure you want to continue?
+            </p>
+            <div className="modal-action">
+              <button className="btn btn-ghost" onClick={() => setProcessConfirmWarning(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={executeProcess}>
+                Yes, process anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <input
         ref={bulkReplaceInputRef}
         type="file"
@@ -856,13 +920,12 @@ export default function UploadPage() {
         actions={toolbarActions}
         trailing={
           <div className="w-40">
-            <UploadMoreButton onFilesSelected={captureFiles} />
+            <UploadMoreButton onFilesSelected={captureFiles} onError={setUploadError} />
           </div>
         }
       />
 
-      {/* Preview grid — grouped into per-file sections, each its own labeled
-          box (e.g. "name.pdf") with that file's pages in a wrapping row. */}
+      {/* Preview grid */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="flex flex-col gap-6">
           {groups.map((group) => (
@@ -882,10 +945,11 @@ export default function UploadPage() {
                     thumbnailUrl={item.previewSrc}
                     isImage={item.isImage}
                     status={{
-                      text: item.isProcessed ? 'done' : 'pending',
-                      className: item.isProcessed ? 'badge-success' : 'badge-ghost',
+                      text: item.errorText ? 'error' : item.isProcessed ? 'done' : 'pending',
+                      className: item.errorText ? 'badge-error' : item.isProcessed ? 'badge-success' : 'badge-ghost',
                     }}
                     warningText={warningTextFor(item)}
+                    errorText={item.errorText}
                     onToggle={() => togglePageSelection(originalIndex)}
                     onRemove={() => handleRemovePreview(originalIndex)}
                     onReplaceWithFile={(file) => handleReplaceWithFile(originalIndex, file)}
@@ -902,7 +966,10 @@ export default function UploadPage() {
 
 function warningTextFor(item: PreviewItem): string | undefined {
   if (!item.shouldWarn) return undefined;
+  if (item.isInvalidSize) return 'Invalid size';
   if (item.isBlurry && item.isDark) return 'Blurry and too dark';
-  if (item.isBlurry) return 'May be blurry';
-  return 'May be too dark';
+  if (item.isBlurry) return 'Might be blurry';
+  return 'Might be too dark';
 }
+export default function UploadPage() { return <ErrorBoundary><UploadPageInner /></ErrorBoundary>; }
+
