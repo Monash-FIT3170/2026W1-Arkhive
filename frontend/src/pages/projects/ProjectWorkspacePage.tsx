@@ -18,7 +18,9 @@ import PreviewCard from '../upload/components/preview/PreviewCard';
 import PageToolbar, { type ToolbarAction } from '../upload/components/preview/PageToolbar';
 import PageGroupSection from '../upload/components/preview/PageGroupSection';
 import ValidationWorkspace from '../validation/components/ValidationWorkspace';
+import Toast from '../validation/components/modals/Toast';
 import { flatten } from '../../utils/flattener';
+import { filterValidFiles, partitionBySize, MAX_FILE_SIZE_MB } from '../upload/components/dropzone/dropZoneUtils';
 import type {
   ProjectDetail,
   DocumentRecord,
@@ -36,6 +38,12 @@ import type { PageReview } from '../../models/IssueReview';
 // Unwrap defensively so either shape renders correctly.
 function extractComponents(raw: unknown): OCRComponent[] {
   if (!Array.isArray(raw) || raw.length === 0) return [];
+  
+  // If the backend saved it as `Pages` (an array of arrays), flatten it
+  if (Array.isArray(raw[0])) {
+    return raw.flat() as OCRComponent[];
+  }
+
   const first = raw[0] as any;
   if (first && typeof first === 'object' && Array.isArray(first.components)) {
     return first.components as OCRComponent[];
@@ -79,6 +87,7 @@ export default function ProjectWorkspacePage() {
   const [processingKeys, setProcessingKeys] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
   const [showReprocessConfirm, setShowReprocessConfirm] = useState(false);
+  const [showWarningConfirm, setShowWarningConfirm] = useState(false);
 
   // Delete confirmation covers both a single hover-triggered card delete and
   // the toolbar's bulk "Delete Selected" action, sharing one modal/handler.
@@ -264,12 +273,24 @@ export default function ProjectWorkspacePage() {
   }, []);
 
   // ── Upload ─────────────────────────────────────────────────────────────
-  async function handleFilesCaptured(files: File[]) {
+  async function handleFilesCaptured(capturedFiles: File[]) {
     if (!project) return;
     setIsUploading(true);
     setActionError(null);
+
+    const validFiles = filterValidFiles(capturedFiles);
+    const { accepted, rejected } = partitionBySize(validFiles);
+
+    if (rejected.length > 0) {
+      setActionError(`One or more files are too large. Maximum size is ${MAX_FILE_SIZE_MB} MB.`);
+      if (accepted.length === 0) {
+        setIsUploading(false);
+        return;
+      }
+    }
+
     try {
-      const items = await buildPreviewItemsForFiles(files, createdUrlsRef.current, 0);
+      const items = await buildPreviewItemsForFiles(accepted, createdUrlsRef.current, 0);
 
       const byFile = new Map<number, typeof items>();
       items.forEach((item) => {
@@ -282,6 +303,8 @@ export default function ProjectWorkspacePage() {
         let documentId: string | undefined;
         const filename = group[0]?.label ?? 'document';
 
+        const pageFlags = new Map<number, any>();
+
         for (let pageIndex = 0; pageIndex < group.length; pageIndex++) {
           const item = group[pageIndex];
           if (!item.hasFile || !item.previewSrc) continue;
@@ -293,10 +316,10 @@ export default function ProjectWorkspacePage() {
             blob,
             pageFilename,
             pageIndex,
-            'image/png',
             documentId
           );
           documentId = result.documentId;
+          pageFlags.set(pageIndex, result.qualityFlags);
         }
 
         if (documentId) {
@@ -310,6 +333,7 @@ export default function ProjectWorkspacePage() {
                 document_id: finalDocumentId,
                 page_index: pageIndex,
                 status: 'pending' as PageStatus,
+                quality_flags: pageFlags.get(pageIndex),
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               }));
@@ -379,6 +403,30 @@ export default function ProjectWorkspacePage() {
   // existing data), otherwise processes immediately like before.
   function handleProcessClick() {
     if (selectedKeys.size === 0 || isProcessing) return;
+
+    let hasWarnings = false;
+    documents.forEach((doc) => {
+      (doc.pages || []).forEach((page) => {
+        if (selectedKeys.has(makePageKey(doc.id, page.page_index))) {
+           const flags = page.quality_flags;
+           if (flags && flags.shouldWarn) {
+             hasWarnings = true;
+           }
+        }
+      });
+    });
+
+    if (hasWarnings) {
+      setShowWarningConfirm(true);
+    } else if (countSelectedAlreadyProcessed() > 0) {
+      setShowReprocessConfirm(true);
+    } else {
+      handleProcessSelected();
+    }
+  }
+
+  function handleWarningConfirm() {
+    setShowWarningConfirm(false);
     if (countSelectedAlreadyProcessed() > 0) {
       setShowReprocessConfirm(true);
     } else {
@@ -581,11 +629,12 @@ export default function ProjectWorkspacePage() {
       <div className="flex-1 flex flex-col">
         {header}
         <EmptyUploadView onFilesCaptured={handleFilesCaptured} onError={setActionError} />
-        {actionError && (
-          <div className="toast toast-top toast-center z-50 mt-16">
-            <div className="alert alert-error shadow-lg">{actionError}</div>
-          </div>
-        )}
+        <Toast
+          open={!!actionError}
+          message={actionError || ''}
+          type="error"
+          onDismiss={() => setActionError(null)}
+        />
       </div>
     );
   }
@@ -633,11 +682,12 @@ export default function ProjectWorkspacePage() {
     <div className="flex-1 flex flex-col">
       {header}
 
-      {actionError && (
-        <div className="toast toast-top toast-center z-50 mt-16">
-          <div className="alert alert-error shadow-lg">{actionError}</div>
-        </div>
-      )}
+      <Toast
+        open={!!actionError}
+        message={actionError || ''}
+        type="error"
+        onDismiss={() => setActionError(null)}
+      />
       {/* FILE VIEW AND UPLOAD */}
       <div className={mode === 'files' ? 'flex-1 flex flex-col' : 'hidden'}>
         <PageToolbar
@@ -647,7 +697,7 @@ export default function ProjectWorkspacePage() {
           actions={filesToolbarActions}
           trailing={
             <div className="w-40">
-              <UploadMoreButton onFilesSelected={handleFilesCaptured} />
+              <UploadMoreButton onFilesSelected={handleFilesCaptured} onError={setActionError} />
             </div>
           }
         />
@@ -683,6 +733,7 @@ export default function ProjectWorkspacePage() {
                             text: page.status,
                             className: statusBadgeClass(page.status),
                           }}
+                          warningText={warningTextForPage(page.quality_flags)}
                           errorText={page.error_message}
                           onToggle={() => toggleSelected(doc.id, page.page_index)}
                           onRemove={() =>
@@ -780,6 +831,36 @@ export default function ProjectWorkspacePage() {
           <div className="modal-backdrop" onClick={() => setShowReprocessConfirm(false)} />
         </div>
       )}
+
+      {/* Warning confirmation */}
+      {showWarningConfirm && (
+        <div className="modal modal-open z-50">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg text-warning">Warning: Low Quality Images</h3>
+            <p className="py-4 text-sm">
+              You have selected images that are flagged for low quality (e.g. blurry, dark, or invalid size).
+              Processing these images might produce poor or unexpected OCR results.
+              Are you sure you want to continue?
+            </p>
+            <div className="modal-action">
+              <button className="btn btn-ghost" onClick={() => setShowWarningConfirm(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleWarningConfirm}>
+                Yes, process anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function warningTextForPage(flags: any): string | undefined {
+  if (!flags || !flags.shouldWarn) return undefined;
+  if (flags.isInvalidSize) return 'Invalid size';
+  if (flags.isBlurry && flags.isDark) return 'Blurry and too dark';
+  if (flags.isBlurry) return 'Might be blurry';
+  return 'Might be too dark';
 }

@@ -32,6 +32,7 @@
     "@google/generative-ai": "^0.24.1",
     "@llamaindex/llama-cloud": "^2.16.0",
     "@supabase/supabase-js": "^2.116.0",
+    "@techstark/opencv-js": "^5.0.0-release.1",
     "@types/express-session": "^1.19.0",
     "@types/multer": "^2.1.0",
     "cors": "^2.8.6",
@@ -43,7 +44,8 @@
     "openredaction": "^1.1.5",
     "pdf-lib": "^1.17.1",
     "pdf-to-img": "^5.0.0",
-    "pdf2img": "^0.5.0"
+    "pdf2img": "^0.5.0",
+    "sharp": "^0.35.5"
   },
   "overrides": {
     "brace-expansion": "^5.0.8"

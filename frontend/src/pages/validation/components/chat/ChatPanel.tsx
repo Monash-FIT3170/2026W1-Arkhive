@@ -9,7 +9,6 @@ import {
   PanelRightOpen,
   PictureInPicture2,
   Send,
-  X,
 } from 'lucide-react';
 import type { ChatMessage } from '../../../../models/Message';
 import MessageItem from './MessageItem';
@@ -23,6 +22,7 @@ import OcrReviewWidget from './OcrReviewWidget';
 import type { HistoryEntry } from '../../../../models/HistoryEntry';
 import type { OcrIssue } from '../../../../models/IssueReview';
 import { buildSlides } from '../../../../utils/review/ocrReviewUtils';
+import Toast from '../modals/Toast';
 
 type Tab = 'chat' | 'review' | 'history';
 type FloatingRectLike = { x: number; y: number; width: number; height: number };
@@ -646,38 +646,12 @@ function ChatPanel({
       `}</style>
 
       {/* Error toast (visible even when the panel is collapsed) */}
-      {chatError && (
-        <div
-          role="alert"
-          className={`fixed right-6 z-[60] w-72 animate-in fade-in slide-in-from-bottom-5 duration-300 ${
-            showFab ? 'bottom-24' : 'bottom-6'
-          }`}
-        >
-          <div className="alert alert-error p-3 text-sm rounded-xl flex items-start gap-2 shadow-lg">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="mt-0.5 h-4 w-4 shrink-0"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <span className="flex-1">{chatError}</span>
-            <button
-              onClick={() => setChatError(null)}
-              className="btn btn-ghost btn-xs btn-circle -mr-1 -mt-1 hover:bg-error-content/20"
-              title="Dismiss"
-              aria-label="Dismiss error"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
+      <Toast
+        open={!!chatError}
+        message={chatError || ''}
+        type="error"
+        onDismiss={() => setChatError(null)}
+      />
 
       {/* ---------- Floating + collapsed: round button ---------- */}
       {showFab && (
