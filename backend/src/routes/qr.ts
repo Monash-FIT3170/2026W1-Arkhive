@@ -44,7 +44,6 @@ const storage = multer.diskStorage({
   filename: function (req, file, cb) {
     // NEW: track page index across the files in this one upload request, so
     // multiple photos sent together land as page-0, page-1, page-2, etc.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const reqAny = req as any;
     if (typeof reqAny._qrPageIndex !== 'number') {
       reqAny._qrPageIndex = 0;

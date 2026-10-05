@@ -1,7 +1,6 @@
 // backend/src/controller/qrController.ts
 import { Request, Response } from 'express';
 import path from 'path';
-import fs from 'fs';
 import {
   createQrSession,
   getQrSession,

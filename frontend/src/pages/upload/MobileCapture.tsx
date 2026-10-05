@@ -19,8 +19,10 @@ interface QueuedPhoto {
 
 export default function MobileCapture() {
   const { token } = useParams<{ token: string }>();
-  const [pageState, setPageState] = useState<PageState>('checking');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pageState, setPageState] = useState<PageState>(token ? 'checking' : 'invalid');
+  const [errorMessage, setErrorMessage] = useState<string | null>(
+    token ? null : 'No upload code was provided.'
+  );
   const [queue, setQueue] = useState<QueuedPhoto[]>([]);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -28,11 +30,7 @@ export default function MobileCapture() {
 
   // Check the token is still valid before showing the capture UI
   useEffect(() => {
-    if (!token) {
-      setPageState('invalid');
-      setErrorMessage('No upload code was provided.');
-      return;
-    }
+    if (!token) return;
 
     let cancelled = false;
     validateQrToken(token).then((result) => {

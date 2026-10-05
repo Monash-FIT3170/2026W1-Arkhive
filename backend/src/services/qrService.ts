@@ -1,10 +1,10 @@
 import crypto from 'crypto';
 import { Store } from 'express-session';
 import QRCode from 'qrcode';
-import { QrSession, QrSessionStatus } from '../models/QrSession';
+import { QrSession } from '../models/QrSession';
 
 const QR_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes, matches "expire after an appropriate period"
-const PUBLIC_APP_URL = 'https://arkhive.yourdomain.com'; // the public URL used to build QR upload links
+const PUBLIC_APP_URL = 'https://arkhive.domain.com'; // the public URL used to build QR upload links
 
 // In-memory map, mirroring the app's existing MemoryStore approach for sessions.
 const qrSessions = new Map<string, QrSession>();
@@ -94,7 +94,6 @@ export function markFailed(token: string, errorMessage: string): void {
 export function loadDesktopSession(
   store: Store,
   desktopSessionId: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   return new Promise((resolve, reject) => {
     store.get(desktopSessionId, (err, sessionData) => {
@@ -110,7 +109,6 @@ export function loadDesktopSession(
 export function saveDesktopSession(
   store: Store,
   desktopSessionId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sessionData: any
 ): Promise<void> {
   return new Promise((resolve, reject) => {
