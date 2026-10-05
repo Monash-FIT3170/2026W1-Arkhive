@@ -11,8 +11,35 @@ export const ALLOWED_R2_UPLOAD_CONTENT_TYPES = ['image/png'] as const;
 
 export const UNSUPPORTED_FILE_TYPE_ERROR = 'Unsupported file type.';
 
+/** Quick Scan uses documentId as a folder name — never allow ../ or other junk. */
+export const INVALID_UPLOAD_PATH_ERROR = 'Invalid documentId or pageIndex.';
+
+const SAFE_DOCUMENT_ID = /^[a-zA-Z0-9_-]+$/;
+const MAX_DOCUMENT_ID_LENGTH = 128;
+const MAX_PAGE_INDEX = 999;
+
 export function isAllowedR2UploadContentType(contentType: string): boolean {
   return (ALLOWED_R2_UPLOAD_CONTENT_TYPES as readonly string[]).includes(contentType);
+}
+
+export function isSafeDocumentId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= MAX_DOCUMENT_ID_LENGTH &&
+    SAFE_DOCUMENT_ID.test(value)
+  );
+}
+
+export function isSafePageIndex(value: unknown): boolean {
+  if (typeof value === 'number') {
+    return Number.isInteger(value) && value >= 0 && value <= MAX_PAGE_INDEX;
+  }
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) {
+    return false;
+  }
+  const n = Number(value);
+  return n >= 0 && n <= MAX_PAGE_INDEX;
 }
 
 export function hasValidFileSignature(buffer: Uint8Array, mimetype: string): boolean {

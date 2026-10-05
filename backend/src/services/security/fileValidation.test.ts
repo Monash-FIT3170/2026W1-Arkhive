@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { hasValidFileSignature, isAllowedR2UploadContentType } from './fileValidation';
+import {
+  hasValidFileSignature,
+  isAllowedR2UploadContentType,
+  isSafeDocumentId,
+  isSafePageIndex,
+} from './fileValidation';
 
 /** Pad to 12 bytes so the length guard is not what fails the test. */
 function bytes(...values: number[]): Uint8Array {
@@ -68,5 +73,38 @@ describe('isAllowedR2UploadContentType', () => {
     expect(isAllowedR2UploadContentType('application/pdf')).toBe(false);
     expect(isAllowedR2UploadContentType('text/html')).toBe(false);
     expect(isAllowedR2UploadContentType('image/jpeg')).toBe(false);
+  });
+});
+
+describe('isSafeDocumentId', () => {
+  it('allows ids the Quick Scan UI actually sends', () => {
+    expect(isSafeDocumentId('File_0_1728000000000-abc12')).toBe(true);
+    expect(isSafeDocumentId('itest-doc-1')).toBe(true);
+    expect(isSafeDocumentId('doc-1')).toBe(true);
+  });
+
+  it('rejects path traversal and other folder-breaking values', () => {
+    expect(isSafeDocumentId('../secret')).toBe(false);
+    expect(isSafeDocumentId('..')).toBe(false);
+    expect(isSafeDocumentId('foo/bar')).toBe(false);
+    expect(isSafeDocumentId('foo\\bar')).toBe(false);
+    expect(isSafeDocumentId('')).toBe(false);
+    expect(isSafeDocumentId('a'.repeat(129))).toBe(false);
+  });
+});
+
+describe('isSafePageIndex', () => {
+  it('allows 0 through 999 as a number or digit string', () => {
+    expect(isSafePageIndex(0)).toBe(true);
+    expect(isSafePageIndex('0')).toBe(true);
+    expect(isSafePageIndex('999')).toBe(true);
+  });
+
+  it('rejects negatives, decimals, and path junk', () => {
+    expect(isSafePageIndex('-1')).toBe(false);
+    expect(isSafePageIndex('1.5')).toBe(false);
+    expect(isSafePageIndex('1000')).toBe(false);
+    expect(isSafePageIndex('0/../../x')).toBe(false);
+    expect(isSafePageIndex('../0')).toBe(false);
   });
 });
