@@ -1,26 +1,56 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import uploadController from '../controller/upload.js';
+import {
+  INVALID_UPLOAD_PATH_ERROR,
+  isSafeDocumentId,
+  isSafePageIndex,
+} from '../services/security/fileValidation.js';
+
+function requireSafeUploadQuery(req: Request, res: Response, next: NextFunction) {
+  if (!isSafeDocumentId(req.query.documentId) || !isSafePageIndex(req.query.pageIndex)) {
+    res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+    return;
+  }
+  next();
+}
+
+function requireSafeDocumentParam(req: Request, res: Response, next: NextFunction) {
+  if (!isSafeDocumentId(req.params.documentId)) {
+    res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+    return;
+  }
+  if (req.params.pageIndex !== undefined && !isSafePageIndex(req.params.pageIndex)) {
+    res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+    return;
+  }
+  next();
+}
 
 // Store files on disk for scalability
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    // Organize by session ID and document ID
     const sessionId = req.session.id;
-    const documentId = (req.query.documentId as string) || 'unknown_document';
+    const documentId = req.query.documentId as string;
+    if (!isSafeDocumentId(documentId)) {
+      cb(new Error(INVALID_UPLOAD_PATH_ERROR), '');
+      return;
+    }
     const uploadPath = path.join(process.cwd(), 'uploads', sessionId, documentId);
-    
-    // Ensure the document directory exists
+
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    const pageIndex = (req.query.pageIndex as string) || '0';
-    // Generate a predictable but unique filename for the page
+    const pageIndex = req.query.pageIndex as string;
+    if (!isSafePageIndex(pageIndex)) {
+      cb(new Error(INVALID_UPLOAD_PATH_ERROR), '');
+      return;
+    }
     const ext = path.extname(file.originalname);
     cb(null, `page-${pageIndex}-${Date.now()}${ext}`);
   },
@@ -44,13 +74,26 @@ const upload = multer({
 const uploadRouter = Router();
 
 // Endpoint to upload a single page immediately
-uploadRouter.post('/page', upload.single('page'), uploadController.uploadPage);
+uploadRouter.post(
+  '/page',
+  requireSafeUploadQuery,
+  upload.single('page'),
+  uploadController.uploadPage
+);
 
 // Endpoint to delete a specific page
-uploadRouter.delete('/page/:documentId/:pageIndex', uploadController.deletePage);
+uploadRouter.delete(
+  '/page/:documentId/:pageIndex',
+  requireSafeDocumentParam,
+  uploadController.deletePage
+);
 
 // Endpoint to delete an entire document
-uploadRouter.delete('/document/:documentId', uploadController.deleteDocument);
+uploadRouter.delete(
+  '/document/:documentId',
+  requireSafeDocumentParam,
+  uploadController.deleteDocument
+);
 
 // Endpoint to trigger OCR processing on the uploaded files
 uploadRouter.post('/process', uploadController.processDocuments);
@@ -67,7 +110,11 @@ uploadRouter.get('/', (req, res) => {
 });
 
 // Returns a specific uploaded image based on documentId and pageIndex
-uploadRouter.get('/image/:documentId/:pageIndex', uploadController.getImage);
+uploadRouter.get(
+  '/image/:documentId/:pageIndex',
+  requireSafeDocumentParam,
+  uploadController.getImage
+);
 
 // Backwards compatibility endpoint for preview images (returns the first image of the first document)
 uploadRouter.get('/image', uploadController.getFirstImage);

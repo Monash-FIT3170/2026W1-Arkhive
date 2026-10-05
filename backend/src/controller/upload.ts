@@ -4,6 +4,9 @@ import { DocumentJob } from '../models/Job';
 import {
   hasValidFileSignature,
   INVALID_FILE_CONTENTS_ERROR,
+  INVALID_UPLOAD_PATH_ERROR,
+  isSafeDocumentId,
+  isSafePageIndex,
 } from '../services/security/fileValidation';
 import 'express-session';
 import 'multer';
@@ -47,6 +50,11 @@ export default {
 
     if (!file || !documentId || !pageIndex) {
       res.status(400).json({ error: 'Missing file, documentId, or pageIndex.' });
+      return;
+    }
+
+    if (!isSafeDocumentId(documentId) || !isSafePageIndex(pageIndex)) {
+      res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
       return;
     }
 
@@ -95,6 +103,12 @@ export default {
   deletePage: (req: Request, res: Response) => {
     const documentId = req.params.documentId as string;
     const pageIndex = req.params.pageIndex as string;
+
+    if (!isSafeDocumentId(documentId) || !isSafePageIndex(pageIndex)) {
+      res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+      return;
+    }
+
     const doc = req.session.documents?.[documentId];
 
     if (doc && doc.pages[pageIndex]) {
@@ -129,6 +143,11 @@ export default {
   // Delete an entire document
   deleteDocument: (req: Request, res: Response) => {
     const documentId = req.params.documentId as string;
+
+    if (!isSafeDocumentId(documentId)) {
+      res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+      return;
+    }
 
     if (req.session.documents?.[documentId]) {
       const sessionId = req.session.id;
@@ -169,11 +188,13 @@ export default {
 
     for (const selection of selected) {
       const { documentId, pages } = selection;
+      if (!isSafeDocumentId(documentId)) continue;
       const doc = sessionDocs[documentId];
       if (!doc) continue;
 
       const files: { pageIndex: string; path: string }[] = [];
       for (const pageIndex of pages) {
+        if (!isSafePageIndex(pageIndex)) continue;
         const relativePath = doc.pages[pageIndex];
         if (relativePath) {
           const absolutePath = path.join(process.cwd(), 'uploads', relativePath);
@@ -398,6 +419,12 @@ export default {
   getImage: (req: Request, res: Response) => {
     const documentId = req.params.documentId as string;
     const pageIndex = req.params.pageIndex as string;
+
+    if (!isSafeDocumentId(documentId) || !isSafePageIndex(pageIndex)) {
+      res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+      return;
+    }
+
     const doc = req.session.documents?.[documentId];
 
     if (!doc || !doc.pages[pageIndex]) {

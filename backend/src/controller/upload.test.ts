@@ -8,7 +8,10 @@ vi.mock('../services/ocr/ocr', () => ({
 }));
 
 import uploadController from './upload';
-import { INVALID_FILE_CONTENTS_ERROR } from '../services/security/fileValidation';
+import {
+  INVALID_FILE_CONTENTS_ERROR,
+  INVALID_UPLOAD_PATH_ERROR,
+} from '../services/security/fileValidation';
 
 const PNG_HEADER = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
@@ -31,10 +34,13 @@ function writeTempFile(data: Buffer, filename: string) {
   return filePath;
 }
 
-function createMockReqRes(file: { path: string; filename: string; mimetype: string } | undefined) {
+function createMockReqRes(
+  file: { path: string; filename: string; mimetype: string } | undefined,
+  query: { documentId: string; pageIndex: string } = { documentId: 'doc-1', pageIndex: '0' }
+) {
   const req: any = {
     file,
-    query: { documentId: 'doc-1', pageIndex: '0' },
+    query,
     body: {},
     session: { id: 'test-session' },
   };
@@ -84,5 +90,34 @@ describe('uploadPage file signature check', () => {
     expect(getJson()).toEqual({ error: INVALID_FILE_CONTENTS_ERROR });
     expect(fs.existsSync(filePath)).toBe(false);
     expect(req.session.documents).toBeUndefined();
+  });
+});
+
+describe('uploadPage path traversal check', () => {
+  it('rejects a documentId that walks out of the session folder', () => {
+    const filePath = writeTempFile(PNG_HEADER, 'page-0.png');
+    const { req, res, getStatus, getJson } = createMockReqRes(
+      { path: filePath, filename: 'page-0.png', mimetype: 'image/png' },
+      { documentId: '../secret', pageIndex: '0' }
+    );
+
+    uploadController.uploadPage(req, res);
+
+    expect(getStatus()).toBe(400);
+    expect(getJson()).toEqual({ error: INVALID_UPLOAD_PATH_ERROR });
+    expect(req.session.documents).toBeUndefined();
+  });
+
+  it('rejects a pageIndex that is not a small whole number', () => {
+    const filePath = writeTempFile(PNG_HEADER, 'page-0.png');
+    const { req, res, getStatus, getJson } = createMockReqRes(
+      { path: filePath, filename: 'page-0.png', mimetype: 'image/png' },
+      { documentId: 'doc-1', pageIndex: '0/../../x' }
+    );
+
+    uploadController.uploadPage(req, res);
+
+    expect(getStatus()).toBe(400);
+    expect(getJson()).toEqual({ error: INVALID_UPLOAD_PATH_ERROR });
   });
 });
