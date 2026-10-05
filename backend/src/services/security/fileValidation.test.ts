@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hasValidFileSignature } from './fileValidation';
+import { hasValidFileSignature, isAllowedR2UploadContentType } from './fileValidation';
 
 /** Pad to 12 bytes so the length guard is not what fails the test. */
 function bytes(...values: number[]): Uint8Array {
@@ -56,5 +56,17 @@ describe('hasValidFileSignature', () => {
     expect(hasValidFileSignature(new Uint8Array([0x89, 0x50, 0x4e, 0x47]), 'image/png')).toBe(
       false
     );
+  });
+});
+
+describe('isAllowedR2UploadContentType', () => {
+  it('allows image/png', () => {
+    expect(isAllowedR2UploadContentType('image/png')).toBe(true);
+  });
+
+  it('rejects PDF, HTML, and JPEG labels', () => {
+    expect(isAllowedR2UploadContentType('application/pdf')).toBe(false);
+    expect(isAllowedR2UploadContentType('text/html')).toBe(false);
+    expect(isAllowedR2UploadContentType('image/jpeg')).toBe(false);
   });
 });

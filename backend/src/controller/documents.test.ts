@@ -15,7 +15,10 @@ vi.mock('../services/supabaseClient', () => ({
 import { supabase } from '../services/supabaseClient';
 import * as r2Client from '../services/r2Client';
 import * as ocrService from '../services/ocr/ocr';
-import { INVALID_FILE_CONTENTS_ERROR } from '../services/security/fileValidation';
+import {
+  INVALID_FILE_CONTENTS_ERROR,
+  UNSUPPORTED_FILE_TYPE_ERROR,
+} from '../services/security/fileValidation';
 
 const PNG_HEADER = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
@@ -100,7 +103,7 @@ describe('Documents Controller', () => {
       const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
         projectId: 'proj-1',
         filename: 'report.pdf',
-        contentType: 'application/pdf',
+        contentType: 'image/png',
         pageIndex: 0,
         documentId: 'doc-123', // Pass documentId so randomUUID() is skipped
       });
@@ -111,6 +114,44 @@ describe('Documents Controller', () => {
       expect(getJson().uploadUrl).toBe('https://r2.test/upload-presigned');
       expect(getJson().documentId).toBe('doc-123');
       expect(getJson().storageKey).toContain('test-user-123/proj-1/');
+    });
+
+    it('returns 400 when the requested content type is not image/png', async () => {
+      const generateSpy = vi
+        .spyOn(r2Client, 'generateUploadUrl')
+        .mockResolvedValue('https://r2.test/should-not-be-used');
+
+      const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
+        projectId: 'proj-1',
+        filename: 'page.html',
+        contentType: 'text/html',
+        pageIndex: 0,
+      });
+
+      await documentsController.getUploadUrl(req, res);
+
+      expect(getStatus()).toBe(400);
+      expect(getJson()).toEqual({ error: UNSUPPORTED_FILE_TYPE_ERROR });
+      expect(generateSpy).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when the requested content type is application/pdf', async () => {
+      const generateSpy = vi
+        .spyOn(r2Client, 'generateUploadUrl')
+        .mockResolvedValue('https://r2.test/should-not-be-used');
+
+      const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
+        projectId: 'proj-1',
+        filename: 'report.pdf',
+        contentType: 'application/pdf',
+        pageIndex: 0,
+      });
+
+      await documentsController.getUploadUrl(req, res);
+
+      expect(getStatus()).toBe(400);
+      expect(getJson()).toEqual({ error: UNSUPPORTED_FILE_TYPE_ERROR });
+      expect(generateSpy).not.toHaveBeenCalled();
     });
 
     it('returns 403 if project is not owned by user', async () => {
