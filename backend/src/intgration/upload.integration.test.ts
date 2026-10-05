@@ -4,7 +4,7 @@ import request from 'supertest';
 import fs from 'fs';
 import path from 'path';
 import app from '../app';
-import { INVALID_FILE_CONTENTS_ERROR } from '../services/security/fileValidation';
+import { INVALID_FILE_CONTENTS_ERROR, INVALID_UPLOAD_PATH_ERROR } from '../services/security/fileValidation';
 
 /** 12-byte PNG signature so the new magic-byte check accepts the fixture. */
 const PNG_HEADER = Buffer.from([
@@ -85,6 +85,21 @@ describe('upload -> process integration', () => {
     expect(docsRes.status).toBe(200);
     const fakeDoc = docsRes.body.find((doc: { documentId: string }) => doc.documentId === documentId);
     expect(fakeDoc).toBeUndefined();
+  });
+
+  it('rejects a documentId that tries to leave the session folder', async () => {
+    const uploadRes = await agent
+      .post('/api/upload/page?documentId=../secret&pageIndex=0')
+      .attach('page', PNG_HEADER, {
+        filename: 'page-0.png',
+        contentType: 'image/png',
+      });
+
+    expect(uploadRes.status).toBe(400);
+    expect(uploadRes.body.error).toBe(INVALID_UPLOAD_PATH_ERROR);
+
+    const uploadsRoot = path.join(process.cwd(), 'uploads');
+    expect(fs.existsSync(path.join(uploadsRoot, 'secret'))).toBe(false);
   });
 
   afterAll(() => {
