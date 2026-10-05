@@ -42,7 +42,7 @@ export default {
 
   // Desktop polls this on an interval while the QR is displayed
   getStatus: (req: Request, res: Response) => {
-    const { token } = req.params;
+    const token = req.params.token as string;
     const session = getQrSession(token);
 
     if (!session) {
@@ -62,7 +62,7 @@ export default {
 
   // Mobile page calls this before rendering the capture UI, to confirm the token is still valid
   validateToken: (req: Request, res: Response) => {
-    const { token } = req.params;
+    const token = req.params.token as string;
     const session = getQrSession(token);
 
     if (!session || session.status === 'expired') {
@@ -81,7 +81,7 @@ export default {
   // Mobile page posts the captured/selected photo(s) here (multer middleware runs first)
   // NEW: now handles multiple files in one request instead of a single file
   mobileUpload: async (req: Request, res: Response) => {
-    const { token } = req.params;
+    const token = req.params.token as string;
     const files = req.files as Express.Multer.File[] | undefined;
 
     const session = getQrSession(token);

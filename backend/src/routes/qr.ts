@@ -24,7 +24,7 @@ const ALLOWED_MIME_TYPES = [
 // (the phone's session is not the desktop's session).
 const storage = multer.diskStorage({
   destination: function (req, _file, cb) {
-    const token = req.params.token;
+    const token = req.params.token as string;
     const desktopSessionId = getDesktopSessionId(token);
     const session = getQrSession(token);
 
