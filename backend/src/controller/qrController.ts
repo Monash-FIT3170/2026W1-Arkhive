@@ -18,6 +18,9 @@ export default {
     try {
       const desktopSessionId = req.session.id;
       // New document, same convention as a fresh scan on desktop
+      if (!req.session.documents) {
+        req.session.documents = {};
+      }
       const documentId = `doc-${Date.now()}`;
 
       const { token, qrImageDataUrl, expiresAt } = await createQrSession(
