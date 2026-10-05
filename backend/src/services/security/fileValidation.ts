@@ -6,6 +6,15 @@
  */
 export const INVALID_FILE_CONTENTS_ERROR = 'Invalid or mismatched file contents detected.';
 
+/** Projects store every page as page-N.png. Only mint R2 PUT URLs for this type. */
+export const ALLOWED_R2_UPLOAD_CONTENT_TYPES = ['image/png'] as const;
+
+export const UNSUPPORTED_FILE_TYPE_ERROR = 'Unsupported file type.';
+
+export function isAllowedR2UploadContentType(contentType: string): boolean {
+  return (ALLOWED_R2_UPLOAD_CONTENT_TYPES as readonly string[]).includes(contentType);
+}
+
 export function hasValidFileSignature(buffer: Uint8Array, mimetype: string): boolean {
   if (buffer.length < 12) {
     return false;

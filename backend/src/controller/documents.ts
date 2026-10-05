@@ -13,6 +13,8 @@ import { parseTableWithRetries } from '../services/ocr/ocr';
 import {
   hasValidFileSignature,
   INVALID_FILE_CONTENTS_ERROR,
+  isAllowedR2UploadContentType,
+  UNSUPPORTED_FILE_TYPE_ERROR,
 } from '../services/security/fileValidation';
 import type { ExtractedPage } from '../models/TableData';
 import type { PageSelection, ProcessedPageResult } from '../models/Project.ts';
@@ -187,6 +189,12 @@ export default {
         return;
       }
 
+      const mimeType = contentType || 'image/png';
+      if (!isAllowedR2UploadContentType(mimeType)) {
+        res.status(400).json({ error: UNSUPPORTED_FILE_TYPE_ERROR });
+        return;
+      }
+
       const { data: project, error: projectError } = await supabase
         .from('projects')
         .select('id')
@@ -198,8 +206,6 @@ export default {
         res.status(403).json({ error: 'Project not found or not owned by user.' });
         return;
       }
-
-      const mimeType = contentType || 'image/png';
       const docId = existingDocId || randomUUID();
       const numericPageIndex = Number(pageIndex);
 
