@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ExtractedData } from '../../../../models/TableData';
 import type { ValidationFileGroup } from '../../../../utils/fileGrouping';
 import { exportExtractedDataAsCSV, exportExtractedDataAsSimpleCSV } from '../../../../services/csvDownloadService';
@@ -40,7 +40,23 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
     xlsx_default: false
   });
 
-  if (!isOpen) return null;
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(null), 3000);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
+  const successToast = successMessage ? (
+    <div className="toast toast-top toast-center z-[10000]">
+      <div className="alert alert-success" role="status">
+        <span>{successMessage}</span>
+      </div>
+    </div>
+  ) : null;
+
+  if (!isOpen) return successToast;
 
   const isValidFilename = (name: string) => !/[\\/:*?"<>|]/.test(name) && name.trim().length > 0;
   const isFilenameValid = isValidFilename(customFilename);
@@ -81,11 +97,30 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
     const xlsxItems: BulkExportItem[] = [];
     const baseFilename = customFilename.trim() || 'export';
 
+    const exportedFormats = new Set<string>();
+    let fileCount = 0;
+    const recordExport = (format: string, count = 1) => {
+      exportedFormats.add(format);
+      fileCount += count;
+    };
+
     const performExport = (data: ExtractedData, suffix: string) => {
-      if (selectedTemplates.csv_default) exportExtractedDataAsCSV(data, `${baseFilename}${suffix}_default.csv`);
-      if (selectedTemplates.csv_simple) exportExtractedDataAsSimpleCSV(data, `${baseFilename}${suffix}_simple.csv`);
-      if (selectedTemplates.txt_default) exportExtractedDataAsTXT(data, `${baseFilename}${suffix}_default.txt`);
-      if (selectedTemplates.json_default) exportExtractedDataAsJSON(data, `${baseFilename}${suffix}_default.json`);
+      if (selectedTemplates.csv_default) {
+        exportExtractedDataAsCSV(data, `${baseFilename}${suffix}_default.csv`);
+        recordExport('CSV');
+      }
+      if (selectedTemplates.csv_simple) {
+        exportExtractedDataAsSimpleCSV(data, `${baseFilename}${suffix}_simple.csv`);
+        recordExport('CSV');
+      }
+      if (selectedTemplates.txt_default) {
+        exportExtractedDataAsTXT(data, `${baseFilename}${suffix}_default.txt`);
+        recordExport('TXT');
+      }
+      if (selectedTemplates.json_default) {
+        exportExtractedDataAsJSON(data, `${baseFilename}${suffix}_default.json`);
+        recordExport('JSON');
+      }
       if (selectedTemplates.xlsx_default) {
         xlsxItems.push({ name: `${baseFilename}${suffix}_default`, data });
       }
@@ -142,10 +177,20 @@ export function ExportModal({ isOpen, onClose, extractedData, fileGroups, curren
         } else {
           downloadBulkXLSX(xlsxItems);
         }
+        recordExport('XLSX', xlsxItems.length);
       } catch (err) {
         setExportError(err instanceof Error ? err.message : 'Could not generate the Excel download.');
         return;
       }
+    }
+
+    if (fileCount > 0) {
+      const formats = Array.from(exportedFormats);
+      setSuccessMessage(
+        fileCount === 1
+          ? `${formats[0]} file downloaded successfully`
+          : `${fileCount} files downloaded (${formats.join(', ')})`
+      );
     }
 
     if (onExport) onExport();
