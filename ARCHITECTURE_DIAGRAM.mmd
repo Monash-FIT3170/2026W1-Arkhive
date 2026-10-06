@@ -1,0 +1,144 @@
+flowchart TD
+  %% =========================================================================
+  %% ARKHIVE SYSTEM ARCHITECTURE & DATA FLOW DIAGRAM
+  %% =========================================================================
+
+  subgraph CLIENT["Client Layer (frontend/src)"]
+    direction TB
+    subgraph UI_PAGES["User Interfaces & Pages (pages/)"]
+      AUTH_P["Login & Guest Auth<br/><code>pages/login</code>"]
+      PROJ_P["Projects & Workspace<br/><code>pages/projects</code>"]
+      UPL_P["Upload & Previews<br/><code>pages/upload</code>"]
+      MOB_P["Mobile Capture via QR<br/><code>pages/upload/MobileCapture</code>"]
+      VAL_P["Validation Workspace<br/><code>pages/validation</code>"]
+    end
+
+    subgraph CLIENT_CORE["Components & State (components/, hooks/, utils/)"]
+      AUTH_GUARD["Auth Guard & Session<br/><code>context/AuthProvider</code>"]
+      VAL_WS["Validation Workspace<br/><code>ValidationWorkspace</code>"]
+      EDITOR["Table Editor & Undo/Redo<br/><code>useTableEditor, useUndoRedo</code>"]
+      SCANNER["OCR Issue Scanner<br/><code>useReviewQueue, useReviewScanner</code>"]
+      PDF_UTIL["PDF Page Splitter<br/><code>pdfjs-dist, HTML5 Canvas</code>"]
+    end
+
+    subgraph CLIENT_SERVICES["Frontend Services (services/)"]
+      C_DOC_SVC["documentService.ts"]
+      C_PROJ_SVC["projectService.ts"]
+      C_UPL_SVC["uploadService.ts"]
+      C_LLM_SVC["llmService.ts"]
+      C_EXP_SVC["batchExportService.ts"]
+      C_SUBA_SDK["supabaseClient.ts (Anon Key)"]
+    end
+  end
+
+  subgraph API_GATEWAY["API Gateway & Routing (backend/src)"]
+    direction TB
+    ENTRY["Server Entrypoint<br/><code>backend/app.ts + src/app.ts</code>"]
+    AUTH_MID["Auth Middleware<br/><code>middleware/auth.ts (JWT verify)</code>"]
+    SESS_MID["Session & Multer<br/><code>express-session, multer</code>"]
+
+    subgraph ROUTES["Express Routers (routes/)"]
+      R_PROJ["/api/projects<br/><code>projectRoutes.ts</code>"]
+      R_DOC["/api/documents<br/><code>documentRoutes.ts</code>"]
+      R_UPL["/api/upload<br/><code>upload.ts (Legacy/Guest)</code>"]
+      R_EXT["/api/extraction<br/><code>extractionRoutes.ts</code>"]
+      R_QR["/api/qr<br/><code>qr.ts</code>"]
+      R_LLM["/api/llm<br/><code>llmRoutes.ts</code>"]
+    end
+
+    subgraph CONTROLLERS["Controllers (controller/)"]
+      C_PROJ["projects.ts"]
+      C_DOC["documents.ts"]
+      C_UPL["upload.ts"]
+      C_EXT["extraction.ts"]
+      C_QR["qrController.ts"]
+      C_LLM["llm.ts"]
+    end
+  end
+
+  subgraph BACKEND_SERVICES["Domain Logic & Processing (backend/src/services)"]
+    IMG_PROC["Image Processor<br/><code>imageProcessor.ts (Sharp + OpenCV)</code><br/><i>Resize & Blur/Darkness Checks</i>"]
+    PRE_OCR["OCR Preprocessor<br/><code>ocrPreprocessor.ts</code><br/><i>JIT Sharpen & Grayscale</i>"]
+    OCR_PIPE["OCR Pipeline Engine<br/><code>ocr/ocr.ts + utils_table_extraction_new.ts</code><br/><i>Poller, Retries & Fallbacks</i>"]
+    HYDRATE["Bounding Box Hydrator<br/><code>ocr/utils/experimental.ts</code><br/><i>OpenRedaction + Gemini Mapping</i>"]
+    R2_SVC["Object Storage Client<br/><code>r2Client.ts (AWS S3 SDK)</code>"]
+    SUBA_SVC["Database Client<br/><code>supabaseClient.ts (Service Role)</code>"]
+    AI_SVC["LLM Service<br/><code>llm/aiService.ts (Google GenAI)</code>"]
+    QR_SVC["QR Session Store<br/><code>qrService.ts</code>"]
+  end
+
+  subgraph EXTERNAL["Databases, Storage & Third-Party APIs"]
+    direction TB
+    subgraph SUPABASE_CLOUD["Supabase Platform"]
+      SUBA_AUTH[("Supabase Auth<br/><i>Users, JWT & OAuth</i>")]
+      POSTGRES[("PostgreSQL Database<br/><code>projects, documents, document_pages</code><br/><i>Row Level Security (RLS)</i>")]
+    end
+
+    subgraph STORAGE_TIER["Storage Infrastructure"]
+      R2_BUCKET[("Cloudflare R2 Bucket<br/><i>PNG Page Blobs: {user}/{project}/{doc}/page-{n}.png</i>")]
+      LOCAL_FS[("Local Disk /uploads<br/><i>Ephemeral session uploads & QR temp files</i>")]
+    end
+
+    subgraph AI_SERVICES["Cognitive & AI Cloud Services"]
+      AZURE_DI["Azure Document Intelligence<br/><i>prebuilt-layout model</i>"]
+      GEMINI_API["Google Gemini LLM<br/><i>Gemini 2.x Flash / Pro</i>"]
+    end
+  end
+
+  %% =========================================================================
+  %% CONNECTIONS & DATA FLOWS
+  %% =========================================================================
+
+  %% Client internal flows
+  AUTH_P --> C_SUBA_SDK
+  C_SUBA_SDK -.->|"Auth & Token"| SUBA_AUTH
+  PROJ_P --> C_PROJ_SVC
+  PROJ_P --> C_DOC_SVC
+  UPL_P --> PDF_UTIL
+  PDF_UTIL --> C_DOC_SVC
+  PDF_UTIL --> C_UPL_SVC
+  MOB_P -->|"Camera photo upload"| R_QR
+  VAL_P --> VAL_WS
+  VAL_WS --> EDITOR
+  VAL_WS --> SCANNER
+  VAL_WS --> C_LLM_SVC
+  VAL_WS --> C_EXP_SVC
+
+  %% Client to Backend Gateway
+  C_PROJ_SVC -->|"Bearer JWT"| R_PROJ
+  C_DOC_SVC -->|"Bearer JWT + Multipart"| R_DOC
+  C_UPL_SVC -->|"Session Cookie"| R_UPL
+  C_LLM_SVC --> R_LLM
+
+  %% Gateway routing & middleware
+  R_PROJ --> AUTH_MID --> C_PROJ
+  R_DOC --> AUTH_MID --> C_DOC
+  R_UPL --> SESS_MID --> C_UPL
+  R_EXT --> SESS_MID --> C_EXT
+  R_QR --> C_QR
+  R_LLM --> C_LLM
+
+  %% Controllers to Services
+  C_PROJ --> SUBA_SVC
+  C_DOC --> IMG_PROC
+  C_DOC --> R2_SVC
+  C_DOC --> SUBA_SVC
+  C_DOC --> OCR_PIPE
+  C_UPL --> IMG_PROC
+  C_UPL --> OCR_PIPE
+  C_QR --> QR_SVC
+  C_LLM --> AI_SVC
+
+  %% Service processing pipelines
+  IMG_PROC -->|"Optimized PNG Buffer"| R2_SVC
+  IMG_PROC -->|"Local Disk Cache"| LOCAL_FS
+  OCR_PIPE --> PRE_OCR --> AZURE_DI
+  AZURE_DI -->|"Raw Layout & Cells"| HYDRATE
+  HYDRATE -->|"Table Structuring"| GEMINI_API
+  HYDRATE -->|"Structured Table + Bounding Boxes"| C_DOC
+  AI_SVC -->|"Field Corrections & Chat"| GEMINI_API
+
+  %% Services to Persistence
+  R2_SVC -->|"Put / Get Presigned URL"| R2_BUCKET
+  SUBA_SVC -->|"Bypass RLS Queries"| POSTGRES
+  POSTGRES -.->|"Enforce Tenant RLS"| SUBA_AUTH
