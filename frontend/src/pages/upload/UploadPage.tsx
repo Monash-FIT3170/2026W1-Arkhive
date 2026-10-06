@@ -20,6 +20,7 @@ import type { PreviewItem } from './types';
 import { buildPreviewItemsForFiles } from './components/preview/previewHelpers';
 import EmptyUploadView from './components/EmptyUploadView';
 import UploadMoreButton from './components/actions/UploadMoreButton';
+import ScanQrButton from './components/actions/ScanQrButton';
 import PreviewCard from './components/preview/PreviewCard';
 import PageToolbar, { type ToolbarAction } from './components/preview/PageToolbar';
 import PageGroupSection from './components/preview/PageGroupSection';
@@ -232,7 +233,76 @@ function UploadPageInner() {
         setIsProcessing(false);
       });
   }
+  // ── QR (phone) upload ──────────────────────────────────────────────────────
+  // NEW: Called by ScanQrButton once the phone's photo has landed in the session.
+  // Re-fetches the session's documents and adds any we aren't already showing,
+  // mirroring what the hydrate-on-mount effect does. Phone uploads arrive as a
+  // brand-new document, same as a fresh desktop upload.
+  async function handleQrUploaded() {
+    try {
+      const docs = await getUploadedDocuments();
+      const knownIds = new Set(previewItemsRef.current.map((item) => item.documentId));
 
+      const newItems: PreviewItem[] = [];
+      docs.forEach((doc) => {
+        if (knownIds.has(doc.documentId)) return;
+
+        const fileIndex = nextFileIndexRef.current++;
+        doc.pages.forEach((pageObj) => {
+          const pageUrlStr = typeof pageObj === 'string' ? pageObj : pageObj.url;
+          const qualityFlags = typeof pageObj === 'object' ? pageObj.qualityFlags : undefined;
+          const parts = pageUrlStr.split('/');
+          const backendPageIndex = parseInt(parts[parts.length - 1], 10);
+
+          newItems.push({
+            label: doc.label || `Mobile Upload ${fileIndex + 1}`,
+            subtitle: `Page ${backendPageIndex + 1}`,
+            previewSrc: pageUrlStr,
+            isImage: true,
+            hasFile: true,
+            fileIndex,
+            backendPageIndex,
+            documentId: doc.documentId,
+            isProcessed: false,
+            isBlurry: qualityFlags?.isBlurry,
+            isDark: qualityFlags?.isDark,
+            isInvalidSize: qualityFlags?.isInvalidSize,
+            shouldWarn: qualityFlags?.shouldWarn,
+          });
+        });
+      });
+
+      if (newItems.length === 0) return;
+
+      setPreviewItems((prev) => {
+        const startIndex = prev.length;
+        const next = [...prev, ...newItems];
+        if (prev.length === 0) {
+          unlockStep(1); // unlock step 1 (preview) after the first successful capture
+        }
+
+        // Select the new pages by default, like captureFiles does
+        setSelectedPages((prevSel) => {
+          const nextSel = new Set(prevSel);
+          newItems.forEach((item, i) => {
+            if (item.hasFile) nextSel.add(startIndex + i);
+          });
+          return nextSel;
+        });
+
+        return next;
+      });
+      // explicitly go to the preview screen once the QR photo has landed,
+      // instead of relying only on the previewItems-watching effect.
+      setTimeout(() => {
+        navigate('/upload?step=preview', { replace: true });
+      }, 1500);
+
+    } catch (err) {
+      console.error('Failed to refresh documents after QR upload', err);
+      setUploadError('Your photo was uploaded, but the page could not be refreshed. Please reload.');
+    }
+  }
   // ── Page selection ─────────────────────────────────────────────────────────
   function togglePageSelection(index: number) {
     setSelectedPages((prev) => {
@@ -719,7 +789,7 @@ function UploadPageInner() {
     return (
       <>
         {renderNotification()}
-        <EmptyUploadView onFilesCaptured={captureFiles} onError={setUploadError} />
+        <EmptyUploadView onFilesCaptured={captureFiles} onError={setUploadError} onQrUploaded={handleQrUploaded} />
       </>
     );
   }
@@ -919,8 +989,11 @@ function UploadPageInner() {
         onDeselectAll={deselectAllPages}
         actions={toolbarActions}
         trailing={
-          <div className="w-40">
-            <UploadMoreButton onFilesSelected={captureFiles} onError={setUploadError} />
+          <div className="flex items-center gap-2">
+            <ScanQrButton onUploaded={handleQrUploaded} className="btn btn-outline btn-sm" />
+            <div className="w-40">
+              <UploadMoreButton onFilesSelected={captureFiles} onError={setUploadError} />
+            </div>
           </div>
         }
       />

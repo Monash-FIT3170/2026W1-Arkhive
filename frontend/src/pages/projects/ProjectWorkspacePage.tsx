@@ -14,6 +14,8 @@ import {
 import { buildPreviewItemsForFiles } from '../upload/components/preview/previewHelpers';
 import EmptyUploadView from '../upload/components/EmptyUploadView';
 import UploadMoreButton from '../upload/components/actions/UploadMoreButton';
+import ScanQrButton from '../upload/components/actions/ScanQrButton';
+import { getUploadedDocuments, deleteDocumentFromBackend } from '../../services/uploadService';
 import PreviewCard from '../upload/components/preview/PreviewCard';
 import PageToolbar, { type ToolbarAction } from '../upload/components/preview/PageToolbar';
 import PageGroupSection from '../upload/components/preview/PageGroupSection';
@@ -273,6 +275,41 @@ export default function ProjectWorkspacePage() {
   }, []);
 
   // ── Upload ─────────────────────────────────────────────────────────────
+  async function handleQrUploaded(docId?: string) {
+    setIsUploading(true);
+    setActionError(null);
+    try {
+      const sessionDocs = await getUploadedDocuments();
+      const targetDocs = docId ? sessionDocs.filter(d => d.documentId === docId) : sessionDocs;
+      
+      if (targetDocs.length === 0) {
+        setIsUploading(false);
+        return;
+      }
+
+      const files: File[] = [];
+      for (const doc of targetDocs) {
+        for (let i = 0; i < doc.pages.length; i++) {
+          const page = doc.pages[i];
+          const pageUrl = typeof page === 'string' ? page : page.url;
+          const blob = await (await fetch(pageUrl)).blob();
+          const filename = doc.label || `qr_capture_${doc.documentId}_${i}.png`;
+          files.push(new File([blob], filename, { type: blob.type }));
+        }
+        await deleteDocumentFromBackend(doc.documentId).catch(console.error);
+      }
+      
+      setIsUploading(false); // handleFilesCaptured will set it to true again
+      if (files.length > 0) {
+        await handleFilesCaptured(files);
+      }
+    } catch (err) {
+      setActionError('Failed to import photos from phone.');
+      console.error(err);
+      setIsUploading(false);
+    }
+  }
+
   async function handleFilesCaptured(capturedFiles: File[]) {
     if (!project) return;
     setIsUploading(true);
@@ -628,7 +665,7 @@ export default function ProjectWorkspacePage() {
     return (
       <div className="flex-1 flex flex-col">
         {header}
-        <EmptyUploadView onFilesCaptured={handleFilesCaptured} onError={setActionError} />
+        <EmptyUploadView onFilesCaptured={handleFilesCaptured} onError={setActionError} onQrUploaded={handleQrUploaded} />
         <Toast
           open={!!actionError}
           message={actionError || ''}
@@ -696,8 +733,11 @@ export default function ProjectWorkspacePage() {
           onDeselectAll={deselectAll}
           actions={filesToolbarActions}
           trailing={
-            <div className="w-40">
-              <UploadMoreButton onFilesSelected={handleFilesCaptured} onError={setActionError} />
+            <div className="flex items-center gap-2">
+              <ScanQrButton onUploaded={handleQrUploaded} className="btn btn-outline btn-sm" />
+              <div className="w-40">
+                <UploadMoreButton onFilesSelected={handleFilesCaptured} onError={setActionError} />
+              </div>
             </div>
           }
         />
