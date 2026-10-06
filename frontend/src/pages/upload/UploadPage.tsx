@@ -248,20 +248,26 @@ function UploadPageInner() {
         if (knownIds.has(doc.documentId)) return;
 
         const fileIndex = nextFileIndexRef.current++;
-        doc.pages.forEach((pageUrl) => {
-          const parts = pageUrl.split('/');
+        doc.pages.forEach((pageObj) => {
+          const pageUrlStr = typeof pageObj === 'string' ? pageObj : pageObj.url;
+          const qualityFlags = typeof pageObj === 'object' ? pageObj.qualityFlags : undefined;
+          const parts = pageUrlStr.split('/');
           const backendPageIndex = parseInt(parts[parts.length - 1], 10);
 
           newItems.push({
             label: doc.label || `Mobile Upload ${fileIndex + 1}`,
             subtitle: `Page ${backendPageIndex + 1}`,
-            previewSrc: pageUrl,
+            previewSrc: pageUrlStr,
             isImage: true,
             hasFile: true,
             fileIndex,
             backendPageIndex,
             documentId: doc.documentId,
             isProcessed: false,
+            isBlurry: qualityFlags?.isBlurry,
+            isDark: qualityFlags?.isDark,
+            isInvalidSize: qualityFlags?.isInvalidSize,
+            shouldWarn: qualityFlags?.shouldWarn,
           });
         });
       });
