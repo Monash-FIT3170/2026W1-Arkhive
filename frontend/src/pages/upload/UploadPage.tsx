@@ -984,7 +984,7 @@ function UploadPageInner() {
         actions={toolbarActions}
         trailing={
           <div className="flex items-center gap-2">
-            <ScanQrButton onUploaded={handleQrUploaded} className="btn btn-outline btn-sm w-full" />
+            <ScanQrButton onUploaded={handleQrUploaded} className="btn btn-outline btn-sm" />
             <div className="w-40">
               <UploadMoreButton onFilesSelected={captureFiles} onError={setUploadError} />
             </div>

@@ -16,7 +16,7 @@ type ModalState = 'closed' | 'loading' | 'waiting' | 'success' | 'expired' | 'er
 
 interface ScanQrButtonProps {
   // Called once the phone's upload has landed in the session, so the parent can refresh its previews
-  onUploaded: () => void;
+  onUploaded: (docId?: string) => void;
   className?: string;
   disabled?: boolean;
 }
@@ -72,7 +72,14 @@ export default function ScanQrButton({
 
         if (result.status === 'uploaded') {
           setModalState('success');
-          onUploadedRef.current();
+          let docId: string | undefined;
+          if (result.uploadedImageUrl) {
+            const parts = result.uploadedImageUrl.split('/');
+            if (parts.length >= 3) {
+              docId = parts[parts.length - 2];
+            }
+          }
+          onUploadedRef.current(docId);
           return;
         }
         if (result.status === 'expired') {
