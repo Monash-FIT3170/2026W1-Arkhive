@@ -27,6 +27,24 @@ export const s3Client = new S3Client({
 });
 
 /**
+ * Uploads a buffer directly to R2.
+ */
+export async function putObject(
+  key: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<void> {
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  });
+
+  await s3Client.send(command);
+}
+
+/**
  * Generates a presigned PUT URL allowing the client to upload an object directly to R2.
  */
 export async function generateUploadUrl(

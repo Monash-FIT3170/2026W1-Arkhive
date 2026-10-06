@@ -35,6 +35,12 @@ function AppContent() {
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:id" element={<ProjectWorkspacePage />} />
           </Route>
+          <Route path="*" element={
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <h1 className="text-4xl font-bold mb-4">404</h1>
+              <p className="text-lg text-base-content/70">Page not found</p>
+            </div>
+          } />
         </Routes>
       </div>
     </div>

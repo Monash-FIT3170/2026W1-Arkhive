@@ -5,6 +5,7 @@ export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 export interface DocumentJob {
   id: string;
+  documentId?: string;
   index: number;
   fileName: string;
   imageIndex: number;
