@@ -305,7 +305,7 @@ function ExtractedDataPanel({
           )}
           <button
             onClick={() => setShowExportModal(true)}
-            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl ${
+            className={`btn btn-sm gap-2 text-xs transition-all rounded-xl text-base-100 ${
               exportedFormat ? 'btn-success' : 'btn-primary'
             }`}
           >

@@ -12,6 +12,7 @@ export type ToolbarAction = {
   icon?: ReactNode;
   onClick: () => void;
   tone?: 'primary' | 'error' | 'outline';
+  text?: string;
   disabled?: boolean;
   /** Shows a spinner instead of the icon/label — for the in-flight Process action. */
   isBusy?: boolean;
@@ -66,7 +67,7 @@ export default function PageToolbar({
           actions.map((action) => (
             <button
               key={action.key}
-              className={`btn btn-sm gap-1.5 ${toneClass(action.tone)}`}
+              className={`btn btn-sm gap-1.5 ${toneClass(action.tone)} ${action.text}`}
               disabled={action.disabled}
               onClick={action.onClick}
             >

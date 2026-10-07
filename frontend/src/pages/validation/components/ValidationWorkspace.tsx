@@ -472,7 +472,7 @@ function ValidationWorkspace({
                       type="button"
                       className={`flex items-center justify-between gap-3 px-2.5 py-2 text-xs rounded-lg transition-colors w-full min-w-0 ${
                         idx === activeFileIndex
-                          ? 'active font-semibold bg-primary text-primary-content'
+                          ? 'active font-semibold bg-primary text-base-100'
                           : 'hover:bg-base-200'
                       }`}
                       onClick={() => {
@@ -483,7 +483,7 @@ function ValidationWorkspace({
                       <span className="flex items-center gap-2 min-w-0 flex-1">
                         <FileText
                           className={`w-3.5 h-3.5 shrink-0 ${
-                            idx === activeFileIndex ? 'text-primary-content' : 'text-primary'
+                            idx === activeFileIndex ? 'text-base-100' : 'text-primary'
                           }`}
                         />
                         <span className="truncate text-left font-normal" title={fg.fileName}>
@@ -493,7 +493,7 @@ function ValidationWorkspace({
                       <span
                         className={`badge badge-xs shrink-0 font-medium ${
                           idx === activeFileIndex
-                            ? 'badge-ghost bg-primary-content/20 text-primary-content border-none'
+                            ? 'badge-ghost bg-primary-content/20 text-base-100 border-none'
                             : 'badge-ghost text-base-content/70'
                         }`}
                       >
@@ -538,7 +538,7 @@ function ValidationWorkspace({
                         onClick={() => handleSelectPageInFile(pIdx)}
                         className={`btn btn-xs h-6 min-h-0 px-2 rounded-lg text-xs transition-all ${
                           pIdx === activePageIndexInFile
-                            ? 'btn-primary font-bold shadow-xs'
+                            ? 'btn-primary font-bold shadow-xs text-base-100'
                             : 'btn-ghost hover:bg-base-200'
                         }`}
                       >
@@ -626,7 +626,7 @@ function ValidationWorkspace({
             <button
               onClick={() => setViewMode('split')}
               className={`btn btn-xs join-item rounded-lg gap-1 h-7 min-h-0 ${
-                viewMode === 'split' ? 'btn-primary shadow-xs' : 'btn-ghost'
+                viewMode === 'split' ? 'btn-primary shadow-xs text-base-100' : 'btn-ghost'
               }`}
               title="Side-by-side Split View"
             >
@@ -636,7 +636,7 @@ function ValidationWorkspace({
             <button
               onClick={() => setViewMode('document')}
               className={`btn btn-xs join-item rounded-lg gap-1 h-7 min-h-0 ${
-                viewMode === 'document' ? 'btn-primary shadow-xs' : 'btn-ghost'
+                viewMode === 'document' ? 'btn-primary shadow-xs text-base-100' : 'btn-ghost'
               }`}
               title="Document Full Focus View"
             >
@@ -646,7 +646,7 @@ function ValidationWorkspace({
             <button
               onClick={() => setViewMode('table')}
               className={`btn btn-xs join-item rounded-lg gap-1 h-7 min-h-0 ${
-                viewMode === 'table' ? 'btn-primary shadow-xs' : 'btn-ghost'
+                viewMode === 'table' ? 'btn-primary shadow-xs text-base-100' : 'btn-ghost'
               }`}
               title="Table Full Focus View"
             >
@@ -660,7 +660,7 @@ function ValidationWorkspace({
             <button
               onClick={() => setIsPiPOpen(!isPiPOpen)}
               className={`btn btn-xs rounded-lg gap-1.5 h-7 min-h-0 text-xs ${
-                isPiPOpen ? 'btn-primary shadow-xs' : 'btn-outline'
+                isPiPOpen ? 'btn-primary shadow-xs text-base-100' : 'btn-outline'
               }`}
               title={
                 isPiPOpen
