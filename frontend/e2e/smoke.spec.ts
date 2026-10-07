@@ -64,3 +64,16 @@ test('guest user can select a valid image for upload', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/upload\?step=preview$/);
 });
+
+test('unsupported file type is not accepted for upload', async ({ page }) => {
+  const loginPage = new LoginPage(page);
+
+  await loginPage.goto();
+  await loginPage.continueAsGuest();
+
+  const fileInput = page.locator('input[type="file"]');
+
+  await fileInput.setInputFiles('e2e/fixtures/invalid-test.csv');
+
+  await expect(page).toHaveURL(/\/upload$/);
+});
