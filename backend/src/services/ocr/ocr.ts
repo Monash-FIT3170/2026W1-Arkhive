@@ -1,104 +1,30 @@
-import path from 'path';
-import vision from '@google-cloud/vision';
-import fs from 'fs';
+import { GoogleGenAI } from '@google/genai';
 
 import { withRetry } from './utils/utils.js';
-import { analyse_result } from './utils/utils_table_extraction_new.js';
-import { getMockOcrResult } from './mockOcrFixture.js';
+import { analyse_result } from './utils/analyseBuffer.js';
 import { prepareForOCR } from '../ocrPreprocessor.js';
+import { structureDocument } from './pipeline/pipeline.js';
+import type { DocType, StructuredDocument } from '../../models/Document.js';
 
-const sampleImage = 'assets/sample-page-1.png';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-
-
-/**
- * @author Aryan Cyrus (33114242)
- * Initializes the Google Cloud Vision client with the necessary credentials.
- *
- * We are when deploying one needs to add env variables to hosting platform BUT:
- * - Render does not take JSON env variables, so we need to
- *   convert the JSON to base64 and then decode it back to JSON in the code.
- *
- * So all render sees is: GOOGLE_CREDENTIALS_BASE64 = <base64 encoded JSON>
- */
-const localCredsPath = path.resolve(
-  process.cwd(),
-  '../backend/src/credentials/google-vision-key.json'
-);
-const tempCredsPath = path.join('/tmp', 'google-vision-key.json');
-
-let credsPath: string;
-
-if (process.env.GOOGLE_CREDENTIALS_BASE64) {
-  // Render (or any host with the base64 env var set): decode to /tmp
-  fs.writeFileSync(tempCredsPath, Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64'));
-  credsPath = tempCredsPath;
-} else {
-  // Local dev: use the JSON file already sitting in the repo
-  credsPath = localCredsPath;
+export interface ParseOptions {
+  docType?: DocType; // skip classification when known
+  pageOffset?: number; // real 0-based page index of this image within its document
 }
 
-const client = new vision.ImageAnnotatorClient({
-  keyFilename: credsPath,
-  features: [
-    {
-      type: 'DOCUMENT_TEXT_DETECTION',
-    },
-  ],
-  imageContext: {
-    languageHints: ['en'],
-  },
-});
+async function parseDocument(imageBuffer: Buffer, opts: ParseOptions): Promise<StructuredDocument> {
+  // Skips Azure + Gemini entirely (no CI secrets, no flaky network). Fixture must be a StructuredDocument.
 
-/**
- *
- * THIS NEEDS TO BE REWORKED
- */
-export async function textExtraction(buffer: Buffer): Promise<string> {
-  const [result] = await client.documentTextDetection({
-    image: { content: buffer },
-  });
-  return result.fullTextAnnotation?.text ?? '';
+  const preprocessed = await prepareForOCR(imageBuffer); // JIT sharpening + grayscale
+  const azure = await analyse_result(preprocessed);
+  return structureDocument(azure, { ai, docType: opts.docType, pageOffset: opts.pageOffset });
 }
 
-//test ocr on 1 png page
-export async function testOCR() {
-  const sampleImagePath = path.resolve(process.cwd(), sampleImage);
-  const imageBuffer = fs.readFileSync(sampleImagePath);
-  const text = await textExtraction(imageBuffer);
-
-  return {
-    success: true,
-    text
-  };
-}
-
-
-
-/** 
- @author Harsha Sharma (33879303)
-*/
-async function parseTable(imageBuffer: Buffer) {
-  // Skips the real Azure Document Intelligence + Gemini calls entirely.
-  // See mockOcrFixture.ts for why: no CI/test secrets, no flaky network dependency.
-  if (process.env.OCR_MODE === 'mock') {
-    return getMockOcrResult();
-  }
-  
-  // Phase 4: JIT OCR Enhancement (sharpening + grayscale)
-  const preprocessedBuffer = await prepareForOCR(imageBuffer);
-  
-  return analyse_result(preprocessedBuffer);
-}
-
-/*
- @author Harsha Sharma (33879303)
-*/
-export async function parseTableWithRetries(
+export function parseDocumentWithRetries(
   imageBuffer: Buffer,
+  opts: ParseOptions = {},
   onRetry?: (attempt: number, maxRetries: number) => void
-) {
-  return await withRetry(() => parseTable(imageBuffer), 1, 3000, onRetry);
+): Promise<StructuredDocument> {
+  return withRetry(() => parseDocument(imageBuffer, opts), 1, 3000, onRetry);
 }
-
-
