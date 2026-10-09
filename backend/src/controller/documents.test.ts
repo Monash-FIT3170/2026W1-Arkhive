@@ -16,6 +16,15 @@ import { supabase } from '../services/supabaseClient';
 import * as r2Client from '../services/r2Client';
 import * as ocrService from '../services/ocr/ocr';
 
+vi.mock('../services/imageProcessor', () => {
+  return {
+    processImage: vi.fn().mockResolvedValue({
+      buffer: Buffer.from('processed_mock'),
+      qualityFlags: { isBlurry: false, isDark: false, isInvalidSize: false, shouldWarn: false }
+    })
+  };
+});
+
 function createMockReqRes(
   userId: string | null = 'test-user-123',
   body = {},
@@ -49,6 +58,8 @@ function createMockReqRes(
 describe('Documents Controller', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(r2Client, 'putObject').mockResolvedValue(undefined);
   });
 
   describe('getUploadUrl', () => {
@@ -100,10 +111,11 @@ describe('Documents Controller', () => {
         documentId: 'doc-123', // Pass documentId so randomUUID() is skipped
       });
 
-      await documentsController.getUploadUrl(req, res);
+      req.file = { buffer: Buffer.from('mock') } as Express.Multer.File;
+      await documentsController.uploadPage(req, res);
 
       expect(getStatus()).toBe(201);
-      expect(getJson().uploadUrl).toBe('https://r2.test/upload-presigned');
+      expect(getJson().qualityFlags).toBeDefined();
       expect(getJson().documentId).toBe('doc-123');
       expect(getJson().storageKey).toContain('test-user-123/proj-1/');
     });
@@ -124,8 +136,10 @@ describe('Documents Controller', () => {
         filename: 'report.pdf',
         pageIndex: 0, // Added required pageIndex
       });
+      
+      req.file = { buffer: Buffer.from('mock') } as Express.Multer.File;
 
-      await documentsController.getUploadUrl(req, res);
+      await documentsController.uploadPage(req, res);
 
       expect(getStatus()).toBe(403);
     });
@@ -246,11 +260,16 @@ describe('Documents Controller', () => {
 
       expect(getStatus()).toBe(200);
       expect(getJson().results).toEqual([
-        { documentId: 'doc-123', pageIndex: 0, status: 'done', rawResult: mockOcrResult },
+        {
+          documentId: 'doc-123',
+          pageIndex: 0,
+          status: 'done',
+          rawResult: mockOcrResult,
+        },
       ]);
       expect(update.mock.calls.map((call) => call[0])).toEqual([
         { status: 'processing' },
-        { status: 'done', raw_ocr_result: mockOcrResult, error_message: null },
+        { status: 'done', raw_ocr_result: mockOcrResult, review_state: null, error_message: null },
       ]);
     });
 
@@ -274,7 +293,9 @@ describe('Documents Controller', () => {
     });
 
     it('skips a page already marked done unless force is set', async () => {
-      mockOwnedDocument([{ page_index: 0, status: 'done', raw_ocr_result: mockOcrResult }]);
+      mockOwnedDocument([
+        { page_index: 0, status: 'done', review_state: null, raw_ocr_result: mockOcrResult },
+      ]);
       const getObjectBufferSpy = vi.spyOn(r2Client, 'getObjectBuffer');
       vi.spyOn(ocrService, 'parseTableWithRetries');
 
@@ -488,7 +509,8 @@ describe('Documents Controller', () => {
         contentType: 'image/png',
       });
 
-      await documentsController.getUploadUrl(req, res);
+      req.file = { buffer: Buffer.from('mock') } as Express.Multer.File;
+      await documentsController.uploadPage(req, res);
 
       expect(getStatus()).toBe(201);
       expect(getJson().pageIndex).toBe(1);
@@ -556,6 +578,9 @@ describe('Documents Controller', () => {
                 eq: vi.fn().mockResolvedValue({ error: null }),
               }),
             }),
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ count: 1, error: null }),
+            }),
           } as any;
         }
         return {} as any;
@@ -572,6 +597,64 @@ describe('Documents Controller', () => {
       expect(deleteObjectSpy).toHaveBeenCalledWith('user/proj/doc-123/page-2.png');
       expect(getStatus()).toBe(200);
       expect(getJson().pageIndex).toBe(2);
+      expect(getJson().documentDeleted).toBe(false);
+    });
+
+    it('deletes the parent document when its last page is removed', async () => {
+      const deleteObjectSpy = vi.spyOn(r2Client, 'deleteObject').mockResolvedValue();
+      const deletePrefixSpy = vi.spyOn(r2Client, 'deletePrefix').mockResolvedValue();
+
+      const mockDoc = {
+        id: 'doc-123',
+        storage_path: 'user/proj/doc-123',
+      };
+
+      const deleteDocumentEqSpy = vi.fn().mockResolvedValue({ error: null });
+
+      vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+        if (table === 'documents') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({ data: mockDoc, error: null }),
+                }),
+              }),
+            }),
+            delete: vi.fn().mockReturnValue({
+              eq: deleteDocumentEqSpy,
+            }),
+          } as any;
+        }
+        if (table === 'document_pages') {
+          return {
+            delete: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: null }),
+              }),
+            }),
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
+
+      const { req, res, getStatus, getJson } = createMockReqRes(
+        'test-user-123',
+        {},
+        { id: 'doc-123', pageIndex: '0' }
+      );
+
+      await documentsController.deletePage(req, res);
+
+      expect(deleteObjectSpy).toHaveBeenCalledWith('user/proj/doc-123/page-0.png');
+      expect(deletePrefixSpy).toHaveBeenCalledWith('user/proj/doc-123/');
+      expect(deleteObjectSpy).toHaveBeenCalledWith('user/proj/doc-123');
+      expect(deleteDocumentEqSpy).toHaveBeenCalledWith('id', 'doc-123');
+      expect(getStatus()).toBe(200);
+      expect(getJson().documentDeleted).toBe(true);
     });
   });
 });

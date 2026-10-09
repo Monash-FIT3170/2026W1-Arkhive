@@ -1,4 +1,4 @@
-import { SchemaType, Schema } from '@google/generative-ai';
+import { Schema, Type } from '@google/genai';
 export interface Vertex {
   x: number;
   y: number;
@@ -33,82 +33,48 @@ export type OCRColumnBox = {
 
 export type OCRColumnBoundingBoxes = Record<string, OCRColumnBox>;
 
-export const geminiSchemaBBoxPrompt: Schema = {
-  type: SchemaType.OBJECT,
+export const geminiSchemaBBoxPromptSimplified: Schema = {
+  type: Type.OBJECT,
   properties: {
     components: {
-      type: SchemaType.ARRAY,
+      type: Type.ARRAY,
       description: 'List of OCR layout components extracted from the document',
       items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         properties: {
           id: {
-            type: SchemaType.STRING,
+            type: Type.STRING,
           },
           type: {
-            type: SchemaType.STRING,
+            type: Type.STRING,
             format: 'enum',
             enum: ['TITLE', 'HEADER', 'TABLE_ROW', 'BODY_TEXT', 'TABLE_COLS'],
           },
           indentation: {
-            type: SchemaType.NUMBER,
+            type: Type.NUMBER,
           },
           y: {
-            type: SchemaType.NUMBER,
+            type: Type.NUMBER,
           },
           layer: {
-            type: SchemaType.INTEGER,
+            type: Type.INTEGER,
           },
           parentId: {
-            type: SchemaType.STRING,
+            type: Type.STRING,
           },
           text: {
-            type: SchemaType.STRING,
+            type: Type.STRING,
           },
           cells: {
-            type: SchemaType.ARRAY,
+            type: Type.ARRAY,
             description:
               'One entry for EVERY column in the table, in column order — use an empty string "" for columns this row does not populate. Never omit an entry or shift values to skip blanks. Must have exactly as many entries as "boundingBoxes", in the same order.',
             items: {
-              type: SchemaType.STRING,
+              type: Type.STRING,
             },
           },
           confidence: {
-            type: SchemaType.NUMBER,
-          },
-          boundingBoxes: {
-            type: SchemaType.ARRAY,
-            description:
-              'One entry for EVERY column in the table, in column order — including columns this row does not populate (use an empty "text" but still provide the correct "column" label and a vertices box for that grid position). Must have exactly as many entries as the "cells" array, in the same order.',
-            items: {
-              type: SchemaType.OBJECT,
-              properties: {
-                columnKey: {
-                  type: SchemaType.STRING, // e.g. "col_0", "col_1"
-                },
-                text: {
-                  type: SchemaType.STRING,
-                },
-                column: {
-                  type: SchemaType.STRING, // e.g. "Column 0"
-                },
-                confidence: {
-                  type: SchemaType.NUMBER,
-                },
-                vertices: {
-                  type: SchemaType.ARRAY,
-                  items: {
-                    type: SchemaType.OBJECT,
-                    properties: {
-                      x: { type: SchemaType.NUMBER },
-                      y: { type: SchemaType.NUMBER },
-                    },
-                    required: ['x', 'y'],
-                  },
-                },
-              },
-              required: ['columnKey', 'text', 'column', 'vertices', 'confidence'],
-            },
+            type: Type.NUMBER,
           },
         },
         required: [
@@ -116,7 +82,6 @@ export const geminiSchemaBBoxPrompt: Schema = {
           'type',
           'indentation',
           'y',
-          'boundingBoxes',
           'layer',
           'text',
           'confidence',
@@ -126,6 +91,7 @@ export const geminiSchemaBBoxPrompt: Schema = {
   },
   required: ['components'],
 };
+
 
 export type OCRBoundingBoxes = Record<string, OCRBoundingBox>;
 

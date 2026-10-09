@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ValidationWorkspace from './ValidationWorkspace';
 import type { ExtractedPage } from '../../../models/TableData';
 import type { OCRComponent } from '../../../models/OCRComponent';
@@ -163,5 +163,65 @@ describe('ValidationWorkspace - File Separation & Adaptive View Modes', () => {
     // Click Split Mode
     fireEvent.click(splitModeBtn);
     expect(screen.getByText('EXTRACTED DATA')).toBeInTheDocument();
+  });
+
+  it('allows renaming a column header in edit mode and persists the update', () => {
+    render(
+      <ValidationWorkspace
+        pages={mockPages}
+        ocrPages={mockOcrPages}
+        imageUrls={mockImageUrls}
+        fileMetadata={mockFileMetadata}
+        onPersist={mockPersist}
+      />
+    );
+
+    // Toggle edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    // Find Rename Column button
+    const renameBtns = screen.getAllByTitle('Rename Column');
+    fireEvent.click(renameBtns[0]);
+
+    // Modal input opens
+    const input = screen.getByPlaceholderText('Column name');
+    expect(input).toHaveValue('ITEM');
+
+    fireEvent.change(input, { target: { value: 'PRODUCT_NAME' } });
+
+    // Confirm rename
+    const confirmBtns = screen.getAllByRole('button', { name: 'Rename Column' });
+    fireEvent.click(confirmBtns[confirmBtns.length - 1]);
+
+    // Verify onPersist is called
+    expect(mockPersist).toHaveBeenCalled();
+    const persistedPages: ExtractedPage[] = mockPersist.mock.calls[0][0];
+    expect(persistedPages[0].columns).toContain('PRODUCT_NAME');
+    expect(persistedPages[0].columns).not.toContain('ITEM');
+    expect(persistedPages[0].rows[0].PRODUCT_NAME).toBe('Item 1A');
+  });
+
+  it('renders the re-scan page button scoped to the active page in the top bar', async () => {
+    render(
+      <ValidationWorkspace
+        pages={mockPages}
+        ocrPages={mockOcrPages}
+        imageUrls={mockImageUrls}
+        fileMetadata={mockFileMetadata}
+        onPersist={mockPersist}
+      />
+    );
+
+    // Initial page is page 1
+    const rescanBtn = screen.getByRole('button', { name: /Re-scan page 1/i });
+    expect(rescanBtn).toBeInTheDocument();
+    await waitFor(() => expect(rescanBtn).toHaveTextContent('Re-scan Page'));
+
+    // Switch to page 2 of Invoice_01.pdf
+    const page2Btn = screen.getByRole('button', { name: '2' });
+    fireEvent.click(page2Btn);
+
+    // Re-scan button updates its scope to page 2
+    expect(screen.getByRole('button', { name: /Re-scan page 2/i })).toBeInTheDocument();
   });
 });

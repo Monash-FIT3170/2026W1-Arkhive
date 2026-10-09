@@ -21,19 +21,43 @@ function escapeCell(value: unknown): string {
 }
 
 /**
- * Converts ExtractedData (columns + rows) into a CSV string.
+ * Converts ExtractedData (columns + rows) or multiple pages into a CSV string.
  */
-export function formatExtractedDataAsCSV(data: ExtractedData): string {
-	const exportColumns = [...data.columns];
+export function formatExtractedDataAsCSV(data: ExtractedData | ExtractedData[]): string {
+	const dataArray = Array.isArray(data) ? data : [data];
+	if (dataArray.length === 0) return "";
 
-	const header = exportColumns.map(escapeCell).join(",");
+	// Stack each page's table vertically in the CSV.
+	// This prevents tables with completely different structures from 
+	// staggering incorrectly and creating huge empty gaps.
+	const parts: string[] = [];
 
-	const rowLines = data.rows.map((row) => {
-		const dataCells = data.columns.map((col) => escapeCell(row[col]));
-		return [...dataCells].join(",");
+	dataArray.forEach((page, index) => {
+		if (!page || !page.columns || !page.rows) return;
+
+		const exportColumns = [...page.columns];
+		const header = exportColumns.map(escapeCell).join(",");
+
+		const rowLines = page.rows.map((row) => {
+			const dataCells = exportColumns.map((col) => escapeCell(row[col]));
+			return [...dataCells].join(",");
+		});
+
+		// Add a small title if exporting multiple pages to distinguish them
+		if (dataArray.length > 1) {
+			parts.push(`"--- Page ${index + 1} ---"`);
+		}
+		
+		parts.push(header);
+		parts.push(...rowLines);
+
+		// Add a blank row between pages
+		if (index < dataArray.length - 1) {
+			parts.push("");
+		}
 	});
 
-	return [header, ...rowLines].join("\n");
+	return parts.join("\n");
 }
 
 /**
@@ -60,9 +84,42 @@ export function downloadCSV(
  * Convenience wrapper: format + download in one call.
  */
 export function exportExtractedDataAsCSV(
-	data: ExtractedData,
+	data: ExtractedData | ExtractedData[],
 	filename?: string
 ): void {
 	const csv = formatExtractedDataAsCSV(data);
+	downloadCSV(csv, filename);
+}
+
+/**
+ * A simplified CSV format for testing purposes
+ */
+export function formatExtractedDataAsSimpleCSV(data: ExtractedData | ExtractedData[]): string {
+	const dataArray = Array.isArray(data) ? data : [data];
+	if (dataArray.length === 0) return "";
+
+	const parts: string[] = [];
+	parts.push("SIMPLE CSV EXPORT");
+
+	dataArray.forEach((page) => {
+		if (!page || !page.rows) return;
+		page.rows.forEach((row) => {
+			const values = Object.entries(row)
+				.filter(([key, val]) => !key.startsWith('_') && typeof val !== 'object') 
+				.map(([_, val]) => escapeCell(val));
+			parts.push(values.join(","));
+		});
+	});
+	return parts.join("\n");
+}
+
+/**
+ * Convenience wrapper for the simple CSV export.
+ */
+export function exportExtractedDataAsSimpleCSV(
+	data: ExtractedData | ExtractedData[],
+	filename?: string
+): void {
+	const csv = formatExtractedDataAsSimpleCSV(data);
 	downloadCSV(csv, filename);
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, FileText, Trash2, Columns2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Columns2, FileText as FilesTabIcon } from 'lucide-react';
 import { getProject } from '../../services/projectService';
 import {
   uploadPageToR2,
@@ -9,12 +9,24 @@ import {
   saveExtractedData,
   deletePage,
   deleteDocument,
+  saveReviewState,
 } from '../../services/documentService';
 import { buildPreviewItemsForFiles } from '../upload/components/preview/previewHelpers';
 import EmptyUploadView from '../upload/components/EmptyUploadView';
 import UploadMoreButton from '../upload/components/actions/UploadMoreButton';
+import ScanQrButton from '../upload/components/actions/ScanQrButton';
+import { getUploadedDocuments, deleteDocumentFromBackend } from '../../services/uploadService';
+import PreviewCard from '../upload/components/preview/PreviewCard';
+import PageToolbar, { type ToolbarAction } from '../upload/components/preview/PageToolbar';
+import PageGroupSection from '../upload/components/preview/PageGroupSection';
 import ValidationWorkspace from '../validation/components/ValidationWorkspace';
+import Toast from '../validation/components/modals/Toast';
 import { flatten } from '../../utils/flattener';
+import {
+  filterValidFiles,
+  partitionBySize,
+  MAX_FILE_SIZE_MB,
+} from '../upload/components/dropzone/dropZoneUtils';
 import type {
   ProjectDetail,
   DocumentRecord,
@@ -23,6 +35,8 @@ import type {
 } from '../../models/Project';
 import type { ExtractedPage } from '../../models/TableData';
 import type { OCRComponent } from '../../models/OCRComponent';
+import { makePageKey, parsePageKey } from '../../utils/keys';
+import type { PageReview } from '../../models/IssueReview';
 
 // The OCR backend stores one page's result per document_pages row, but the
 // real Azure/Gemini pipeline wraps it as `Pages` — [{ page_num, components }]
@@ -30,6 +44,12 @@ import type { OCRComponent } from '../../models/OCRComponent';
 // Unwrap defensively so either shape renders correctly.
 function extractComponents(raw: unknown): OCRComponent[] {
   if (!Array.isArray(raw) || raw.length === 0) return [];
+
+  // If the backend saved it as `Pages` (an array of arrays), flatten it
+  if (Array.isArray(raw[0])) {
+    return raw.flat() as OCRComponent[];
+  }
+
   const first = raw[0] as any;
   if (first && typeof first === 'object' && Array.isArray(first.components)) {
     return first.components as OCRComponent[];
@@ -58,10 +78,6 @@ function statusBadgeClass(status: PageStatus): string {
   }
 }
 
-function pageKey(documentId: string, pageIndex: number): string {
-  return `${documentId}:${pageIndex}`;
-}
-
 export default function ProjectWorkspacePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -77,6 +93,7 @@ export default function ProjectWorkspacePage() {
   const [processingKeys, setProcessingKeys] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
   const [showReprocessConfirm, setShowReprocessConfirm] = useState(false);
+  const [showWarningConfirm, setShowWarningConfirm] = useState(false);
 
   // Delete confirmation covers both a single hover-triggered card delete and
   // the toolbar's bulk "Delete Selected" action, sharing one modal/handler.
@@ -197,13 +214,13 @@ export default function ProjectWorkspacePage() {
   // pages are added/removed — not on every edit (edits flow the other way,
   // through persistPages, so they aren't clobbered by this effect).
   const validationKeysSignature = validationList
-    .map((entry) => pageKey(entry.documentId, entry.pageIndex))
+    .map((entry) => makePageKey(entry.documentId, entry.pageIndex))
     .join('|');
 
   // Lazily resolve a viewable image URL for every known page.
   useEffect(() => {
     allPages.forEach(({ document, pageIndex }) => {
-      const key = pageKey(document.id, pageIndex);
+      const key = makePageKey(document.id, pageIndex);
       if (imageUrlMap[key]) return;
       getDownloadUrl(document.id, pageIndex)
         .then((url) => setImageUrlMap((prev) => (prev[key] ? prev : { ...prev, [key]: url })))
@@ -262,12 +279,59 @@ export default function ProjectWorkspacePage() {
   }, []);
 
   // ── Upload ─────────────────────────────────────────────────────────────
-  async function handleFilesCaptured(files: File[]) {
-    if (!project) return;
+  async function handleQrUploaded(docId?: string) {
     setIsUploading(true);
     setActionError(null);
     try {
-      const items = await buildPreviewItemsForFiles(files, createdUrlsRef.current, 0);
+      const sessionDocs = await getUploadedDocuments();
+      const targetDocs = docId ? sessionDocs.filter((d) => d.documentId === docId) : sessionDocs;
+
+      if (targetDocs.length === 0) {
+        setIsUploading(false);
+        return;
+      }
+
+      const files: File[] = [];
+      for (const doc of targetDocs) {
+        for (let i = 0; i < doc.pages.length; i++) {
+          const page = doc.pages[i];
+          const pageUrl = typeof page === 'string' ? page : page.url;
+          const blob = await (await fetch(pageUrl)).blob();
+          const filename = doc.label || `qr_capture_${doc.documentId}_${i}.png`;
+          files.push(new File([blob], filename, { type: blob.type }));
+        }
+        await deleteDocumentFromBackend(doc.documentId).catch(console.error);
+      }
+
+      setIsUploading(false); // handleFilesCaptured will set it to true again
+      if (files.length > 0) {
+        await handleFilesCaptured(files);
+      }
+    } catch (err) {
+      setActionError('Failed to import photos from phone.');
+      console.error(err);
+      setIsUploading(false);
+    }
+  }
+
+  async function handleFilesCaptured(capturedFiles: File[]) {
+    if (!project) return;
+    setIsUploading(true);
+    setActionError(null);
+
+    const validFiles = filterValidFiles(capturedFiles);
+    const { accepted, rejected } = partitionBySize(validFiles);
+
+    if (rejected.length > 0) {
+      setActionError(`One or more files are too large. Maximum size is ${MAX_FILE_SIZE_MB} MB.`);
+      if (accepted.length === 0) {
+        setIsUploading(false);
+        return;
+      }
+    }
+
+    try {
+      const items = await buildPreviewItemsForFiles(accepted, createdUrlsRef.current, 0);
 
       const byFile = new Map<number, typeof items>();
       items.forEach((item) => {
@@ -280,6 +344,8 @@ export default function ProjectWorkspacePage() {
         let documentId: string | undefined;
         const filename = group[0]?.label ?? 'document';
 
+        const pageFlags = new Map<number, any>();
+
         for (let pageIndex = 0; pageIndex < group.length; pageIndex++) {
           const item = group[pageIndex];
           if (!item.hasFile || !item.previewSrc) continue;
@@ -291,10 +357,10 @@ export default function ProjectWorkspacePage() {
             blob,
             pageFilename,
             pageIndex,
-            'image/png',
             documentId
           );
           documentId = result.documentId;
+          pageFlags.set(pageIndex, result.qualityFlags);
         }
 
         if (documentId) {
@@ -308,6 +374,7 @@ export default function ProjectWorkspacePage() {
                 document_id: finalDocumentId,
                 page_index: pageIndex,
                 status: 'pending' as PageStatus,
+                quality_flags: pageFlags.get(pageIndex),
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               }));
@@ -339,7 +406,7 @@ export default function ProjectWorkspacePage() {
 
   // ── Selection ──────────────────────────────────────────────────────────
   function toggleSelected(documentId: string, pageIndex: number) {
-    const key = pageKey(documentId, pageIndex);
+    const key = makePageKey(documentId, pageIndex);
     setSelectedKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -349,7 +416,7 @@ export default function ProjectWorkspacePage() {
   }
 
   function selectAll() {
-    setSelectedKeys(new Set(allPages.map((p) => pageKey(p.document.id, p.pageIndex))));
+    setSelectedKeys(new Set(allPages.map((p) => makePageKey(p.document.id, p.pageIndex))));
   }
 
   function deselectAll() {
@@ -364,7 +431,7 @@ export default function ProjectWorkspacePage() {
     let count = 0;
     documents.forEach((doc) => {
       (doc.pages || []).forEach((page) => {
-        if (selectedKeys.has(pageKey(doc.id, page.page_index)) && page.status === 'done') {
+        if (selectedKeys.has(makePageKey(doc.id, page.page_index)) && page.status === 'done') {
           count++;
         }
       });
@@ -377,6 +444,30 @@ export default function ProjectWorkspacePage() {
   // existing data), otherwise processes immediately like before.
   function handleProcessClick() {
     if (selectedKeys.size === 0 || isProcessing) return;
+
+    let hasWarnings = false;
+    documents.forEach((doc) => {
+      (doc.pages || []).forEach((page) => {
+        if (selectedKeys.has(makePageKey(doc.id, page.page_index))) {
+          const flags = page.quality_flags;
+          if (flags && flags.shouldWarn) {
+            hasWarnings = true;
+          }
+        }
+      });
+    });
+
+    if (hasWarnings) {
+      setShowWarningConfirm(true);
+    } else if (countSelectedAlreadyProcessed() > 0) {
+      setShowReprocessConfirm(true);
+    } else {
+      handleProcessSelected();
+    }
+  }
+
+  function handleWarningConfirm() {
+    setShowWarningConfirm(false);
     if (countSelectedAlreadyProcessed() > 0) {
       setShowReprocessConfirm(true);
     } else {
@@ -449,7 +540,9 @@ export default function ProjectWorkspacePage() {
       prev
         .map((doc) => ({
           ...doc,
-          pages: (doc.pages || []).filter((page) => !keys.has(pageKey(doc.id, page.page_index))),
+          pages: (doc.pages || []).filter(
+            (page) => !keys.has(makePageKey(doc.id, page.page_index))
+          ),
         }))
         .filter((doc) => (doc.pages || []).length > 0)
     );
@@ -468,7 +561,7 @@ export default function ProjectWorkspacePage() {
     try {
       const keys =
         deleteTarget.type === 'single'
-          ? [pageKey(deleteTarget.documentId, deleteTarget.pageIndex)]
+          ? [makePageKey(deleteTarget.documentId, deleteTarget.pageIndex)]
           : Array.from(selectedKeys);
 
       const byDoc = new Map<string, number[]>();
@@ -499,6 +592,26 @@ export default function ProjectWorkspacePage() {
     }
   }
 
+  const initialReviews = useMemo(
+    () =>
+      Object.fromEntries(
+        (project?.documents ?? []).flatMap((doc) =>
+          (doc.pages ?? [])
+            .filter((p) => p.review_state)
+            .map((p) => [makePageKey(doc.id, p.page_index), p.review_state!] as const)
+        )
+      ),
+    [project]
+  );
+
+  const handleReviewChange = useCallback((pageKey: string, review: PageReview) => {
+    const parsed = parsePageKey(pageKey);
+    if (!parsed) return;
+    saveReviewState(parsed.documentId, parsed.pageIndex, review).catch((err) =>
+      console.error('Failed to save review state', err)
+    );
+  }, []);
+
   // ── Render ─────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
@@ -522,7 +635,10 @@ export default function ProjectWorkspacePage() {
   const header = (
     <div className="flex items-center justify-between px-6 h-12 border-b border-base-300 shrink-0">
       <div className="flex items-center gap-2 min-w-0">
-        <button className="btn btn-ghost btn-sm gap-1.0 p-1.0" onClick={() => navigate('/projects')}>
+        <button
+          className="btn btn-ghost btn-sm gap-1.0 p-1.0"
+          onClick={() => navigate('/projects')}
+        >
           <ArrowLeft className="w-4 h-4" /> Projects
         </button>
         <span className="text-base-content/40 p-0">/</span>
@@ -534,7 +650,7 @@ export default function ProjectWorkspacePage() {
             className={`btn btn-sm join-item gap-1.5 ${mode === 'files' ? 'btn-active' : ''}`}
             onClick={() => setMode('files')}
           >
-            <FileText className="w-4 h-4" />
+            <FilesTabIcon className="w-4 h-4" />
             Files
           </button>
           <button
@@ -553,12 +669,17 @@ export default function ProjectWorkspacePage() {
     return (
       <div className="flex-1 flex flex-col">
         {header}
-        <EmptyUploadView onFilesCaptured={handleFilesCaptured} onError={setActionError} />
-        {actionError && (
-          <div className="toast toast-top toast-center z-50 mt-16">
-            <div className="alert alert-error shadow-lg">{actionError}</div>
-          </div>
-        )}
+        <EmptyUploadView
+          onFilesCaptured={handleFilesCaptured}
+          onError={setActionError}
+          onQrUploaded={handleQrUploaded}
+        />
+        <Toast
+          open={!!actionError}
+          message={actionError || ''}
+          type="error"
+          onDismiss={() => setActionError(null)}
+        />
       </div>
     );
   }
@@ -574,72 +695,61 @@ export default function ProjectWorkspacePage() {
       )
     : [];
   const imageUrls = hasEnteredValidate
-    ? validationList.map((e) => imageUrlMap[pageKey(e.documentId, e.pageIndex)] || '')
+    ? validationList.map((e) => imageUrlMap[makePageKey(e.documentId, e.pageIndex)] || '')
     : [];
   // stable per-page identity for useReviewQueue, so appending pages later
   // doesn't retrigger detection on pages already processed
   const pageKeys = hasEnteredValidate
-    ? validationList.map((e) => pageKey(e.documentId, e.pageIndex))
+    ? validationList.map((e) => makePageKey(e.documentId, e.pageIndex))
     : [];
+
+  const filesToolbarActions: ToolbarAction[] = [
+    {
+      key: 'delete',
+      label: `Delete (${selectedKeys.size})`,
+      icon: <Trash2 className="w-3.5 h-3.5" />,
+      tone: 'error',
+      disabled: isProcessing || isDeleting,
+      onClick: () => setDeleteTarget({ type: 'bulk' }),
+    },
+    {
+      key: 'process',
+      label: `Process (${selectedKeys.size})`,
+      tone: 'primary',
+      text: 'text-base-100',
+      disabled: isProcessing || isDeleting,
+      isBusy: isProcessing,
+      onClick: handleProcessClick,
+    },
+  ];
 
   // ── Files/Validation view ─────────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col">
       {header}
 
-      {actionError && (
-        <div className="toast toast-top toast-center z-50 mt-16">
-          <div className="alert alert-error shadow-lg">{actionError}</div>
-        </div>
-      )}
+      <Toast
+        open={!!actionError}
+        message={actionError || ''}
+        type="error"
+        onDismiss={() => setActionError(null)}
+      />
       {/* FILE VIEW AND UPLOAD */}
       <div className={mode === 'files' ? 'flex-1 flex flex-col' : 'hidden'}>
-        <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg bg-base-200/40 px-4 py-2.5">
-          <div className="flex items-center gap-3">
-            {selectedKeys.size > 0 ? (
-              <>
-                <span className="text-sm font-medium text-base-content/70">
-                  selected ({selectedKeys.size})
-                </span>
-                <button className="btn btn-ghost btn-xs" onClick={deselectAll}>
-                  Clear
-                </button>
-              </>
-            ) : (
-              <button className="btn btn-ghost btn-sm" onClick={selectAll}>
-                Select all
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {selectedKeys.size > 0 && (
-              <>
-                <button
-                  className="btn btn-sm btn-error btn-outline gap-1.5"
-                  disabled={isProcessing || isDeleting}
-                  onClick={() => setDeleteTarget({ type: 'bulk' })}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  {`Delete (${selectedKeys.size})`}
-                </button>
-                <button
-                  className="btn btn-sm btn-primary"
-                  disabled={isProcessing || isDeleting}
-                  onClick={handleProcessClick}
-                >
-                  {isProcessing ? (
-                    <span className="loading loading-spinner loading-sm" />
-                  ) : (
-                    `Process (${selectedKeys.size})`
-                  )}
-                </button>
-              </>
-            )}
-            <div className="w-40">
-              <UploadMoreButton onFilesSelected={handleFilesCaptured} />
+        <PageToolbar
+          selectedCount={selectedKeys.size}
+          onSelectAll={selectAll}
+          onDeselectAll={deselectAll}
+          actions={filesToolbarActions}
+          trailing={
+            <div className="flex items-center gap-2">
+              <ScanQrButton onUploaded={handleQrUploaded} className="btn btn-outline btn-sm" />
+              <div className="w-40">
+                <UploadMoreButton onFilesSelected={handleFilesCaptured} onError={setActionError} />
+              </div>
             </div>
-          </div>
-        </div>
+          }
+        />
 
         {isUploading && (
           <div className="px-6 py-2 text-sm text-base-content/60 flex items-center gap-2">
@@ -652,98 +762,41 @@ export default function ProjectWorkspacePage() {
             {documents
               .filter((doc) => (doc.pages || []).length > 0)
               .map((doc) => (
-              <section
-                key={doc.id}
-                className="rounded-lg border border-base-300 bg-base-200/40 p-4"
-              >
-                <h3 className="mb-3 text-sm font-semibold text-base-content/70 flex items-center gap-2">
-                  <FileText className="w-4 h-4" /> {doc.filename}
-                </h3>
-                <div className="flex flex-wrap gap-4">
+                <PageGroupSection key={doc.id} label={doc.filename}>
                   {(doc.pages || [])
                     .slice()
                     .sort((a, b) => a.page_index - b.page_index)
                     .map((page) => {
-                      const key = pageKey(doc.id, page.page_index);
+                      const key = makePageKey(doc.id, page.page_index);
                       const imageUrl = imageUrlMap[key];
                       const isBeingProcessed = processingKeys.has(key);
                       return (
-                        <div
+                        <PreviewCard
                           key={key}
-                          className={`group w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden transition-opacity ${
-                            isBeingProcessed ? 'animate-pulse opacity-80' : ''
-                          }`}
-                        >
-                          <div
-                            className={`relative h-[120px] bg-base-300 ${
-                              isBeingProcessed ? 'cursor-not-allowed' : 'cursor-pointer'
-                            }`}
-                            onClick={() => {
-                              if (isBeingProcessed) return;
-                              toggleSelected(doc.id, page.page_index);
-                            }}
-                          >
-                            {imageUrl ? (
-                              <img
-                                src={imageUrl}
-                                alt={`Page ${page.page_index + 1}`}
-                                className={`w-full h-full object-cover transition-[filter] ${
-                                  isBeingProcessed ? 'grayscale' : ''
-                                }`}
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span className="loading loading-spinner loading-sm" />
-                              </div>
-                            )}
-                            <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/25" />
-                            <input
-                              type="checkbox"
-                              className={`checkbox checkbox-sm checkbox-primary absolute border-2 top-2 left-2 transition-opacity ${
-                                selectedKeys.has(key) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                              }`}
-                              checked={selectedKeys.has(key)}
-                              disabled={isBeingProcessed}
-                              onChange={() => toggleSelected(doc.id, page.page_index)}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-xs btn-circle absolute top-2 right-2 bg-base-100/80 text-error opacity-0 transition-opacity group-hover:opacity-100"
-                              title="Delete page"
-                              disabled={isBeingProcessed}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteTarget({
-                                  type: 'single',
-                                  documentId: doc.id,
-                                  pageIndex: page.page_index,
-                                });
-                              }}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                          <div className="p-2 flex items-center justify-between text-xs">
-                            <span>Page {page.page_index + 1}</span>
-                            <span className={`badge badge-xs ${statusBadgeClass(page.status)}`}>
-                              {page.status}
-                            </span>
-                          </div>
-                          {page.error_message && (
-                            <div
-                              className="px-2 pb-2 text-xs text-error truncate"
-                              title={page.error_message}
-                            >
-                              {page.error_message}
-                            </div>
-                          )}
-                        </div>
+                          title={`${doc.filename} - Page ${page.page_index + 1}`}
+                          caption={`Page ${page.page_index + 1}`}
+                          isSelected={selectedKeys.has(key)}
+                          thumbnailUrl={imageUrl}
+                          isBusy={isBeingProcessed}
+                          status={{
+                            text: page.status,
+                            className: statusBadgeClass(page.status),
+                          }}
+                          warningText={warningTextForPage(page.quality_flags)}
+                          errorText={page.error_message}
+                          onToggle={() => toggleSelected(doc.id, page.page_index)}
+                          onRemove={() =>
+                            setDeleteTarget({
+                              type: 'single',
+                              documentId: doc.id,
+                              pageIndex: page.page_index,
+                            })
+                          }
+                        />
                       );
                     })}
-                </div>
-              </section>
-            ))}
+                </PageGroupSection>
+              ))}
           </div>
         </div>
       </div>
@@ -756,6 +809,8 @@ export default function ProjectWorkspacePage() {
             ocrPages={ocrPages}
             imageUrls={imageUrls}
             pageKeys={pageKeys}
+            initialReviews={initialReviews}
+            onReviewChange={handleReviewChange}
             fileMetadata={fileMetadata}
             syncKey={validationKeysSignature}
             onPersist={persistPages}
@@ -814,13 +869,47 @@ export default function ProjectWorkspacePage() {
                 onClick={handleProcessSelected}
                 disabled={isProcessing}
               >
-                {isProcessing ? <span className="loading loading-spinner loading-sm" /> : 'Reprocess'}
+                {isProcessing ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  'Reprocess'
+                )}
               </button>
             </div>
           </div>
           <div className="modal-backdrop" onClick={() => setShowReprocessConfirm(false)} />
         </div>
       )}
+
+      {/* Warning confirmation */}
+      {showWarningConfirm && (
+        <div className="modal modal-open z-50">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg text-warning">Warning: Low Quality Images</h3>
+            <p className="py-4 text-sm">
+              You have selected images that are flagged for low quality (e.g. blurry, dark, or
+              invalid size). Processing these images might produce poor or unexpected OCR results.
+              Are you sure you want to continue?
+            </p>
+            <div className="modal-action">
+              <button className="btn btn-ghost" onClick={() => setShowWarningConfirm(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleWarningConfirm}>
+                Yes, process anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function warningTextForPage(flags: any): string | undefined {
+  if (!flags || !flags.shouldWarn) return undefined;
+  if (flags.isInvalidSize) return 'Invalid size';
+  if (flags.isBlurry && flags.isDark) return 'Blurry and too dark';
+  if (flags.isBlurry) return 'Might be blurry';
+  return 'Might be too dark';
 }

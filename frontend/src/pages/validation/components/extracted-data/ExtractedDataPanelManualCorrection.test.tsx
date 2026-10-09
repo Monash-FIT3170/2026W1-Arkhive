@@ -64,6 +64,59 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     expect(screen.getByText('Value2')).toBeDefined();
   });
 
+  it('renders confidence score column with AI Metric badge, tooltip, and visual separation', () => {
+    render(<ControlledPanel onHover={onHoverMock} extractedData={mockExtractedData} />);
+    const header = screen.getByTestId('confidence-header');
+    expect(header).toBeInTheDocument();
+    expect(screen.getByText('AI Metric')).toBeInTheDocument();
+    expect(screen.getByText('CONFIDENCE')).toBeInTheDocument();
+    expect(
+      screen.getByTitle(
+        'Confidence score is an AI extraction metric and is not part of the exported table data.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('auto-hides confidence score column in edit mode to avoid confusion with table data', () => {
+    render(<ControlledPanel onHover={onHoverMock} extractedData={mockExtractedData} />);
+    expect(screen.getByTestId('confidence-header')).toBeInTheDocument();
+    expect(screen.getByTestId('confidence-cell-row1')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    expect(screen.queryByTestId('confidence-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('confidence-cell-row1')).not.toBeInTheDocument();
+  });
+
+  it('toggles confidence score column between collapsed and expanded states', () => {
+    render(<ControlledPanel onHover={onHoverMock} extractedData={mockExtractedData} />);
+
+    // Initially expanded
+    expect(screen.getByText('CONFIDENCE')).toBeInTheDocument();
+    expect(screen.getByText('AI Metric')).toBeInTheDocument();
+    const collapseBtn = screen.getByTitle('Collapse Confidence column');
+    expect(collapseBtn).toBeInTheDocument();
+
+    // Click to collapse
+    fireEvent.click(collapseBtn);
+
+    // Collapsed state
+    expect(screen.queryByText('CONFIDENCE')).not.toBeInTheDocument();
+    expect(screen.queryByText('AI Metric')).not.toBeInTheDocument();
+    expect(screen.getByTestId('confidence-header')).toBeInTheDocument();
+    expect(screen.getByTestId('confidence-cell-row1')).toBeInTheDocument();
+    const expandBtn = screen.getByTitle('Expand Confidence column');
+    expect(expandBtn).toBeInTheDocument();
+
+    // Click to expand again
+    fireEvent.click(expandBtn);
+
+    // Expanded state restored
+    expect(screen.getByText('CONFIDENCE')).toBeInTheDocument();
+    expect(screen.getByText('AI Metric')).toBeInTheDocument();
+    expect(screen.getByTitle('Collapse Confidence column')).toBeInTheDocument();
+  });
+
   it('turns a cell into an input field when clicked in edit mode', async () => {
     render(<ControlledPanel onHover={onHoverMock} extractedData={mockExtractedData} />);
 
@@ -266,6 +319,117 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     expect(onColumnDeleteMock).toHaveBeenCalledWith('Field1');
   });
 
+  it('triggers onColumnRename when Rename Column button is clicked and a new name is confirmed', () => {
+    const onColumnRenameMock = vi.fn();
+    render(
+      <ControlledPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onColumnRename={onColumnRenameMock}
+      />
+    );
+
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    const renameBtns = screen.getAllByTitle('Rename Column');
+    expect(renameBtns.length).toBe(2);
+
+    fireEvent.click(renameBtns[0]);
+
+    // Modal opens with existing name
+    const input = screen.getByPlaceholderText('Column name') as HTMLInputElement;
+    expect(input.value).toBe('Field1');
+
+    fireEvent.change(input, { target: { value: 'Renamed_Field' } });
+
+    const confirmBtns = screen.getAllByRole('button', { name: 'Rename Column' });
+    const confirmBtn = confirmBtns[confirmBtns.length - 1];
+    fireEvent.click(confirmBtn);
+
+    expect(onColumnRenameMock).toHaveBeenCalledWith('Field1', 'Renamed_Field');
+  });
+
+  it('triggers onColumnRename when column header text is clicked in edit mode', () => {
+    const onColumnRenameMock = vi.fn();
+    render(
+      <ControlledPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onColumnRename={onColumnRenameMock}
+      />
+    );
+
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    const headerTitle = screen.getByText('Field2');
+    fireEvent.click(headerTitle);
+
+    const input = screen.getByPlaceholderText('Column name') as HTMLInputElement;
+    expect(input.value).toBe('Field2');
+
+    fireEvent.change(input, { target: { value: 'New_Field2' } });
+
+    const confirmBtns = screen.getAllByRole('button', { name: 'Rename Column' });
+    const confirmBtn = confirmBtns[confirmBtns.length - 1];
+    fireEvent.click(confirmBtn);
+
+    expect(onColumnRenameMock).toHaveBeenCalledWith('Field2', 'New_Field2');
+  });
+
+  it('does not trigger onColumnRename when modal is cancelled', () => {
+    const onColumnRenameMock = vi.fn();
+    render(
+      <ControlledPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onColumnRename={onColumnRenameMock}
+      />
+    );
+
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    const renameBtns = screen.getAllByTitle('Rename Column');
+    fireEvent.click(renameBtns[0]);
+
+    const input = screen.getByPlaceholderText('Column name');
+    fireEvent.change(input, { target: { value: 'WillCancel' } });
+
+    fireEvent.click(screen.getByText('Cancel'));
+
+    expect(onColumnRenameMock).not.toHaveBeenCalled();
+  });
+
+  it('shows error and disables submit when new name conflicts with an existing column', () => {
+    const onColumnRenameMock = vi.fn();
+    render(
+      <ControlledPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        onColumnRename={onColumnRenameMock}
+      />
+    );
+
+    // Enable edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    const renameBtns = screen.getAllByTitle('Rename Column');
+    fireEvent.click(renameBtns[0]);
+
+    const input = screen.getByPlaceholderText('Column name');
+    fireEvent.change(input, { target: { value: 'Field2' } });
+
+    expect(screen.getByText('A column with this name already exists')).toBeDefined();
+    const confirmBtns = screen.getAllByRole('button', { name: 'Rename Column' });
+    const confirmBtn = confirmBtns[confirmBtns.length - 1] as HTMLButtonElement;
+    expect(confirmBtn.disabled).toBe(true);
+
+    fireEvent.click(confirmBtn);
+    expect(onColumnRenameMock).not.toHaveBeenCalled();
+  });
+
   it('triggers onRowMove with up/down directions when move buttons are clicked', () => {
     const onRowMoveMock = vi.fn();
     render(
@@ -315,5 +479,21 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     fireEvent.dragOver(secondHeader);
     fireEvent.drop(secondHeader);
     expect(onColumnReorderMock).toHaveBeenCalledWith(['Field1', 'Field2']);
+  });
+
+  it('highlights cell with soft primary blue background and maintains readable black text', () => {
+    render(
+      <ControlledPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        hoveredOverlayIds={['row1:Field1']}
+      />
+    );
+
+    const cell = document.getElementById('cell-row1-Field1');
+    expect(cell).toBeDefined();
+    expect(cell?.className).toContain('bg-primary/20');
+    expect(cell?.className).toContain('text-base-content');
+    expect(cell?.className).not.toContain('text-primary-content');
   });
 });
