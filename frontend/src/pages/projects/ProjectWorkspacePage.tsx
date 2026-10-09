@@ -22,7 +22,11 @@ import PageGroupSection from '../upload/components/preview/PageGroupSection';
 import ValidationWorkspace from '../validation/components/ValidationWorkspace';
 import Toast from '../validation/components/modals/Toast';
 import { flatten } from '../../utils/flattener';
-import { filterValidFiles, partitionBySize, MAX_FILE_SIZE_MB } from '../upload/components/dropzone/dropZoneUtils';
+import {
+  filterValidFiles,
+  partitionBySize,
+  MAX_FILE_SIZE_MB,
+} from '../upload/components/dropzone/dropZoneUtils';
 import type {
   ProjectDetail,
   DocumentRecord,
@@ -40,7 +44,7 @@ import type { PageReview } from '../../models/IssueReview';
 // Unwrap defensively so either shape renders correctly.
 function extractComponents(raw: unknown): OCRComponent[] {
   if (!Array.isArray(raw) || raw.length === 0) return [];
-  
+
   // If the backend saved it as `Pages` (an array of arrays), flatten it
   if (Array.isArray(raw[0])) {
     return raw.flat() as OCRComponent[];
@@ -280,8 +284,8 @@ export default function ProjectWorkspacePage() {
     setActionError(null);
     try {
       const sessionDocs = await getUploadedDocuments();
-      const targetDocs = docId ? sessionDocs.filter(d => d.documentId === docId) : sessionDocs;
-      
+      const targetDocs = docId ? sessionDocs.filter((d) => d.documentId === docId) : sessionDocs;
+
       if (targetDocs.length === 0) {
         setIsUploading(false);
         return;
@@ -298,7 +302,7 @@ export default function ProjectWorkspacePage() {
         }
         await deleteDocumentFromBackend(doc.documentId).catch(console.error);
       }
-      
+
       setIsUploading(false); // handleFilesCaptured will set it to true again
       if (files.length > 0) {
         await handleFilesCaptured(files);
@@ -445,10 +449,10 @@ export default function ProjectWorkspacePage() {
     documents.forEach((doc) => {
       (doc.pages || []).forEach((page) => {
         if (selectedKeys.has(makePageKey(doc.id, page.page_index))) {
-           const flags = page.quality_flags;
-           if (flags && flags.shouldWarn) {
-             hasWarnings = true;
-           }
+          const flags = page.quality_flags;
+          if (flags && flags.shouldWarn) {
+            hasWarnings = true;
+          }
         }
       });
     });
@@ -665,7 +669,11 @@ export default function ProjectWorkspacePage() {
     return (
       <div className="flex-1 flex flex-col">
         {header}
-        <EmptyUploadView onFilesCaptured={handleFilesCaptured} onError={setActionError} onQrUploaded={handleQrUploaded} />
+        <EmptyUploadView
+          onFilesCaptured={handleFilesCaptured}
+          onError={setActionError}
+          onQrUploaded={handleQrUploaded}
+        />
         <Toast
           open={!!actionError}
           message={actionError || ''}
@@ -708,6 +716,7 @@ export default function ProjectWorkspacePage() {
       key: 'process',
       label: `Process (${selectedKeys.size})`,
       tone: 'primary',
+      text: 'text-base-100',
       disabled: isProcessing || isDeleting,
       isBusy: isProcessing,
       onClick: handleProcessClick,
@@ -878,8 +887,8 @@ export default function ProjectWorkspacePage() {
           <div className="modal-box">
             <h3 className="font-bold text-lg text-warning">Warning: Low Quality Images</h3>
             <p className="py-4 text-sm">
-              You have selected images that are flagged for low quality (e.g. blurry, dark, or invalid size).
-              Processing these images might produce poor or unexpected OCR results.
+              You have selected images that are flagged for low quality (e.g. blurry, dark, or
+              invalid size). Processing these images might produce poor or unexpected OCR results.
               Are you sure you want to continue?
             </p>
             <div className="modal-action">
