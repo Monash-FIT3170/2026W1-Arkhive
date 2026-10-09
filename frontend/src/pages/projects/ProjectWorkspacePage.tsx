@@ -21,7 +21,7 @@ import PageToolbar, { type ToolbarAction } from '../upload/components/preview/Pa
 import PageGroupSection from '../upload/components/preview/PageGroupSection';
 import ValidationWorkspace from '../validation/components/ValidationWorkspace';
 import Toast from '../validation/components/modals/Toast';
-import { flatten } from '../../utils/flattener';
+import { pageToExtractedPage } from '../../utils/flattener';
 import {
   filterValidFiles,
   partitionBySize,
@@ -235,11 +235,12 @@ export default function ProjectWorkspacePage() {
   }
 
   function getExtractedData(documentId: string, pageIndex: number): ExtractedPage | null {
-    const page = findPage(documentId, pageIndex);
-    if (!page) return null;
-    if (page.extracted_data) return page.extracted_data;
-    if (page.raw_ocr_result)
-      return { ...flatten(extractComponents(page.raw_ocr_result)), pageIndex };
+    // const page = findPage(documentId, pageIndex);
+    // if (!page) return null;
+    // if (page.extracted_data) return page.extracted_data;
+    // if (page.raw_ocr_result)
+    //   return { ...flatten(extractComponents(page.raw_ocr_result)), pageIndex };
+    // return null;
     return null;
   }
 
@@ -802,7 +803,7 @@ export default function ProjectWorkspacePage() {
       </div>
 
       {/* VALIDATION WORKSPACE */}
-      {hasEnteredValidate && validationList.length > 0 && (
+      {/* {hasEnteredValidate && validationList.length > 0 && (
         <div className={mode === 'validate' ? 'flex-1 flex flex-col' : 'hidden'}>
           <ValidationWorkspace
             pages={pages}
@@ -817,7 +818,7 @@ export default function ProjectWorkspacePage() {
             heightClassName="lg:h-[calc(100vh-124px)]"
           />
         </div>
-      )}
+      )} */}
 
       {/* Delete confirmation */}
       {deleteTarget && (

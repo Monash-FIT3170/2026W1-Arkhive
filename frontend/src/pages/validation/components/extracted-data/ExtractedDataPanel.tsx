@@ -13,45 +13,18 @@ import {
   Info,
 } from 'lucide-react'; // NEW: Importing icons for confidence badges and export button
 import React, { useState, useEffect } from 'react';
-import type { ExtractedData } from '../../../../models/TableData';
+import type {
+  ExtractedData,
+  ExtractedField,
+  ExtractedText,
+  TableTab,
+} from '../../../../models/TableData';
+import { getConfidenceTier } from '../../../../utils/confidenceTier';
+import ExtractedFieldsSection from './ExtractedFieldsSection';
 import type { ValidationFileGroup } from '../../../../utils/fileGrouping';
 import { ExportModal } from './ExportModal'; // NEW: Excel export service (US-4.5)
 import TextInputModal from '../modals/TextInputModal';
 import Toast from '../modals/Toast';
-
-// NEW update: Helper function helps to determine the confidence tier of a row
-// Returns the appropriate DaisyUI badge class and label based on the score
-// Thresholds: >=0.85 = high (green), 0.70-0.84 = medium (amber), <0.70 = low (red)
-function getConfidenceTier(confidence: number): {
-  colour: string;
-  label: string;
-  isLow: boolean;
-  badgeClass?: string;
-} {
-  const percent = Math.round(confidence * 100);
-  if (confidence >= 0.85) {
-    return {
-      colour: '#22c55e',
-      label: `${percent}% - High`,
-      isLow: false,
-      badgeClass: 'badge-success',
-    };
-  } else if (confidence >= 0.7) {
-    return {
-      colour: '#f59e0b',
-      label: `${percent}% - Medium`,
-      isLow: false,
-      badgeClass: 'badge-warning',
-    };
-  } else {
-    return {
-      colour: '#f59e0b',
-      label: `${percent}% - Low`,
-      isLow: true, // triggers row highlight and warning icon
-      badgeClass: 'badge-error',
-    };
-  }
-}
 
 function ExtractedDataPanel({
   onHover,
@@ -73,6 +46,14 @@ function ExtractedDataPanel({
   onEditModeChange,
   editedCells,
   onUndoLast,
+  tables,
+  activeTableId,
+  onSelectTable,
+  fields,
+  texts,
+  editedBlockIds,
+  onBlockEdit,
+  onBlockHover,
 }: {
   onHover: (id: string | null) => void;
   extractedData: ExtractedData;
@@ -93,6 +74,16 @@ function ExtractedDataPanel({
   onEditModeChange?: (value: boolean) => void;
   editedCells?: Set<string>;
   onUndoLast?: () => void;
+  /** Tables on this page (tabs show only when there is more than one). */
+  tables?: TableTab[];
+  activeTableId?: string;
+  onSelectTable?: (tableId: string) => void;
+  /** Non-table content of the page. */
+  fields?: ExtractedField[];
+  texts?: ExtractedText[];
+  editedBlockIds?: Set<string>;
+  onBlockEdit?: (blockId: string, newValue: string) => void;
+  onBlockHover?: (blockId: string | null) => void;
 }) {
   const [isMouseInside, setIsMouseInside] = useState(false);
 
@@ -293,7 +284,7 @@ function ExtractedDataPanel({
               </>
             )}
           </button>
-          {isEditMode && onColumnAdd && (
+          {isEditMode && onColumnAdd && extractedData.columns.length > 0 && (
             <button
               onClick={() => setShowAddColumnModal(true)}
               className="btn btn-sm gap-2 text-xs transition-all rounded-xl btn-outline"
@@ -323,11 +314,53 @@ function ExtractedDataPanel({
           </button>
         </div>
       </div>
+      {/* Fields + text blocks that sit outside the table */}
+      <ExtractedFieldsSection
+        fields={fields ?? []}
+        texts={texts ?? []}
+        isEditMode={isEditMode}
+        editedIds={editedBlockIds}
+        onEdit={onBlockEdit}
+        onHover={onBlockHover}
+      />
+
+      {/* Table switcher: only when the page has more than one table */}
+      {tables && tables.length > 1 && (
+        <div role="tablist" aria-label="Tables on this page" className="mb-2 flex flex-wrap gap-1">
+          {tables.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              type="button"
+              aria-selected={t.id === activeTableId}
+              onClick={() => onSelectTable?.(t.id)}
+              className={`btn btn-xs h-7 min-h-0 gap-1.5 rounded-lg text-xs ${
+                t.id === activeTableId ? 'btn-primary text-base-100' : 'btn-outline'
+              }`}
+            >
+              {t.label}
+              <span className="opacity-70 font-normal">
+                {t.rowCount} {t.rowCount === 1 ? 'row' : 'rows'}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/*Acknowledgement: AI (Google Gemini) was used while coding the
             manual corrections*/}
       {/* Table */}
       <div className="flex-1 overflow-auto min-h-0 max-w-full pb-20">
-        <table className="table table-fixed w-full border border-base-300 text-[10px]">
+        {extractedData.columns.length === 0 && (
+          <div className="py-8 text-center text-sm text-base-content/60">
+            No table was found on this page.
+          </div>
+        )}
+        <table
+          className={`table table-fixed w-full border border-base-300 text-[10px] ${
+            extractedData.columns.length === 0 ? 'hidden' : ''
+          }`}
+        >
           {/* Table Header */}
           <thead>
             <tr className="text-base-content/70">
@@ -707,7 +740,7 @@ function ExtractedDataPanel({
       </div>
 
       {/* Add Row Button */}
-      {isEditMode && onRowAdd && (
+      {isEditMode && onRowAdd && extractedData.columns.length > 0 && (
         <div className="mt-4 flex justify-center">
           <button
             onClick={onRowAdd}

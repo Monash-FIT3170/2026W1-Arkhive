@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import ValidationWorkspace from './components/ValidationWorkspace';
-import type { Pages } from '../../models/OCRComponent';
+import type { StructuredPage } from '../../models/Document';
 import type { ExtractedPage } from '../../models/TableData';
 import {
   getProcessedImageUrls,
@@ -12,7 +12,7 @@ import {
   saveExtractionSession,
   getBatchJobs,
 } from '../../services/extractionService';
-import { flatten } from '../../utils/flattener';
+import { pageToExtractedPage } from '../../utils/flattener';
 import type { FileMetadataInput } from '../../utils/fileGrouping';
 
 // Single-session Upload/Validation flow. This page's only job is knowing
@@ -21,7 +21,7 @@ import type { FileMetadataInput } from '../../utils/fileGrouping';
 // chat lives in <ValidationWorkspace>, shared with ProjectWorkspacePage.
 function ValidationPage() {
   const [imageUrls, setImageUrls] = useState<string[]>([]); // one image URL per page
-  const [ocrPages, setOcrPages] = useState<Pages>([]); // raw OCR, one array per page
+  const [ocrPages, setOcrPages] = useState<StructuredPage[]>([]); // raw structured OCR, one entry per page
   const [fileMetadata, setFileMetadata] = useState<FileMetadataInput[]>([]);
 
   useEffect(() => {
@@ -41,9 +41,7 @@ function ValidationPage() {
         ]);
 
         setOcrPages(ocrData);
-        setImageUrls(
-          processedUrls.length > 0 ? processedUrls : [getUploadedImageUrl()]
-        );
+        setImageUrls(processedUrls.length > 0 ? processedUrls : [getUploadedImageUrl()]);
 
         if (uploadedDocs && uploadedDocs.length > 0) {
           setFileMetadata(
@@ -70,15 +68,11 @@ function ValidationPage() {
   }, []);
 
   // Flatten ALL pages whenever the raw OCR data changes. This is the single
-  // source of truth for extractedPages — nothing else should call flatten()
-  // directly. Once this feeds ValidationWorkspace, further edits are the
+  // source of truth for extractedPages — nothing else should call
+  // pageToExtractedPage() directly. Once this feeds ValidationWorkspace, further edits are the
   // workspace's concern (they get reported back here only via onPersist).
   const extractedPages: ExtractedPage[] = useMemo(
-    () =>
-      ocrPages.map((page) => ({
-        ...flatten(page.components),
-        pageIndex: page.page_num - 1,
-      })),
+    () => ocrPages.map((page) => pageToExtractedPage(page)),
     [ocrPages]
   );
 
@@ -93,8 +87,8 @@ function ValidationPage() {
   return (
     <ValidationWorkspace
       pages={extractedPages}
-      syncKey={`${ocrPages.length}:${ocrPages.map((p) => p.page_num).join(',')}`}
-      ocrPages={ocrPages.map((p) => p.components)}
+      syncKey={`${ocrPages.length}:${ocrPages.map((p) => p.pageIndex).join(',')}`}
+      ocrPages={ocrPages.map((p) => p.blocks)}
       imageUrls={imageUrls}
       fileMetadata={fileMetadata}
       onPersist={saveExtractionSession}

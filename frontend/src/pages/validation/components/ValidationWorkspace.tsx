@@ -13,8 +13,14 @@ import DocumentPanel from './document/DocumentPanel';
 import DocumentPreviewPiP from './document/DocumentPreviewPiP';
 import ExtractedDataPanel from './extracted-data/ExtractedDataPanel';
 import ChatPanel, { type AssistantDockMode } from './chat/ChatPanel';
-import type { OCRComponent } from '../../../models/OCRComponent';
+import type { Block } from '../../../models/Document';
 import type { ExtractedPage } from '../../../models/TableData';
+import { listTables, switchActiveTable } from '../../../utils/flattener';
+import {
+  blocksToOverlays,
+  averageOverlayConfidence,
+  type PageOverlay,
+} from '../../../utils/overlays';
 import type { HistoryEntry } from '../../../models/HistoryEntry';
 import { useUndoRedo } from '../../../hooks/useUndoRedo';
 import { useFieldHover } from '../../../hooks/useFieldHover';
@@ -26,7 +32,6 @@ import {
   groupPagesByFiles,
   getGlobalIndex,
   getFileAndLocalPage,
-  calculateAverageConfidence,
   type FileMetadataInput,
 } from '../../../utils/fileGrouping';
 import type { PageReview, ReviewsByPage } from '../../../models/IssueReview';
@@ -64,8 +69,11 @@ function useIsWide(ref: React.RefObject<HTMLElement | null>, minWidth: number, e
 export interface ValidationWorkspaceProps {
   /** The pages to validate, adopted into internal state whenever `syncKey` changes. */
   pages: ExtractedPage[];
-  /** Raw OCR components per page, aligned index-for-index with `pages`. */
-  ocrPages: OCRComponent[][];
+  /**
+   * Structured blocks per page (StructuredPage.blocks), aligned index-for-index
+   * with `pages`. Converted internally to highlightable overlays.
+   */
+  ocrPages: Block[][];
   /** Image URL per page, aligned index-for-index with `pages`. */
   imageUrls: string[];
   /**
@@ -124,7 +132,10 @@ function ValidationWorkspace({
   const [prevSyncKey, setPrevSyncKey] = useState(syncKey);
 
   const documentContext: ExtractedPage | null = extractedPages[currentPageIndex] ?? null;
-  const ocrData: OCRComponent[] = ocrPages[currentPageIndex] ?? [];
+  // Block IR -> highlightable regions for the document panel. Recomputed only
+  // when the blocks themselves change (cell edits don't move regions).
+  const overlayPages = useMemo<PageOverlay[][]>(() => ocrPages.map(blocksToOverlays), [ocrPages]);
+  const overlays: PageOverlay[] = overlayPages[currentPageIndex] ?? [];
   const documentImageURL: string | undefined = imageUrls[currentPageIndex];
 
   const isDragging = useRef(false);
@@ -173,6 +184,7 @@ function ValidationWorkspace({
     currentPageIndexRef.current = currentPageIndex;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditedCells(new Set());
+    setEditedBlockIds(new Set());
   }, [currentPageIndex]);
 
   const handlePagesChange = useCallback((action: React.SetStateAction<ExtractedPage[]>) => {
@@ -191,8 +203,8 @@ function ValidationWorkspace({
 
   // ── File Grouping & Scoped Navigation ────────────────────────────────────
   const fileGroups = useMemo(
-    () => groupPagesByFiles(extractedPages, ocrPages, imageUrls, pageKeys, fileMetadata),
-    [extractedPages, ocrPages, imageUrls, pageKeys, fileMetadata]
+    () => groupPagesByFiles(extractedPages, overlayPages, imageUrls, pageKeys, fileMetadata),
+    [extractedPages, overlayPages, imageUrls, pageKeys, fileMetadata]
   );
 
   const { fileIndex: activeFileIndex, pageIndexInFile: activePageIndexInFile } = useMemo(
@@ -222,8 +234,8 @@ function ValidationWorkspace({
   );
 
   // Confidence calculation for top toolbar
-  const averageConfidence = calculateAverageConfidence(ocrData);
-  const confidencePercent = Math.round(averageConfidence * 100);
+  const averageConfidence = averageOverlayConfidence(overlays);
+  const confidencePercent = averageConfidence === null ? null : Math.round(averageConfidence * 100);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyRedo, setRedoHistory] = useState<HistoryEntry[]>([]);
@@ -414,6 +426,57 @@ function ValidationWorkspace({
     },
   });
 
+  // ── Multi-table + field/text blocks ──────────────────────────────────────
+  const tableTabs = useMemo(
+    () => (documentContext ? listTables(documentContext) : []),
+    [documentContext]
+  );
+
+  // Switching tables only changes which table is loaded into the grid; it is
+  // not a data edit, so it is neither persisted nor pushed onto the undo stack.
+  const handleSelectTable = useCallback(
+    (tableId: string) => {
+      handlePagesChange((prev) =>
+        prev.map((p, i) => (i === currentPageIndexRef.current ? switchActiveTable(p, tableId) : p))
+      );
+      setEditedCells(new Set());
+    },
+    [handlePagesChange]
+  );
+
+  const [editedBlockIds, setEditedBlockIds] = useState<Set<string>>(new Set());
+  const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
+
+  // Field values and text blocks aren't touched by the table hooks, so edits
+  // are applied here, then undo-snapshotted and persisted like any other edit.
+  const handleBlockEdit = useCallback(
+    (blockId: string, newValue: string) => {
+      // pushUndo();
+      handlePagesChange((prev) =>
+        prev.map((p, i) =>
+          i !== currentPageIndexRef.current
+            ? p
+            : {
+                ...p,
+                fields: p.fields?.map((f) => (f.id === blockId ? { ...f, value: newValue } : f)),
+                texts: p.texts?.map((t) => (t.id === blockId ? { ...t, text: newValue } : t)),
+              }
+        )
+      );
+      onPersist(extractedPagesRef.current);
+      setEditedBlockIds((prev) => new Set(prev).add(blockId));
+    },
+    [handlePagesChange, onPersist, pushUndo]
+  );
+
+  // Field/text hover has no table cell behind it, so it bypasses useFieldHover
+  // and highlights the block's own overlay (overlay id === block id).
+  const documentHighlightIds = useMemo(
+    () =>
+      hoveredBlockId ? [...hoveredDocumentOverlayIds, hoveredBlockId] : hoveredDocumentOverlayIds,
+    [hoveredDocumentOverlayIds, hoveredBlockId]
+  );
+
   if (!documentContext) {
     return (
       <div className="flex h-screen items-center justify-center font-semibold text-lg">
@@ -574,14 +637,16 @@ function ValidationWorkspace({
             <span>Confidence:</span>
             <span
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-                confidencePercent >= 85
-                  ? 'border-success text-success bg-base-100'
-                  : confidencePercent >= 70
-                    ? 'border-warning text-warning bg-base-100'
-                    : 'border-error text-error bg-base-100'
+                confidencePercent === null
+                  ? 'border-base-300 text-base-content/50 bg-base-100'
+                  : confidencePercent >= 85
+                    ? 'border-success text-success bg-base-100'
+                    : confidencePercent >= 70
+                      ? 'border-warning text-warning bg-base-100'
+                      : 'border-error text-error bg-base-100'
               }`}
             >
-              {confidencePercent}%
+              {confidencePercent === null ? '—' : `${confidencePercent}%`}
             </span>
           </div>
 
@@ -705,15 +770,15 @@ function ValidationWorkspace({
                     : { width: '100%' }
               }
             >
-              <DocumentPanel
-                hoveredOverlayIds={hoveredDocumentOverlayIds}
+              {/* <DocumentPanel
+                hoveredOverlayIds={documentHighlightIds}
                 documentImageUrl={documentImageURL}
-                ocrData={ocrData}
+                ocrData={overlays}
                 imageUrls={imageUrls}
                 currentPageIndex={currentPageIndex}
                 onPageChange={handlePageIndexChange}
                 hideThumbnails={true}
-              />
+              /> */}
             </div>
           )}
 
@@ -743,7 +808,7 @@ function ValidationWorkspace({
             >
               <ExtractedDataPanel
                 onUndoLast={handleUndo}
-                key={`${tableKey}-${currentPageIndex}`}
+                key={`${tableKey}-${currentPageIndex}-${documentContext.tableId ?? 'none'}`}
                 isEditMode={isEditMode}
                 onEditModeChange={setIsEditMode}
                 editedCells={editedCells}
@@ -765,19 +830,27 @@ function ValidationWorkspace({
                 onColumnRename={renameColumn}
                 onRowMove={moveRow}
                 onColumnReorder={reorderColumns}
+                tables={tableTabs}
+                activeTableId={documentContext.tableId}
+                onSelectTable={handleSelectTable}
+                fields={documentContext.fields}
+                texts={documentContext.texts}
+                editedBlockIds={editedBlockIds}
+                onBlockEdit={handleBlockEdit}
+                onBlockHover={setHoveredBlockId}
               />
 
               {/* Picture-in-Picture (PiP) mini document preview when in Table Focus Mode */}
-              {viewMode === 'table' && isPiPOpen && (
+              {/* {viewMode === 'table' && isPiPOpen && (
                 <DocumentPreviewPiP
                   documentImageUrl={documentImageURL}
-                  ocrData={ocrData}
+                  ocrData={overlays}
                   currentPageIndex={currentPageIndex}
-                  hoveredOverlayIds={hoveredDocumentOverlayIds}
+                  hoveredOverlayIds={documentHighlightIds}
                   onClose={() => setIsPiPOpen(false)}
                   containerRef={containerRef}
                 />
-              )}
+              )} */}
             </div>
           )}
         </div>
