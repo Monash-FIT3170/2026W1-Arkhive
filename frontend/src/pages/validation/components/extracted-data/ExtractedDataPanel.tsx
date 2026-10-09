@@ -143,7 +143,7 @@ function ExtractedDataPanel({
       // but only one scroll target makes sense.
       const safeId = hoveredOverlayIds[0].replace(/:/g, '-');
       const el = document.getElementById(`cell-${safeId}`);
-      if (el) {
+      if (el && typeof el.scrollIntoView === 'function') {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
@@ -534,9 +534,8 @@ function ExtractedDataPanel({
                         className={`p-2 break-words whitespace-normal hover:bg-warning/10 text-base-content text-[13px] transition-colors ${
                           isEditMode ? 'cursor-pointer' : ''
                         } ${
-                          //yellow tint
                           isCellHighlighted && !isEditing
-                            ? 'bg-primary text-primary-content font-bold rounded shadow-inner'
+                            ? 'bg-primary/20 text-base-content font-semibold rounded'
                             : editedCells?.has(fieldId)
                               ? 'bg-warning/15'
                               : ''
