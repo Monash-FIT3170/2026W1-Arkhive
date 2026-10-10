@@ -11,8 +11,9 @@ import {
   getExtractionSession,
   saveExtractionSession,
   getBatchJobs,
+  isStructuredPages,
+  toExtractedPages,
 } from '../../services/extractionService';
-import { pageToExtractedPage } from '../../utils/flattener';
 import type { FileMetadataInput } from '../../utils/fileGrouping';
 
 // Single-session Upload/Validation flow. This page's only job is knowing
@@ -22,12 +23,15 @@ import type { FileMetadataInput } from '../../utils/fileGrouping';
 function ValidationPage() {
   const [imageUrls, setImageUrls] = useState<string[]>([]); // one image URL per page
   const [ocrPages, setOcrPages] = useState<StructuredPage[]>([]); // raw structured OCR, one entry per page
+  // Set instead of ocrPages when the session already holds the editor's saved pages
+  // (onPersist writes ExtractedPage[]). They carry no blocks, so overlays aren't available then.
+  const [savedPages, setSavedPages] = useState<ExtractedPage[] | null>(null);
   const [fileMetadata, setFileMetadata] = useState<FileMetadataInput[]>([]);
 
   useEffect(() => {
     async function loadSession() {
       try {
-        const [ocrData, processedUrls, batchData, uploadedDocs] = await Promise.all([
+        const [session, processedUrls, batchData, uploadedDocs] = await Promise.all([
           getExtractionSession(),
           typeof getProcessedImageUrls === 'function'
             ? getProcessedImageUrls().catch(() => [])
@@ -40,7 +44,8 @@ function ValidationPage() {
             : Promise.resolve([]),
         ]);
 
-        setOcrPages(ocrData);
+        if (isStructuredPages(session)) setOcrPages(session);
+        else setSavedPages(toExtractedPages(session));
         setImageUrls(processedUrls.length > 0 ? processedUrls : [getUploadedImageUrl()]);
 
         if (uploadedDocs && uploadedDocs.length > 0) {
@@ -67,13 +72,13 @@ function ValidationPage() {
     loadSession();
   }, []);
 
-  // Flatten ALL pages whenever the raw OCR data changes. This is the single
-  // source of truth for extractedPages — nothing else should call
-  // pageToExtractedPage() directly. Once this feeds ValidationWorkspace, further edits are the
+  // Flatten ALL pages whenever the raw OCR data changes (toExtractedPages is the single
+  // place that calls pageToExtractedPage). Previously saved pages are used as-is so
+  // reloading never discards edits. Once this feeds ValidationWorkspace, further edits are the
   // workspace's concern (they get reported back here only via onPersist).
   const extractedPages: ExtractedPage[] = useMemo(
-    () => ocrPages.map((page) => pageToExtractedPage(page)),
-    [ocrPages]
+    () => savedPages ?? toExtractedPages(ocrPages),
+    [savedPages, ocrPages]
   );
 
   if (extractedPages.length === 0) {
@@ -87,7 +92,11 @@ function ValidationPage() {
   return (
     <ValidationWorkspace
       pages={extractedPages}
-      syncKey={`${ocrPages.length}:${ocrPages.map((p) => p.pageIndex).join(',')}`}
+      syncKey={
+        savedPages
+          ? `saved:${savedPages.length}:${savedPages.map((p) => p.pageIndex).join(',')}`
+          : `${ocrPages.length}:${ocrPages.map((p) => p.pageIndex).join(',')}`
+      }
       ocrPages={ocrPages.map((p) => p.blocks)}
       imageUrls={imageUrls}
       fileMetadata={fileMetadata}

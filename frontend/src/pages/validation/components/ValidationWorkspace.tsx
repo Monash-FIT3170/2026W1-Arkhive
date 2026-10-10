@@ -146,7 +146,8 @@ function ValidationWorkspace({
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
   const [chatActiveTab, setChatActiveTab] = useState<ChatTab>('chat');
-
+  const [editedBlockIds, setEditedBlockIds] = useState<Set<string>>(new Set());
+  const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
   // Docked = side panel that takes layout space. Floating = movable window
   // over the page that takes none. Remembered between sessions.
   const [dockMode, setDockMode] = useState<AssistantDockMode>(() => {
@@ -445,9 +446,6 @@ function ValidationWorkspace({
     [handlePagesChange]
   );
 
-  const [editedBlockIds, setEditedBlockIds] = useState<Set<string>>(new Set());
-  const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
-
   // Field values and text blocks aren't touched by the table hooks, so edits
   // are applied here, then undo-snapshotted and persisted like any other edit.
   const handleBlockEdit = useCallback(
@@ -467,7 +465,7 @@ function ValidationWorkspace({
       onPersist(extractedPagesRef.current);
       setEditedBlockIds((prev) => new Set(prev).add(blockId));
     },
-    [handlePagesChange, onPersist, pushUndo]
+    [handlePagesChange, onPersist]
   );
 
   // Field/text hover has no table cell behind it, so it bypasses useFieldHover
