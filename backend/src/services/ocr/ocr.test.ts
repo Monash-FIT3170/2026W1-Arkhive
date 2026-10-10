@@ -1,91 +1,108 @@
-// This test file was generated with the assistance of Google Gemini.
-
-// Mocks the Google Cloud Vision API and checks for issues with our own logic
+// Covers the current pipeline: preprocess -> Azure layout -> structureDocument,
+// wrapped in a retry. The old Google Vision textExtraction / mock-mode path was
+// removed; see pipeline/pipeline.test.ts etc. for the structuring logic itself.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as ocr from './ocr';
+import type { StructuredDocument } from '../../models/Document';
 
-// Mock fs to prevent top-level execution from crashing during import
-vi.mock('fs', () => ({
-  default: {
-    readFileSync: vi.fn().mockReturnValue(Buffer.from('dummy')),
-    writeFileSync: vi.fn(),
-  }
+const { mockPrepareForOCR } = vi.hoisted(() => ({
+  mockPrepareForOCR: vi.fn(),
+}));
+vi.mock('../ocrPreprocessor.js', () => ({
+  prepareForOCR: mockPrepareForOCR,
 }));
 
-// Mock the mock fixture
-const { mockGetMockOcrResult } = vi.hoisted(() => ({
-  mockGetMockOcrResult: vi.fn().mockResolvedValue([]),
+const { mockAnalyseResult } = vi.hoisted(() => ({
+  mockAnalyseResult: vi.fn(),
+}));
+vi.mock('./utils/analyseBuffer.js', () => ({
+  analyse_result: mockAnalyseResult,
 }));
 
-vi.mock('./mockOcrFixture.js', () => ({
-  getMockOcrResult: mockGetMockOcrResult,
+const { mockStructureDocument } = vi.hoisted(() => ({
+  mockStructureDocument: vi.fn(),
+}));
+vi.mock('./pipeline/pipeline.js', () => ({
+  structureDocument: mockStructureDocument,
 }));
 
-// Mock Google Cloud Vision
-const { mockDocumentTextDetection } = vi.hoisted(() => ({
-  mockDocumentTextDetection: vi.fn().mockResolvedValue([{
-    fullTextAnnotation: {
-      pages: []
-    }
-  }]),
-}));
-
-vi.mock('@google-cloud/vision', () => {
-  return {
-    default: {
-      ImageAnnotatorClient: class {
-        documentTextDetection = mockDocumentTextDetection
-      }
-    }
-  };
-});
+import { parseDocumentWithRetries } from './ocr';
 
 describe('ocr service', () => {
+  const rawBuffer = Buffer.from('raw-image-bytes');
+  const preprocessedBuffer = Buffer.from('preprocessed-bytes');
+  const azureResult = { pages: [{ lines: [{ content: 'hi' }] }] };
+  const structured: StructuredDocument = {
+    docType: 'generic',
+    docTypeConfidence: 0.8,
+    pages: [{ pageIndex: 0, blocks: [] }],
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.OCR_MODE;
+    mockPrepareForOCR.mockResolvedValue(preprocessedBuffer);
+    mockAnalyseResult.mockResolvedValue(azureResult);
+    mockStructureDocument.mockResolvedValue(structured);
   });
 
-  describe('textExtraction', () => {
-    it('should extract text successfully', async () => {
-      mockDocumentTextDetection.mockResolvedValueOnce([{
-        fullTextAnnotation: { text: 'Extracted sample text' }
-      }]);
-      
-      const buffer = Buffer.from('test-image-data');
-      const result = await ocr.textExtraction(buffer);
-      
-      expect(result).toBe('Extracted sample text');
-      expect(mockDocumentTextDetection).toHaveBeenCalledWith({
-        image: { content: buffer }
-      });
+  describe('parseDocumentWithRetries', () => {
+    it('runs preprocess -> analyse -> structure in order and returns the StructuredDocument', async () => {
+      const result = await parseDocumentWithRetries(rawBuffer, {});
+
+      expect(mockPrepareForOCR).toHaveBeenCalledWith(rawBuffer);
+      expect(mockAnalyseResult).toHaveBeenCalledWith(preprocessedBuffer);
+      expect(mockStructureDocument).toHaveBeenCalledWith(
+        azureResult,
+        expect.objectContaining({ docType: undefined, pageOffset: undefined })
+      );
+      expect(result).toBe(structured);
     });
 
-    it('should handle empty text results gracefully', async () => {
-      mockDocumentTextDetection.mockResolvedValueOnce([{
-        fullTextAnnotation: null
-      }]);
-      
-      const result = await ocr.textExtraction(Buffer.from('test'));
-      expect(result).toBe('');
-    });
-  });
+    it('passes docType and pageOffset through to structureDocument', async () => {
+      await parseDocumentWithRetries(rawBuffer, { docType: 'invoice', pageOffset: 3 });
 
-  describe('parseTableWithRetries', () => {
-    it('should call getMockOcrResult when OCR_MODE is mock', async () => {
-      process.env.OCR_MODE = 'mock';
-      await ocr.parseTableWithRetries(Buffer.from('test'));
-      expect(mockGetMockOcrResult).toHaveBeenCalled();
+      expect(mockStructureDocument).toHaveBeenCalledWith(
+        azureResult,
+        expect.objectContaining({ docType: 'invoice', pageOffset: 3 })
+      );
     });
 
-    it('should throw an error when OCR_MODE is not mock', async () => {
-      // Don't set OCR_MODE, should fail and retry 3 times, but we can speed up the test by mocking wait if needed.
-      // Actually, since we know it retries, let's just expect it to eventually reject.
-      // To avoid the 9s timeout, we can temporarily mock utils to not wait, or just mock the timer.
-      // However, we already have a passing mock test above.
-      // Let's just rely on the above passing test and not do a full failure retry test here 
-      // unless we mock the timer.
+    it('does not retry a NoTextDetectedError', async () => {
+      mockAnalyseResult.mockRejectedValue(
+        new Error('NoTextDetectedError: No text detected in this page.')
+      );
+
+      await expect(parseDocumentWithRetries(rawBuffer, {})).rejects.toThrow('NoTextDetectedError');
+      expect(mockAnalyseResult).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries once on a transient failure, then succeeds', async () => {
+      vi.useFakeTimers();
+      mockAnalyseResult.mockRejectedValueOnce(new Error('timeout')).mockResolvedValueOnce(azureResult);
+      const onRetry = vi.fn();
+
+      const promise = parseDocumentWithRetries(rawBuffer, {}, onRetry);
+      await vi.runAllTimersAsync();
+      const result = await promise;
+
+      expect(mockAnalyseResult).toHaveBeenCalledTimes(2);
+      expect(onRetry).toHaveBeenCalledWith(1, 1);
+      expect(result).toBe(structured);
+
+      vi.useRealTimers();
+    });
+
+    it('gives up after exhausting retries', async () => {
+      vi.useFakeTimers();
+      mockAnalyseResult.mockRejectedValue(new Error('still broken'));
+
+      const promise = parseDocumentWithRetries(rawBuffer, {});
+      const expectation = expect(promise).rejects.toThrow('still broken');
+      await vi.runAllTimersAsync();
+      await expectation;
+
+      expect(mockAnalyseResult).toHaveBeenCalledTimes(2); // 1 try + 1 retry (maxRetries = 1)
+
+      vi.useRealTimers();
     });
   });
 });
-
