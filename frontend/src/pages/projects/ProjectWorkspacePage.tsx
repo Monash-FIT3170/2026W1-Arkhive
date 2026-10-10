@@ -34,27 +34,47 @@ import type {
   PageSelection,
 } from '../../models/Project';
 import type { ExtractedPage } from '../../models/TableData';
-import type { OCRComponent } from '../../models/OCRComponent';
+import type { Block, StructuredPage } from '../../models/Document';
 import { makePageKey, parsePageKey } from '../../utils/keys';
 import type { PageReview } from '../../models/IssueReview';
 
-// The OCR backend stores one page's result per document_pages row, but the
-// real Azure/Gemini pipeline wraps it as `Pages` — [{ page_num, components }]
-// — while the OCR_MODE=mock fixture returns a flat OCRComponent[] instead.
-// Unwrap defensively so either shape renders correctly.
-function extractComponents(raw: unknown): OCRComponent[] {
-  if (!Array.isArray(raw) || raw.length === 0) return [];
+// The OCR backend stores one page's result per document_pages row
+// (raw_ocr_result). With the Block IR that result is a StructuredPage
+// ({ pageIndex, blocks }), but depending on the pipeline/mock it may also come
+// back wrapped as a StructuredDocument ({ pages: [...] }) or as a bare Block[].
+// Unwrap defensively so any of those renders. Pages stored in the old
+// OCRComponent shape can't be converted — they come back empty (and are logged)
+// until they're reprocessed.
+function isBlock(x: unknown): x is Block {
+  const kind = (x as { kind?: unknown } | null)?.kind;
+  return kind === 'table' || kind === 'field' || kind === 'text';
+}
 
-  // If the backend saved it as `Pages` (an array of arrays), flatten it
-  if (Array.isArray(raw[0])) {
-    return raw.flat() as OCRComponent[];
+function extractStructuredPage(raw: unknown, pageIndex: number): StructuredPage {
+  const empty: StructuredPage = { pageIndex, blocks: [] };
+  if (!raw || typeof raw !== 'object') return empty;
+
+  // Bare Block[]
+  if (Array.isArray(raw)) {
+    if (raw.every(isBlock)) return { pageIndex, blocks: raw };
+    console.warn('raw_ocr_result is in a legacy shape; reprocess this page to view it.');
+    return empty;
   }
 
-  const first = raw[0] as any;
-  if (first && typeof first === 'object' && Array.isArray(first.components)) {
-    return first.components as OCRComponent[];
+  const obj = raw as { blocks?: unknown; pages?: unknown };
+
+  // StructuredPage
+  if (Array.isArray(obj.blocks)) return { pageIndex, blocks: obj.blocks.filter(isBlock) };
+
+  // StructuredDocument — one page's result per row, so take the matching page
+  // (or the only one).
+  if (Array.isArray(obj.pages)) {
+    const pages = obj.pages as StructuredPage[];
+    const match = pages.find((p) => p?.pageIndex === pageIndex) ?? pages[0];
+    return { pageIndex, blocks: Array.isArray(match?.blocks) ? match.blocks.filter(isBlock) : [] };
   }
-  return raw as OCRComponent[];
+
+  return empty;
 }
 
 // Project workspace: upload pages into the project, batch-process them with
@@ -112,6 +132,9 @@ export default function ProjectWorkspacePage() {
   // persistPages can save each edited page back to the right place.
   const validationListRef = useRef<typeof validationList>([]);
   const [hasEnteredValidate, setHasEnteredValidate] = useState(false);
+  // Bumped whenever (re)processing replaces pages' OCR data, so the workspace
+  // re-syncs even though the set of page keys is unchanged.
+  const [dataVersion, setDataVersion] = useState(0);
 
   // ── Load project ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -213,9 +236,9 @@ export default function ProjectWorkspacePage() {
   // so the flat extractedPages array only gets rebuilt from `documents` when
   // pages are added/removed — not on every edit (edits flow the other way,
   // through persistPages, so they aren't clobbered by this effect).
-  const validationKeysSignature = validationList
-    .map((entry) => makePageKey(entry.documentId, entry.pageIndex))
-    .join('|');
+  const validationKeysSignature =
+    validationList.map((entry) => makePageKey(entry.documentId, entry.pageIndex)).join('|') +
+    `#${dataVersion}`;
 
   // Lazily resolve a viewable image URL for every known page.
   useEffect(() => {
@@ -229,20 +252,32 @@ export default function ProjectWorkspacePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPages]);
 
-  function findPage(documentId: string, pageIndex: number) {
-    const doc = documents.find((d) => d.id === documentId);
-    return doc?.pages?.find((p) => p.page_index === pageIndex);
-  }
+  // What <ValidationWorkspace> consumes, built index-for-index from validationList
+  // (pages / ocrPages / imageUrls / pageKeys must stay aligned):
+  //   pages    — the user's saved edits (extracted_data) if there are any,
+  //              otherwise the page's raw OCR flattened for the grid
+  //   ocrPages — the page's raw blocks, which drive the document highlights
+  // Edits are only ever read back from extracted_data; the workspace ignores
+  // changes to `pages` unless syncKey changes, so rebuilding here is cheap and safe.
+  const { validationPages, validationBlocks } = useMemo(() => {
+    const validationPages: ExtractedPage[] = [];
+    const validationBlocks: Block[][] = [];
+    if (!hasEnteredValidate) return { validationPages, validationBlocks };
 
-  function getExtractedData(documentId: string, pageIndex: number): ExtractedPage | null {
-    // const page = findPage(documentId, pageIndex);
-    // if (!page) return null;
-    // if (page.extracted_data) return page.extracted_data;
-    // if (page.raw_ocr_result)
-    //   return { ...flatten(extractComponents(page.raw_ocr_result)), pageIndex };
-    // return null;
-    return null;
-  }
+    validationList.forEach((entry) => {
+      const page = documents
+        .find((d) => d.id === entry.documentId)
+        ?.pages?.find((p) => p.page_index === entry.pageIndex);
+      const structured = extractStructuredPage(page?.raw_ocr_result, entry.pageIndex);
+      validationBlocks.push(structured.blocks);
+      validationPages.push(
+        page?.extracted_data
+          ? { ...page.extracted_data, pageIndex: entry.pageIndex }
+          : pageToExtractedPage(structured)
+      );
+    });
+    return { validationPages, validationBlocks };
+  }, [documents, validationList, hasEnteredValidate]);
 
   // Persist a full pages array back to each page's document/pageIndex pair
   // (the project workspace saves per-page, unlike ValidationPage's single
@@ -512,6 +547,11 @@ export default function ProjectWorkspacePage() {
                 ...page,
                 status: result.status,
                 raw_ocr_result: result.rawResult ?? page.raw_ocr_result,
+                // fresh OCR replaces any earlier edits for this page
+                extracted_data:
+                  result.status !== 'error' && result.rawResult !== undefined
+                    ? undefined
+                    : page.extracted_data,
                 error_message: result.errorMessage,
               };
             }),
@@ -522,6 +562,7 @@ export default function ProjectWorkspacePage() {
       const anySucceeded = results.some((r) => r.status !== 'error');
       setSelectedKeys(new Set());
       if (anySucceeded) {
+        setDataVersion((v) => v + 1);
         setMode('validate');
         setHasEnteredValidate(true);
       }
@@ -685,16 +726,6 @@ export default function ProjectWorkspacePage() {
     );
   }
 
-  const pages = hasEnteredValidate
-    ? validationList
-        .map((entry) => getExtractedData(entry.documentId, entry.pageIndex))
-        .filter((page): page is ExtractedPage => page !== null)
-    : [];
-  const ocrPages = hasEnteredValidate
-    ? validationList.map((entry) =>
-        extractComponents(findPage(entry.documentId, entry.pageIndex)?.raw_ocr_result)
-      )
-    : [];
   const imageUrls = hasEnteredValidate
     ? validationList.map((e) => imageUrlMap[makePageKey(e.documentId, e.pageIndex)] || '')
     : [];
@@ -803,11 +834,11 @@ export default function ProjectWorkspacePage() {
       </div>
 
       {/* VALIDATION WORKSPACE */}
-      {/* {hasEnteredValidate && validationList.length > 0 && (
+      {hasEnteredValidate && validationList.length > 0 && (
         <div className={mode === 'validate' ? 'flex-1 flex flex-col' : 'hidden'}>
           <ValidationWorkspace
-            pages={pages}
-            ocrPages={ocrPages}
+            pages={validationPages}
+            ocrPages={validationBlocks}
             imageUrls={imageUrls}
             pageKeys={pageKeys}
             initialReviews={initialReviews}
@@ -818,7 +849,7 @@ export default function ProjectWorkspacePage() {
             heightClassName="lg:h-[calc(100vh-124px)]"
           />
         </div>
-      )} */}
+      )}
 
       {/* Delete confirmation */}
       {deleteTarget && (
