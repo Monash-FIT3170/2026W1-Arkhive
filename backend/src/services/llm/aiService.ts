@@ -2,7 +2,7 @@ import { GoogleGenerativeAI, SchemaType, Schema } from '@google/generative-ai';
 import type { Message, ReviewField, Intent, AppliedEdits } from '../../models/message';
 import dotenv from 'dotenv';
 import type { ExtractedData, ExtractedPage, ExtractedRow } from '../../models/TableData';
-import { buildFocusedContext } from './utils/contextMaker';
+import { buildFocusedContext, inferColumnType, rowNeighbours } from './utils/contextMaker';
 import { profileColumnLocally } from './utils/formatUtils';
 dotenv.config();
 
@@ -431,6 +431,22 @@ const chatResponseSchema: Schema = {
   required: ['response'],
 };
 
+/**
+ * The chat endpoint may legitimately return no intent (approvals, "unclear"), but
+ * the review endpoints exist to produce a value: the intent must be present and
+ * carry the fields the UI reads.
+ */
+const withIntentRequired = (required: string[]): Schema => ({
+  ...chatResponseSchema,
+  properties: {
+    ...chatResponseSchema.properties,
+    intent: { ...(chatResponseSchema.properties!.intent as any), nullable: false, required },
+  },
+  required: ['response', 'intent'],
+});
+const reviewFieldSchema = withIntentRequired(['type', 'rowId', 'column', 'newValue']);
+const reviewBulkSchema = withIntentRequired(['type', 'bulkUpdates']);
+
 const formatDetectionSchema: Schema = {
   type: SchemaType.OBJECT,
   properties: {
@@ -496,7 +512,9 @@ INTENTS:
 - Delete columns: type 'column_delete' with tableId and 'deletedColumns'.
 - The user confirms the columns look correct: 'column_confirm' with approved true.
 - The user approves or rejects the document generally: 'approval' or 'rejection'.
-- If the request is not actionable or you cannot tell which cell they mean, use 'unclear' (or null) and ask a short clarifying question in 'response'. Do not guess a row.
+- BIAS TOWARD ACTING. Every edit you propose is shown to the user with Accept / Reject buttons and can be undone, so a reasonable best guess is better than a refusal. Choose the most sensible interpretation, do it, and say in 'response' what you assumed (e.g. "I numbered each row as the number above plus 1").
+- Requests about a whole column, or "each row" / "every row", have no single rowId: use 'bulk_update' with one entry for every row that should change. When a value depends on the row above (numbering, running totals, "one more than the previous"), work out the final values yourself in table order, so each value follows from the FINAL value above it. For a numbering / index column, "given by the one above it" means the previous row's number plus 1. If there is no starting value, begin from the first existing number in the column, or from 1 if the whole column is blank.
+- Use 'unclear' only when you genuinely cannot choose between meaningfully different interpretations (for example two tables could both match and nothing says which). Ask one short question in that case, never a refusal.
 Always be polite and confirm what you are doing in the 'response' field.
 
 CURRENT PAGE CONTEXT:
@@ -533,8 +551,14 @@ ${formattedContext}
   ): Promise<any> => {
     const tableId = field.tableId ?? documentContext.tableId;
     const grid = resolveGrid(documentContext, tableId);
-    const { rowIndex, otherFieldsInRow, columnValuesFromOtherRows, columnType } =
-      buildFocusedContext(grid, field);
+    const {
+      rowIndex,
+      otherFieldsInRow,
+      columnValuesFromOtherRows,
+      columnType,
+      previousRowValue,
+      nextRowValue,
+    } = buildFocusedContext(grid, field);
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.5-flash-lite',
@@ -544,6 +568,8 @@ ${formattedContext}
       - Row position: index ${rowIndex} in the rows array (0-indexed) — ignore any row ID, use this position
       - Column: "${field.column}" — inferred column type: ${columnType}
       - OCR-read value: "${field.value}"
+      - Value in this column in the row directly above: ${JSON.stringify(previousRowValue)}
+      - Value in this column in the row directly below: ${JSON.stringify(nextRowValue)}
       - Flag Reason: ${field.issueType === 'format' ? 'Formatting Inconsistency' : 'Low OCR Confidence'}
 
         Other already-confirmed values in this same row, for context:
@@ -558,7 +584,7 @@ ${formattedContext}
 
         Your job:
         1. Look at the surrounding row and column data to judge what the value most likely should be.
-        2. Clean and normalize the OCR value. Remove any unnecessary leading/trailing whitespace, stray punctuation (like leading hyphens, bullets, or random dots), and formatting artifacts. The corrected value should make logical sense within the context of the document and match the pattern of other rows. Do NOT just echo the literal OCR value back if it contains these artifacts.
+        2. If the OCR value is blank, infer the most plausible value from the neighbouring rows and the column pattern (for example, continue a numbering sequence). Otherwise, clean and normalize the OCR value. Remove any unnecessary leading/trailing whitespace, stray punctuation (like leading hyphens, bullets, or random dots), and formatting artifacts. The corrected value should make logical sense within the context of the document and match the pattern of other rows. Do NOT just echo the literal OCR value back if it contains these artifacts.
         3. Write a short, specific question for the user confirming this one field (e.g. "The quantity in this row looks like it could be 8 or 3 — did you mean 8?"). Put this in 'response'.
         4. Set 'intent.type' to 'correction', 'intent.rowId' to "${field.rowId}", 'intent.column' to "${field.column}", 'intent.tableId' to "${tableId ?? ''}", and 'intent.newValue' to your cleaned, best-guess corrected value.
         5. Set 'intent.oldValue' to the original OCR value "${field.value}".
@@ -568,7 +594,7 @@ ${formattedContext}
         `,
       generationConfig: {
         responseMimeType: 'application/json',
-        responseSchema: chatResponseSchema,
+        responseSchema: reviewFieldSchema,
         temperature: 0.2,
       },
     });
@@ -601,11 +627,14 @@ ${formattedContext}
     const grid = resolveGrid(documentContext, tableId);
     const flaggedIds = new Set(fields.map((f) => String(f.rowId)));
 
+    // Per flagged row: its neighbours in this column (so a blank can continue a
+    // sequence such as numbering) plus the rest of the row for context.
     const rowContexts = fields.map(({ rowId }) => {
-      const row = grid.rows.find((r) => String(r._id) === String(rowId));
+      const { rowIndex, previousRowValue, nextRowValue } = rowNeighbours(grid, rowId, column);
+      const row = grid.rows[rowIndex];
       if (!row) return { rowId, otherFields: {} };
       const { _id, _cellKeyMap, _confidence, _cellConfidence, _indentLevel, ...otherFields } = row;
-      return { rowId, otherFields };
+      return { rowId, rowIndex, previousRowValue, nextRowValue, otherFields };
     });
 
     const referenceValues = grid.rows
@@ -613,6 +642,7 @@ ${formattedContext}
       .map((r) => r[column])
       .filter((v) => v !== null && v !== undefined && String(v).trim() !== '')
       .slice(0, 20);
+    const columnType = inferColumnType(referenceValues.map(String));
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.5-flash-lite',
@@ -627,18 +657,18 @@ ${formattedContext}
     The flagged cells, with the rest of their row for context:
     ${JSON.stringify(rowContexts, null, 2)}
 
-    Values from OTHER rows in this same column that already look correctly formatted, for reference:
+    Values from OTHER rows in this same column that already look correctly formatted, for reference (inferred column type: ${columnType}):
     ${JSON.stringify(referenceValues, null, 2)}
 
     Your job:
-    1. For EACH flagged row, clean and normalize its "${column}" value so it matches the expected format. Remove stray punctuation/whitespace/OCR artifacts. Use the row's other fields and the reference values to judge the most plausible correction -- don't just blindly strip characters if that produces a value that doesn't make sense in context.
+    1. For EACH flagged row, clean and normalize its "${column}" value so it matches the expected format. Remove stray punctuation/whitespace/OCR artifacts. If a flagged cell is blank, infer the most plausible value from 'previousRowValue' / 'nextRowValue', the row's other fields and the reference values (for example, continue a numbering sequence); only return an empty string if there is genuinely no basis to infer one. Use the row's other fields and the reference values to judge the most plausible correction -- don't just blindly strip characters if that produces a value that doesn't make sense in context.
     2. Set 'intent.type' to 'bulk_update' and 'intent.tableId' to "${tableId ?? ''}".
     3. Populate 'intent.bulkUpdates' with EXACTLY one entry per flagged row: 'rowId' (the exact id given above), 'column' set to "${column}", 'tableId' set to "${tableId ?? ''}", and 'newValue' as your corrected value. Do not omit any row.
     4. Set 'response' to a short, one-sentence summary of what you changed and why.
     `,
       generationConfig: {
         responseMimeType: 'application/json',
-        responseSchema: chatResponseSchema,
+        responseSchema: reviewBulkSchema,
         temperature: 0.2,
       },
     });

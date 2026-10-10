@@ -85,7 +85,8 @@ export function useReviewSuggestions({
       try {
         const reply = await requestFieldReview(field, page);
         if (reply.intent?.newValue != null) return reply.intent.newValue;
-        return findUpdatedCell(reply.updatedContext, tableId, rowId, column) ?? reply.response;
+        // Never fall back to reply.response: it is prose, and accepting it would write a sentence into the cell.
+        return findUpdatedCell(reply.updatedContext, tableId, rowId, column) ?? null;
       } catch (e) {
         console.error(e);
         return null;
