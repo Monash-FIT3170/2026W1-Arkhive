@@ -6,7 +6,7 @@ import {
   plainTextExtractor,
   llmStructurer,
 } from './extractors';
-import type { RawCell, RawLine, RawPage, RawTable } from './layout';
+import type { RawCell, RawPage, RawTable } from './layout';
 
 const word = (text: string, confidence: number, offset: number, x: number) => ({
   text,
