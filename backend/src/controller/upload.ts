@@ -342,7 +342,9 @@ export default {
         updatedAt: Date.now(),
       };
 
-      const debugPath = path.join(process.cwd(), 'combined-ocr-output.json');
+      const debugDir = path.join(process.cwd(), 'tmp');
+      fs.mkdirSync(debugDir, { recursive: true });
+      const debugPath = path.join(debugDir, 'combined-ocr-output.json');
 
       fs.writeFileSync(debugPath, JSON.stringify(combinedOcrData, null, 2), 'utf8');
 
