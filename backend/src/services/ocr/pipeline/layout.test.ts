@@ -126,6 +126,11 @@ describe('toRawPages', () => {
     expect(page.lines[0].confidence).toBeCloseTo((0.9 + 0.8) / 2);
   });
 
+  it('offsets pageIndex by pageOffset (each image is OCR\'d alone, so Azure always reports pageNumber 1)', () => {
+    const [page] = toRawPages(azure, 5);
+    expect(page.pageIndex).toBe(5); // pageOffset 5 + (pageNumber 1 - 1)
+  });
+
   it('maps Azure tables, trims cell text, flags header cells, and attaches overlapping words', () => {
     const [page] = toRawPages(azure, undefined);
 

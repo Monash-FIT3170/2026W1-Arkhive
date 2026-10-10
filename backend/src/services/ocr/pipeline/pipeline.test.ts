@@ -139,11 +139,10 @@ describe('structureDocument', () => {
     consoleSpy.mockRestore();
   });
 
-  it('passes pageOffset through so toRawPages/extractors line up with the real page index', async () => {
+  it('passes pageOffset through so the resulting page carries the real document-wide page index', async () => {
     const doc = await structureDocument(azureWithTableAndLeftover(), { ai, docType: 'table', pageOffset: 5 });
-    // toRawPages itself always derives pageIndex from Azure's pageNumber, not pageOffset,
-    // so this just documents current behavior rather than asserting a specific index.
     expect(doc.pages).toHaveLength(1);
+    expect(doc.pages[0].pageIndex).toBe(5);
   });
 });
 

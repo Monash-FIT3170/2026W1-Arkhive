@@ -115,6 +115,6 @@ export function toRawPages(result: AnalyzeResultOutput, pageOffset: number | und
         })),
       }));
 
-    return { pageIndex: p.pageNumber - 1, lines, tables };
+    return { pageIndex: (pageOffset ?? 0) + (p.pageNumber - 1), lines, tables };
   });
 }
