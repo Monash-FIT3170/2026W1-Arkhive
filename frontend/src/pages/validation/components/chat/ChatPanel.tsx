@@ -10,7 +10,7 @@ import {
   PictureInPicture2,
   Send,
 } from 'lucide-react';
-import type { ChatMessage } from '../../../../models/Message';
+import type { ChatMessage, AppliedEdits, Intent } from '../../../../models/Message';
 import MessageItem from './MessageItem';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { sendMessage } from '../../../../services/llmService';
@@ -120,7 +120,7 @@ function ChatPanel({
   messages: ChatMessage[];
   onAddMessage: (msg: ChatMessage) => void;
   documentContext: ExtractedPage;
-  onContextUpdate: (updated: ExtractedPage) => void;
+  onContextUpdate: (updated: ExtractedPage, applied?: AppliedEdits, intent?: Intent | null) => void;
   onAccept: () => void;
   onReject: () => void;
   flaggedIssues?: OcrIssue[];
@@ -381,10 +381,11 @@ function ChatPanel({
 
       // ai returns updated context
       if (reply.updatedContext) {
-        onContextUpdate({
-          ...reply.updatedContext,
-          pageIndex: documentContext.pageIndex,
-        });
+        onContextUpdate(
+          { ...reply.updatedContext, pageIndex: documentContext.pageIndex },
+          reply.applied,
+          reply.intent
+        );
       }
 
       onAddMessage({

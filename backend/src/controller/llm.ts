@@ -1,14 +1,13 @@
-import {
-  BulkReviewFieldRequest,
-  ChatRequest,
-  ReviewFieldRequest,
-} from '../models/message';
+import { BulkReviewFieldRequest, ChatRequest, ReviewFieldRequest } from '../models/message';
 import { Request, Response } from 'express';
 
 import aiService from '../services/llm/aiService';
 
 export default {
-  chatWithModel: async (req: Request<Record<string, never>, Record<string, never>, ChatRequest>, res: Response) => {
+  chatWithModel: async (
+    req: Request<Record<string, never>, Record<string, never>, ChatRequest>,
+    res: Response
+  ) => {
     try {
       const { messages, documentContext } = req.body;
 
@@ -18,7 +17,6 @@ export default {
       }
 
       const reply = await aiService.sendMessageToGemini(messages, documentContext);
-      console.log(reply);
       res.json({ reply });
     } catch (error) {
       console.error('Error communicating with Gemini:', error);
@@ -28,14 +26,16 @@ export default {
       });
     }
   },
-  reviewField: async (req: Request<Record<string, never>, Record<string, never>, ReviewFieldRequest>, res: Response) => {
+  reviewField: async (
+    req: Request<Record<string, never>, Record<string, never>, ReviewFieldRequest>,
+    res: Response
+  ) => {
     try {
       const { field, documentContext } = req.body;
       if (!field || !documentContext) {
         return res.status(400).json({ error: 'field and documentContext are required' });
       }
       const reply = await aiService.suggestFieldCorrection(field, documentContext);
-      console.log(reply);
       res.json({ reply });
     } catch (error) {
       console.error('Error communicating with Gemini:', error);
@@ -45,14 +45,22 @@ export default {
       });
     }
   },
-  reviewBulk: async (req: Request<Record<string, never>, Record<string, never>, BulkReviewFieldRequest>, res: Response) => {
+  reviewBulk: async (
+    req: Request<Record<string, never>, Record<string, never>, BulkReviewFieldRequest>,
+    res: Response
+  ) => {
     try {
-      const { column, fields, documentContext } = req.body;
-      if (!fields || !documentContext) {
-        return res.status(400).json({ error: 'field and documentContext are required' });
+      const { column, fields, documentContext, formatRegex, tableId } = req.body;
+      if (!column || !fields || !documentContext) {
+        return res.status(400).json({ error: 'column, fields and documentContext are required' });
       }
-      const reply = await aiService.suggestBulkFieldCorrections(column, fields, documentContext);
-      console.log(reply);
+      const reply = await aiService.suggestBulkFieldCorrections(
+        column,
+        fields,
+        documentContext,
+        formatRegex,
+        tableId
+      );
       res.json({ reply });
     } catch (error) {
       console.error('Error communicating with Gemini:', error);
@@ -69,7 +77,6 @@ export default {
         return res.status(400).json({ error: 'sampledData is required' });
       }
       const regexMap = await aiService.detectTableFormats(sampledData);
-      console.log('Detected formats:', regexMap);
       res.json({ regexMap });
     } catch (error) {
       console.error('Error in format detection:', error);

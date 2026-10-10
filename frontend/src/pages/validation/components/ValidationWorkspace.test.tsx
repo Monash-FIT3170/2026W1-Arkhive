@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ValidationWorkspace from './ValidationWorkspace';
 import type { ExtractedPage } from '../../../models/TableData';
-import type { OCRComponent } from '../../../models/OCRComponent';
+import type { Block } from '../../../models/Document';
 
 // Mock child panels that have heavy dependencies
 vi.mock('./chat/ChatPanel', () => ({
@@ -40,10 +40,10 @@ describe('ValidationWorkspace - File Separation & Adaptive View Modes', () => {
     { pageIndex: 2, columns: ['QTY'], itemColumnKey: 'QTY', rows: [{ _id: '3', QTY: 'Item 2A', _cellConfidence: {} }] },
   ];
 
-  const mockOcrPages: OCRComponent[][] = [
-    [{ id: 'c1', type: 'TABLE_ROW', indentation: 0, y: 0, layer: 0, text: 't1', confidence: 0.95 }],
-    [{ id: 'c2', type: 'TABLE_ROW', indentation: 0, y: 0, layer: 0, text: 't2', confidence: 0.9 }],
-    [{ id: 'c3', type: 'TABLE_ROW', indentation: 0, y: 0, layer: 0, text: 't3', confidence: 0.85 }],
+  const mockOcrPages: Block[][] = [
+    [{ kind: 'text', id: 'c1', role: 'paragraph', text: 't1', confidence: 0.95 }],
+    [{ kind: 'text', id: 'c2', role: 'paragraph', text: 't2', confidence: 0.9 }],
+    [{ kind: 'text', id: 'c3', role: 'paragraph', text: 't3', confidence: 0.85 }],
   ];
 
   const mockImageUrls = ['http://img/1.png', 'http://img/2.png', 'http://img/3.png'];

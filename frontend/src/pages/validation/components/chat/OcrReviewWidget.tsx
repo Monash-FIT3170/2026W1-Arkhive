@@ -77,7 +77,7 @@ export default function OcrReviewWidget({
           : currentSlide.issues[0]?.pageIndex;
       onSlideChange(fieldIds, pageIndex);
     }
-  }, [currentIndex, currentSlide]);
+  }, [currentIndex, currentSlide, onSlideChange]);
 
   // Whenever the slide list shrinks (or changes) for any reason — resolving an
   // issue, the parent updating `issues`, — make sure currentIndex still
@@ -216,7 +216,10 @@ export default function OcrReviewWidget({
         {formatCheckFailed && (
           <div className="flex items-center gap-2 mb-3 p-2.5 rounded-xl bg-warning/10 border border-warning/30 text-xs text-warning shrink-0">
             <AlertCircle size={14} className="shrink-0" />
-            <span>Format check failed on this page. Use the &quot;Re-scan Page&quot; button in the top bar to retry.</span>
+            <span>
+              Format check failed on this page. Use the &quot;Re-scan Page&quot; button in the top
+              bar to retry.
+            </span>
           </div>
         )}
         {unresolvedIssues.length === 0 ? (

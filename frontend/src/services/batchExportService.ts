@@ -1,6 +1,6 @@
 import type { DocumentJob } from '../models/Job';
-import type { ExtractedData } from '../models/TableData';
-import { flatten } from '../utils/flattener';
+import type { ExtractedData, ExtractedPage } from '../models/TableData';
+import { toExtractedPages, type StoredExtraction } from './extractionService';
 
 type ZipEntry = {
   name: string;
@@ -157,27 +157,16 @@ function sanitizeSheetName(name: string, index: number, usedNames: Set<string>):
   return finalName;
 }
 
-function buildSheetXml(data: ExtractedData): string {
-  const rowsXml: string[] = [];
-
-  const headerCells = (data.columns || [])
-    .map((col, i) => {
-      const ref = `${columnLetter(i)}1`;
-      return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(col)}</t></is></c>`;
-    })
-    .join('');
-  rowsXml.push(`<row r="1">${headerCells}</row>`);
-
-  (data.rows || []).forEach((row, rowIndex) => {
-    const excelRow = rowIndex + 2;
-    const cells = (data.columns || [])
-      .map((col, i) => {
-        const ref = `${columnLetter(i)}${excelRow}`;
-        const value = row[col] ?? '';
-        return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`;
-      })
+function buildSheetXml(rows: string[][]): string {
+  const rowsXml = rows.map((cells, r) => {
+    const excelRow = r + 1;
+    const cellsXml = cells
+      .map(
+        (value, c) =>
+          `<c r="${columnLetter(c)}${excelRow}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`
+      )
       .join('');
-    rowsXml.push(`<row r="${excelRow}">${cells}</row>`);
+    return `<row r="${excelRow}">${cellsXml}</row>`;
   });
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -195,18 +184,88 @@ function triggerDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function getJobExtractedData(job: DocumentJob): ExtractedData {
-  if (job.extractedData && job.extractedData.columns && job.extractedData.rows) {
-    return job.extractedData;
+// ───────────── Job -> pages -> sections ─────────────
+// A job holds one or more ExtractedPages. A page can carry several tables
+// (the active one plus `otherTables`) and key/value fields, so each exporter
+// works from the same list of rectangular "sections" instead of one grid.
+
+interface Section {
+  title: string;
+  columns: string[];
+  rows: string[][];
+}
+
+const cellText = (v: unknown): string => String(v ?? '');
+
+/** Edited pages (job.extractedData) win over raw OCR (job.ocrData); either may be the old or new shape. */
+function getJobPages(job: DocumentJob): ExtractedPage[] {
+  const hasContent = (pages: ExtractedPage[]) =>
+    pages.some((p) => p.columns.length > 0 || (p.fields?.length ?? 0) > 0);
+
+  for (const stored of [job.extractedData, job.ocrData] as unknown as (
+    StoredExtraction | undefined
+  )[]) {
+    const pages = toExtractedPages(stored);
+    if (hasContent(pages)) return pages;
   }
-  if (job.ocrData && job.ocrData.length > 0) {
-    return flatten(job.ocrData);
+  return [
+    {
+      pageIndex: 0,
+      columns: ['Document', 'Status'],
+      itemColumnKey: 'Document',
+      rows: [{ _id: '1', Document: job.fileName, Status: job.status, _cellConfidence: {} }],
+    },
+  ];
+}
+
+/** Every non-empty table on a page, in document order (active table + parked others). */
+function getPageTables(page: ExtractedPage): { id: string; data: ExtractedData }[] {
+  const all = new Map<string, ExtractedData>();
+  if (page.columns.length > 0) all.set(page.tableId ?? 'table', page);
+  for (const t of page.otherTables ?? []) if (t.columns.length > 0) all.set(t.tableId, t);
+
+  const order = page.tableOrder ?? [];
+  const ids = [
+    ...order.filter((id) => all.has(id)),
+    ...[...all.keys()].filter((id) => !order.includes(id)),
+  ];
+  return ids.map((id) => ({ id, data: all.get(id)! }));
+}
+
+function getJobSections(job: DocumentJob): Section[] {
+  const sections: Section[] = [];
+  for (const page of getJobPages(job)) {
+    const label = `Page ${page.pageIndex + 1}`;
+    if (page.fields?.length) {
+      sections.push({
+        title: `${label}: Fields`,
+        columns: ['Field', 'Value'],
+        rows: page.fields.map((f) => [f.label || f.key, f.value]),
+      });
+    }
+    const tables = getPageTables(page);
+    tables.forEach(({ data }, i) =>
+      sections.push({
+        title: tables.length > 1 ? `${label}: Table ${i + 1}` : `${label}: Table`,
+        columns: data.columns,
+        rows: data.rows.map((row) => data.columns.map((col) => cellText(row[col]))),
+      })
+    );
   }
-  return {
-    columns: ['Document', 'Status'],
-    itemColumnKey: 'Document',
-    rows: [{ _id: '1', Document: job.fileName, Status: job.status, _cellConfidence: {} }],
-  };
+  return sections;
+}
+
+/** Sections stacked with a blank row between. Titles only appear when there is more than one. */
+function getJobRows(job: DocumentJob): string[][] {
+  const sections = getJobSections(job);
+  const titled = sections.length > 1;
+  const rows: string[][] = [];
+  sections.forEach((s, i) => {
+    if (i > 0) rows.push([]);
+    if (titled) rows.push([s.title]);
+    rows.push(s.columns, ...s.rows);
+  });
+  return rows;
 }
 
 /**
@@ -221,8 +280,8 @@ export function exportBatchAsXLSX(
   const usedNames = new Set<string>();
   const sheetItems = jobs.map((job, idx) => {
     const sheetName = sanitizeSheetName(job.fileName || `Doc_${idx + 1}`, idx, usedNames);
-    const data = getJobExtractedData(job);
-    return { sheetName, data, sheetId: idx + 1, relId: `rId${idx + 1}` };
+    const rows = getJobRows(job);
+    return { sheetName, rows, sheetId: idx + 1, relId: `rId${idx + 1}` };
   });
 
   const contentTypesOverrides = sheetItems
@@ -273,7 +332,7 @@ export function exportBatchAsXLSX(
     { name: 'xl/_rels/workbook.xml.rels', data: textEncode(workbookRelsXml) },
     ...sheetItems.map((s) => ({
       name: `xl/worksheets/sheet${s.sheetId}.xml`,
-      data: textEncode(buildSheetXml(s.data)),
+      data: textEncode(buildSheetXml(s.rows)),
     })),
   ];
 
@@ -290,31 +349,22 @@ export function exportBatchAsXLSX(
 export function exportBatchAsCSV(jobs: DocumentJob[], filename = 'arkhive-batch-export.csv'): void {
   if (!jobs || jobs.length === 0) return;
 
-  const sections: string[] = [];
+  const quote = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const sections = jobs.map((job, index) =>
+    [
+      `--- DOCUMENT ${index + 1}: ${job.fileName} ---`,
+      ...getJobRows(job).map((row) => row.map(quote).join(',')),
+    ].join('\n')
+  );
 
-  jobs.forEach((job, index) => {
-    const data = getJobExtractedData(job);
-    const headerRow = `--- DOCUMENT ${index + 1}: ${job.fileName} ---`;
-    const colRow = (data.columns || []).map((col) => `"${col.replace(/"/g, '""')}"`).join(',');
-    const rowLines = (data.rows || []).map((row) =>
-      (data.columns || [])
-        .map((col) => {
-          const val = String(row[col] ?? '');
-          return `"${val.replace(/"/g, '""')}"`;
-        })
-        .join(',')
-    );
-
-    sections.push([headerRow, colRow, ...rowLines].join('\n'));
-  });
-
-  const content = sections.join('\n\n');
-  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob([sections.join('\n\n')], { type: 'text/csv;charset=utf-8;' });
   triggerDownload(blob, filename);
 }
 
 /**
  * Export all document jobs in the batch as a structured JSON file.
+ * Each job lists its pages; each page lists its tables (with row indent levels),
+ * fields and text blocks.
  */
 export function exportBatchAsJSON(
   jobs: DocumentJob[],
@@ -327,13 +377,25 @@ export function exportBatchAsJSON(
     fileName: job.fileName,
     status: job.status,
     confidence: job.confidence,
-    extractedData: getJobExtractedData(job),
+    pages: getJobPages(job).map((page) => ({
+      pageIndex: page.pageIndex,
+      fields: page.fields ?? [],
+      texts: page.texts ?? [],
+      tables: getPageTables(page).map(({ id, data }) => ({
+        id,
+        columns: data.columns,
+        itemColumnKey: data.itemColumnKey,
+        rows: data.rows.map((row) => ({
+          _indentLevel: row._indentLevel ?? 0,
+          ...Object.fromEntries(data.columns.map((col) => [col, cellText(row[col])])),
+        })),
+      })),
+    })),
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   }));
 
-  const jsonStr = JSON.stringify(batchPayload, null, 2);
-  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(batchPayload, null, 2)], { type: 'application/json' });
   triggerDownload(blob, filename);
 }
 
@@ -343,20 +405,11 @@ export function exportBatchAsJSON(
 export function exportBatchAsTXT(jobs: DocumentJob[], filename = 'arkhive-batch-export.txt'): void {
   if (!jobs || jobs.length === 0) return;
 
-  const sections: string[] = [];
-
-  jobs.forEach((job, index) => {
-    const data = getJobExtractedData(job);
+  const sections = jobs.map((job, index) => {
     const banner = `========================================================\nDOCUMENT ${index + 1}: ${job.fileName}\nCONFIDENCE: ${Math.round((job.confidence || 0) * 100)}%\n========================================================`;
-    const colHeader = (data.columns || []).join('\t');
-    const rowLines = (data.rows || []).map((row) =>
-      (data.columns || []).map((col) => String(row[col] ?? '')).join('\t')
-    );
-
-    sections.push([banner, colHeader, ...rowLines].join('\n'));
+    return [banner, ...getJobRows(job).map((row) => row.join('\t'))].join('\n');
   });
 
-  const content = sections.join('\n\n');
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+  const blob = new Blob([sections.join('\n\n')], { type: 'text/plain;charset=utf-8;' });
   triggerDownload(blob, filename);
 }

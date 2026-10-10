@@ -5,7 +5,7 @@ import {
   getFileAndLocalPage,
 } from './fileGrouping';
 import type { ExtractedPage } from '../models/TableData';
-import type { OCRComponent } from '../models/OCRComponent';
+import type { PageOverlay } from './overlays';
 
 describe('fileGrouping utility', () => {
   const mockPages: ExtractedPage[] = [
@@ -15,11 +15,11 @@ describe('fileGrouping utility', () => {
     { pageIndex: 3, columns: ['C'], itemColumnKey: 'C', rows: [{ _id: '4', C: 'val4', _cellConfidence: {} }] },
   ];
 
-  const mockOcrPages: OCRComponent[][] = [
-    [{ id: 'c1', type: 'TABLE_ROW', indentation: 0, y: 0, layer: 0, text: 't1', confidence: 0.9 }],
-    [{ id: 'c2', type: 'TABLE_ROW', indentation: 0, y: 0, layer: 0, text: 't2', confidence: 0.8 }],
-    [{ id: 'c3', type: 'TABLE_ROW', indentation: 0, y: 0, layer: 0, text: 't3', confidence: 0.95 }],
-    [{ id: 'c4', type: 'TABLE_ROW', indentation: 0, y: 0, layer: 0, text: 't4', confidence: 0.7 }],
+  const mockOcrPages: PageOverlay[][] = [
+    [{ id: 'c1', kind: 'text', text: 't1', confidence: 0.9, page: 1, polygon: [] }],
+    [{ id: 'c2', kind: 'text', text: 't2', confidence: 0.8, page: 2, polygon: [] }],
+    [{ id: 'c3', kind: 'text', text: 't3', confidence: 0.95, page: 3, polygon: [] }],
+    [{ id: 'c4', kind: 'text', text: 't4', confidence: 0.7, page: 4, polygon: [] }],
   ];
 
   const mockImageUrls = [

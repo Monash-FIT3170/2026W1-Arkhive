@@ -5,12 +5,12 @@ import type {
   Message,
   ReviewField,
 } from '../models/Message';
-import type { ExtractedData } from '../models/TableData';
+import type { ExtractedPage } from '../models/TableData';
 import { apiUrl } from './apiBase';
 
 export async function sendMessage(
   messages: Message[],
-  documentContext?: ExtractedData
+  documentContext?: ExtractedPage
 ): Promise<ChatResponse> {
   const response = await fetch(apiUrl('/api/llm/chat'), {
     method: 'POST',
@@ -20,20 +20,19 @@ export async function sendMessage(
     body: JSON.stringify({
       messages,
       documentContext,
-    } as ChatRequest),
+    } satisfies ChatRequest),
   });
   if (!response.ok) {
     throw new Error('Failed to send message');
   }
 
   const data = await response.json();
-  console.log(data);
   return data.reply;
 }
 
 export async function requestFieldReview(
   field: ReviewField,
-  documentContext: ExtractedData
+  documentContext: ExtractedPage
 ): Promise<ChatResponse> {
   const response = await fetch(apiUrl('/api/llm/chat/review-field'), {
     method: 'POST',

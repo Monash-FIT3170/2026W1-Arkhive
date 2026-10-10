@@ -38,23 +38,12 @@ const { mockJobs } = vi.hoisted(() => ({
 
 // Mock dependencies
 vi.mock('../../services/extractionService', () => ({
-  getExtractionSession: vi.fn().mockResolvedValue([
-    {
-      page_num: 1,
-      components: [
-        {
-          id: '1',
-          type: 'TABLE_ROW',
-          cells: ['A'],
-          confidence: 0.9,
-          boundingBoxes: {},
-          indentation: 0,
-          y: 0,
-          layer: 0,
-          text: 'A',
-        },
-      ],
-    },
+  getExtractionSession: vi.fn().mockResolvedValue([]), // shape doesn't matter: isStructuredPages/toExtractedPages below are mocked too
+  // ValidationPage picks a branch with isStructuredPages, then normalises via toExtractedPages;
+  // both are mocked directly so this test doesn't need a real StructuredPage/Document fixture.
+  isStructuredPages: vi.fn().mockReturnValue(false),
+  toExtractedPages: vi.fn().mockReturnValue([
+    { pageIndex: 0, tableId: 't1', columns: ['ITEM', 'QTY'], itemColumnKey: 'ITEM', rows: [{ _id: 'row1', _cellConfidence: {}, ITEM: 'Paper', QTY: '5' }] },
   ]),
   getBatchJobs: vi.fn().mockResolvedValue({
     batchId: 'batch-123',

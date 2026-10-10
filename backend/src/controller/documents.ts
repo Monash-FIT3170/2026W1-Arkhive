@@ -10,7 +10,8 @@ import {
   putObject,
 } from '../services/r2Client';
 import { processImage } from '../services/imageProcessor';
-import { parseTableWithRetries } from '../services/ocr/ocr';
+import { parseDocumentWithRetries } from '../services/ocr/ocr';
+import type { DocType } from '../models/Document';
 import type { ExtractedPage } from '../models/TableData';
 import type { PageSelection, ProcessedPageResult } from '../models/Project.ts';
 import { PageReview } from '../models/IssueReview';
@@ -32,28 +33,41 @@ async function getOwnedDocument(documentId: string, ownerId: string) {
   return document;
 }
 
+const VALID_DOC_TYPES: ReadonlySet<string> = new Set<DocType>([
+  'table',
+  'receipt',
+  'invoice',
+  'generic',
+]);
 
 const chunk = (size: number) => (arr: any[]) =>
   Array.from({ length: Math.ceil(arr.length / size) }, (_: any, i: number) =>
     arr.slice(i * size, i * size + size)
   );
 
-
-async function processPage(selection: PageSelection, ownerId: string): Promise<ProcessedPageResult[]>{
+async function processPage(
+  selection: PageSelection,
+  ownerId: string
+): Promise<ProcessedPageResult[]> {
   const { documentId, pageIndices, force } = selection;
+  // Optional hint from the client; skips classification in the OCR pipeline.
+  // Validated because it ends up in a model prompt.
+  const docType: DocType | undefined =
+    selection.docType && VALID_DOC_TYPES.has(selection.docType) ? selection.docType : undefined;
 
   const document = await getOwnedDocument(documentId, ownerId);
   if (!document) {
-    return Promise.all(pageIndices.map(async (pageIndex)=>{
-      return {
-        documentId,
-        pageIndex,
-        status: 'error',
-        errorMessage: 'Document not found or access denied.',
-      }
-      }
-    ));
-    }
+    return Promise.all(
+      pageIndices.map(async (pageIndex) => {
+        return {
+          documentId,
+          pageIndex,
+          status: 'error',
+          errorMessage: 'Document not found or access denied.',
+        };
+      })
+    );
+  }
 
   const { data: pageRows, error: pagesError } = await supabase
     .from('document_pages')
@@ -63,71 +77,82 @@ async function processPage(selection: PageSelection, ownerId: string): Promise<P
 
   if (pagesError) {
     console.error('Failed to fetch document_pages for processing:', pagesError);
-    return Promise.all(pageIndices.map(async (pageIndex)=>{
-          return {
-            documentId,
-            pageIndex,
-            status: 'error',
-            errorMessage: pagesError.message,
-          };
-        }
-      )
-    )
+    return Promise.all(
+      pageIndices.map(async (pageIndex) => {
+        return {
+          documentId,
+          pageIndex,
+          status: 'error',
+          errorMessage: pagesError.message,
+        };
+      })
+    );
   }
 
   const pageByIndex = new Map((pageRows || []).map((p) => [p.page_index, p]));
 
-  const t: Promise<ProcessedPageResult[]> = Promise.all(pageIndices.map(async (pageIndex)=>{
-    const pageRow = pageByIndex.get(pageIndex);
+  const t: Promise<ProcessedPageResult[]> = Promise.all(
+    pageIndices.map(async (pageIndex) => {
+      const pageRow = pageByIndex.get(pageIndex);
 
-    // Skip pages already validated, unless the caller forces a redo.
-    if (pageRow && pageRow.status === 'done' && !force) {
-      return {
-        documentId,
-        pageIndex,
-        status: 'done',
-        rawResult: pageRow.raw_ocr_result,
-        skipped: true,
-      };
-    }
-
-    await supabase
-      .from('document_pages')
-      .update({ status: 'processing' })
-      .eq('document_id', documentId)
-      .eq('page_index', pageIndex);
-
-    try {
-      const key = `${document.storage_path}/page-${pageIndex}.png`;
-      const buffer = await getObjectBuffer(key);
-      const rawResult = await parseTableWithRetries(buffer);
-
-      // Persist immediately — this is the fix for "crash mid-validation
-      // means re-OCR everything." Status goes back to 'pending' (not
-      // 'done') because raw OCR output still needs user validation
-      // before it's trustworthy.
-      await supabase
-        .from('document_pages')
-        .update({ status: 'done', raw_ocr_result: rawResult, error_message: null, review_state: null })
-        .eq('document_id', documentId)
-        .eq('page_index', pageIndex);
-
-      return { documentId, pageIndex, status: 'done', rawResult };
-    } catch (ocrError: any) {
-      const errorMessage =
-        ocrError?.message || 'OCR processing failed. Check credentials and document format.';
-      console.error(`OCR failed for ${documentId} page ${pageIndex}:`, ocrError);
+      // Skip pages already validated, unless the caller forces a redo.
+      if (pageRow && pageRow.status === 'done' && !force) {
+        return {
+          documentId,
+          pageIndex,
+          status: 'done',
+          rawResult: pageRow.raw_ocr_result,
+          skipped: true,
+        };
+      }
 
       await supabase
         .from('document_pages')
-        .update({ status: 'error', error_message: errorMessage })
+        .update({ status: 'processing' })
         .eq('document_id', documentId)
         .eq('page_index', pageIndex);
 
-      return { documentId, pageIndex, status: 'error', errorMessage };
-    }
-  }))
-  return t
+      try {
+        const key = `${document.storage_path}/page-${pageIndex}.png`;
+        const buffer = await getObjectBuffer(key);
+        // rawResult is a StructuredDocument. pageOffset is the REAL page index
+        // so the blocks' regions/pageIndex line up with this page's image.
+        const rawResult = await parseDocumentWithRetries(buffer, {
+          docType,
+          pageOffset: pageIndex,
+        });
+
+        // Persist immediately — this is the fix for "crash mid-validation
+        // means re-OCR everything." Raw OCR output is stored as-is; the
+        // user's validated edits are saved separately via saveExtractedData.
+        await supabase
+          .from('document_pages')
+          .update({
+            status: 'done',
+            raw_ocr_result: rawResult,
+            error_message: null,
+            review_state: null,
+          })
+          .eq('document_id', documentId)
+          .eq('page_index', pageIndex);
+
+        return { documentId, pageIndex, status: 'done', rawResult };
+      } catch (ocrError: any) {
+        const errorMessage =
+          ocrError?.message || 'OCR processing failed. Check credentials and document format.';
+        console.error(`OCR failed for ${documentId} page ${pageIndex}:`, ocrError);
+
+        await supabase
+          .from('document_pages')
+          .update({ status: 'error', error_message: errorMessage })
+          .eq('document_id', documentId)
+          .eq('page_index', pageIndex);
+
+        return { documentId, pageIndex, status: 'error', errorMessage };
+      }
+    })
+  );
+  return t;
 }
 
 export default {
@@ -202,19 +227,17 @@ export default {
       }
 
       // Ensure this page has a row to hang status/OCR data off of.
-      // We upsert and DO NOT ignore duplicates, so if they re-upload page 1, 
+      // We upsert and DO NOT ignore duplicates, so if they re-upload page 1,
       // it resets status to 'pending' and updates quality flags.
-      const { error: pageInsertError } = await supabase
-        .from('document_pages')
-        .upsert(
-          { 
-            document_id: docId, 
-            page_index: numericPageIndex, 
-            status: 'pending',
-            quality_flags: qualityFlags
-          },
-          { onConflict: 'document_id,page_index' }
-        );
+      const { error: pageInsertError } = await supabase.from('document_pages').upsert(
+        {
+          document_id: docId,
+          page_index: numericPageIndex,
+          status: 'pending',
+          quality_flags: qualityFlags,
+        },
+        { onConflict: 'document_id,page_index' }
+      );
 
       if (pageInsertError) {
         console.error('Failed to create document_pages record:', pageInsertError);
@@ -352,17 +375,19 @@ export default {
         res.status(400).json({ error: 'selections must be a non-empty array.' });
         return;
       }
-      
-      const MAX_CHUNK_SIZE = 5
-      const chunks = chunk(MAX_CHUNK_SIZE)(selections)
-      const resultsMatrix:ProcessedPageResult[][] = await chunks.reduce<Promise<ProcessedPageResult[][]>>(async (acc, chnk) => {
-        const accResolved = await acc
-        const chunkRes = await Promise.all(chnk.map(selctin => processPage(selctin, ownerId)));
-        accResolved.push(chunkRes.flat());
-        return acc
-      }, Promise.resolve([]))
 
-      const results: ProcessedPageResult[] = resultsMatrix.flatMap(_ => _)
+      const MAX_CHUNK_SIZE = 5;
+      const chunks = chunk(MAX_CHUNK_SIZE)(selections);
+      const resultsMatrix: ProcessedPageResult[][] = await chunks.reduce<
+        Promise<ProcessedPageResult[][]>
+      >(async (acc, chnk) => {
+        const accResolved = await acc;
+        const chunkRes = await Promise.all(chnk.map((selctin) => processPage(selctin, ownerId)));
+        accResolved.push(chunkRes.flat());
+        return acc;
+      }, Promise.resolve([]));
+
+      const results: ProcessedPageResult[] = resultsMatrix.flatMap((_) => _);
 
       res.json({ success: true, results });
     } catch (err: any) {
