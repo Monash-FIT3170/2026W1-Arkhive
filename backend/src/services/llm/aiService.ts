@@ -1,275 +1,13 @@
 import { GoogleGenerativeAI, SchemaType, Schema } from '@google/generative-ai';
-import type { Message, ReviewField, Intent, AppliedEdits } from '../../models/message';
+import type { Message, ReviewField } from '../../models/message';
 import dotenv from 'dotenv';
-import type { ExtractedData, ExtractedPage, ExtractedRow } from '../../models/TableData';
+import type { ExtractedPage } from '../../models/TableData';
 import { buildFocusedContext, inferColumnType, rowNeighbours } from './utils/contextMaker';
 import { profileColumnLocally } from './utils/formatUtils';
+import { getGrid, resolveEdit, resolveWithRetry, type Grid } from './utils/intentApplier';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Page-aware intent application
-//
-// The page is: one ACTIVE table (top-level columns/rows, identified by
-// page.tableId), any number of parked tables (page.otherTables), plus
-// key/value `fields` and `texts`. Every function below returns a new page and
-// reports exactly what it changed, so callers never claim success on a no-op.
-// ─────────────────────────────────────────────────────────────────────────────
-
-type Grid = ExtractedData;
-
-const sameId = (a: unknown, b: unknown) => String(a) === String(b);
-
-/** The grid for a tableId (active grid when omitted / equal to page.tableId). */
-function getGrid(page: ExtractedPage, tableId?: string): Grid | undefined {
-  if (!tableId || tableId === page.tableId) return page;
-  return page.otherTables?.find((t) => t.tableId === tableId);
-}
-
-function rowExists(grid: Grid | undefined, rowId: unknown): boolean {
-  return !!grid?.rows.some((r) => sameId(r._id, rowId));
-}
-
-/**
- * Which table holds this row? Trust the model's tableId if the row is really
- * there, otherwise search (row ids come from the flattener and are unique per
- * block, but the model can still mislabel the table).
- */
-function locateRow(page: ExtractedPage, rowId: unknown, hinted?: string): string | undefined {
-  if (hinted && rowExists(getGrid(page, hinted), rowId)) return hinted;
-  if (rowExists(page, rowId)) return page.tableId;
-  return page.otherTables?.find((t) => rowExists(t, rowId))?.tableId;
-}
-
-/** Apply fn to one table and write the result back to the right place on the page. */
-function editGrid(
-  page: ExtractedPage,
-  tableId: string | undefined,
-  fn: (g: Grid) => Grid
-): ExtractedPage {
-  if (!tableId || tableId === page.tableId) {
-    const next = fn(page);
-    return { ...page, columns: next.columns, rows: next.rows, itemColumnKey: next.itemColumnKey };
-  }
-  const others = page.otherTables ?? [];
-  if (!others.some((t) => t.tableId === tableId)) return page; // unknown table: no-op
-  return {
-    ...page,
-    otherTables: others.map((t) => {
-      if (t.tableId !== tableId) return t;
-      const next = fn(t);
-      return { ...t, columns: next.columns, rows: next.rows, itemColumnKey: next.itemColumnKey };
-    }),
-  };
-}
-
-/** Set cell values. Only counts edits where both the row and the column exist. */
-function setCells(
-  grid: Grid,
-  edits: { rowId: string | number; column: string; newValue: string }[]
-): { grid: Grid; applied: { rowId: string | number; column: string }[] } {
-  const applied: { rowId: string | number; column: string }[] = [];
-  const rows = grid.rows.map((row) => {
-    const mine = edits.filter(
-      (e) =>
-        sameId(e.rowId, row._id) && grid.columns.includes(e.column) && !e.column.startsWith('_')
-    );
-    if (!mine.length) return row;
-    const next: ExtractedRow = { ...row, _cellConfidence: { ...row._cellConfidence } };
-    for (const e of mine) {
-      next[e.column] = e.newValue ?? '';
-      next._cellConfidence[e.column] = 1; // human-confirmed; keep in sync with useTableEditor.editCell
-      applied.push({ rowId: row._id, column: e.column });
-    }
-    return next;
-  });
-  return { grid: { ...grid, rows }, applied };
-}
-
-/** Rename columns (columns are the flattener's keys). Moves every per-column map with them. */
-function renameColumns(
-  grid: Grid,
-  updates: { from: string; to: string }[]
-): { grid: Grid; count: number } {
-  const valid = updates.filter(
-    (u) => grid.columns.includes(u.from) && u.to && u.to !== u.from && !grid.columns.includes(u.to)
-  );
-  if (!valid.length) return { grid, count: 0 };
-  const map = new Map(valid.map((u) => [u.from, u.to]));
-  return {
-    count: valid.length,
-    grid: {
-      ...grid,
-      columns: grid.columns.map((c) => map.get(c) ?? c),
-      itemColumnKey: map.get(grid.itemColumnKey) ?? grid.itemColumnKey,
-      rows: grid.rows.map((row) => {
-        const next: ExtractedRow = {
-          ...row,
-          _cellConfidence: { ...row._cellConfidence },
-          _cellKeyMap: row._cellKeyMap ? { ...row._cellKeyMap } : undefined,
-        };
-        for (const [from, to] of map) {
-          if (from in next) {
-            next[to] = next[from];
-            delete next[from];
-          }
-          if (from in next._cellConfidence) {
-            next._cellConfidence[to] = next._cellConfidence[from];
-            delete next._cellConfidence[from];
-          }
-          if (next._cellKeyMap && from in next._cellKeyMap) {
-            next._cellKeyMap[to] = next._cellKeyMap[from];
-            delete next._cellKeyMap[from];
-          }
-        }
-        return next;
-      }),
-    },
-  };
-}
-
-function deleteColumns(grid: Grid, names: string[]): { grid: Grid; count: number } {
-  const del = new Set(names.filter((c) => grid.columns.includes(c) && c !== grid.itemColumnKey));
-  if (!del.size) return { grid, count: 0 };
-  return {
-    count: del.size,
-    grid: {
-      ...grid,
-      columns: grid.columns.filter((c) => !del.has(c)),
-      rows: grid.rows.map((row) => {
-        const next: ExtractedRow = {
-          ...row,
-          _cellConfidence: { ...row._cellConfidence },
-          _cellKeyMap: row._cellKeyMap ? { ...row._cellKeyMap } : undefined,
-        };
-        del.forEach((c) => {
-          delete next[c];
-          delete next._cellConfidence[c];
-          if (next._cellKeyMap) delete next._cellKeyMap[c];
-        });
-        return next;
-      }),
-    },
-  };
-}
-
-/**
- * Apply an LLM intent to a page. Returns the new page and what actually changed.
- * `applied.total === 0` means nothing matched and the caller must not pretend otherwise.
- */
-function applyIntentToPage(
-  page: ExtractedPage,
-  intent: Intent
-): { page: ExtractedPage; applied: AppliedEdits & { total: number } } {
-  let result = page;
-  const tableIds = new Set<string>();
-  const cells: { rowId: string | number; column: string }[] = [];
-  const blockIds: string[] = [];
-  let total = 0;
-
-  const touch = (tableId: string | undefined) => {
-    const id = tableId ?? result.tableId;
-    if (id) tableIds.add(id);
-  };
-
-  const applyCellEdits = (
-    edits: { rowId: string | number; column: string; newValue: string; tableId?: string }[]
-  ) => {
-    // group by the table that really holds each row
-    const groups = new Map<string, typeof edits>();
-    for (const e of edits) {
-      const tid = locateRow(result, e.rowId, e.tableId ?? intent.tableId) ?? '';
-      groups.set(tid, [...(groups.get(tid) ?? []), e]);
-    }
-    for (const [tid, group] of groups) {
-      result = editGrid(result, tid || undefined, (g) => {
-        const r = setCells(g, group);
-        if (r.applied.length) {
-          cells.push(...r.applied);
-          total += r.applied.length;
-          touch(tid || undefined);
-        }
-        return r.grid;
-      });
-    }
-  };
-
-  switch (intent.type) {
-    case 'correction':
-      if (intent.rowId != null && intent.column && intent.newValue != null) {
-        applyCellEdits([{ rowId: intent.rowId, column: intent.column, newValue: intent.newValue }]);
-      }
-      break;
-
-    case 'bulk_update':
-      applyCellEdits(intent.bulkUpdates ?? []);
-      break;
-
-    case 'column_correction':
-      result = editGrid(result, intent.tableId, (g) => {
-        const r = renameColumns(g, intent.updates ?? []);
-        if (r.count) {
-          total += r.count;
-          touch(intent.tableId);
-        }
-        return r.grid;
-      });
-      break;
-
-    case 'column_delete':
-      result = editGrid(result, intent.tableId, (g) => {
-        const r = deleteColumns(g, intent.deletedColumns ?? []);
-        if (r.count) {
-          total += r.count;
-          touch(intent.tableId);
-        }
-        return r.grid;
-      });
-      break;
-
-    case 'field_correction':
-      if (intent.blockId && intent.newValue != null) {
-        const id = intent.blockId;
-        const newValue = intent.newValue;
-        const hitField = result.fields?.some((f) => f.id === id);
-        const hitText = result.texts?.some((t) => t.id === id);
-        if (hitField || hitText) {
-          result = {
-            ...result,
-            fields: result.fields?.map((f) => (f.id === id ? { ...f, value: newValue } : f)),
-            texts: result.texts?.map((t) => (t.id === id ? { ...t, text: newValue } : t)),
-          };
-          blockIds.push(id);
-          total += 1;
-        }
-      }
-      break;
-  }
-
-  return { page: result, applied: { tableIds: [...tableIds], cells, blockIds, total } };
-}
-
-const EDIT_INTENTS: Intent['type'][] = [
-  'correction',
-  'column_correction',
-  'column_delete',
-  'bulk_update',
-  'field_correction',
-];
-
-/** Run an intent against the page; returns what the endpoints should send back. */
-function resolveEdit(page: ExtractedPage | undefined, intent: Intent | null | undefined) {
-  if (!page || !intent || !EDIT_INTENTS.includes(intent.type)) {
-    return { updatedContext: undefined, applied: undefined, nothingMatched: false };
-  }
-  const { page: next, applied } = applyIntentToPage(page, intent);
-  if (applied.total === 0) {
-    return { updatedContext: undefined, applied: undefined, nothingMatched: true };
-  }
-  const { total: _total, ...rest } = applied;
-  return { updatedContext: next, applied: rest as AppliedEdits, nothingMatched: false };
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Context shown to the model
@@ -381,7 +119,8 @@ const chatResponseSchema: Schema = {
         },
         updates: {
           type: SchemaType.ARRAY,
-          description: 'A list of column name updates (for column_correction).',
+          description:
+            'ONLY for column_correction: renaming column headers as {from, to}. NEVER use this array to change actual cell data/numbers.',
           items: {
             type: SchemaType.OBJECT,
             properties: {
@@ -393,7 +132,8 @@ const chatResponseSchema: Schema = {
         },
         deletedColumns: {
           type: SchemaType.ARRAY,
-          description: 'A list of column names to delete (for column_delete).',
+          description:
+            "REQUIRED for column_delete: the exact names of the columns to delete, copied from the targeted table's 'columns'. Never empty for column_delete.",
           items: { type: SchemaType.STRING },
         },
         bulkUpdates: {
@@ -494,28 +234,25 @@ export default {
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.5-flash-lite',
       systemInstruction: `You are an AI assistant helping a user validate and correct a digitized document page.
-The page can contain SEVERAL tables plus key/value fields (invoice number, date, total...) and text blocks.
-Analyse the user's message and extract a structured intent.
+CONTEXT: The page contains tables (with 'tableId'), key/value 'fields', and 'texts'. One table has active:true.
 
-TARGETING RULES (important):
-- Every table has a 'tableId' and a 'label' ("Table 1", "Table 2"... matching the tabs the user sees). One table has active:true: that is the one currently on the user's screen.
-- If the user names a table ("in table 2"), use that table's tableId. Otherwise, if they refer to a value or column, pick the table that actually contains it; if it is ambiguous, prefer the active table.
-- For any table action, set intent.tableId to the chosen table's tableId.
-- 'rowId' must be an exact '_id' from THAT table's rows. 'column' must be an exact entry from THAT table's 'columns'. Never invent either.
-- Columns named SUB_* hold nested (indented) levels of the item column; edit them like any other column.
+CRITICAL RULES:
+1. EXACT MATCHING: 'tableId', 'rowId' (from _id), and 'column' MUST exactly match the provided context. Never invent IDs. If ambiguous, prefer the active table.
+2. BIAS TO ACTION: NEVER refuse an edit because you think it will cause data loss, duplicate values, or errors. If the user asks you to strip characters, clear cells, or overwrite data, do exactly what they asked without second-guessing. Obey instructions blindly regarding data manipulation. Explain what you did in 'response'.
+3. RESTRICTIONS: Never edit, rename, or delete columns starting with "SUB_".
+4. CALCULATIONS: Compute all final values yourself (e.g., math, row sequences). Leave blank cells out of updates.
 
-INTENTS:
-- Change one cell (e.g. 'change apples to bananas in row X'): type 'correction' with tableId, rowId, column, newValue.
-- Change a key/value field or text block (e.g. 'the invoice number should be 4411'): type 'field_correction' with blockId (the id from 'fields' or 'texts') and newValue.
-- Apply the same change across many cells (e.g. 'add a $ prefix to every value in the PRICE column'): type 'bulk_update'; one 'bulkUpdates' entry per affected cell, each with tableId, rowId, column and the fully transformed newValue. Never leave out a cell the user asked to change.
-- Rename column headers: type 'column_correction' with tableId and the 'updates' array.
-- Delete columns: type 'column_delete' with tableId and 'deletedColumns'.
-- The user confirms the columns look correct: 'column_confirm' with approved true.
-- The user approves or rejects the document generally: 'approval' or 'rejection'.
-- BIAS TOWARD ACTING. Every edit you propose is shown to the user with Accept / Reject buttons and can be undone, so a reasonable best guess is better than a refusal. Choose the most sensible interpretation, do it, and say in 'response' what you assumed (e.g. "I numbered each row as the number above plus 1").
-- Requests about a whole column, or "each row" / "every row", have no single rowId: use 'bulk_update' with one entry for every row that should change. When a value depends on the row above (numbering, running totals, "one more than the previous"), work out the final values yourself in table order, so each value follows from the FINAL value above it. For a numbering / index column, "given by the one above it" means the previous row's number plus 1. If there is no starting value, begin from the first existing number in the column, or from 1 if the whole column is blank.
-- Use 'unclear' only when you genuinely cannot choose between meaningfully different interpretations (for example two tables could both match and nothing says which). Ask one short question in that case, never a refusal.
-Always be polite and confirm what you are doing in the 'response' field.
+INTENT TYPES (Choose exactly one):
+- 'correction': Edit 1 cell. Requires: tableId, rowId, column, newValue.
+- 'bulk_update': Edit multiple cells. Requires: 'bulkUpdates' array (list tableId, rowId, column, newValue for EVERY changed cell). NEVER use 'updates' here.
+- 'column_correction': Rename headers. Requires: 'updates' array of {from, to}. NEVER use for cell data.
+- 'column_delete': Delete columns. Requires: 'deletedColumns' array of string names. NEVER use 'updates' here.
+- 'field_correction': Edit key/value fields. Requires: blockId, newValue.
+- 'column_confirm': User approves columns. Requires: approved: true.
+- 'approval' / 'rejection': General document approval.
+- 'unclear': ONLY if request is impossible to interpret. Ask 1 short question.
+
+Your 'response' must politely describe ONLY the changes actually included in your intent payload.
 
 CURRENT PAGE CONTEXT:
 ${formattedContext}
@@ -523,6 +260,7 @@ ${formattedContext}
       generationConfig: {
         responseMimeType: 'application/json',
         responseSchema: chatResponseSchema,
+        temperature: 0.2,
       },
     });
 
@@ -534,13 +272,24 @@ ${formattedContext}
 
     const chat = model.startChat({ history });
     const result = await chat.sendMessage(lastMessage);
-    const parsed = JSON.parse(result.response.text());
+    const first = JSON.parse(result.response.text());
 
-    const { updatedContext, applied, nothingMatched } = resolveEdit(documentContext, parsed.intent);
-    if (nothingMatched) {
-      parsed.response = `${parsed.response}\n\n(I couldn't match that to a cell in the document, so nothing was changed. Could you tell me which table and row you mean?)`;
-      parsed.intent = null; // don't show Accept/Reject for a no-op
-    }
+    // If the intent didn't land on anything real, tell the model exactly why and let it
+    // correct itself once. If that still fails, the user gets the truth instead of a
+    // false "done!" (see resolveWithRetry).
+    const { parsed, updatedContext, applied } = await resolveWithRetry(
+      documentContext,
+      first,
+      async (reason) => {
+        const retry = await chat.sendMessage(
+          `That intent could not be applied: ${reason}\n` +
+            `Send the intent again using the exact tableId, column names and row ids from the page context. ` +
+            `Put column names to delete in 'deletedColumns' (never in 'updates'). ` +
+            `If the request genuinely cannot be done, use type 'unclear' and explain in one sentence in 'response'.`
+        );
+        return JSON.parse(retry.response.text());
+      }
+    );
 
     return { ...parsed, updatedContext, applied };
   },
