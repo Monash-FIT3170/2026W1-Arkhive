@@ -10,6 +10,8 @@ import type { Block, Vertex } from '../models/Document';
  */
 export interface PageOverlay {
   id: string;
+  /** Row id for table cells, so hovering a whole row can light up all its cells. */
+  groupId?: string;
   kind: 'cell' | 'field' | 'text';
   text: string;
   confidence: number; // 0..1
@@ -26,6 +28,7 @@ export function blocksToOverlays(blocks: Block[]): PageOverlay[] {
           if (!cell.region || cell.region.polygon.length === 0) continue;
           out.push({
             id: `${row.id}:${key}`,
+            groupId: row.id,
             kind: 'cell',
             text: cell.text,
             confidence: cell.confidence,

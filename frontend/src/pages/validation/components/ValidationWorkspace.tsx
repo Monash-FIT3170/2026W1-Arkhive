@@ -770,7 +770,7 @@ function ValidationWorkspace({
                     : { width: '100%' }
               }
             >
-              {/* <DocumentPanel
+              <DocumentPanel
                 hoveredOverlayIds={documentHighlightIds}
                 documentImageUrl={documentImageURL}
                 ocrData={overlays}
@@ -778,7 +778,7 @@ function ValidationWorkspace({
                 currentPageIndex={currentPageIndex}
                 onPageChange={handlePageIndexChange}
                 hideThumbnails={true}
-              /> */}
+              />
             </div>
           )}
 
