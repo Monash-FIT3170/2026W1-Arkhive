@@ -258,7 +258,7 @@ export default {
               imageIndex: index,
               imageUrl: `/api/upload/image/${documentId}/${files[0].pageIndex}`,
               status: 'completed',
-              ocrData: ocrComponents as any,
+              ocrData: ocrComponents,
               confidence,
               createdAt: Date.now(),
               updatedAt: Date.now(),
@@ -325,7 +325,7 @@ export default {
       // and pageIndex is renumbered globally (each document's own pages start at 0).
       const completedJobs = jobs.filter((job) => job.status === 'completed');
       const combinedOcrData: StructuredPage[] = completedJobs
-        .flatMap((job) => job.ocrData as unknown as StructuredPage[])
+        .flatMap((job) => job.ocrData)
         .map((page, i) => ({ ...page, pageIndex: i }));
 
       // Get every page from all successfully processed documents, in the same order
