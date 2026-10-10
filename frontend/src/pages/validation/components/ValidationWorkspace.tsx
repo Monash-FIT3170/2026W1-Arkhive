@@ -841,7 +841,7 @@ function ValidationWorkspace({
               />
 
               {/* Picture-in-Picture (PiP) mini document preview when in Table Focus Mode */}
-              {/* {viewMode === 'table' && isPiPOpen && (
+              {viewMode === 'table' && isPiPOpen && (
                 <DocumentPreviewPiP
                   documentImageUrl={documentImageURL}
                   ocrData={overlays}
@@ -850,7 +850,7 @@ function ValidationWorkspace({
                   onClose={() => setIsPiPOpen(false)}
                   containerRef={containerRef}
                 />
-              )} */}
+              )}
             </div>
           )}
         </div>

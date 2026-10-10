@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { FileText, GripHorizontal } from 'lucide-react';
 import DocumentPanel from './DocumentPanel';
-import type { OCRComponent } from '../../../../models/OCRComponent';
+import type { PageOverlay } from '../../../../utils/overlays';
 
 export interface DocumentPreviewPiPProps {
   documentImageUrl?: string | null;
-  ocrData: OCRComponent[];
+  ocrData: PageOverlay[];
   currentPageIndex: number;
   hoveredOverlayIds: string[];
   onClose: () => void;
@@ -59,8 +59,10 @@ export default function DocumentPreviewPiP({
 
   // Calculate current top-left relative to parent container
   const getContainerOffset = useCallback(() => {
-    const fallbackWidth = typeof window !== 'undefined' && window.innerWidth > 0 ? window.innerWidth : 1200;
-    const fallbackHeight = typeof window !== 'undefined' && window.innerHeight > 0 ? window.innerHeight : 800;
+    const fallbackWidth =
+      typeof window !== 'undefined' && window.innerWidth > 0 ? window.innerWidth : 1200;
+    const fallbackHeight =
+      typeof window !== 'undefined' && window.innerHeight > 0 ? window.innerHeight : 800;
 
     if (!modalRef.current) {
       return { x: 16, y: 16, containerWidth: fallbackWidth, containerHeight: fallbackHeight };
@@ -70,8 +72,10 @@ export default function DocumentPreviewPiP({
     const container = containerRef?.current ?? modalRef.current.parentElement;
     const containerRect = container?.getBoundingClientRect();
 
-    const containerWidth = containerRect && containerRect.width > 0 ? containerRect.width : fallbackWidth;
-    const containerHeight = containerRect && containerRect.height > 0 ? containerRect.height : fallbackHeight;
+    const containerWidth =
+      containerRect && containerRect.width > 0 ? containerRect.width : fallbackWidth;
+    const containerHeight =
+      containerRect && containerRect.height > 0 ? containerRect.height : fallbackHeight;
 
     return {
       x: modalRect.left - (containerRect?.left ?? 0),
