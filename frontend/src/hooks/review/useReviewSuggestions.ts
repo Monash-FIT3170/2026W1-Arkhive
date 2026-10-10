@@ -1,5 +1,5 @@
 import { useCallback, type RefObject } from 'react';
-import type { ExtractedPage } from '../../models/TableData';
+import type { ExtractedData, ExtractedPage } from '../../models/TableData';
 import type { ReviewField } from '../../models/Message';
 import type { ReviewsByPage } from '../../models/IssueReview';
 import { requestBulkFieldReview, requestFieldReview } from '../../services/llmService';
@@ -15,19 +15,28 @@ interface UseReviewSuggestionsOptions {
 
 type BulkReply = Awaited<ReturnType<typeof requestBulkFieldReview>>;
 
-/** Looks a cell up in an LLM-returned page context. */
+/** The grid for a tableId on a page (the active grid when omitted / equal to page.tableId). */
+function gridOf(page: ExtractedPage | undefined, tableId?: string): ExtractedData | undefined {
+  if (!page) return undefined;
+  if (!tableId || tableId === page.tableId) return page;
+  return page.otherTables?.find((t) => t.tableId === tableId);
+}
+
+/** Looks a cell up in an LLM-returned page context, in the right table. */
 function findUpdatedCell(
   context: ExtractedPage | undefined,
+  tableId: string | undefined,
   rowId: string | number,
   column: string
 ): string | undefined {
-  const row = context?.rows.find((r) => String(r._id) === String(rowId));
+  const row = gridOf(context, tableId)?.rows.find((r) => String(r._id) === String(rowId));
   return row && row[column] !== undefined ? String(row[column]) : undefined;
 }
 
 /** rowId -> suggested value, from either explicit bulk updates or the updated context. */
 function collectBulkSuggestions(
   reply: BulkReply,
+  tableId: string | undefined,
   rowIds: readonly (string | number)[],
   column: string
 ): Record<string, string> {
@@ -40,7 +49,7 @@ function collectBulkSuggestions(
     rowIds
       .filter((id) => fromIntent[String(id)] === undefined)
       .flatMap((id) => {
-        const value = findUpdatedCell(reply.updatedContext, id, column);
+        const value = findUpdatedCell(reply.updatedContext, tableId, id, column);
         return value === undefined ? [] : [[String(id), value] as const];
       })
   );
@@ -62,7 +71,10 @@ export function useReviewSuggestions({
       if (!page || !issue) return null;
 
       const { rowId, column } = parseFieldId(fieldId);
+      // Review issues come from the grid on screen, which is the page's active table.
+      const tableId = page.tableId;
       const field: ReviewField = {
+        tableId,
         rowId,
         column,
         value: issue.ocrValue,
@@ -72,8 +84,8 @@ export function useReviewSuggestions({
 
       try {
         const reply = await requestFieldReview(field, page);
-        if (reply.intent?.newValue) return reply.intent.newValue;
-        return findUpdatedCell(reply.updatedContext, rowId, column) ?? reply.response;
+        if (reply.intent?.newValue != null) return reply.intent.newValue;
+        return findUpdatedCell(reply.updatedContext, tableId, rowId, column) ?? reply.response;
       } catch (e) {
         console.error(e);
         return null;
@@ -92,10 +104,12 @@ export function useReviewSuggestions({
       const page = pagesRef.current[pageIndex];
       if (!page) return null;
 
+      const tableId = page.tableId;
       const review = reviews[pageKeys[pageIndex]];
       const reviewFields: ReviewField[] = fields.map((f) => {
         const issue = findOpenIssue(review, f.fieldId);
         return {
+          tableId,
           rowId: f.rowId,
           column,
           value: f.ocrValue,
@@ -106,6 +120,7 @@ export function useReviewSuggestions({
 
       try {
         const reply = await requestBulkFieldReview({
+          tableId,
           column,
           fields: reviewFields,
           formatRegex,
@@ -113,6 +128,7 @@ export function useReviewSuggestions({
         });
         const suggestions = collectBulkSuggestions(
           reply,
+          tableId,
           fields.map((f) => f.rowId),
           column
         );

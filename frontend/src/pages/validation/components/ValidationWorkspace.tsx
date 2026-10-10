@@ -379,6 +379,13 @@ function ValidationWorkspace({
       onPagesChange: handlePagesChange,
       onPersist,
       pushUndo,
+      addHistoryEntry,
+      onCellsEdited: (cells) => {
+        const ids = cells.map((c) => `${c.rowId}:${c.column}`);
+        setEditedCells((prev) => new Set([...prev, ...ids]));
+        ids.forEach(handleCellEdited);
+      },
+      onBlocksEdited: (ids) => setEditedBlockIds((prev) => new Set([...prev, ...ids])),
     });
 
   // Row indent/outdent
