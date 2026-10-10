@@ -462,8 +462,10 @@ function ExtractedDataPanel({
                           )
                             return;
                           const cols = [...extractedData.columns];
-                          cols.splice(cols.indexOf(draggedColumn), 1);
-                          cols.splice(cols.indexOf(column), 0, draggedColumn);
+                          const from = cols.indexOf(draggedColumn);
+                          const to = cols.indexOf(column); // read before splice: removing `from` shifts later indices
+                          cols.splice(from, 1);
+                          cols.splice(to, 0, draggedColumn);
                           onColumnReorder?.(cols);
                           setDraggedColumn(null);
                           setDragOverColumn(null);
@@ -535,12 +537,14 @@ function ExtractedDataPanel({
                   {!isEditMode &&
                     (isConfidenceCollapsed ? (
                       <th
+                        data-testid="confidence-header"
                         className="p-1.5 text-center border-b border-base-300 border-l-2 border-base-300 bg-base-200/60 w-[42px] select-none align-middle cursor-pointer hover:bg-base-300/50 transition-colors"
                         onClick={toggleConfidenceCollapsed}
                       >
                         <div className="flex flex-col items-center justify-center gap-1">
                           <button
                             type="button"
+                            title="Expand Confidence column"
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleConfidenceCollapsed();
@@ -555,7 +559,10 @@ function ExtractedDataPanel({
                         </div>
                       </th>
                     ) : (
-                      <th className="p-2.5 text-left border-b border-base-300 border-l-2 border-base-300 bg-base-200/60 whitespace-normal break-words w-[135px] select-none align-top">
+                      <th
+                        data-testid="confidence-header"
+                        className="p-2.5 text-left border-b border-base-300 border-l-2 border-base-300 bg-base-200/60 whitespace-normal break-words w-[135px] select-none align-top"
+                      >
                         <div className="flex flex-col h-full justify-between gap-1.5">
                           <div className="flex items-center justify-between gap-1">
                             <span className="badge badge-neutral badge-xs text-[9px] font-semibold tracking-wider uppercase opacity-75 px-1.5 py-0.5">
@@ -565,11 +572,13 @@ function ExtractedDataPanel({
                               <span
                                 className="tooltip tooltip-left cursor-help"
                                 data-tip="Confidence score is an AI extraction metric and is not part of the exported table data."
+                                title="Confidence score is an AI extraction metric and is not part of the exported table data."
                               >
                                 <Info className="w-3.5 h-3.5 text-base-content/40 hover:text-base-content transition-colors" />
                               </span>
                               <button
                                 type="button"
+                                title="Collapse Confidence column"
                                 onClick={toggleConfidenceCollapsed}
                                 className="btn btn-ghost btn-xs btn-square h-5 w-5 min-h-0 text-base-content/50 hover:text-base-content hover:bg-base-300/60 rounded-md transition-colors"
                               >
@@ -664,6 +673,7 @@ function ExtractedDataPanel({
                       {!isEditMode &&
                         (isConfidenceCollapsed ? (
                           <td
+                            data-testid={`confidence-cell-${row._id}`}
                             className={`p-1.5 border-l-2 border-base-300 text-center ${tier.isLow ? 'bg-error/15' : 'bg-base-200/40'}`}
                             title={tier.label}
                           >
@@ -679,6 +689,7 @@ function ExtractedDataPanel({
                           </td>
                         ) : (
                           <td
+                            data-testid={`confidence-cell-${row._id}`}
                             className={`p-2 border-l-2 border-base-300 ${tier.isLow ? 'bg-error/15' : 'bg-base-200/40'}`}
                           >
                             <div className="flex items-center gap-1">
@@ -720,12 +731,14 @@ function ExtractedDataPanel({
                             {onRowMove && (
                               <div className="flex flex-col">
                                 <button
+                                  title="Move Row Up"
                                   className="btn btn-ghost btn-[0.5rem] min-h-0 h-4 px-1 text-base-content opacity-50 hover:opacity-100"
                                   onClick={() => onRowMove(row._id, 'up')}
                                 >
                                   <ChevronUp className="w-3 h-3" />
                                 </button>
                                 <button
+                                  title="Move Row Down"
                                   className="btn btn-ghost btn-[0.5rem] min-h-0 h-4 px-1 text-base-content opacity-50 hover:opacity-100"
                                   onClick={() => onRowMove(row._id, 'down')}
                                 >
@@ -735,6 +748,7 @@ function ExtractedDataPanel({
                             )}
                             {onRowDelete && (
                               <button
+                                title="Delete Row"
                                 className="btn btn-ghost btn-xs btn-square text-error opacity-50 hover:opacity-100"
                                 onClick={() => {
                                   onRowDelete(row._id);

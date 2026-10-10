@@ -3,37 +3,12 @@
     "pageIndex": 0,
     "blocks": [
       {
-        "kind": "table",
-        "id": "mock_t1",
-        "confidence": 0.97,
-        "columns": [
-          {
-            "key": "DESCRIPTION",
-            "label": "Description"
-          },
-          {
-            "key": "AMOUNT",
-            "label": "Amount"
-          }
-        ],
-        "itemColumnKey": "DESCRIPTION",
-        "rows": [
-          {
-            "id": "mock_t1_r1",
-            "level": 0,
-            "confidence": 0.97,
-            "cells": {
-              "DESCRIPTION": {
-                "text": "Invoice total",
-                "confidence": 0.97
-              },
-              "AMOUNT": {
-                "text": "$42.00",
-                "confidence": 0.97
-              }
-            }
-          }
-        ]
+        "id": "b1",
+        "kind": "field",
+        "key": "total",
+        "label": "Total",
+        "value": "Invoice total: $42.00",
+        "confidence": 0.97
       }
     ]
   }
