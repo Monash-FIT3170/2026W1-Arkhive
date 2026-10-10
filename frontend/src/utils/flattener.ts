@@ -8,7 +8,10 @@ import type {
 import type { Block, Cell, StructuredPage, TableBlock, TableRow } from '../models/Document';
 
 export interface FlattenerOptions {
+  /** Complete row-id -> level override (see indentLevelsOf in indentEditor). Wins over detected levels. */
   manualIndentLevels?: Record<string, number>;
+  /** User-chosen hierarchy column. Overrides block.itemColumnKey. null = flat table (no nesting). */
+  hierarchyColumnKey?: string | null;
 }
 
 interface Node {
@@ -27,13 +30,16 @@ export function tableToExtractedData(
   opts: FlattenerOptions = {}
 ): ExtractedData {
   const manual = opts.manualIndentLevels ?? {};
+  const flat = opts.hierarchyColumnKey === null;
   const keys = block.columns.map((c) => c.key);
-  const itemIdx = Math.max(0, keys.indexOf(block.itemColumnKey));
+  const requested = opts.hierarchyColumnKey;
+  const hierarchyKey = requested && keys.includes(requested) ? requested : block.itemColumnKey;
+  const itemIdx = Math.max(0, keys.indexOf(hierarchyKey));
   const itemKey = keys[itemIdx];
 
   const stack: Node[] = [];
   const nodes: Node[] = block.rows.map((row) => {
-    const level = manual[row.id] ?? row.level;
+    const level = flat ? 0 : (manual[row.id] ?? row.level);
     while (stack.length && stack[stack.length - 1].level >= level) stack.pop();
     const node: Node = { row, level, path: [] };
     node.path = [...(stack[stack.length - 1]?.path ?? []), node];
@@ -41,7 +47,8 @@ export function tableToExtractedData(
     return node;
   });
 
-  const maxDepth = Math.max(0, ...nodes.map((n) => n.path.length - 1));
+  // reduce, not Math.max(...spread): spreading a huge table overflows the call stack
+  const maxDepth = nodes.reduce((m, n) => Math.max(m, n.path.length - 1), 0);
   const subCols = Array.from({ length: maxDepth }, (_, i) => `SUB_${itemKey}_${i + 1}`);
 
   const rows: ExtractedRow[] = nodes.map(({ row, path }) => {

@@ -20,6 +20,8 @@ import type {
   TableTab,
 } from '../../../../models/TableData';
 import { getConfidenceTier } from '../../../../utils/confidenceTier';
+import { canIndentIndex, isDerivedColumn } from '../../../../utils/indentEditor';
+import { parseFieldId } from '../../../../utils/tableOperations';
 import ExtractedFieldsSection from './ExtractedFieldsSection';
 import type { ValidationFileGroup } from '../../../../utils/fileGrouping';
 import { ExportModal } from './ExportModal'; // NEW: Excel export service (US-4.5)
@@ -42,6 +44,7 @@ function ExtractedDataPanel({
   onColumnRename,
   onRowMove,
   onColumnReorder,
+  onIndentColumnChange,
   isEditMode,
   onEditModeChange,
   editedCells,
@@ -70,6 +73,8 @@ function ExtractedDataPanel({
   onColumnRename?: (oldName: string, newName: string) => void;
   onRowMove?: (rowId: string | number, direction: 'up' | 'down') => void;
   onColumnReorder?: (newColumns: string[]) => void;
+  /** Choose which column the row hierarchy (indent) is carried by. */
+  onIndentColumnChange?: (column: string) => void;
   isEditMode?: boolean;
   onEditModeChange?: (value: boolean) => void;
   editedCells?: Set<string>;
@@ -181,7 +186,7 @@ function ExtractedDataPanel({
       e.preventDefault();
       handleCellBlur(fieldId);
 
-      const [rowId, column] = fieldId.split(':');
+      const { rowId, column } = parseFieldId(fieldId);
       const columns = extractedData.columns;
       const rows = extractedData.rows;
       const colIdx = columns.indexOf(column);
@@ -240,6 +245,11 @@ function ExtractedDataPanel({
     }, 2000);
   };
 
+  // SUB_ columns are derived from the hierarchy, so they can't be the indent column.
+  const indentColumnOptions = extractedData.columns.filter(
+    (c) => !isDerivedColumn(extractedData, c)
+  );
+
   return (
     <div
       className="h-full w-full rounded-lg border border-base-300 bg-base-200 p-4 text-left shadow-sm flex flex-col"
@@ -293,6 +303,25 @@ function ExtractedDataPanel({
               <Plus className="w-3.5 h-3.5" />
               Add Column
             </button>
+          )}
+          {isEditMode && onIndentColumnChange && indentColumnOptions.length > 1 && (
+            <label
+              className="flex items-center gap-1.5 text-xs text-base-content/70"
+              title="Column that rows are indented from"
+            >
+              Indent by
+              <select
+                className="select select-bordered select-xs rounded-lg"
+                value={extractedData.itemColumnKey}
+                onChange={(e) => onIndentColumnChange(e.target.value)}
+              >
+                {indentColumnOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
           <button
             onClick={() => setShowExportModal(true)}
@@ -365,105 +394,125 @@ function ExtractedDataPanel({
           <thead>
             <tr className="text-base-content/70">
               {/* Existing columns (unchanged) */}
-              {extractedData.columns.map((column) => (
-                <th
-                  key={column}
-                  className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${
-                    isEditMode && dragOverColumn === column && draggedColumn !== column
-                      ? 'bg-primary/20'
-                      : ''
-                  }`}
-                  style={{ height: '1px' }}
-                  draggable={isEditMode}
-                  onDragStart={() => {
-                    if (!isEditMode) {
-                      return;
-                    }
-                    setDraggedColumn(column);
-                  }}
-                  onDragOver={(e) => {
-                    if (!isEditMode) {
-                      return;
-                    }
-                    e.preventDefault();
-                    setDragOverColumn(column);
-                  }}
-                  onDragLeave={() => {
-                    setDragOverColumn(null);
-                  }}
-                  onDrop={() => {
-                    if (!isEditMode || !draggedColumn || draggedColumn === column) {
-                      return;
-                    }
-                    const cols = [...extractedData.columns];
-                    const fromIdx = cols.indexOf(draggedColumn);
-                    const toIdx = cols.indexOf(column);
-                    cols.splice(fromIdx, 1);
-                    cols.splice(toIdx, 0, draggedColumn);
-                    onColumnReorder?.(cols);
-                    setDraggedColumn(null);
-                    setDragOverColumn(null);
-                  }}
-                >
-                  <div className="flex flex-col items-center justify-between h-full gap-2">
-                    {/* drag handle icon only shown in edit mode */}
-                    {isEditMode && (
-                      <div className="cursor-grab text-base-content/40 hover:text-base-content/80 w-full flex justify-center">
-                        ⠿
-                      </div>
-                    )}
+              {extractedData.columns.map((column) => {
+                const derived = isDerivedColumn(extractedData, column);
+                const isIndentColumn = column === extractedData.itemColumnKey;
+                const canRename = isEditMode && !!onColumnRename && !derived;
+                return (
+                  <th
+                    key={column}
+                    className={`p-3 whitespace-normal break-words text-center text-[12px] font-bold border-b border-base-300 align-top transition-colors ${
+                      isEditMode && dragOverColumn === column && draggedColumn !== column
+                        ? 'bg-primary/20'
+                        : ''
+                    }`}
+                    style={{ height: '1px' }}
+                    draggable={isEditMode && !derived}
+                    onDragStart={() => {
+                      if (!isEditMode || derived) {
+                        return;
+                      }
+                      setDraggedColumn(column);
+                    }}
+                    onDragOver={(e) => {
+                      if (!isEditMode || derived) {
+                        return;
+                      }
+                      e.preventDefault();
+                      setDragOverColumn(column);
+                    }}
+                    onDragLeave={() => {
+                      setDragOverColumn(null);
+                    }}
+                    onDrop={() => {
+                      if (
+                        !isEditMode ||
+                        derived ||
+                        !draggedColumn ||
+                        draggedColumn === column ||
+                        isDerivedColumn(extractedData, draggedColumn)
+                      ) {
+                        return;
+                      }
+                      const cols = [...extractedData.columns];
+                      const fromIdx = cols.indexOf(draggedColumn);
+                      const toIdx = cols.indexOf(column);
+                      cols.splice(fromIdx, 1);
+                      cols.splice(toIdx, 0, draggedColumn);
+                      onColumnReorder?.(cols);
+                      setDraggedColumn(null);
+                      setDragOverColumn(null);
+                    }}
+                  >
+                    <div className="flex flex-col items-center justify-between h-full gap-2">
+                      {/* drag handle icon only shown in edit mode */}
+                      {isEditMode && !derived && (
+                        <div className="cursor-grab text-base-content/40 hover:text-base-content/80 w-full flex justify-center">
+                          ⠿
+                        </div>
+                      )}
 
-                    <span
-                      className={`text-left w-full flex-grow ${
-                        isEditMode && onColumnRename ? 'cursor-pointer hover:underline' : ''
-                      }`}
-                      title={isEditMode && onColumnRename ? 'Click to rename column' : undefined}
-                      onClick={(e) => {
-                        if (isEditMode && onColumnRename) {
-                          e.stopPropagation();
-                          setRenamingColumn(column);
-                        }
-                      }}
-                    >
-                      {column.replace(/_/g, ' ')}
-                    </span>
+                      <span
+                        className={`text-left w-full flex-grow ${
+                          canRename ? 'cursor-pointer hover:underline' : ''
+                        }`}
+                        title={canRename ? 'Click to rename column' : undefined}
+                        onClick={(e) => {
+                          if (canRename) {
+                            e.stopPropagation();
+                            setRenamingColumn(column);
+                          }
+                        }}
+                      >
+                        {column.replace(/_/g, ' ')}
+                      </span>
 
-                    {isEditMode && (onColumnRename || onColumnDelete) && (
-                      <div className="flex items-center justify-center gap-1 w-full bg-base-300/30 rounded px-1 py-0.5">
-                        {onColumnRename && (
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-base-content/70 opacity-60 hover:opacity-100 hover:bg-base-content/10"
-                            title="Rename Column"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRenamingColumn(column);
-                            }}
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                        )}
-                        {onColumnDelete && (
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-error opacity-60 hover:opacity-100 hover:bg-error/20"
-                            title="Delete Column"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onColumnDelete(column);
-                              setRowDeleteToast(false);
-                              setColumnRenameToast(null);
-                              setColumnDeleteToast(column);
-                            }}
-                          >
-                            <Trash className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </th>
-              ))}
+                      {isIndentColumn && (
+                        <span
+                          className="badge badge-primary badge-outline badge-xs text-[9px]"
+                          title="Rows are indented from this column"
+                        >
+                          indent
+                        </span>
+                      )}
+
+                      {isEditMode && !derived && (onColumnRename || onColumnDelete) && (
+                        <div className="flex items-center justify-center gap-1 w-full bg-base-300/30 rounded px-1 py-0.5">
+                          {onColumnRename && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-base-content/70 opacity-60 hover:opacity-100 hover:bg-base-content/10"
+                              title="Rename Column"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRenamingColumn(column);
+                              }}
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          )}
+                          {onColumnDelete && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs btn-square min-h-0 h-5 w-5 text-error opacity-60 hover:opacity-100 hover:bg-error/20"
+                              title="Delete Column"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onColumnDelete(column);
+                                setRowDeleteToast(false);
+                                setColumnRenameToast(null);
+                                setColumnDeleteToast(column);
+                              }}
+                            >
+                              <Trash className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
 
               {/* Confidence column header: shown in view mode, auto-hidden in edit mode */}
               {!isEditMode &&
@@ -537,7 +586,7 @@ function ExtractedDataPanel({
 
           {/* Body */}
           <tbody>
-            {extractedData.rows.map((row) => {
+            {extractedData.rows.map((row, rowIndex) => {
               const tier = getConfidenceTier(row._confidence ?? 1);
 
               return (
@@ -553,10 +602,13 @@ function ExtractedDataPanel({
                       ? hoveredOverlayIds.includes(fieldId)
                       : false;
                     const safeId = fieldId.replace(/:/g, '-');
+                    const derived = isDerivedColumn(extractedData, column);
 
                     const isEditing = editingCellId === fieldId;
                     const displayValue =
-                      localEdits[fieldId] !== undefined
+                      // The row data is the source of truth once the parent applies the edit.
+                      // A cached local edit would mask values re-derived by indent/outdent.
+                      !onCellEdit && localEdits[fieldId] !== undefined
                         ? localEdits[fieldId]
                         : String(row[column] || '');
 
@@ -571,7 +623,9 @@ function ExtractedDataPanel({
                             ? 'bg-primary/20 text-base-content font-semibold rounded'
                             : editedCells?.has(fieldId)
                               ? 'bg-warning/15'
-                              : ''
+                              : derived
+                                ? 'bg-base-300/20'
+                                : ''
                         }`}
                         onMouseEnter={() => onHover(fieldId)}
                         onMouseLeave={() => onHover(null)}
@@ -683,7 +737,7 @@ function ExtractedDataPanel({
                             <button
                               className="btn btn-ghost btn-[0.5rem] min-h-0 h-4 px-1 text-base-content opacity-50 hover:opacity-100"
                               title="Indent (make child of previous row)"
-                              disabled={(row._indentLevel ?? 0) === 0 && false /* see note below */}
+                              disabled={!canIndentIndex(extractedData.rows, rowIndex)}
                               onClick={() => onRowIndent?.(row._id)}
                             >
                               <ChevronRight className="w-3 h-3" />

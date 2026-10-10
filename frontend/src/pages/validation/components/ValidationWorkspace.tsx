@@ -400,6 +400,7 @@ function ValidationWorkspace({
     renameColumn,
     moveRow,
     reorderColumns,
+    setIndentColumn,
   } = useTableEditor({
     currentPageIndexRef,
     extractedPagesRef,
@@ -830,6 +831,7 @@ function ValidationWorkspace({
                 onColumnRename={renameColumn}
                 onRowMove={moveRow}
                 onColumnReorder={reorderColumns}
+                onIndentColumnChange={setIndentColumn}
                 tables={tableTabs}
                 activeTableId={documentContext.tableId}
                 onSelectTable={handleSelectTable}
