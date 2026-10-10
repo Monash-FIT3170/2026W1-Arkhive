@@ -476,7 +476,7 @@ export default {
       : 'null';
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash-lite',
       systemInstruction: `You are an AI assistant helping a user validate and correct a digitized document page.
 The page can contain SEVERAL tables plus key/value fields (invoice number, date, total...) and text blocks.
 Analyse the user's message and extract a structured intent.
@@ -537,7 +537,7 @@ ${formattedContext}
       buildFocusedContext(grid, field);
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash-lite',
       systemInstruction: `You are helping verify OCR-extracted table data. One specific cell has been flagged for review.
 
       The cell in question:
@@ -615,7 +615,7 @@ ${formattedContext}
       .slice(0, 20);
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash-lite',
       systemInstruction: `You are helping verify OCR-extracted table data. Multiple cells in the SAME column "${column}" have been flagged as inconsistent with the column's expected format.
 
     ${
