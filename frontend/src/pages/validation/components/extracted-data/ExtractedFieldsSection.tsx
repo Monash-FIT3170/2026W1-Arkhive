@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronRight, Edit2 } from 'lucide-react';
+import { AlertTriangle, Edit2 } from 'lucide-react';
 import type { ExtractedField, ExtractedText } from '../../../../models/TableData';
 import { getConfidenceTier } from '../../../../utils/confidenceTier';
 
@@ -7,10 +7,8 @@ interface Props {
   fields: ExtractedField[];
   texts: ExtractedText[];
   isEditMode?: boolean;
-  /** Ids (field/text block ids) edited this session, for the pencil marker. */
   editedIds?: Set<string>;
   onEdit?: (id: string, newValue: string) => void;
-  /** Hover a field/text -> highlight its region on the document. */
   onHover?: (id: string | null) => void;
 }
 
@@ -21,11 +19,6 @@ const ROLE_LABEL: Record<ExtractedText['role'], string> = {
   footer: 'Footer',
 };
 
-/**
- * Key/value fields (invoice number, total...) and text blocks (titles, notes)
- * that sit outside the table. Editing follows the table's edit mode: click a
- * value while editing, Enter/blur commits, Esc cancels.
- */
 export default function ExtractedFieldsSection({
   fields,
   texts,
@@ -34,7 +27,6 @@ export default function ExtractedFieldsSection({
   onEdit,
   onHover,
 }: Props) {
-  const [open, setOpen] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [initial, setInitial] = useState('');
@@ -86,83 +78,62 @@ export default function ExtractedFieldsSection({
     );
 
   return (
-    <div
-      className="mb-3 rounded-lg border border-base-300 bg-base-100/60"
-      data-testid="fields-section"
-    >
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-base-content/70"
-        aria-expanded={open}
-      >
-        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        Document details
-        <span className="font-normal normal-case text-base-content/50">
-          ({fields.length} {fields.length === 1 ? 'field' : 'fields'}
-          {texts.length > 0 ? `, ${texts.length} text` : ''})
-        </span>
-      </button>
-
-      {open && (
-        <div className="max-h-56 overflow-auto px-3 pb-3 space-y-3">
-          {fields.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {fields.map((f) => {
-                const tier = getConfidenceTier(f.confidence);
-                return (
-                  <div
-                    key={f.id}
-                    className={`rounded-md border px-2.5 py-1.5 transition-colors hover:bg-warning/10 ${
-                      tier.isLow ? 'border-error/40 bg-error/10' : 'border-base-300 bg-base-100'
-                    }`}
-                    onMouseEnter={() => onHover?.(f.id)}
-                    onMouseLeave={() => onHover?.(null)}
-                  >
-                    <div className="mb-0.5 flex items-center justify-between gap-2">
-                      <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-base-content/60">
-                        {f.label || f.key}
-                      </span>
-                      {tier.isLow && (
-                        <span title={`Low confidence (${tier.label}) - please check this value`}>
-                          <AlertTriangle className="w-3 h-3 text-error flex-shrink-0" />
-                        </span>
-                      )}
-                    </div>
-                    {renderValue(f.id, f.value, false)}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {texts.length > 0 && (
-            <div className="space-y-1.5">
-              {texts.map((t) => {
-                const tier = getConfidenceTier(t.confidence);
-                return (
-                  <div
-                    key={t.id}
-                    className={`flex gap-2 rounded-md border px-2.5 py-1.5 transition-colors hover:bg-warning/10 ${
-                      tier.isLow ? 'border-error/40 bg-error/10' : 'border-base-300 bg-base-100'
-                    }`}
-                    onMouseEnter={() => onHover?.(t.id)}
-                    onMouseLeave={() => onHover?.(null)}
-                  >
-                    <span className="mt-0.5 w-14 flex-shrink-0 text-[10px] font-semibold uppercase tracking-wide text-base-content/60">
-                      {ROLE_LABEL[t.role]}
+    <div className="flex-1 overflow-auto pb-4 space-y-3 pr-2" data-testid="fields-section">
+      {fields.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {fields.map((f) => {
+            const tier = getConfidenceTier(f.confidence);
+            return (
+              <div
+                key={f.id}
+                className={`rounded-md border px-2.5 py-1.5 transition-colors hover:bg-warning/10 ${
+                  tier.isLow ? 'border-error/40 bg-error/10' : 'border-base-300 bg-base-100'
+                }`}
+                onMouseEnter={() => onHover?.(f.id)}
+                onMouseLeave={() => onHover?.(null)}
+              >
+                <div className="mb-0.5 flex items-center justify-between gap-2">
+                  <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-base-content/60">
+                    {f.label || f.key}
+                  </span>
+                  {tier.isLow && (
+                    <span title={`Low confidence (${tier.label}) - please check this value`}>
+                      <AlertTriangle className="w-3 h-3 text-error flex-shrink-0" />
                     </span>
-                    <div className="min-w-0 flex-1">{renderValue(t.id, t.text, true)}</div>
-                    {tier.isLow && (
-                      <span title={`Low confidence (${tier.label})`}>
-                        <AlertTriangle className="w-3 h-3 text-error flex-shrink-0" />
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  )}
+                </div>
+                {renderValue(f.id, f.value, false)}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {texts.length > 0 && (
+        <div className="space-y-1.5">
+          {texts.map((t) => {
+            const tier = getConfidenceTier(t.confidence);
+            return (
+              <div
+                key={t.id}
+                className={`flex gap-2 rounded-md border px-2.5 py-1.5 transition-colors hover:bg-warning/10 ${
+                  tier.isLow ? 'border-error/40 bg-error/10' : 'border-base-300 bg-base-100'
+                }`}
+                onMouseEnter={() => onHover?.(t.id)}
+                onMouseLeave={() => onHover?.(null)}
+              >
+                <span className="mt-0.5 w-14 flex-shrink-0 text-[10px] font-semibold uppercase tracking-wide text-base-content/60">
+                  {ROLE_LABEL[t.role]}
+                </span>
+                <div className="min-w-0 flex-1">{renderValue(t.id, t.text, true)}</div>
+                {tier.isLow && (
+                  <span title={`Low confidence (${tier.label})`}>
+                    <AlertTriangle className="w-3 h-3 text-error flex-shrink-0" />
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
