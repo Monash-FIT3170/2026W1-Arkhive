@@ -40,7 +40,9 @@ describe('upload -> process integration', () => {
     expect(result?.success).toBe(true);
     const block = result?.ocrData?.[0]?.blocks?.[0];
     expect(block?.kind).toBe('table');
-    expect(block?.rows?.[0]?.cells?.DESCRIPTION?.text).toBe('Invoice total');
+    if (block?.kind === 'table') {
+      expect(block.rows[0]?.cells?.DESCRIPTION?.text).toBe('Invoice total');
+    }
 
     // Read-back: proves the processed result actually persisted
     // server-side, not just that the response looked right in-flight.

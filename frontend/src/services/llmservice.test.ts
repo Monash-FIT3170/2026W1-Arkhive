@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { sendMessage } from "../services/llmService";
 import type { Message } from "../models/Message";
-import type { ExtractedData } from "../models/TableData";
+import type { ExtractedPage } from "../models/TableData";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -11,7 +11,8 @@ const sampleMessages: Message[] = [
   { role: "user", content: "Change Apples to Mangoes in row comp_1" }
 ];
 
-const sampleContext: ExtractedData = {
+const sampleContext: ExtractedPage = {
+  pageIndex: 0,
   columns: ["ITEM", "QTY", "PRICE"],
   itemColumnKey: "ITEM",
   rows: [
