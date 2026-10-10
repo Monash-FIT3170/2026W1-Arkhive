@@ -30,15 +30,20 @@ export function usePageMutation({
       transform: (page: ExtractedPage) => ExtractedPage
     ): { pageIndex: number; page: ExtractedPage } | null => {
       const pageIndex = currentPageIndexRef.current;
-      const currentPage = extractedPagesRef.current[pageIndex];
+      const pages = extractedPagesRef.current;
+      const currentPage = pages[pageIndex];
       if (!currentPage) return null;
 
       const next = transform(currentPage);
       if (next === currentPage) return null; // no-op
 
-      pushUndo(extractedPagesRef.current);
+      // onPagesChange is a state update, so the ref still holds the OLD pages
+      // right after it. Persist the pages we just computed, not the ref.
+      const nextPages = pages.map((page, i) => (i === pageIndex ? next : page));
+
+      pushUndo(pages);
       onPagesChange((prev) => prev.map((page, i) => (i === pageIndex ? next : page)));
-      onPersist(extractedPagesRef.current);
+      onPersist(nextPages);
 
       return { pageIndex, page: next };
     },

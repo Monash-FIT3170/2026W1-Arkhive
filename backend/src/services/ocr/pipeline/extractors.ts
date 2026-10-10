@@ -18,6 +18,7 @@ import {
   minX,
   unionPolygon,
 } from './layout';
+import { detectNumberingLevels } from './numbering';
 
 export const MODEL = 'gemini-flash-lite-latest';
 
@@ -58,9 +59,11 @@ function toCell(c: RawCell, page: number): Cell {
   };
 }
 
+// No words => null, NOT the cell box: the box is grid-aligned, so every row would get
+// the same x and every level would silently come out 0.
 function leftX(c?: RawCell): number | null {
-  if (!c) return null;
-  const x = c.words.length ? Math.min(...c.words.map((w) => minX(w.polygon))) : minX(c.polygon);
+  if (!c || !c.words.length) return null;
+  const x = Math.min(...c.words.map((w) => minX(w.polygon)));
   return Number.isFinite(x) ? x : null;
 }
 
@@ -75,7 +78,17 @@ function levelFn(xs: number[], thresh: number) {
   return (x: number) => centres.reduce((lvl, c, i) => (x >= c - thresh ? i : lvl), 0);
 }
 
-function buildTable(t: RawTable, page: number): TableBlock | null {
+/** Column with the most non-empty cells; ties broken by total text length, then leftmost. */
+function pickItemIndex(cols: { filled: number; chars: number }[]): number {
+  let best = 0;
+  cols.forEach((c, i) => {
+    const b = cols[best];
+    if (c.filled > b.filled || (c.filled === b.filled && c.chars > b.chars)) best = i;
+  });
+  return best;
+}
+
+export function buildTable(t: RawTable, page: number): TableBlock | null {
   if (!t.cells.length) return null;
 
   const headerRows = new Set(t.cells.filter((c) => c.isHeader).map((c) => c.rowIndex));
@@ -97,10 +110,12 @@ function buildTable(t: RawTable, page: number): TableBlock | null {
   });
 
   const body = t.cells.filter((c) => !headerRows.has(c.rowIndex));
-  const textLen = columns.map((_, i) =>
-    body.filter((c) => c.columnIndex === i).reduce((s, c) => s + c.text.length, 0)
+  const itemIdx = pickItemIndex(
+    columns.map((_, i) => {
+      const cs = body.filter((c) => c.columnIndex === i && c.text);
+      return { filled: cs.length, chars: cs.reduce((n, c) => n + c.text.length, 0) };
+    })
   );
-  const itemIdx = textLen.indexOf(Math.max(...textLen));
   const thresh =
     (median(t.cells.flatMap((c) => c.words).map((w) => height(w.polygon))) || 0.1) * 0.75;
 
@@ -111,6 +126,18 @@ function buildTable(t: RawTable, page: number): TableBlock | null {
     .map(([ri, cells]) => ({ ri, cells, x: leftX(cells.find((c) => c.columnIndex === itemIdx)) }))
     .filter((r) => r.cells.some((c) => c.text));
 
+  const noX = raw.filter((r) => r.x === null).length;
+  if (raw.length && noX / raw.length > 0.5) {
+    console.warn(
+      `[extractors] ${t.id}: ${noX}/${raw.length} rows had no item-cell words; geometric indent levels are unreliable`
+    );
+  }
+  // Outline numbering (1 / 1.1 / 1.1.1) is more reliable than pixels, so it wins when present.
+  const numbered = detectNumberingLevels(
+    raw.map((r) => Object.fromEntries(r.cells.map((c) => [columns[c.columnIndex].key, c.text]))),
+    columns.map((c) => c.key)
+  );
+
   const toLevel = levelFn(
     raw.map((r) => r.x).filter((x): x is number => x !== null),
     thresh
@@ -118,8 +145,8 @@ function buildTable(t: RawTable, page: number): TableBlock | null {
   const rows: TableRow[] = [];
   const stack: TableRow[] = [];
   let prev = 0;
-  for (const r of raw) {
-    const level = r.x === null ? prev : toLevel(r.x);
+  for (const [idx, r] of raw.entries()) {
+    const level = numbered ? numbered.levels[idx] : r.x === null ? prev : toLevel(r.x);
     prev = level;
     const cells: Record<string, Cell> = {};
     r.cells.forEach((c) => {
@@ -324,11 +351,39 @@ export const llmStructurer: Extractor = {
         };
       });
       if (!columns.length || !rows.length) return;
+
+      // Item column = most filled cells (same rule as native tables), not blindly columns[0].
+      const itemKey =
+        columns[
+          pickItemIndex(
+            columns.map((c) => {
+              const ts = rows.map((r) => r.cells[c.key]?.text ?? '').filter(Boolean);
+              return { filled: ts.length, chars: ts.reduce((n, t) => n + t.length, 0) };
+            })
+          )
+        ].key;
+
+      // Levels: outline numbering first, then the left edge of each row's item text.
+      const numbered = detectNumberingLevels(
+        rows.map((r) => Object.fromEntries(Object.entries(r.cells).map(([k, c]) => [k, c.text]))),
+        columns.map((c) => c.key)
+      );
+      if (numbered) {
+        rows.forEach((r, i) => (r.level = numbered.levels[i]));
+      } else {
+        const xs = rows.map((r) => minX(r.cells[itemKey]?.region?.polygon ?? []));
+        const thresh = (median(todo.map((l) => height(l.polygon))) || 0.1) * 0.75;
+        const toLevel = levelFn(xs.filter(Number.isFinite), thresh);
+        rows.forEach((r, i) => {
+          r.level = Number.isFinite(xs[i]) ? toLevel(xs[i]) : (rows[i - 1]?.level ?? 0);
+        });
+      }
+
       out.push({
         kind: 'table',
         id: `p${pageNo}_t${ti}`,
         columns,
-        itemColumnKey: columns[0].key,
+        itemColumnKey: itemKey,
         rows,
         confidence: Math.min(...rows.map((r) => r.confidence)),
       });
