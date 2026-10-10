@@ -4,6 +4,7 @@ import { withRetry } from './utils/utils.js';
 import { analyse_result } from './utils/analyseBuffer.js';
 import { prepareForOCR } from '../ocrPreprocessor.js';
 import { structureDocument } from './pipeline/pipeline.js';
+import { getMockOcrResult } from './mockOcrFixture.js';
 import type { DocType, StructuredDocument } from '../../models/Document.js';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
@@ -15,6 +16,9 @@ export interface ParseOptions {
 
 async function parseDocument(imageBuffer: Buffer, opts: ParseOptions): Promise<StructuredDocument> {
   // Skips Azure + Gemini entirely (no CI secrets, no flaky network). Fixture must be a StructuredDocument.
+  if (process.env.OCR_MODE === 'mock') {
+    return getMockOcrResult(opts.pageOffset ?? 0);
+  }
 
   const preprocessed = await prepareForOCR(imageBuffer); // JIT sharpening + grayscale
   const azure = await analyse_result(preprocessed);

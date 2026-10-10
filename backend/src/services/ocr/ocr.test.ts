@@ -1,7 +1,9 @@
 // Covers the current pipeline: preprocess -> Azure layout -> structureDocument,
-// wrapped in a retry. The old Google Vision textExtraction / mock-mode path was
-// removed; see pipeline/pipeline.test.ts etc. for the structuring logic itself.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// wrapped in a retry, plus the OCR_MODE=mock short-circuit used by CI / the
+// integration suites so they never need real Azure/Gemini credentials. The old
+// Google Vision textExtraction path is gone for good; see pipeline/*.test.ts
+// for the structuring logic itself.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { StructuredDocument } from '../../models/Document';
 
 const { mockPrepareForOCR } = vi.hoisted(() => ({
@@ -25,6 +27,13 @@ vi.mock('./pipeline/pipeline.js', () => ({
   structureDocument: mockStructureDocument,
 }));
 
+const { mockGetMockOcrResult } = vi.hoisted(() => ({
+  mockGetMockOcrResult: vi.fn(),
+}));
+vi.mock('./mockOcrFixture.js', () => ({
+  getMockOcrResult: mockGetMockOcrResult,
+}));
+
 import { parseDocumentWithRetries } from './ocr';
 
 describe('ocr service', () => {
@@ -36,12 +45,45 @@ describe('ocr service', () => {
     docTypeConfidence: 0.8,
     pages: [{ pageIndex: 0, blocks: [] }],
   };
+  const mockFixture: StructuredDocument = {
+    docType: 'invoice',
+    docTypeConfidence: 1,
+    pages: [{ pageIndex: 0, blocks: [] }],
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.OCR_MODE;
     mockPrepareForOCR.mockResolvedValue(preprocessedBuffer);
     mockAnalyseResult.mockResolvedValue(azureResult);
     mockStructureDocument.mockResolvedValue(structured);
+    mockGetMockOcrResult.mockReturnValue(mockFixture);
+  });
+
+  afterEach(() => {
+    delete process.env.OCR_MODE;
+  });
+
+  describe('OCR_MODE=mock', () => {
+    it('returns the fixture and skips Azure/Gemini entirely', async () => {
+      process.env.OCR_MODE = 'mock';
+
+      const result = await parseDocumentWithRetries(rawBuffer, { pageOffset: 2 });
+
+      expect(mockGetMockOcrResult).toHaveBeenCalledWith(2);
+      expect(mockPrepareForOCR).not.toHaveBeenCalled();
+      expect(mockAnalyseResult).not.toHaveBeenCalled();
+      expect(mockStructureDocument).not.toHaveBeenCalled();
+      expect(result).toBe(mockFixture);
+    });
+
+    it('defaults pageOffset to 0 when omitted', async () => {
+      process.env.OCR_MODE = 'mock';
+
+      await parseDocumentWithRetries(rawBuffer, {});
+
+      expect(mockGetMockOcrResult).toHaveBeenCalledWith(0);
+    });
   });
 
   describe('parseDocumentWithRetries', () => {
