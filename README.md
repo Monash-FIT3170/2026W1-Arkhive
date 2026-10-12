@@ -145,6 +145,10 @@ cd 2026W1-Arkhive
    SUPABASE_URL=https://your-project-ref.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
 
+   # Cookie signing. Required in production (the server will not start without it).
+   # Local development can leave this unset and will use a built-in dev default.
+   SESSION_SECRET=session_secret_here
+
    # Cloudflare R2 Credentials
    R2_ACCOUNT_ID=your_cloudflare_account_id_here
    R2_ACCESS_KEY_ID=your_r2_access_key_id_here
