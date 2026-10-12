@@ -141,97 +141,120 @@ export default function ProjectsPage() {
         <CreateProjectForm onCreate={create} onError={setError} />
       </div>
 
-      {/* Search and sort */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <label className="input input-bordered flex items-center gap-2 w-full">
-          <Search className="w-4 h-4 opacity-50" />
-          <input
-            type="search"
-            placeholder="Search projects..."
-            className="grow"
-            aria-label="Search projects"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </label>
+      {/* Project controls */}
+      <div className="flex flex-col gap-4">
+        {/* Search and sorting */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <label className="input input-bordered flex items-center gap-2 w-full flex-1 min-w-0">
+            <Search className="w-4 h-4 opacity-50" />
+            <input
+              type="search"
+              placeholder="Search projects..."
+              className="grow min-w-0"
+              aria-label="Search projects"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </label>
 
-        <select
-          className="select select-bordered w-full sm:w-48"
-          aria-label="Sort projects"
-          value={sortOption}
-          onChange={(e) => setSortOption(e.target.value as SortOption)}
-        >
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="name-asc">Name: A-Z</option>
-          <option value="name-desc">Name: Z-A</option>
-        </select>
-      </div>
-
-      <div className="flex justify-end gap-2" role="group" aria-label="Project view">
-        <button
-          type="button"
-          className={`btn btn-sm ${viewMode === 'grid' ? 'btn-primary' : 'btn-ghost'}`}
-          onClick={() => changeView('grid')}
-          aria-pressed={viewMode === 'grid'}
-        >
-          <LayoutGrid className="w-4 h-4" />
-          Grid
-        </button>
-
-        <button
-          type="button"
-          className={`btn btn-sm ${viewMode === 'list' ? 'btn-primary' : 'btn-ghost'}`}
-          onClick={() => changeView('list')}
-          aria-pressed={viewMode === 'list'}
-        >
-          <List className="w-4 h-4" />
-          List
-        </button>
-      </div>
-
-      {!isLoading && projects.length > 0 && (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button type="button" className="btn btn-outline btn-sm" onClick={toggleBulkMode}>
-            {bulkMode ? 'Cancel Selection' : 'Select Projects'}
-          </button>
-
-          {bulkMode && (
-            <>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() =>
-                  setSelectedIds((prev) => [
-                    ...new Set([...prev, ...filteredProjects.map((p) => p.id)]),
-                  ])
-                }
-                disabled={filteredProjects.length === 0}
-              >
-                Select All
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setSelectedIds([])}
-                disabled={selectedIds.length === 0}
-              >
-                Clear
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-error btn-sm"
-                disabled={selectedIds.length === 0}
-                onClick={() => setShowBulkConfirm(true)}
-              >
-                Delete Selected ({selectedIds.length})
-              </button>
-            </>
-          )}
+          <select
+            className="select select-bordered w-full sm:w-48"
+            aria-label="Sort projects"
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value as SortOption)}
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="name-asc">Name: A-Z</option>
+            <option value="name-desc">Name: Z-A</option>
+          </select>
         </div>
-      )}
+
+        {/* Count, view options and selection */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-base-content/60">
+            {!isLoading && projects.length > 0
+              ? `Showing ${filteredProjects.length} of ${projects.length} projects`
+              : ''}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Grid / List toggle */}
+            <div className="join" role="group" aria-label="Project view">
+              <button
+                type="button"
+                className={`btn btn-sm join-item ${
+                  viewMode === 'grid' ? 'btn-primary' : 'btn-ghost'
+                }`}
+                onClick={() => changeView('grid')}
+                aria-pressed={viewMode === 'grid'}
+              >
+                <LayoutGrid className="w-4 h-4" />
+                Grid
+              </button>
+
+              <button
+                type="button"
+                className={`btn btn-sm join-item ${
+                  viewMode === 'list' ? 'btn-primary' : 'btn-ghost'
+                }`}
+                onClick={() => changeView('list')}
+                aria-pressed={viewMode === 'list'}
+              >
+                <List className="w-4 h-4" />
+                List
+              </button>
+            </div>
+
+            {/* Bulk selection toggle */}
+            {!isLoading && projects.length > 0 && (
+              <button
+                type="button"
+                className={`btn btn-sm ${bulkMode ? 'btn-primary' : 'btn-outline'}`}
+                onClick={toggleBulkMode}
+              >
+                {bulkMode ? 'Cancel Selection' : 'Select Projects'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Bulk actions */}
+        {bulkMode && (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() =>
+                setSelectedIds((prev) => [
+                  ...new Set([...prev, ...filteredProjects.map((p) => p.id)]),
+                ])
+              }
+              disabled={filteredProjects.length === 0}
+            >
+              Select Displayed
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setSelectedIds([])}
+              disabled={selectedIds.length === 0}
+            >
+              Clear
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-error btn-sm"
+              disabled={selectedIds.length === 0}
+              onClick={() => setShowBulkConfirm(true)}
+            >
+              Delete Selected ({selectedIds.length})
+            </button>
+          </div>
+        )}
+      </div>
 
       {isLoading ? (
         <div className="flex justify-center py-12">
