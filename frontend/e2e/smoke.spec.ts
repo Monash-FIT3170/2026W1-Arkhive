@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures/test';
 
 test('unauthenticated user is redirected to login', async ({ page }) => {
-  await page.goto('http://localhost:5173');
+  await page.goto('/');
 
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('heading', { name: 'Arkhive' })).toBeVisible();
