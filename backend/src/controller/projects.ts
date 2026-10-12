@@ -195,6 +195,11 @@ export default {
       const { name } = req.body;
       const ownerId = req.userId;
 
+      if (typeof id !== 'string') {
+        res.status(400).json({ error: 'Invalid project ID.' });
+        return;
+      }
+
       if (!name || typeof name !== 'string' || !name.trim()) {
         res.status(400).json({ error: 'Updated project name is required.' });
         return;
