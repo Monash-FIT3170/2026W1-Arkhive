@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, FolderOpen } from 'lucide-react';
+import { AlertCircle, FolderOpen, Search } from 'lucide-react';
 import { useProjects } from '../../hooks/useProjects';
 import { useProjectPreview } from '../../hooks/useProjectPreview';
 import CreateProjectForm from './components/CreateProjectForm';
@@ -14,6 +14,7 @@ import ConfirmDeleteModal from './components/ConfirmDeleteModal';
  * Guest access is blocked upstream by the RequireUser route guard (see
  * App.tsx) — this component can assume a real user is always present.
  */
+type SortOption = 'newest' | 'oldest' | 'name-asc' | 'name-desc';
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const { projects, isLoading, error, setError, create, rename, remove } = useProjects();
@@ -21,6 +22,27 @@ export default function ProjectsPage() {
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOption, setSortOption] = useState<SortOption>('newest');
+  const filteredProjects = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const result = projects.filter((project) => project.name.toLowerCase().includes(query));
+
+    switch (sortOption) {
+      case 'oldest':
+        return result.reverse();
+
+      case 'name-asc':
+        return result.sort((a, b) => a.name.localeCompare(b.name));
+
+      case 'name-desc':
+        return result.sort((a, b) => b.name.localeCompare(a.name));
+
+      default:
+        return result;
+    }
+  }, [projects, searchQuery, sortOption]);
 
   async function confirmDelete() {
     if (!deleteConfirmId || isDeleting) return;
@@ -50,6 +72,39 @@ export default function ProjectsPage() {
 
       <CreateProjectForm onCreate={create} onError={setError} />
 
+      {/* Search and sort */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <label className="input input-bordered flex items-center gap-2 w-full">
+          <Search className="w-4 h-4 opacity-50" />
+          <input
+            type="search"
+            placeholder="Search projects..."
+            className="grow"
+            aria-label="Search projects"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </label>
+
+        <select
+          className="select select-bordered w-full sm:w-48"
+          aria-label="Sort projects"
+          value={sortOption}
+          onChange={(e) => setSortOption(e.target.value as SortOption)}
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="name-asc">Name: A-Z</option>
+          <option value="name-desc">Name: Z-A</option>
+        </select>
+      </div>
+
+      {!isLoading && projects.length > 0 && (
+        <p className="text-sm text-base-content/60">
+          Showing {filteredProjects.length} of {projects.length} projects
+        </p>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-12">
           <span className="loading loading-spinner loading-md" />
@@ -59,9 +114,17 @@ export default function ProjectsPage() {
           <FolderOpen className="w-8 h-8" />
           No projects yet — create one above to get started.
         </div>
+      ) : filteredProjects.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-base-content/50">
+          <Search className="w-8 h-8" />
+          <p>No projects match your search.</p>
+          <button className="btn btn-ghost btn-sm" onClick={() => setSearchQuery('')}>
+            Clear search
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-          {projects.map((project) => (
+          {filteredProjects.map((project) => (
             <ProjectCard
               key={project.id}
               project={project}
