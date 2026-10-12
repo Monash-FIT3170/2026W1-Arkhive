@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, FolderOpen, Search } from 'lucide-react';
+import { AlertCircle, FolderOpen, Search, LayoutGrid, List } from 'lucide-react';
 import { useProjects } from '../../hooks/useProjects';
 import { useProjectPreview } from '../../hooks/useProjectPreview';
 import CreateProjectForm from './components/CreateProjectForm';
@@ -15,6 +15,7 @@ import ConfirmDeleteModal from './components/ConfirmDeleteModal';
  * App.tsx) — this component can assume a real user is always present.
  */
 type SortOption = 'newest' | 'oldest' | 'name-asc' | 'name-desc';
+type ViewMode = 'grid' | 'list';
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const { projects, isLoading, error, setError, create, rename, remove } = useProjects();
@@ -43,6 +44,24 @@ export default function ProjectsPage() {
         return result;
     }
   }, [projects, searchQuery, sortOption]);
+
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      return localStorage.getItem('arkhive-project-view') === 'list' ? 'list' : 'grid';
+    } catch {
+      return 'grid';
+    }
+  });
+
+  function changeView(mode: ViewMode) {
+    setViewMode(mode);
+
+    try {
+      localStorage.setItem('arkhive-project-view', mode);
+    } catch {
+      // Continue without saving the preference.
+    }
+  }
 
   async function confirmDelete() {
     if (!deleteConfirmId || isDeleting) return;
@@ -99,11 +118,27 @@ export default function ProjectsPage() {
         </select>
       </div>
 
-      {!isLoading && projects.length > 0 && (
-        <p className="text-sm text-base-content/60">
-          Showing {filteredProjects.length} of {projects.length} projects
-        </p>
-      )}
+      <div className="flex justify-end gap-2" role="group" aria-label="Project view">
+        <button
+          type="button"
+          className={`btn btn-sm ${viewMode === 'grid' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => changeView('grid')}
+          aria-pressed={viewMode === 'grid'}
+        >
+          <LayoutGrid className="w-4 h-4" />
+          Grid
+        </button>
+
+        <button
+          type="button"
+          className={`btn btn-sm ${viewMode === 'list' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => changeView('list')}
+          aria-pressed={viewMode === 'list'}
+        >
+          <List className="w-4 h-4" />
+          List
+        </button>
+      </div>
 
       {isLoading ? (
         <div className="flex justify-center py-12">
@@ -123,20 +158,68 @@ export default function ProjectsPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-          {filteredProjects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              isExpanded={isExpanded(project.id)}
-              preview={getPreview(project.id)}
-              onNavigate={(id) => navigate(`/projects/${id}`)}
-              onToggleExpand={toggleExpand}
-              onDeleteRequest={setDeleteConfirmId}
-              onRename={rename}
-              onError={setError}
-            />
-          ))}
+        <div
+          className={
+            viewMode === 'grid'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start'
+              : 'flex flex-col gap-2'
+          }
+        >
+          {filteredProjects.map((project) =>
+            viewMode === 'grid' ? (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                isExpanded={isExpanded(project.id)}
+                preview={getPreview(project.id)}
+                onNavigate={(id) => navigate(`/projects/${id}`)}
+                onToggleExpand={toggleExpand}
+                onDeleteRequest={setDeleteConfirmId}
+                onRename={rename}
+                onError={setError}
+              />
+            ) : (
+              <div key={project.id} className="border border-base-300 rounded-lg bg-base-100">
+                <div className="flex items-center justify-between gap-3 p-3">
+                  <span className="font-medium truncate min-w-0">{project.name}</span>
+
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => toggleExpand(project.id)}
+                      aria-expanded={isExpanded(project.id)}
+                    >
+                      {isExpanded(project.id) ? 'Hide details' : 'Details'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => navigate(`/projects/${project.id}`)}
+                    >
+                      Open
+                    </button>
+                  </div>
+                </div>
+
+                {isExpanded(project.id) && (
+                  <div className="p-3 border-t border-base-300">
+                    <ProjectCard
+                      project={project}
+                      isExpanded={isExpanded(project.id)}
+                      preview={getPreview(project.id)}
+                      onNavigate={(id) => navigate(`/projects/${id}`)}
+                      onToggleExpand={toggleExpand}
+                      onDeleteRequest={setDeleteConfirmId}
+                      onRename={rename}
+                      onError={setError}
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          )}
         </div>
       )}
 
