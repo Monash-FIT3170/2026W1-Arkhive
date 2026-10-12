@@ -76,6 +76,54 @@ export default function ProjectsPage() {
     }
   }
 
+  //bulk deletion handling
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id]
+    );
+  }
+
+  function toggleBulkMode() {
+    setBulkMode((prev) => !prev);
+    setSelectedIds([]);
+  }
+
+  async function confirmBulkDelete() {
+    if (isBulkDeleting || selectedIds.length === 0) return;
+
+    setIsBulkDeleting(true);
+    setError(null);
+
+    const failedIds: string[] = [];
+    const total = selectedIds.length;
+
+    try {
+      for (const id of selectedIds) {
+        try {
+          await remove(id);
+        } catch {
+          failedIds.push(id);
+        }
+      }
+
+      setShowBulkConfirm(false);
+      setSelectedIds(failedIds);
+
+      if (failedIds.length > 0) {
+        setError(`Failed to delete ${failedIds.length} of ${total} projects.`);
+      } else {
+        setBulkMode(false);
+      }
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }
+
   return (
     <div className="flex-1 p-8 max-w-5xl mx-auto w-full flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -142,6 +190,49 @@ export default function ProjectsPage() {
         </button>
       </div>
 
+      {!isLoading && projects.length > 0 && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button type="button" className="btn btn-outline btn-sm" onClick={toggleBulkMode}>
+            {bulkMode ? 'Cancel Selection' : 'Select Projects'}
+          </button>
+
+          {bulkMode && (
+            <>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() =>
+                  setSelectedIds((prev) => [
+                    ...new Set([...prev, ...filteredProjects.map((p) => p.id)]),
+                  ])
+                }
+                disabled={filteredProjects.length === 0}
+              >
+                Select Displayed
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setSelectedIds([])}
+                disabled={selectedIds.length === 0}
+              >
+                Clear
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-error btn-sm"
+                disabled={selectedIds.length === 0}
+                onClick={() => setShowBulkConfirm(true)}
+              >
+                Delete Selected ({selectedIds.length})
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-12">
           <span className="loading loading-spinner loading-md" />
@@ -167,61 +258,75 @@ export default function ProjectsPage() {
               : 'flex flex-col gap-2'
           }
         >
-          {filteredProjects.map((project) =>
-            viewMode === 'grid' ? (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                isExpanded={isExpanded(project.id)}
-                preview={getPreview(project.id)}
-                onNavigate={(id) => navigate(`/projects/${id}`)}
-                onToggleExpand={toggleExpand}
-                onDeleteRequest={setDeleteConfirmId}
-                onRename={rename}
-                onError={setError}
-              />
-            ) : (
-              <div key={project.id} className="border border-base-300 rounded-lg bg-base-100">
-                <div className="flex items-center justify-between gap-3 p-3">
-                  <span className="font-medium truncate min-w-0">{project.name}</span>
+          {filteredProjects.map((project) => (
+            <div key={project.id} className="w-full min-w-0">
+              {bulkMode && (
+                <label className="flex items-center gap-2 mb-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm"
+                    checked={selectedIds.includes(project.id)}
+                    onChange={() => toggleSelected(project.id)}
+                  />
+                  Select
+                </label>
+              )}
 
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => toggleExpand(project)}
-                      aria-expanded={isExpanded(project.id)}
-                    >
-                      {isExpanded(project.id) ? 'Hide details' : 'Details'}
-                    </button>
+              {viewMode === 'grid' ? (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  isExpanded={isExpanded(project.id)}
+                  preview={getPreview(project.id)}
+                  onNavigate={(id) => navigate(`/projects/${id}`)}
+                  onToggleExpand={toggleExpand}
+                  onDeleteRequest={setDeleteConfirmId}
+                  onRename={rename}
+                  onError={setError}
+                />
+              ) : (
+                <div key={project.id} className="border border-base-300 rounded-lg bg-base-100">
+                  <div className="flex items-center justify-between gap-3 p-3">
+                    <span className="font-medium truncate min-w-0">{project.name}</span>
 
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      onClick={() => navigate(`/projects/${project.id}`)}
-                    >
-                      Open
-                    </button>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => toggleExpand(project)}
+                        aria-expanded={isExpanded(project.id)}
+                      >
+                        {isExpanded(project.id) ? 'Hide details' : 'Details'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => navigate(`/projects/${project.id}`)}
+                      >
+                        Open
+                      </button>
+                    </div>
                   </div>
+
+                  {isExpanded(project.id) && (
+                    <div className="p-3 border-t border-base-300">
+                      <ProjectCard
+                        project={project}
+                        isExpanded={isExpanded(project.id)}
+                        preview={getPreview(project.id)}
+                        onNavigate={(id) => navigate(`/projects/${id}`)}
+                        onToggleExpand={toggleExpand}
+                        onDeleteRequest={setDeleteConfirmId}
+                        onRename={rename}
+                        onError={setError}
+                      />
+                    </div>
+                  )}
                 </div>
-
-                {isExpanded(project.id) && (
-                  <div className="p-3 border-t border-base-300">
-                    <ProjectCard
-                      project={project}
-                      isExpanded={isExpanded(project.id)}
-                      preview={getPreview(project.id)}
-                      onNavigate={(id) => navigate(`/projects/${id}`)}
-                      onToggleExpand={toggleExpand}
-                      onDeleteRequest={setDeleteConfirmId}
-                      onRename={rename}
-                      onError={setError}
-                    />
-                  </div>
-                )}
-              </div>
-            )
-          )}
+              )}
+            </div>
+          ))}
         </div>
       )}
 
@@ -232,6 +337,20 @@ export default function ProjectsPage() {
           isLoading={isDeleting}
           onCancel={() => setDeleteConfirmId(null)}
           onConfirm={confirmDelete}
+        />
+      )}
+
+      {showBulkConfirm && (
+        <ConfirmDeleteModal
+          title={`Delete ${selectedIds.length} Projects?`}
+          description={`You are about to permanently delete ${selectedIds.length} selected projects and all their documents. This action cannot be undone.`}
+          isLoading={isBulkDeleting}
+          onCancel={() => {
+            if (!isBulkDeleting) {
+              setShowBulkConfirm(false);
+            }
+          }}
+          onConfirm={confirmBulkDelete}
         />
       )}
     </div>
