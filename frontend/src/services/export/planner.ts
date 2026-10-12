@@ -1,6 +1,6 @@
 import type { ExtractedPage } from '../../models/TableData';
 import { buildZip, textEncode } from './zip';
-import { getTemplate, type ExportTemplate } from './Templates';
+import { getTemplate, type ExportTemplate } from './templates';
 import type { ExportOptions, ExportUnit } from './model';
 
 /**

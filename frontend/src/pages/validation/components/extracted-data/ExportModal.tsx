@@ -7,7 +7,7 @@ import {
   TEMPLATES,
   getTemplate,
   templatesByFormat,
-} from '../../../../services/export/Templates';
+} from '../../../../services/export/templates';
 import {
   deliver,
   planExport,
