@@ -208,7 +208,7 @@ export default function ProjectsPage() {
                 }
                 disabled={filteredProjects.length === 0}
               >
-                Select Displayed
+                Select All
               </button>
 
               <button
@@ -260,18 +260,6 @@ export default function ProjectsPage() {
         >
           {filteredProjects.map((project) => (
             <div key={project.id} className="w-full min-w-0">
-              {bulkMode && (
-                <label className="flex items-center gap-2 mb-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-sm"
-                    checked={selectedIds.includes(project.id)}
-                    onChange={() => toggleSelected(project.id)}
-                  />
-                  Select
-                </label>
-              )}
-
               {viewMode === 'grid' ? (
                 <ProjectCard
                   key={project.id}
@@ -283,13 +271,16 @@ export default function ProjectsPage() {
                   onDeleteRequest={setDeleteConfirmId}
                   onRename={rename}
                   onError={setError}
+                  bulkMode={bulkMode}
+                  isSelected={selectedIds.includes(project.id)}
+                  onToggleSelect={toggleSelected}
                 />
               ) : (
                 <div key={project.id} className="border border-base-300 rounded-lg bg-base-100">
                   <div className="flex items-center justify-between gap-3 p-3">
                     <span className="font-medium truncate min-w-0">{project.name}</span>
 
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
@@ -306,6 +297,16 @@ export default function ProjectsPage() {
                       >
                         Open
                       </button>
+
+                      {bulkMode && (
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-xs rounded-full"
+                          aria-label={`Select ${project.name}`}
+                          checked={selectedIds.includes(project.id)}
+                          onChange={() => toggleSelected(project.id)}
+                        />
+                      )}
                     </div>
                   </div>
 

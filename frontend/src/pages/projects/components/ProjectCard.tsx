@@ -13,6 +13,9 @@ interface ProjectCardProps {
   onDeleteRequest: (id: string) => void;
   onRename: (id: string, name: string) => Promise<unknown>;
   onError: (message: string) => void;
+  bulkMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 export default function ProjectCard({
@@ -24,6 +27,9 @@ export default function ProjectCard({
   onDeleteRequest,
   onRename,
   onError,
+  bulkMode = false,
+  isSelected = false,
+  onToggleSelect,
 }: ProjectCardProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
@@ -130,6 +136,7 @@ export default function ProjectCard({
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
+
                 <button
                   type="button"
                   className="btn btn-ghost btn-xs text-error"
@@ -141,6 +148,18 @@ export default function ProjectCard({
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
+
+                {/* bulk mode checkbox */}
+                {bulkMode && (
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-xs rounded-full"
+                    aria-label={`Select ${project.name}`}
+                    checked={isSelected}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => onToggleSelect?.(project.id)}
+                  />
+                )}
               </>
             )}
           </div>
