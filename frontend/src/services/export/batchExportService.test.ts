@@ -3,9 +3,9 @@ import {
   exportBatchAsXLSX,
   exportBatchAsCSV,
   exportBatchAsJSON,
-  exportBatchAsTXT
+  exportBatchAsTXT,
 } from './batchExportService';
-import type { DocumentJob } from '../models/Job';
+import type { DocumentJob } from '../../models/Job';
 
 describe('batchExportService', () => {
   let clickSpy: any;
@@ -23,10 +23,10 @@ describe('batchExportService', () => {
       extractedData: {
         columns: ['ITEM', 'QTY', 'PRICE'],
         itemColumnKey: 'ITEM',
-        rows: [{ _id: '1', ITEM: 'Laptop', QTY: '1', PRICE: '$1200', _cellConfidence: {} }]
+        rows: [{ _id: '1', ITEM: 'Laptop', QTY: '1', PRICE: '$1200', _cellConfidence: {} }],
       },
       createdAt: 1000,
-      updatedAt: 1000
+      updatedAt: 1000,
     },
     {
       id: 'job-2',
@@ -40,11 +40,11 @@ describe('batchExportService', () => {
       extractedData: {
         columns: ['ITEM', 'PRICE'],
         itemColumnKey: 'ITEM',
-        rows: [{ _id: '2', ITEM: 'Coffee', PRICE: '$4.50', _cellConfidence: {} }]
+        rows: [{ _id: '2', ITEM: 'Coffee', PRICE: '$4.50', _cellConfidence: {} }],
       },
       createdAt: 1000,
-      updatedAt: 1000
-    }
+      updatedAt: 1000,
+    },
   ];
 
   beforeEach(() => {
