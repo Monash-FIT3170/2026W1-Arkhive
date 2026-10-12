@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, FolderOpen, Search, LayoutGrid, List } from 'lucide-react';
+import { AlertCircle, FolderOpen, Search, LayoutGrid, List, X } from 'lucide-react';
 import { useProjects } from '../../hooks/useProjects';
 import { useProjectPreview } from '../../hooks/useProjectPreview';
 import CreateProjectForm from './components/CreateProjectForm';
@@ -131,9 +131,24 @@ export default function ProjectsPage() {
       </div>
 
       {error && (
-        <div className="alert alert-error text-sm">
-          <AlertCircle className="w-4 h-4" />
-          {error}
+        <div
+          role="alert"
+          className="alert alert-error flex items-center justify-between gap-3 text-sm"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs shrink-0"
+            onClick={() => setError(null)}
+            aria-label="Dismiss error"
+            title="Dismiss error"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
