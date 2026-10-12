@@ -89,7 +89,9 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      <CreateProjectForm onCreate={create} onError={setError} />
+      <div className="mb-4">
+        <CreateProjectForm onCreate={create} onError={setError} />
+      </div>
 
       {/* Search and sort */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -187,7 +189,7 @@ export default function ProjectsPage() {
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
-                      onClick={() => toggleExpand(project.id)}
+                      onClick={() => toggleExpand(project)}
                       aria-expanded={isExpanded(project.id)}
                     >
                       {isExpanded(project.id) ? 'Hide details' : 'Details'}
