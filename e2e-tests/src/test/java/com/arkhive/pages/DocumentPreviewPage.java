@@ -20,37 +20,84 @@ public class DocumentPreviewPage extends BasePage {
     }
 
     public boolean isDisplayed() {
-        return isDisplayed(pageObjects.previewHeader) || isDisplayed(pageObjects.sidebarHeading);
+        return isDisplayed(pageObjects.previewHeader) || isDisplayed(pageObjects.previewCards);
+    }
+
+    public boolean isDisplayed(int timeoutSeconds) {
+        return isDisplayed(pageObjects.previewHeader, timeoutSeconds) || isDisplayed(pageObjects.previewCards, timeoutSeconds);
     }
 
     public void selectAllPages() {
-        click(pageObjects.selectAllButton);
+        if (isDisplayed(pageObjects.selectAllButton)) {
+            click(pageObjects.selectAllButton);
+        }
     }
 
     public void deselectAllPages() {
-        click(pageObjects.deselectAllButton);
+        if (isDisplayed(pageObjects.clearSelectionButton)) {
+            click(pageObjects.clearSelectionButton);
+        }
+    }
+
+    public boolean isAnyPageSelected() {
+        return isDisplayed(pageObjects.selectedCountLabel) || isDisplayed(pageObjects.clearSelectionButton);
     }
 
     public int getPreviewCardCount() {
         try {
-            waitForPresence(pageObjects.gridItems);
-            List<WebElement> items = driver.findElements(pageObjects.gridItems);
+            waitForPresence(pageObjects.previewCards);
+            List<WebElement> items = driver.findElements(pageObjects.previewCards);
             return items.size();
         } catch (TimeoutException e) {
             return 0;
         }
     }
 
-    public void clickProcess() {
-        click(pageObjects.processButton);
+    public boolean isProcessButtonAvailable() {
+        return isDisplayed(pageObjects.processButton, 3);
     }
 
     public boolean isProcessButtonEnabled() {
-        try {
-            WebElement btn = waitForVisible(pageObjects.processButton);
-            return btn.isEnabled() && btn.getDomProperty("disabled") == null;
-        } catch (Exception e) {
+        if (!isDisplayed(pageObjects.processButton, 3)) {
             return false;
+        }
+        return isEnabled(pageObjects.processButton);
+    }
+
+    public boolean waitForProcessButtonEnabled(int timeoutSeconds) {
+        try {
+            org.openqa.selenium.support.ui.WebDriverWait customWait =
+                    new org.openqa.selenium.support.ui.WebDriverWait(driver, java.time.Duration.ofSeconds(timeoutSeconds));
+            return customWait.until(d -> isProcessButtonEnabled());
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    public boolean waitForThumbnailsLoaded(int timeoutSeconds) {
+        try {
+            org.openqa.selenium.support.ui.WebDriverWait customWait =
+                    new org.openqa.selenium.support.ui.WebDriverWait(driver, java.time.Duration.ofSeconds(timeoutSeconds));
+            return Boolean.TRUE.equals(customWait.until(d -> {
+                List<WebElement> cards = driver.findElements(pageObjects.previewCards);
+                if (cards.isEmpty()) return false;
+                for (WebElement card : cards) {
+                    List<WebElement> imgs = card.findElements(org.openqa.selenium.By.tagName("img"));
+                    if (imgs.isEmpty()) return false;
+                }
+                return true;
+            }));
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    public void clickProcess() {
+        waitForProcessButtonEnabled(10);
+        click(pageObjects.processButton);
+        // If low quality confirmation modal is triggered, confirm to proceed with processing
+        if (isDisplayed(pageObjects.lowQualityModal, 3)) {
+            click(pageObjects.lowQualityModalConfirmButton);
         }
     }
 
@@ -59,10 +106,6 @@ public class DocumentPreviewPage extends BasePage {
     }
 
     public String getErrorMessage() {
-        return waitForVisible(pageObjects.errorAlert).getText();
-    }
-
-    public boolean hasSuccessMessage() {
-        return isDisplayed(pageObjects.successAlert);
+        return getText(pageObjects.errorAlert);
     }
 }

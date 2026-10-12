@@ -16,14 +16,18 @@ public class TestConfig {
     private final boolean headless;
     private final int processingTimeoutSeconds;
     private final String testResourcesDir;
+    private final String testUserEmail;
+    private final String testUserPassword;
 
     public TestConfig() {
         loadProperties();
 
-        this.baseUrl = getProperty("baseUrl", "http://localhost:5173");
-        this.headless = Boolean.parseBoolean(getProperty("headless", "false"));
-        this.processingTimeoutSeconds = Integer.parseInt(getProperty("processingTimeout", "120"));
-        this.testResourcesDir = getProperty("testResourcesDir", "src/test/resources/documents/");
+        this.baseUrl = getPropertyOrEnv("baseUrl", "BASE_URL", "http://localhost:5173");
+        this.headless = Boolean.parseBoolean(getPropertyOrEnv("headless", "HEADLESS", "false"));
+        this.processingTimeoutSeconds = Integer.parseInt(getPropertyOrEnv("processingTimeout", "PROCESSING_TIMEOUT", "120"));
+        this.testResourcesDir = getPropertyOrEnv("testResourcesDir", "TEST_RESOURCES_DIR", "src/test/resources/documents/");
+        this.testUserEmail = getPropertyOrEnv("testUserEmail", "TEST_USER_EMAIL", "");
+        this.testUserPassword = getPropertyOrEnv("testUserPassword", "TEST_USER_PASSWORD", "");
     }
 
     private void loadProperties() {
@@ -36,10 +40,16 @@ public class TestConfig {
         }
     }
 
-    private String getProperty(String key, String defaultValue) {
+    private String getPropertyOrEnv(String key, String envVar, String defaultValue) {
         String systemProp = System.getProperty(key);
         if (systemProp != null && !systemProp.trim().isEmpty()) {
             return systemProp.trim();
+        }
+        if (envVar != null) {
+            String envVal = System.getenv(envVar);
+            if (envVal != null && !envVal.trim().isEmpty()) {
+                return envVal.trim();
+            }
         }
         return properties.getProperty(key, defaultValue).trim();
     }
@@ -58,5 +68,13 @@ public class TestConfig {
 
     public String getTestResourcesDir() {
         return testResourcesDir;
+    }
+
+    public String getTestUserEmail() {
+        return testUserEmail;
+    }
+
+    public String getTestUserPassword() {
+        return testUserPassword;
     }
 }

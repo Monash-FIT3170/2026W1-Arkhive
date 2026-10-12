@@ -47,12 +47,64 @@ public class BasePage {
         waitForPresence(locator).sendKeys(text);
     }
 
+    protected void clearAndType(By locator, String text) {
+        WebElement element = waitForClickable(locator);
+        element.clear();
+        element.sendKeys(text);
+    }
+
+    protected String getText(By locator) {
+        return waitForVisible(locator).getText();
+    }
+
     protected boolean isDisplayed(By locator) {
         try {
             return waitForVisible(locator).isDisplayed();
         } catch (TimeoutException e) {
             return false;
         }
+    }
+
+    protected boolean isDisplayed(By locator, int timeoutSeconds) {
+        try {
+            return waitForVisible(locator, timeoutSeconds).isDisplayed();
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    protected boolean waitForInvisibility(By locator, int timeoutSeconds) {
+        try {
+            WebDriverWait customWait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            return Boolean.TRUE.equals(customWait.until(ExpectedConditions.invisibilityOfElementLocated(locator)));
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    protected boolean isEnabled(By locator) {
+        try {
+            WebElement el = waitForVisible(locator);
+            String ariaDisabled = el.getDomAttribute("aria-disabled");
+            if ("true".equalsIgnoreCase(ariaDisabled)) {
+                return false;
+            }
+            Object disabledProp = el.getDomProperty("disabled");
+            if (Boolean.TRUE.equals(disabledProp)) {
+                return false;
+            }
+            String disabledAttr = el.getDomAttribute("disabled");
+            if (disabledAttr != null) {
+                return false;
+            }
+            return el.isEnabled();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    protected boolean isElementPresent(By locator) {
+        return !driver.findElements(locator).isEmpty();
     }
 
     protected boolean waitForUrlContains(String urlFraction) {

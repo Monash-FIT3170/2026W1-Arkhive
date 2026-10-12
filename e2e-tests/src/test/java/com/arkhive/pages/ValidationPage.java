@@ -16,18 +16,44 @@ public class ValidationPage extends BasePage {
     }
 
     public boolean isDisplayed() {
-        return waitForUrlContains("/validation");
+        return waitForUrlContains("/validation") && !isDisplayed(pageObjects.loadingIndicator);
     }
 
     public boolean isDisplayed(int timeoutSeconds) {
-        return waitForUrlContains("/validation", timeoutSeconds);
+        if (!waitForUrlContains("/validation", timeoutSeconds)) {
+            return false;
+        }
+        waitForInvisibility(pageObjects.loadingIndicator, timeoutSeconds);
+        return isDisplayed(pageObjects.extractedDataViewer, timeoutSeconds)
+                || isDisplayed(pageObjects.viewModeGroup, timeoutSeconds)
+                || isDisplayed(pageObjects.documentViewer, timeoutSeconds);
+    }
+
+    public boolean isWorkspaceLoaded(int timeoutSeconds) {
+        return isDisplayed(timeoutSeconds);
     }
 
     public boolean isDocumentPanelDisplayed() {
-        return isDisplayed(pageObjects.documentViewer);
+        return isDisplayed(pageObjects.documentViewer, 5);
     }
 
     public boolean isExtractedDataPanelDisplayed() {
-        return isDisplayed(pageObjects.extractedDataViewer);
+        return isDisplayed(pageObjects.extractedDataViewer, 5);
+    }
+
+    public boolean isConfidenceBadgeDisplayed() {
+        return isDisplayed(pageObjects.confidenceBadge, 5);
+    }
+
+    public void switchToSplitView() {
+        click(pageObjects.splitViewButton);
+    }
+
+    public void switchToDocumentView() {
+        click(pageObjects.documentViewButton);
+    }
+
+    public void switchToTableView() {
+        click(pageObjects.tableViewButton);
     }
 }

@@ -16,11 +16,16 @@ public class UploadPage extends BasePage {
     }
 
     public void open(String url) {
-        driver.get(url);
+        String target = url.endsWith("/upload") ? url : url + "/upload";
+        driver.get(target);
     }
 
     public boolean isDisplayed() {
-        return isDisplayed(pageObjects.brandingHeading);
+        return isDisplayed(pageObjects.brandingHeading) || isDisplayed(pageObjects.dropzoneText);
+    }
+
+    public boolean isDropzoneDisplayed() {
+        return isDisplayed(pageObjects.dropzoneText);
     }
 
     public void uploadFile(String filePath) {
@@ -31,7 +36,11 @@ public class UploadPage extends BasePage {
         return isDisplayed(pageObjects.errorAlert);
     }
 
+    public boolean hasErrorMessage(int timeoutSeconds) {
+        return isDisplayed(pageObjects.errorAlert, timeoutSeconds);
+    }
+
     public String getErrorMessage() {
-        return waitForVisible(pageObjects.errorAlert).getText();
+        return getText(pageObjects.errorAlert);
     }
 }

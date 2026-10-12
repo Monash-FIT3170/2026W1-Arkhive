@@ -4,9 +4,15 @@ import com.arkhive.pages.DocumentPreviewPage;
 import com.arkhive.pages.UploadPage;
 import com.arkhive.pages.ValidationPage;
 import org.testng.Assert;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 public class UploadPageTest extends BaseTest {
+
+    @BeforeMethod
+    public void setupGuestSession() {
+        loginAsGuest();
+    }
 
     @Test(description = "Verify that the Upload page dropzone is displayed after guest login setup")
     public void testUploadPageDisplayedAfterGuestLogin() {
@@ -22,10 +28,10 @@ public class UploadPageTest extends BaseTest {
         String oversizedFilePath = testFileUtils.getTestFilePath("sample-file.pdf");
         uploadPage.uploadFile(oversizedFilePath);
 
-        Assert.assertTrue(uploadPage.hasErrorMessage(), "Oversized file upload should display an error message");
+        Assert.assertTrue(uploadPage.hasErrorMessage(5), "Oversized file upload should display an error message");
         String errorMsg = uploadPage.getErrorMessage();
-        Assert.assertTrue(errorMsg.contains("5MB limit") || errorMsg.contains("exceed") || errorMsg.contains("large"),
-            "Expected file size error message for sample-file.pdf, got: " + errorMsg);
+        Assert.assertTrue(errorMsg.contains("exceed the 5MB limit"),
+            "Expected file size error message mentioning 'exceed the 5MB limit', got: " + errorMsg);
     }
 
     @Test(description = "Verify that uploading a valid file transitions to DocumentPreviewPage with preview cards")
@@ -36,7 +42,7 @@ public class UploadPageTest extends BaseTest {
         String validFilePath = testFileUtils.getTestFilePath("valid-sample.pdf");
         uploadPage.uploadFile(validFilePath);
 
-        Assert.assertTrue(previewPage.isDisplayed(), "DocumentPreviewPage should be displayed upon uploading valid file");
+        Assert.assertTrue(previewPage.isDisplayed(15), "DocumentPreviewPage should be displayed upon uploading valid file");
         Assert.assertTrue(previewPage.getPreviewCardCount() > 0, "At least one preview card should be rendered on DocumentPreviewPage");
     }
 
@@ -48,12 +54,15 @@ public class UploadPageTest extends BaseTest {
         String validFilePath = testFileUtils.getTestFilePath("valid-sample.pdf");
         uploadPage.uploadFile(validFilePath);
 
-        Assert.assertTrue(previewPage.isDisplayed(), "DocumentPreviewPage should be displayed upon uploading valid file");
+        Assert.assertTrue(previewPage.isDisplayed(15), "DocumentPreviewPage should be displayed upon uploading valid file");
+        Assert.assertTrue(previewPage.isAnyPageSelected(), "Uploaded pages should be initially selected");
 
         previewPage.deselectAllPages();
-        Assert.assertFalse(previewPage.isProcessButtonEnabled(), "Process button should be disabled when all pages are deselected");
+        Assert.assertFalse(previewPage.isAnyPageSelected(), "No pages should remain selected after deselecting all");
+        Assert.assertFalse(previewPage.isProcessButtonAvailable(), "Process button should not be displayed when all pages are deselected");
 
         previewPage.selectAllPages();
+        Assert.assertTrue(previewPage.isAnyPageSelected(), "Pages should be selected after clicking Select all");
         Assert.assertTrue(previewPage.isProcessButtonEnabled(), "Process button should be enabled when pages are selected");
     }
 
@@ -64,15 +73,14 @@ public class UploadPageTest extends BaseTest {
         ValidationPage validationPage = pageObjectManager.getValidationPage();
 
         String validFilePath = testFileUtils.getTestFilePath("valid-sample.pdf");
-        System.out.println(validFilePath);
         uploadPage.uploadFile(validFilePath);
 
-        Assert.assertTrue(previewPage.isDisplayed(), "DocumentPreviewPage should be displayed upon uploading valid file");
+        Assert.assertTrue(previewPage.isDisplayed(15), "DocumentPreviewPage should be displayed upon uploading valid file");
 
         previewPage.clickProcess();
 
         int timeout = testConfig.getProcessingTimeoutSeconds();
-        Assert.assertTrue(validationPage.isDisplayed(timeout),
+        Assert.assertTrue(validationPage.isWorkspaceLoaded(timeout),
             "User should be navigated to ValidationPage after processing document (allowing up to " + timeout + " seconds)");
     }
 }

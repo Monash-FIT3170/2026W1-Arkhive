@@ -28,9 +28,21 @@ public abstract class BaseTest {
         driverManager.initializeDriver();
         driver = driverManager.getDriver();
         pageObjectManager = new PageObjectManager(driver);
+    }
 
-        // Common setup: Navigate and enter guest mode for all tests
+    /**
+     * Explicit authentication helper for tests requiring guest mode access.
+     */
+    protected void loginAsGuest() {
         pageObjectManager.getLoginPage().loginAsGuest(testConfig.getBaseUrl());
+    }
+
+    /**
+     * Explicit authentication helper for tests requiring registered user access.
+     */
+    protected void loginAsUser(String email, String password) {
+        pageObjectManager.getLoginPage().open(testConfig.getBaseUrl());
+        pageObjectManager.getLoginPage().loginWithEmailPassword(email, password);
     }
 
     @AfterMethod(alwaysRun = true)

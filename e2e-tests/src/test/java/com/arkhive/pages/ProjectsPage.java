@@ -1,0 +1,92 @@
+package com.arkhive.pages;
+
+import com.arkhive.pageobjects.ProjectsPageObjects;
+import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+
+import java.util.List;
+
+/**
+ * Page Object representing the Projects management page (/projects).
+ */
+public class ProjectsPage extends BasePage {
+
+    private final ProjectsPageObjects pageObjects;
+
+    public ProjectsPage(WebDriver driver) {
+        super(driver);
+        this.pageObjects = new ProjectsPageObjects();
+    }
+
+    public void open(String baseUrl) {
+        String target = baseUrl.endsWith("/projects") ? baseUrl : baseUrl + "/projects";
+        driver.get(target);
+    }
+
+    public boolean isDisplayed() {
+        return isDisplayed(pageObjects.pageHeading);
+    }
+
+    public boolean isDisplayed(int timeoutSeconds) {
+        return isDisplayed(pageObjects.pageHeading, timeoutSeconds);
+    }
+
+    public void createNewProject(String projectName) {
+        waitForInvisibility(pageObjects.loadingSpinner, 5);
+        clearAndType(pageObjects.projectNameInput, projectName);
+        click(pageObjects.createProjectButton);
+        // Wait until created project card appears or loading finishes
+        waitForVisible(pageObjects.projectCardByName(projectName), 10);
+    }
+
+    public int getProjectCount() {
+        waitForInvisibility(pageObjects.loadingSpinner, 5);
+        try {
+            List<WebElement> cards = driver.findElements(pageObjects.projectCards);
+            return cards.size();
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    public boolean hasProject(String projectName) {
+        waitForInvisibility(pageObjects.loadingSpinner, 5);
+        return isDisplayed(pageObjects.projectCardByName(projectName), 5);
+    }
+
+    public void openProject(String projectName) {
+        click(pageObjects.projectOpenAreaByName(projectName));
+    }
+
+    public void renameProject(String currentName, String newName) {
+        click(pageObjects.renameButtonByName(currentName));
+        waitForVisible(pageObjects.activeRenameInput, 5);
+        clearAndType(pageObjects.activeRenameInput, newName);
+        click(pageObjects.saveRenameButton);
+        waitForVisible(pageObjects.projectCardByName(newName), 10);
+    }
+
+    public void deleteProject(String projectName) {
+        click(pageObjects.deleteButtonByName(projectName));
+        waitForVisible(pageObjects.deleteModalTitle, 5);
+        click(pageObjects.confirmDeleteButton);
+        waitForInvisibility(pageObjects.deleteModalTitle, 5);
+        waitForInvisibility(pageObjects.projectCardByName(projectName), 10);
+    }
+
+    public void cancelDeleteProject(String projectName) {
+        click(pageObjects.deleteButtonByName(projectName));
+        waitForVisible(pageObjects.deleteModalTitle, 5);
+        click(pageObjects.cancelDeleteButton);
+        waitForInvisibility(pageObjects.deleteModalTitle, 5);
+    }
+
+    public boolean hasErrorMessage() {
+        return isDisplayed(pageObjects.errorAlert);
+    }
+
+    public String getErrorMessage() {
+        return getText(pageObjects.errorAlert);
+    }
+}
