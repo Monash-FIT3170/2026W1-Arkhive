@@ -8,6 +8,11 @@ export class LoginPage {
   readonly registerTab: Locator;
   readonly guestLink: Locator;
   readonly guestConfirmButton: Locator;
+  readonly displayNameInput: Locator;
+  readonly registerEmailInput: Locator;
+  readonly registerPasswordInput: Locator;
+  readonly confirmPasswordInput: Locator;
+  readonly createAccountButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -18,6 +23,17 @@ export class LoginPage {
     this.guestLink = page.getByText('Continue as Guest', { exact: true });
     this.guestConfirmButton = page
     .getByRole('button', { name: 'Continue as Guest' }).last();
+    this.displayNameInput = page.getByPlaceholder(
+      'Display Name (first name or nickname)'
+    );
+    this.registerEmailInput = page.getByPlaceholder('Email');
+    this.registerPasswordInput = page.getByPlaceholder('Password', {
+      exact: true,
+    });
+    this.confirmPasswordInput = page.getByPlaceholder('Confirm Password');
+    this.createAccountButton = page.getByRole('button', {
+      name: 'Create Account',
+});
   }
 
   async goto() {
@@ -36,5 +52,17 @@ export class LoginPage {
   async continueAsGuest() {
   await this.guestLink.click();
   await this.guestConfirmButton.click();
+  }
+
+  async fillRegistrationForm(
+    displayName: string,
+    email: string,
+    password: string,
+    confirmPassword: string
+  ) {
+    await this.displayNameInput.fill(displayName);
+    await this.registerEmailInput.fill(email);
+    await this.registerPasswordInput.fill(password);
+    await this.confirmPasswordInput.fill(confirmPassword);
   }
 }

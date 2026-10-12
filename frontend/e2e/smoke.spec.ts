@@ -77,3 +77,23 @@ test('unsupported file type is not accepted for upload', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/upload$/);
 });
+
+test('registration shows error when passwords do not match', async ({ page }) => {
+  const loginPage = new LoginPage(page);
+
+  await loginPage.goto();
+  await loginPage.openRegister();
+
+  await loginPage.fillRegistrationForm(
+    'Jasper',
+    'test@example.com',
+    'password123',
+    'different123'
+  );
+
+  await loginPage.createAccountButton.click();
+
+  await expect(
+    page.getByText('Passwords do not match.')
+  ).toBeVisible();
+});
