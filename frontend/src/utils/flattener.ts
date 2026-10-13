@@ -1,417 +1,184 @@
-import type { ExtractedData, ExtractedPage, ExtractedRow } from '../models/TableData';
-import type { OCRComponent, Page, Pages } from '../models/OCRComponent';
-
-// ==========================================
-// TYPES & INTERFACES
-// ==========================================
-
-interface CellData {
-  //Represents 1 cell in row
-  value: string; //Value of the cell
-  confidence: number; // Confidence value of the celll
-  ref: string; //reference ID
-}
-
-interface TreeNode {
-  //Represents a row
-  id: string; //unique ID
-  confidence: number; //Confidence of the row
-  indent: number; // indent in the row
-  level: number;
-  cells: Record<string, CellData>; // Mapped by column key - cells in row
-  children: TreeNode[]; // Rows whose are indented underneath this row
-}
+import type {
+  ExtractedData,
+  ExtractedPage,
+  ExtractedRow,
+  ExtractedTableSnapshot,
+  TableTab,
+} from '../models/TableData';
+import type { Block, Cell, StructuredPage, TableBlock, TableRow } from '../models/Document';
 
 export interface FlattenerOptions {
-  /**
-   * Manual nesting-depth overrides, keyed by OCRComponent id.
-   * 0 = top-level. 1 = nested one level under the nearest preceding row
-   * with a lower resolved level. Always wins over `parentId` for that
-   * specific row. Rows without an entry fall back to `parentId`,
-   * compared against whatever is currently on the stack — so a manual
-   * override can start a fresh nesting scope that later un-overridden
-   * rows still nest into automatically.
-   */
+  /** Complete row-id -> level override (see indentLevelsOf in indentEditor). Wins over detected levels. */
   manualIndentLevels?: Record<string, number>;
+  /** User-chosen hierarchy column. Overrides block.itemColumnKey. null = flat table (no nesting). */
+  hierarchyColumnKey?: string | null;
 }
 
-// ==========================================
-// HELPER FUNCTIONS
-// ==========================================
-
-export function normalizeColKey(col: string): string {
-  return col
-    .replace(/\(.*?\)/g, '')
-    .replace(/\./g, '')
-    .trim()
-    .replace(/\s+/g, '_')
-    .toUpperCase();
-}
-
-/** Column-related bounding box keys (`col_0`, `col_1`, ...) in column order. */
-function getColumnBBKeys(component: OCRComponent): string[] {
-  return Object.keys(component.boundingBoxes ?? {})
-    .filter((k) => /^col_\d+$/.test(k))
-    .sort((a, b) => Number(a.split('_')[1]) - Number(b.split('_')[1]));
-}
-
-function resolveColumnIndex(rawCol: string | undefined): number | null {
-  if (!rawCol) return null;
-  const match = rawCol.match(/(\d+)\s*$/);
-  return match ? Number(match[1]) : null;
-}
-
-export function getMidX(component: OCRComponent, key: string): number | null {
-  const verts = component.boundingBoxes?.[key]?.vertices;
-  if (!verts?.length) return null;
-  const xs = verts.map((v) => Number(v.x));
-  return (Math.min(...xs) + Math.max(...xs)) / 2;
+interface Node {
+  row: TableRow;
+  level: number;
+  path: Node[];
 }
 
 /**
- * Estimates a reasonable "this counts as one indent level" distance, scaled to the
- * table's own geometry
- *
- * Basing the threshold on a fraction of the average column width keeps it valid
- * regardless of the coordinate system the OCR engine happens to use.
+ * Projection of ONE TableBlock into the existing flat grid (ExtractedData).
+ * Same inheritance semantics as before; flattening is now a view, not the data model.
+ * Manual overrides win over detected levels and re-derive ancestry via the same stack.
  */
-function estimateIndentThreshold(positions: number[]): number {
-  if (positions.length < 2) return 0.01; // any positive delta counts
-  const gaps = positions.slice(1).map((p, i) => p - positions[i]);
-  const avgColWidth = gaps.reduce((a, b) => a + b, 0) / gaps.length;
-  return Math.max(avgColWidth * 0.1, 0.01);
-}
+export function tableToExtractedData(
+  block: TableBlock,
+  opts: FlattenerOptions = {}
+): ExtractedData {
+  const manual = opts.manualIndentLevels ?? {};
+  const flat = opts.hierarchyColumnKey === null;
+  const keys = block.columns.map((c) => c.key);
+  const requested = opts.hierarchyColumnKey;
+  const hierarchyKey = requested && keys.includes(requested) ? requested : block.itemColumnKey;
+  const itemIdx = Math.max(0, keys.indexOf(hierarchyKey));
+  const itemKey = keys[itemIdx];
 
-/**
- * Function that finds the columns column number that the component is assigned to
- * @param target x coordinate of the comp
- * @param values list of x-coordinates for middle for each column
- * @param startIndex column number that is first to be considered
- * @returns the column index
- */
-function findClosestIndex(target: number, values: number[], startIndex = 0): number {
-  let bestIdx = startIndex;
-  let minScore = Infinity;
-  for (let j = startIndex; j < values.length; j++) {
-    //Find column index whose closest to target
-    const score = Math.abs(target - values[j]);
-    if (score < minScore) {
-      minScore = score;
-      bestIdx = j;
-    }
-  }
-  return bestIdx;
-}
-
-function getIndent(c: OCRComponent): number {
-  const bbKeys = getColumnBBKeys(c);
-  const firstPopulatedKey = bbKeys.find((k) => c.boundingBoxes?.[k]?.text?.trim() !== '');
-
-  const verts = firstPopulatedKey ? c.boundingBoxes?.[firstPopulatedKey]?.vertices : undefined;
-
-  if (verts?.length) {
-    return Math.min(...verts.map((v) => Number(v.x)));
-  }
-  return c.indentation ?? 0;
-}
-
-// ==========================================
-// COLUMN PARSING & CELL MAPPING
-// ==========================================
-
-/**
- * Function that extracts the column
- * @param data RAW OCR Data
- * @returns keys - list of column names, positions - the mid x position of each column
- */
-export function extractColumns(data: OCRComponent[]) {
-  const colComp = data.find((c) => c.type === 'TABLE_COLS');
-  console.log(colComp);
-  const bbKeys = colComp ? getColumnBBKeys(colComp) : [];
-
-  const rawCols = colComp?.cells?.length
-    ? colComp.cells
-    : bbKeys.map((k) => colComp!.boundingBoxes![k].text);
-
-  const keys = rawCols.map(normalizeColKey);
-  const positions = rawCols.map((_, i) => getMidX(colComp!, bbKeys[i]) ?? i * 100);
-
-  return { keys, positions };
-}
-
-/**
- *  Function that attempts to find the main column that contains nested items
- * @param components RAW OCR Data
- * @param colXs The mid x position of each column
- * @returns The column that contains the most components
- */
-export function detectItemColumn(components: OCRComponent[], colXs: number[]): number {
-  if (!components.length || !colXs.length) return 0;
-
-  const counts = new Array(colXs.length).fill(0);
-  for (const c of components) {
-    const bbKeys = getColumnBBKeys(c);
-    //for each component increment the column counter for the first item
-    const firstPopulatedKey = bbKeys.find((k) => c.boundingBoxes?.[k]?.text?.trim() !== '');
-    const startX = firstPopulatedKey ? getMidX(c, firstPopulatedKey) : null; // x coordinate of the first column in component
-    if (startX !== null) {
-      counts[findClosestIndex(startX, colXs)]++;
-    }
-  }
-
-  return counts.indexOf(Math.max(...counts));
-}
-
-/**
- * Parses a flat array of component cells into a dictionary mapped to column keys
- * @param comp Components of RAW OCR
- * @param keys Column Headers
- * @param positions Middle X position of each Column in Table
- * @returns Record of <column key - cell>
- */
-function mapCellsToColumns(
-  comp: OCRComponent,
-  keys: string[],
-  positions: number[]
-): Record<string, CellData> {
-  const result: Record<string, CellData> = {};
-  //   const bbKeys = getColumnBBKeys(comp);
-  //   let lastColIdx = -1;
-
-  comp.cells?.forEach((value, i) => {
-    const bbKey = `col_${i}`; // cells[i] IS column i — look the box up directly
-    const box = comp.boundingBoxes?.[bbKey];
-    const rawCol = box?.column;
-
-    let colIdx = resolveColumnIndex(rawCol); //Column index reported by the box itself
-
-    if (colIdx === null || colIdx < 0 || colIdx >= keys.length) {
-      // No usable "column" field on the box (or no box at all): trust
-      // the cell's real position in the row.
-      colIdx = i;
-    } else if (box) {
-      // A box exists and reports a column — cross-check it against
-      // geometry in case that field is stale, nudging to the closest
-      // column by x-position rather than blindly trusting either source.
-      const midX = getMidX(comp, bbKey);
-      if (midX !== null) {
-        colIdx = findClosestIndex(midX, positions);
-      }
-    }
-
-    if (keys[colIdx]) {
-      result[keys[colIdx]] = {
-        //Make the cell data representation
-        value,
-        confidence: box?.confidence ?? comp.confidence,
-        ref: `${comp.id}:${bbKey}`,
-      };
-    }
+  const stack: Node[] = [];
+  const nodes: Node[] = block.rows.map((row) => {
+    const level = flat ? 0 : (manual[row.id] ?? row.level);
+    while (stack.length && stack[stack.length - 1].level >= level) stack.pop();
+    const node: Node = { row, level, path: [] };
+    node.path = [...(stack[stack.length - 1]?.path ?? []), node];
+    stack.push(node);
+    return node;
   });
 
-  return result;
-}
+  // reduce, not Math.max(...spread): spreading a huge table overflows the call stack
+  const maxDepth = nodes.reduce((m, n) => Math.max(m, n.path.length - 1), 0);
+  const subCols = Array.from({ length: maxDepth }, (_, i) => `SUB_${itemKey}_${i + 1}`);
 
-// ==========================================
-// TREE BUILDING
-// ==========================================
-
-/**
- * Constructs a parent-child tree hierarchy based on spatial indentation
- * @param components RAW OCR components
- * @param keys Column Keys
- * @param positions Mid X position of each column
- * @returns { roots, maxDepth } - roots are top level of the tree (nodes no parent), maximum depth of the tree
- */
-function buildTree(
-  components: OCRComponent[],
-  keys: string[],
-  positions: number[],
-  options?: FlattenerOptions
-) {
-  const roots: TreeNode[] = [];
-  const stack: TreeNode[] = []; // Stack of "active" parents a row can be a child of
-  let maxDepth = 0;
-  const INDENT_THRESHOLD = estimateIndentThreshold(positions);
-  const manualLevels = options?.manualIndentLevels ?? {};
-  const nodesById = new Map<string, TreeNode>();
-
-  for (const comp of components) {
-    const cells = mapCellsToColumns(comp, keys, positions);
-    const rawIndent = getIndent(comp);
-    const manualLevel = manualLevels[comp.id];
-
-    let level: number;
-    let parentNode: TreeNode | undefined;
-
-    if (manualLevel !== undefined) {
-      // A person has decided this row's depth explicitly. Pop anything
-      // at the same or deeper level - it's not this node's parent.
-      level = manualLevel;
-      while (stack.length > 0 && stack[stack.length - 1].level >= level) {
-        stack.pop();
-      }
-      parentNode = stack[stack.length - 1];
-    } else if (comp.parentId && nodesById.has(comp.parentId)) {
-      // Trust the explicit link, but only when it actually resolves.
-      parentNode = nodesById.get(comp.parentId);
-      level = parentNode!.level + 1;
-
-      // Re-sync the geometric stack to this row's real ancestry, so any
-      // later rows that fall back to geometry still nest correctly
-      // relative to it.
-      const idx = stack.indexOf(parentNode!);
-      stack.length = idx >= 0 ? idx + 1 : 0;
-      if (idx < 0) stack.push(parentNode!);
-    } else {
-      // No override, no (usable) parentId: fall back to comparing
-      // against whatever is currently on the stack (which may itself be
-      // a manually-placed or parentId-placed row).
-      while (stack.length > 0) {
-        const top = stack[stack.length - 1];
-        const isDeeper = rawIndent > top.indent + INDENT_THRESHOLD;
-        if (isDeeper) {
-          level = top.level + 1;
-          parentNode = top;
-          break;
-        }
-        stack.pop();
-      }
-      // @ts-expect-error assigned in the loop above when a parent is found
-      if (typeof level === 'undefined') level = 0;
-    }
-
-    const node: TreeNode = {
-      id: comp.id,
-      confidence: comp.confidence,
-      indent: rawIndent,
-      level,
-      cells,
-      children: [],
-    };
-
-    nodesById.set(comp.id, node);
-
-    if (!parentNode) {
-      roots.push(node); //If there is no parent to be a child of, row must be a parent/root node
-    } else {
-      // It must be a child of the resolved parent
-      parentNode.children.push(node);
-    }
-
-    maxDepth = Math.max(maxDepth, node.level);
-    stack.push(node);
-  }
-
-  return { roots, maxDepth };
-}
-
-// ==========================================
-// TREE TRAVERSAL & FLATTENING
-// ==========================================
-
-/**
- * Recursively flattens the tree into table rows, inheriting data from ancestors
- * @param nodes Current TreeNode (Row) tht is being converted into ExtractedRow
- * @param ancestors Previous Row/Parents of the current TreeNode
- * @param keys Column keys
- * @param itemColIdx The column index of the main item column (column that contains nested rows)
- * @param subItemCols Column key names for the nested childern
- * @returns List of ExtractedRow
- */
-function flattenTree(
-  nodes: TreeNode[],
-  ancestors: TreeNode[],
-  keys: string[],
-  itemColIdx: number,
-  subItemCols: string[]
-): ExtractedRow[] {
-  return nodes.flatMap((node) => {
-    // For each node in the convert over into a extractedrow (flatten)
-    const path = [...ancestors, node]; // Full lineage of the current node
-
-    const row: ExtractedRow = {
-      _id: node.id,
-      _confidence: node.confidence,
+  const rows: ExtractedRow[] = nodes.map(({ row, path }) => {
+    const out: ExtractedRow = {
+      _id: row.id,
+      _confidence: row.confidence,
+      _indentLevel: path.length - 1,
       _cellConfidence: {},
       _cellKeyMap: {},
-      _indentLevel: node.level,
+    };
+    const set = (col: string, cell: Cell | undefined, ownerId: string, srcKey: string) => {
+      out[col] = cell?.text ?? '';
+      out._cellConfidence[col] = cell?.confidence ?? row.confidence;
+      if (cell) out._cellKeyMap![col] = `${ownerId}:${srcKey}`; // look up region via rows[ownerId].cells[srcKey]
     };
 
-    // Helper to assign a cell to the ExtractedRow
-    const setCell = (colKey: string, cell?: CellData) => {
-      row[colKey] = cell?.value ?? '';
-      row._cellConfidence[colKey] = cell?.confidence ?? node.confidence;
-      if (cell) row._cellKeyMap![colKey] = cell.ref;
-    };
-
-    // Apply inheritance rules across columns
-    for (let i = 0; i < keys.length; i++) {
-      const colKey = keys[i]; //Column Name being assigned
-
-      if (i < itemColIdx) {
-        // Columns before the MAIN Column
-        // Left Side: Inherit from the closest ancestor that has this column
-        const provider = [...path].reverse().find((n) => {
-          const val = n.cells[colKey]?.value;
-          return val !== undefined && val.trim() !== '';
-        });
-        setCell(colKey, provider?.cells[colKey]);
-      } else if (i === itemColIdx) {
-        // Main Item Column: Always use the absolute root value
-        setCell(colKey, path[0]?.cells[colKey]);
-
-        // Sub Item Columns: Each level of depth fills the respective sub-column
-        subItemCols.forEach((subKey, d) => {
-          const ancestorAtDepth = path[d + 1];
-          setCell(subKey, ancestorAtDepth?.cells[colKey]);
-        });
+    keys.forEach((k, i) => {
+      if (i < itemIdx) {
+        // left of item column: inherit nearest non-empty ancestor
+        const p = [...path].reverse().find((n) => n.row.cells[k]?.text.trim());
+        set(k, p?.row.cells[k], p?.row.id ?? row.id, k);
+      } else if (i === itemIdx) {
+        // root value + one sub column per depth
+        set(k, path[0].row.cells[k], path[0].row.id, k);
+        subCols.forEach((s, d) =>
+          set(s, path[d + 1]?.row.cells[k], path[d + 1]?.row.id ?? row.id, k)
+        );
       } else {
-        // Right Side: Independent data, map directly from current node
-        setCell(colKey, node.cells[colKey]);
+        set(k, row.cells[k], row.id, k); // right of item column: this row only
       }
-    }
-
-    // Traverse recursively
-    return [row, ...flattenTree(node.children, path, keys, itemColIdx, subItemCols)];
+    });
+    return out;
   });
-}
 
-// ==========================================
-// MAIN EXPORT
-// ==========================================
+  return {
+    columns: keys.flatMap((k, i) => (i === itemIdx ? [k, ...subCols] : [k])),
+    rows,
+    itemColumnKey: itemKey,
+  };
+}
 
 /**
- *  Flatten RAW OCR data into flattened ExtractedData
- * @param data RAW OCR data
- * @param options Options to determine nesting
- * @returns flattened ExtractedData
+ * The table that is loaded into the grid by default when a page has several:
+ * the one with the most rows (the others are usually small summary/total boxes).
+ * The user can switch to any other table afterwards.
  */
-export function flatten(data: OCRComponent[], options?: FlattenerOptions): ExtractedData {
-  const components = data.filter((c) => c.type === 'TABLE_ROW');
-
-  // Parse Structure
-  const { keys, positions } = extractColumns(data);
-  const itemColIdx = detectItemColumn(components, positions);
-  const itemColKey = keys[itemColIdx];
-
-  // Build Tree
-  const { roots, maxDepth } = buildTree(components, keys, positions, options);
-  const subItemCols = Array.from({ length: maxDepth }, (_, i) => `SUB_${itemColKey}_${i + 1}`); // Build array of column names for nested columns
-
-  // Traverse & Generate Rows
-  const rows = flattenTree(roots, [], keys, itemColIdx, subItemCols);
-
-  // Final columns schema (injecting sub items directly after the main item column)
-  const finalCols = keys.flatMap((k, i) => (i === itemColIdx ? [k, ...subItemCols] : [k]));
-
-  return { columns: finalCols, rows, itemColumnKey: itemColKey };
+export function pickPrimaryTable(blocks: Block[]): TableBlock | undefined {
+  return blocks
+    .filter((b): b is TableBlock => b.kind === 'table')
+    .reduce<TableBlock | undefined>(
+      (best, t) => (!best || t.rows.length > best.rows.length ? t : best),
+      undefined
+    );
 }
 
-/** Flattens a multi-page OCR response into one ExtractedPage per page. */
-export function flattenPages(pages: Pages, options?: FlattenerOptions): ExtractedPage[] {
-  return pages.map((page: Page) => ({
-    ...flatten(page.components, options),
-    pageIndex: page.page_num - 1,
-  }));
+/**
+ * StructuredPage -> ExtractedPage (what the validation editor consumes).
+ *
+ * - The primary table fills the top-level grid (columns/rows), so existing
+ *   editing hooks keep working.
+ * - Every other table is parked in `otherTables` and can be swapped in.
+ * - Field and text blocks are carried alongside as `fields` / `texts`.
+ * Pages with no table come back with an empty grid so page numbering stays intact.
+ */
+export function pageToExtractedPage(
+  page: StructuredPage,
+  opts: FlattenerOptions = {}
+): ExtractedPage {
+  const tables = page.blocks.filter((b): b is TableBlock => b.kind === 'table');
+  const primary = pickPrimaryTable(page.blocks);
+
+  const grid: ExtractedData = primary
+    ? tableToExtractedData(primary, opts)
+    : { columns: [], rows: [], itemColumnKey: '' };
+
+  const otherTables: ExtractedTableSnapshot[] = tables
+    .filter((t) => t !== primary)
+    .map((t) => ({ ...tableToExtractedData(t, opts), tableId: t.id }));
+
+  return {
+    ...grid,
+    pageIndex: page.pageIndex,
+    tableId: primary?.id,
+    tableOrder: tables.map((t) => t.id),
+    otherTables,
+    fields: page.blocks.flatMap((b) =>
+      b.kind === 'field'
+        ? [{ id: b.id, key: b.key, label: b.label, value: b.value, confidence: b.confidence }]
+        : []
+    ),
+    texts: page.blocks.flatMap((b) =>
+      b.kind === 'text' ? [{ id: b.id, role: b.role, text: b.text, confidence: b.confidence }] : []
+    ),
+  };
+}
+
+/**
+ * Load another of the page's tables into the top-level grid. The table that
+ * was loaded is parked in `otherTables`, edits included, so nothing is lost.
+ * Returns the same object if there is nothing to switch to.
+ */
+export function switchActiveTable(page: ExtractedPage, tableId: string): ExtractedPage {
+  if (!page.tableId || page.tableId === tableId) return page;
+  const target = page.otherTables?.find((t) => t.tableId === tableId);
+  if (!target) return page;
+
+  const parked: ExtractedTableSnapshot = {
+    tableId: page.tableId,
+    columns: page.columns,
+    rows: page.rows,
+    itemColumnKey: page.itemColumnKey,
+  };
+  return {
+    ...page,
+    columns: target.columns,
+    rows: target.rows,
+    itemColumnKey: target.itemColumnKey,
+    tableId,
+    otherTables: [...(page.otherTables ?? []).filter((t) => t.tableId !== tableId), parked],
+  };
+}
+
+/** Tabs for the table switcher, in document order. Empty when the page has no table. */
+export function listTables(page: ExtractedPage): TableTab[] {
+  if (!page.tableId) return [];
+  const byId = new Map<string, ExtractedData>();
+  byId.set(page.tableId, page);
+  for (const t of page.otherTables ?? []) byId.set(t.tableId, t);
+  const order = page.tableOrder ?? [page.tableId];
+  return order
+    .filter((id) => byId.has(id))
+    .map((id, i) => ({ id, label: `Table ${i + 1}`, rowCount: byId.get(id)!.rows.length }));
 }

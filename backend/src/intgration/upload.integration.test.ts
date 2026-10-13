@@ -1,37 +1,35 @@
 // backend/src/integration/upload.integration.test.ts
-import { describe, it, expect, vi, afterAll, beforeAll } from 'vitest';
+import { describe, it, expect, vi, afterAll } from 'vitest';
 import request from 'supertest';
 import fs from 'fs';
 import path from 'path';
 import app from '../app';
+import type { StructuredDocument } from '../models/Document';
 
-// The one real external boundary this flow hits.
-vi.mock('../services/ocr/mockOcrFixture.js', () => ({
-  getMockOcrResult: vi.fn().mockReturnValue([
-    { id: 'comp_1', text: 'Invoice total: $42.00', confidence: 0.97 },
-  ]),
+// The one real external boundary this flow hits: Azure + Gemini, behind
+// parseDocumentWithRetries. Everything else (session, disk storage, image
+// processing) runs for real so the test proves the actual round trip.
+const { mockStructured } = vi.hoisted(() => ({
+  mockStructured: {
+    docType: 'invoice',
+    docTypeConfidence: 0.9,
+    pages: [
+      {
+        pageIndex: 0,
+        blocks: [
+          { id: 'b1', kind: 'field', key: 'total', label: 'Total', value: 'Invoice total: $42.00', confidence: 0.97 },
+        ],
+      },
+    ],
+  } satisfies StructuredDocument,
 }));
 
-// Constructed at module load even though unused in this flow — stub so
-// import never touches real credentials.
-vi.mock('@google-cloud/vision', () => ({
-  default: { ImageAnnotatorClient: class { documentTextDetection = vi.fn(); } },
+vi.mock('../services/ocr/ocr', () => ({
+  parseDocumentWithRetries: vi.fn().mockResolvedValue(mockStructured),
 }));
 
 describe('upload -> process integration', () => {
   const agent = request.agent(app); // keeps the session cookie across requests
-
-  const originalOcrMode = process.env.OCR_MODE;
-  beforeAll(() => {
-    process.env.OCR_MODE = 'mock';
-  });
-  afterAll(() => {
-    if (originalOcrMode) {
-      process.env.OCR_MODE = originalOcrMode;
-    } else {
-      delete process.env.OCR_MODE;
-    }
-  });
 
   it('uploads a page, processes it, and persists the result to the real session', async () => {
     const documentId = 'itest-doc-1';
@@ -47,19 +45,19 @@ describe('upload -> process integration', () => {
 
     const processRes = await agent
       .post('/api/upload/process')
-      .send({ selected: [{ documentId, pages: ['0'], type: 'Invoice' }] });
+      .send({ selected: [{ documentId, pages: ['0'] }] });
     expect(processRes.status).toBe(200);
 
     const events = processRes.text.trim().split('\n').map((l) => JSON.parse(l));
     const final = events[events.length - 1];
     expect(final.type).toBe('success');
-    expect(final.data.ocrData[0].text).toBe('Invoice total: $42.00');
+    expect(final.data.ocrData[0].blocks[0].value).toBe('Invoice total: $42.00');
 
     // The part a fake req/res object can never prove: that it actually
     // round-tripped through real session middleware, not just the response.
     const extractionRes = await agent.get('/api/extraction');
     expect(extractionRes.status).toBe(200);
-    expect(extractionRes.body[0].text).toBe('Invoice total: $42.00');
+    expect(extractionRes.body[0].blocks[0].value).toBe('Invoice total: $42.00');
   });
 
   afterAll(() => {
