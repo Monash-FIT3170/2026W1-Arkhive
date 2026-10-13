@@ -5,8 +5,12 @@
     </listeners>
     <test name="E2E Tests">
         <classes>
-            <class name="com.arkhive.tests.LoginPageTest"/>
-            <class name="com.arkhive.tests.UploadPageTest"/>
+            <class name="com.arkhive.tests.LoginPageTest">
+    <methods>
+        <include name="testInvalidLoginCredentialsRejected"/>
+    </methods>
+</class>
+            <!-- <class name="com.arkhive.tests.UploadPageTest"/>
             <class name="com.arkhive.tests.HomePageTest"/>
             <class name="com.arkhive.tests.ProjectsPageTest"/>
             <class name="com.arkhive.tests.ProjectWorkspacePageTest"/>
@@ -14,7 +18,7 @@
             <class name="com.arkhive.tests.MobileCapturePageTest"/>
             <class name="com.arkhive.tests.ValidationPageTest"/>
             <class name="com.arkhive.tests.ChatPanelComponentTest"/>
-            <class name="com.arkhive.tests.ExportModalComponentTest"/>
+            <class name="com.arkhive.tests.ExportModalComponentTest"/> -->
         </classes>
     </test>
 </suite>

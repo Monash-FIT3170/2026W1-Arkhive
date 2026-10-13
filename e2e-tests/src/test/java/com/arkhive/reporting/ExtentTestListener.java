@@ -97,13 +97,25 @@ public class ExtentTestListener implements ITestListener, IConfigurationListener
      * This allows us to pre-create the ExtentTest entry so that any {@link ReportLogger}
      * calls inside setup (e.g. guest login) are attributed to the correct test.
      *
-     * <p>For {@code @BeforeClass}, {@code @BeforeSuite}, and other configuration types,
-     * {@code tm} may be {@code null} or a non-test method, so we guard with
-     * {@code tm != null && tm.isTest()}.
+     * <p>This callback fires for <em>every</em> configuration method — including
+     * {@code @AfterMethod}. Without filtering on the configuration type, the
+     * {@code @AfterMethod} callback (e.g. {@code BaseTest.tearDown()}) fires after
+     * {@code onTestSuccess()} has cleared the ThreadLocal via {@code cleanup()}, and
+     * {@code ensureTestCreated()} would then produce a second, empty, zero-duration entry.
+     *
+     * <p>Guard conditions:
+     * <ul>
+     *   <li>{@code tm != null && tm.isTest()} — {@code tm} is the upcoming {@code @Test};
+     *       null or non-test for {@code @BeforeClass}, {@code @BeforeSuite}, etc.</li>
+     *   <li>{@code tr.getMethod().isBeforeMethodConfiguration()} — restricts to
+     *       {@code @BeforeMethod} callbacks only, excluding {@code @AfterMethod}.</li>
+     * </ul>
      */
     @Override
     public void beforeConfiguration(ITestResult tr, ITestNGMethod tm) {
-        if (tm != null && tm.isTest()) {
+        if (tm != null && tm.isTest()
+                && tr.getMethod() != null
+                && tr.getMethod().isBeforeMethodConfiguration()) {
             ensureTestCreated(tm);
         }
     }
