@@ -171,7 +171,7 @@ export default function ProjectsPage() {
   const hasSelection = selectedIds.length > 0;
 
   return (
-    <div className="flex-1 p-6 sm:p-8 max-w-6xl mx-auto w-full flex flex-col gap-6">
+    <div className="flex-1 p-6 sm:p-8 max-w-6xl mx-auto w-full flex flex-col gap-6 text-left">
       {/* Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

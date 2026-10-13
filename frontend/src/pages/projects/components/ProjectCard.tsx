@@ -88,7 +88,7 @@ export default function ProjectCard({
     >
       {/* Top Header & Main Click Area */}
       <div
-        className={`flex flex-col gap-3 p-4 ${isRenaming ? '' : 'cursor-pointer'}`}
+        className={`flex flex-col gap-3 p-4 text-left ${isRenaming ? '' : 'cursor-pointer'}`}
         onClick={() => !isRenaming && onNavigate(project.id)}
       >
         {/* Top Row: Folder Icon in Top-Left Corner, Actions & Always-Visible Checkbox in Top-Right */}
@@ -152,13 +152,13 @@ export default function ProjectCard({
         </div>
 
         {/* Project Name and Metadata */}
-        <div className="flex flex-col gap-1 min-w-0">
+        <div className="flex flex-col items-start text-left gap-1 min-w-0">
           {isRenaming ? (
-            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-1.5 w-full" onClick={(e) => e.stopPropagation()}>
               <input
                 autoFocus
                 type="text"
-                className="input input-bordered input-sm flex-1 min-w-0 font-medium"
+                className="input input-bordered input-sm flex-1 min-w-0 font-medium text-left"
                 value={renameValue}
                 onChange={(e) => setRenameValue(e.target.value)}
                 onKeyDown={(e) => {
@@ -191,12 +191,12 @@ export default function ProjectCard({
               </button>
             </div>
           ) : (
-            <span className="font-semibold text-base text-base-content truncate block group-hover:text-primary transition-colors">
+            <span className="font-semibold text-base text-base-content truncate block text-left group-hover:text-primary transition-colors max-w-full">
               {project.name}
             </span>
           )}
 
-          <div className="flex items-center gap-2 text-xs text-base-content/50">
+          <div className="flex items-center justify-start gap-2 text-xs text-base-content/50 text-left">
             <span className="flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
               {formattedDate}
