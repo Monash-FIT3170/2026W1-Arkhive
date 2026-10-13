@@ -17,6 +17,31 @@ function ControlledPanel(props: PanelProps) {
   return <ExtractedDataPanel {...props} isEditMode={isEditMode} onEditModeChange={setIsEditMode} />;
 }
 
+// ExtractedDataPanel only reflects an edit locally when there is no onCellEdit
+// handler at all (otherwise it trusts the parent to feed back updated data, the
+// way the real app's editor hook does). Mirror that feedback loop here so a
+// provided onCellEdit mock still results in the new value being displayed.
+function EditablePanel(props: PanelProps) {
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [data, setData] = useState(props.extractedData);
+  return (
+    <ExtractedDataPanel
+      {...props}
+      extractedData={data}
+      isEditMode={isEditMode}
+      onEditModeChange={setIsEditMode}
+      onCellEdit={(fieldId, newValue) => {
+        props.onCellEdit?.(fieldId, newValue);
+        const [rowId, column] = fieldId.split(':');
+        setData((prev) => ({
+          ...prev,
+          rows: prev.rows.map((r) => (String(r._id) === rowId ? { ...r, [column]: newValue } : r)),
+        }));
+      }}
+    />
+  );
+}
+
 function ReorderPanel(props: PanelProps) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [columns, setColumns] = useState<string[]>(props.extractedData.columns);
@@ -134,7 +159,7 @@ describe('ExtractedDataPanel - Manual Correction', () => {
   it('saves edits via Enter key and shows success message', async () => {
     const user = userEvent.setup();
     render(
-      <ControlledPanel
+      <EditablePanel
         onHover={onHoverMock}
         extractedData={mockExtractedData}
         onCellEdit={onCellEditMock}

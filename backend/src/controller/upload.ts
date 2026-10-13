@@ -1,17 +1,19 @@
 import { Request, Response } from 'express';
-import { parseTableWithRetries } from '../services/ocr/ocr';
+import { parseDocumentWithRetries } from '../services/ocr/ocr';
 import { DocumentJob } from '../models/Job';
 import 'express-session';
 import 'multer';
 import fs from 'fs';
 import path from 'path';
 import { processImage, QualityFlags } from '../services/imageProcessor';
+import type { StructuredPage } from '../models/Document';
 
 declare module 'express-session' {
   interface SessionData {
     extraction?: {
-
-      ocrData: any[];
+      // Pages from every completed job, in upload order. pageIndex is renumbered
+      // 0..n-1 across the whole batch so it lines up with processedImages.
+      ocrData: StructuredPage[];
       processedImages?: string[];
       createdAt: number;
       updatedAt: number;
@@ -19,11 +21,11 @@ declare module 'express-session' {
     documents?: {
       [documentId: string]: {
         label?: string;
-        pages: { 
+        pages: {
           [pageIndex: string]: {
             relativePath: string;
             qualityFlags: QualityFlags;
-          }
+          };
         };
       };
     };
@@ -33,11 +35,10 @@ declare module 'express-session' {
   }
 }
 
-function calculateAverageConfidence(ocrData: any[]): number {
-  const componentsWithConfidence = ocrData.filter((comp) => typeof comp.confidence === 'number');
-  if (componentsWithConfidence.length === 0) return 0;
-  const total = componentsWithConfidence.reduce((sum, comp) => sum + comp.confidence, 0);
-  return total / componentsWithConfidence.length;
+function calculateAverageConfidence(pages: StructuredPage[]): number {
+  const blocks = pages.flatMap((p) => p.blocks).filter((b) => typeof b.confidence === 'number');
+  if (blocks.length === 0) return 0;
+  return blocks.reduce((sum, b) => sum + b.confidence, 0) / blocks.length;
 }
 
 export default {
@@ -62,15 +63,15 @@ export default {
     // Save the file's relative path so we can retrieve it later
     const sessionId = req.session.id;
     const relativePath = path.join(sessionId, documentId, file.filename);
-    
+
     try {
       // Process the image on disk using OpenCV
       const { buffer, qualityFlags } = await processImage(fs.readFileSync(file.path));
       fs.writeFileSync(file.path, buffer);
-      
+
       req.session.documents[documentId].pages[pageIndex] = {
         relativePath,
-        qualityFlags
+        qualityFlags,
       };
 
       // Save document label if sent (only needed once per document)
@@ -143,8 +144,7 @@ export default {
 
   // Process selected documents/pages with OCR, tracked as a batch of per-document jobs
   processDocuments: async (req: Request, res: Response) => {
-    const selected: { documentId: string; pages: string[] }[] =
-      req.body.selected || [];
+    const selected: { documentId: string; pages: string[] }[] = req.body.selected || [];
 
     if (!selected || selected.length === 0) {
       res.status(400).json({ error: 'No documents selected for processing.' });
@@ -221,28 +221,33 @@ export default {
           console.log(`Processing batch job ${index + 1}/${totalDocuments}: ${fileName}`);
 
           try {
-            // Run OCR on every page belonging to this document, in parallel,
-            // then combine the results into a single set of components.
+            // Run OCR on every page belonging to this document, in parallel.
+            // pageOffset is the page's real index so blocks/regions stay correct
+            // even when only a subset of the document's pages was selected.
             const pageResults = await Promise.all(
               files.map(async (file) => {
+                const pageOffset = Number(file.pageIndex);
                 const buffer = fs.readFileSync(file.path);
-                const text = await parseTableWithRetries(buffer, (attempt, max) => {
-                  res.write(
-                    JSON.stringify({
-                      type: 'retry',
-                      jobId,
-                      fileName,
-                      pageIndex: file.pageIndex,
-                      attempt,
-                      maxRetries: max,
-                    }) + '\n'
-                  );
-                });
-                return text;
+                const result = await parseDocumentWithRetries(
+                  buffer,
+                  { pageOffset },
+                  (attempt, maxRetries) => {
+                    res.write(
+                      JSON.stringify({ type: 'retry', jobId, fileName, attempt, maxRetries }) + '\n'
+                    );
+                  }
+                );
+                // One image should yield one page; keep a placeholder if the
+                // pipeline returns none so page order stays aligned with images.
+                return result.pages.length > 0
+                  ? result.pages
+                  : [{ pageIndex: pageOffset, blocks: [] }];
               })
             );
 
-            const ocrComponents = pageResults.flat();
+            // Promise.all preserves input order, so pages stay in the same order as
+            // `files` (and therefore as the processed image URLs built below).
+            const ocrComponents: StructuredPage[] = pageResults.flat();
             const confidence = calculateAverageConfidence(ocrComponents);
 
             const job: DocumentJob = {
@@ -253,7 +258,7 @@ export default {
               imageIndex: index,
               imageUrl: `/api/upload/image/${documentId}/${files[0].pageIndex}`,
               status: 'completed',
-              ocrData: ocrComponents as any,
+              ocrData: ocrComponents,
               confidence,
               createdAt: Date.now(),
               updatedAt: Date.now(),
@@ -315,13 +320,20 @@ export default {
       // Save jobs array to session
       req.session.jobs = jobs;
 
-      // Save combined extraction into session for single-doc / backward compatibility
-      const combinedOcrData = jobs.flatMap((job) => job.ocrData);
+      // Save combined extraction into session for single-doc / backward compatibility.
+      // Failed jobs are excluded from BOTH lists so pages and images stay index-aligned,
+      // and pageIndex is renumbered globally (each document's own pages start at 0).
+      const completedJobs = jobs.filter((job) => job.status === 'completed');
+      const combinedOcrData: StructuredPage[] = completedJobs
+        .flatMap((job) => job.ocrData)
+        .map((page, i) => ({ ...page, pageIndex: i }));
 
-      // Get every single page from all processed documents
-      const allProcessedImages = documentsToProcess.flatMap((doc) =>
-        doc.files.map((file) => `/api/upload/image/${doc.documentId}/${file.pageIndex}`)
-      );
+      // Get every page from all successfully processed documents, in the same order
+      const allProcessedImages = documentsToProcess
+        .filter((doc) => completedJobs.some((job) => job.documentId === doc.documentId))
+        .flatMap((doc) =>
+          doc.files.map((file) => `/api/upload/image/${doc.documentId}/${file.pageIndex}`)
+        );
 
       req.session.extraction = {
         ocrData: combinedOcrData,
@@ -330,7 +342,9 @@ export default {
         updatedAt: Date.now(),
       };
 
-      const debugPath = path.join(process.cwd(), 'combined-ocr-output.json');
+      const debugDir = path.join(process.cwd(), 'tmp');
+      fs.mkdirSync(debugDir, { recursive: true });
+      const debugPath = path.join(debugDir, 'combined-ocr-output.json');
 
       fs.writeFileSync(debugPath, JSON.stringify(combinedOcrData, null, 2), 'utf8');
 
@@ -352,13 +366,13 @@ export default {
       if (!res.headersSent) {
         res.status(500).json({
           error:
-            'OCR batch processing failed. Check that your Google Vision credentials are configured.',
+            'OCR batch processing failed. Check that your Azure and Gemini credentials are configured.',
         });
       } else {
         res.write(
           JSON.stringify({
             type: 'error',
-            message: 'OCR batch processing failed. Check your Google Vision credentials.',
+            message: 'OCR batch processing failed. Check your Azure and Gemini credentials.',
           }) + '\n'
         );
         res.end();

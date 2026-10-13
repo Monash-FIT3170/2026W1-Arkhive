@@ -1,11 +1,5 @@
 import { useState, useRef } from 'react';
-import type { OCRComponent } from '../../../../models/OCRComponent';
-function calculateAverageConfidence(data: OCRComponent[]): number {
-  const componentsWithConfidence = data.filter((comp) => typeof comp.confidence === 'number');
-  if (componentsWithConfidence.length === 0) return 0;
-  const total = componentsWithConfidence.reduce((sum, comp) => sum + comp.confidence, 0);
-  return total / componentsWithConfidence.length;
-}
+import { averageOverlayConfidence, type PageOverlay } from '../../../../utils/overlays';
 
 function DocumentPanel({
   hoveredOverlayIds,
@@ -19,7 +13,8 @@ function DocumentPanel({
 }: {
   hoveredOverlayIds: string[];
   documentImageUrl: string | undefined;
-  ocrData: OCRComponent[];
+  /** Highlightable regions for this page (see utils/overlays.ts). */
+  ocrData: PageOverlay[];
   imageUrls?: string[];
   currentPageIndex?: number;
   onPageChange?: (index: number) => void;
@@ -28,9 +23,8 @@ function DocumentPanel({
 }) {
   const [zoom, setZoom] = useState(1);
   const [viewBox, setViewBox] = useState('0 0 1000 1000'); // default
-  // NEW update: Real average confidence from mock data
-  const averageConfidence = calculateAverageConfidence(ocrData as OCRComponent[]);
-  const confidencePercent = Math.round(averageConfidence * 100);
+  const averageConfidence = averageOverlayConfidence(ocrData);
+  const confidencePercent = averageConfidence === null ? null : Math.round(averageConfidence * 100);
 
   // Panning state
   const containerRef = useRef<HTMLDivElement>(null);
@@ -214,54 +208,41 @@ function DocumentPanel({
                     </feMerge>
                   </filter>
                 </defs>
-                {/* map all the bounding boxes */}
-                {(() => {
-                  // Normalize once
-                  // const normalizedHoverIds = new Set(
-                  //   hoveredOverlayIds.map((id) => (id.startsWith('comp_') ? id : `comp_${id}`))
-                  // );
-                  return (ocrData as OCRComponent[]).map((comp) => {
-                    if (!comp.boundingBoxes) return null;
+                {/* One polygon per overlay (table cell, field or text block) */}
+                {ocrData.map((overlay) => {
+                  const pointsStr = overlay.polygon
+                    .map((v) => `${v.x * scaleX},${v.y * scaleY}`)
+                    .join(' ');
 
-                    return Object.entries(comp.boundingBoxes).map(
-                      ([cellKey, box]: [string, any]) => {
-                        const id = `${comp.id}:${cellKey}`;
+                  // Active when the overlay itself is hovered, or (for table cells)
+                  // when its whole row is.
+                  const isActive =
+                    hoveredOverlayIds.includes(overlay.id) ||
+                    (overlay.groupId !== undefined && hoveredOverlayIds.includes(overlay.groupId));
 
-                        const pointsStr = box.vertices
-                          .map((v: any) => `${v.x * scaleX},${v.y * scaleY}`)
-                          .join(' ');
+                  const confidence = overlay.confidence || 0;
 
-                        const isActive =
-                          hoveredOverlayIds.includes(id) || hoveredOverlayIds.includes(comp.id);
-
-                        //obtaining the confidence for this component to determine the colour of the bounding box
-                        const confidenceInfo = ocrData.find((c) => c.id === comp.id);
-                        const confidence = confidenceInfo ? confidenceInfo.confidence || 0 : 0;
-
-                        return (
-                          <polygon
-                            key={id}
-                            points={pointsStr}
-                            //custom colour based on confidence tier, with low confidence highlighted in red and medium in amber, high confidence is a subtle green
-                            fill={
-                              isActive
-                                ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.15)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 0, 0, 0.15)'}`
-                                : 'transparent'
-                            }
-                            stroke={
-                              isActive
-                                ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.8)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.8)' : 'rgba(255, 0, 0, 0.8)'}`
-                                : 'transparent'
-                            }
-                            strokeWidth={isActive ? 3 : 1}
-                            opacity={isActive ? 1 : 0.75}
-                            filter={isActive ? 'url(#highlightGlow)' : undefined}
-                          />
-                        );
+                  return (
+                    <polygon
+                      key={overlay.id}
+                      points={pointsStr}
+                      // low confidence red, medium amber, high subtle green
+                      fill={
+                        isActive
+                          ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.15)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 0, 0, 0.15)'}`
+                          : 'transparent'
                       }
-                    );
-                  });
-                })()}
+                      stroke={
+                        isActive
+                          ? `${confidence >= 0.85 ? 'rgba(0, 197, 94, 0.8)' : confidence >= 0.7 ? 'rgba(245, 158, 11, 0.8)' : 'rgba(255, 0, 0, 0.8)'}`
+                          : 'transparent'
+                      }
+                      strokeWidth={isActive ? 3 : 1}
+                      opacity={isActive ? 1 : 0.75}
+                      filter={isActive ? 'url(#highlightGlow)' : undefined}
+                    />
+                  );
+                })}
               </svg>
             </div>
           </div>
@@ -295,14 +276,16 @@ function DocumentPanel({
             Confidence Score:
             <span
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-                confidencePercent >= 85
-                  ? 'border-success text-success bg-[var(--color-base-100)]'
-                  : confidencePercent >= 70
-                    ? 'border-warning text-warning bg-[var(--color-base-100)]'
-                    : ' border-error text-error bg-[var(--color-base-100)]'
+                confidencePercent === null
+                  ? 'border-base-300 text-base-content/50 bg-[var(--color-base-100)]'
+                  : confidencePercent >= 85
+                    ? 'border-success text-success bg-[var(--color-base-100)]'
+                    : confidencePercent >= 70
+                      ? 'border-warning text-warning bg-[var(--color-base-100)]'
+                      : ' border-error text-error bg-[var(--color-base-100)]'
               }`}
             >
-              {confidencePercent}%
+              {confidencePercent === null ? '—' : `${confidencePercent}%`}
             </span>
           </div>
         )}

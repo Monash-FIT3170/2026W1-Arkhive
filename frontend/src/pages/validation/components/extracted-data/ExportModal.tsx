@@ -1,34 +1,44 @@
 import { useEffect, useState } from 'react';
-import type { ExtractedData } from '../../../../models/TableData';
+import type { ExtractedData, ExtractedPage } from '../../../../models/TableData';
 import type { ValidationFileGroup } from '../../../../utils/fileGrouping';
+import { DEFAULT_INCLUDE, type ExportInclude } from '../../../../services/export/model';
 import {
-  exportExtractedDataAsCSV,
-  exportExtractedDataAsSimpleCSV,
-} from '../../../../services/csvDownloadService';
-import { exportExtractedDataAsJSON } from '../../../../services/jsonDownloadService';
-import { exportExtractedDataAsTXT } from '../../../../services/txtDownloadService';
+  FORMATS,
+  TEMPLATES,
+  getTemplate,
+  templatesByFormat,
+} from '../../../../services/export/templates';
 import {
-  exportExtractedDataAsXLSX,
-  downloadBulkXLSX,
-  type BulkExportItem,
-} from '../../../../services/xlsxDownloadService';
+  deliver,
+  planExport,
+  renderPlan,
+  type MergeStrategy,
+  type PlannerFileGroup,
+} from '../../../../services/export/planner';
+
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  extractedData: ExtractedData;
+  /** The active page. Only used when `fileGroups` isn't provided. */
+  extractedData: ExtractedData & Partial<ExtractedPage>;
   fileGroups?: ValidationFileGroup[];
   currentGlobalIndex?: number;
   onExport?: () => void;
 }
 
-function mergeExtractedData(pages: ExtractedData[]): ExtractedData {
-  if (pages.length === 0) return { columns: [], rows: [], itemColumnKey: '' };
-  return {
-    columns: pages[0].columns,
-    itemColumnKey: pages[0].itemColumnKey,
-    rows: pages.flatMap((p) => p.rows),
-  };
-}
+const STRATEGIES: { id: MergeStrategy; title: string; description: string }[] = [
+  {
+    id: 'single',
+    title: 'Merge into a single file',
+    description: 'All data combined into one file.',
+  },
+  { id: 'per-file', title: 'Export per document', description: 'One file per source document.' },
+  { id: 'per-page', title: 'Export per page', description: 'One file for every single page.' },
+];
+
+const initialSelection = (current?: number) =>
+  new Set<number>(current !== undefined ? [current] : []);
+const initialTemplates = () => new Set(TEMPLATES.filter((t) => t.defaultSelected).map((t) => t.id));
 
 export function ExportModal({
   isOpen,
@@ -42,19 +52,24 @@ export function ExportModal({
   const [customFileNames, setCustomFileNames] = useState<Record<string, string>>({});
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [mergeStrategy, setMergeStrategy] = useState<'single' | 'per-file' | 'per-page'>('single');
-  const [selectedPages, setSelectedPages] = useState<Set<number>>(
-    new Set(currentGlobalIndex !== undefined ? [currentGlobalIndex] : [])
+  const [mergeStrategy, setMergeStrategy] = useState<MergeStrategy>('single');
+  const [selectedPages, setSelectedPages] = useState<Set<number>>(() =>
+    initialSelection(currentGlobalIndex)
   );
-
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(initialTemplates);
+  const [include, setInclude] = useState<ExportInclude>(DEFAULT_INCLUDE);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [selectedTemplates, setSelectedTemplates] = useState({
-    csv_default: true,
-    csv_simple: false,
-    json_default: false,
-    txt_default: false,
-    xlsx_default: false,
-  });
+
+  // Re-seed the selection every time the modal opens, so it follows the page the user is on now.
+  const [prevOpen, setPrevOpen] = useState(isOpen);
+  if (isOpen !== prevOpen) {
+    setPrevOpen(isOpen);
+    if (isOpen) {
+      setSelectedPages(initialSelection(currentGlobalIndex));
+      setExportError(null);
+      setShowConfirmModal(false);
+    }
+  }
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -74,8 +89,25 @@ export function ExportModal({
 
   if (!isOpen) return successToast;
 
+  // Without file groups, fall back to the active page as a one-page "file".
+  const groups: PlannerFileGroup[] = fileGroups ?? [
+    {
+      fileId: 'current',
+      fileName: 'export',
+      pages: [
+        {
+          globalIndex: currentGlobalIndex ?? 0,
+          pageIndexInFile: 0,
+          extractedPage: { pageIndex: 0, ...extractedData },
+        },
+      ],
+    },
+  ];
+
   const isValidFilename = (name: string) => !/[\\/:*?"<>|]/.test(name) && name.trim().length > 0;
   const isFilenameValid = isValidFilename(customFilename);
+  const baseName = customFilename.trim() || 'export';
+  const templateIds = [...selectedTemplateIds];
 
   const togglePageSelection = (globalIndex: number) => {
     setSelectedPages((prev) => {
@@ -90,157 +122,81 @@ export function ExportModal({
     setSelectedPages((prev) => {
       const next = new Set(prev);
       const allSelected = fileGroup.pages.every((p) => next.has(p.globalIndex));
-      if (allSelected) {
-        fileGroup.pages.forEach((p) => next.delete(p.globalIndex));
-      } else {
-        fileGroup.pages.forEach((p) => next.add(p.globalIndex));
-      }
+      fileGroup.pages.forEach((p) =>
+        allSelected ? next.delete(p.globalIndex) : next.add(p.globalIndex)
+      );
       return next;
     });
   };
 
   const selectAllPages = () => {
     if (!fileGroups) return;
-    const allGlobalIndices = fileGroups.flatMap((g) => g.pages.map((p) => p.globalIndex));
-    if (selectedPages.size === allGlobalIndices.length) {
-      setSelectedPages(new Set()); // deselect all
-    } else {
-      setSelectedPages(new Set(allGlobalIndices));
-    }
+    const all = fileGroups.flatMap((g) => g.pages.map((p) => p.globalIndex));
+    setSelectedPages(selectedPages.size === all.length ? new Set() : new Set(all));
   };
 
+  const toggleTemplate = (id: string) =>
+    setSelectedTemplateIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  // The plan is cheap (no rendering), so counts are exact and always in sync with what gets exported.
+  const planFor = (strategy: MergeStrategy) =>
+    planExport({
+      fileGroups: groups,
+      selectedPages,
+      strategy,
+      templateIds,
+      baseName,
+      fileNames: customFileNames,
+    });
+  const counts: Record<MergeStrategy, number> = {
+    single: planFor('single').length,
+    'per-file': planFor('per-file').length,
+    'per-page': planFor('per-page').length,
+  };
+  const currentCount = counts[mergeStrategy];
+
+  const numGroupsSelected = groups.filter((g) =>
+    g.pages.some((p) => selectedPages.has(p.globalIndex))
+  ).length;
+  const formHintVisible =
+    mergeStrategy === 'single' &&
+    numGroupsSelected > 1 &&
+    templateIds.some((id) => getTemplate(id)?.form);
+
   const handleExtract = () => {
-    const xlsxItems: BulkExportItem[] = [];
-    const baseFilename = customFilename.trim() || 'export';
+    try {
+      const plan = planFor(mergeStrategy);
+      deliver(renderPlan(plan, { include }), `${baseName}.zip`);
 
-    const exportedFormats = new Set<string>();
-    let fileCount = 0;
-    const recordExport = (format: string, count = 1) => {
-      exportedFormats.add(format);
-      fileCount += count;
-    };
-
-    const performExport = (data: ExtractedData, suffix: string) => {
-      if (selectedTemplates.csv_default) {
-        exportExtractedDataAsCSV(data, `${baseFilename}${suffix}_default.csv`);
-        recordExport('CSV');
-      }
-      if (selectedTemplates.csv_simple) {
-        exportExtractedDataAsSimpleCSV(data, `${baseFilename}${suffix}_simple.csv`);
-        recordExport('CSV');
-      }
-      if (selectedTemplates.txt_default) {
-        exportExtractedDataAsTXT(data, `${baseFilename}${suffix}_default.txt`);
-        recordExport('TXT');
-      }
-      if (selectedTemplates.json_default) {
-        exportExtractedDataAsJSON(data, `${baseFilename}${suffix}_default.json`);
-        recordExport('JSON');
-      }
-      if (selectedTemplates.xlsx_default) {
-        xlsxItems.push({ name: `${baseFilename}${suffix}_default`, data });
-      }
-    };
-
-    if (!fileGroups) {
-      // Fallback
-      if (selectedPages.has(currentGlobalIndex ?? 0)) {
-        performExport(extractedData, '');
-      }
-    } else {
-      const getGroupName = (group: ValidationFileGroup) => {
-        let name = customFileNames[group.fileId] || group.fileName;
-        name = name.replace(/\.[^/.]+$/, ''); // remove extension
-        return name.replace(/[\\/:*?"<>|]+/g, '_').replace(/^_+|_+$/g, ''); // replace illegal characters cleanly
-      };
-
-      if (mergeStrategy === 'single') {
-        const allSelectedPages = fileGroups
-          .flatMap((g) => g.pages)
-          .filter((p) => selectedPages.has(p.globalIndex))
-          .map((p) => p.extractedPage);
-        if (allSelectedPages.length > 0) {
-          performExport(mergeExtractedData(allSelectedPages), '');
-        }
-      } else if (mergeStrategy === 'per-file') {
-        fileGroups.forEach((group) => {
-          const groupPages = group.pages
-            .filter((p) => selectedPages.has(p.globalIndex))
-            .map((p) => p.extractedPage);
-          if (groupPages.length > 0) {
-            const cleanName = getGroupName(group);
-            const suffix = `_${cleanName}`;
-            performExport(mergeExtractedData(groupPages), suffix);
-          }
-        });
-      } else if (mergeStrategy === 'per-page') {
-        fileGroups.forEach((group) => {
-          group.pages.forEach((page) => {
-            if (selectedPages.has(page.globalIndex)) {
-              const cleanName = getGroupName(group);
-              const suffix = `_${cleanName}_Page${page.pageIndexInFile + 1}`;
-              performExport(page.extractedPage, suffix);
-            }
-          });
-        });
-      }
-    }
-
-    if (selectedTemplates.xlsx_default && xlsxItems.length > 0) {
-      try {
-        if (xlsxItems.length === 1) {
-          exportExtractedDataAsXLSX(xlsxItems[0].data, `${xlsxItems[0].name}.xlsx`);
-        } else {
-          downloadBulkXLSX(xlsxItems);
-        }
-        recordExport('XLSX', xlsxItems.length);
-      } catch (err) {
-        setExportError(
-          err instanceof Error ? err.message : 'Could not generate the Excel download.'
+      const fileCount = plan.length;
+      if (fileCount > 0) {
+        const formats = Array.from(new Set(plan.map((p) => p.template.format.toUpperCase())));
+        setSuccessMessage(
+          fileCount === 1
+            ? `${formats[0]} file downloaded successfully`
+            : `${fileCount} files downloaded (${formats.join(', ')})`
         );
-        return;
       }
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Could not generate the download.');
+      return;
     }
-
-    if (fileCount > 0) {
-      const formats = Array.from(exportedFormats);
-      setSuccessMessage(
-        fileCount === 1
-          ? `${formats[0]} file downloaded successfully`
-          : `${fileCount} files downloaded (${formats.join(', ')})`
-      );
-    }
-
-    if (onExport) onExport();
+    onExport?.();
     onClose();
+  };
+
+  const handleDownloadClick = () => {
+    if (currentCount > 5) setShowConfirmModal(true);
+    else handleExtract();
   };
 
   const allGlobalIndicesLength = fileGroups?.flatMap((g) => g.pages).length || 0;
   const isAllSelected = allGlobalIndicesLength > 0 && selectedPages.size === allGlobalIndicesLength;
-
-  const templatesCount = Object.values(selectedTemplates).filter(Boolean).length;
-  const numGroupsSelected =
-    fileGroups?.filter((g) => g.pages.some((p) => selectedPages.has(p.globalIndex))).length || 0;
-  const numPagesSelected = selectedPages.size;
-
-  const countForSingle = templatesCount * 1;
-  const countForPerFile = templatesCount * numGroupsSelected;
-  const countForPerPage = templatesCount * numPagesSelected;
-
-  const currentCount =
-    mergeStrategy === 'single'
-      ? countForSingle
-      : mergeStrategy === 'per-file'
-        ? countForPerFile
-        : countForPerPage;
-
-  const handleDownloadClick = () => {
-    if (currentCount > 5) {
-      setShowConfirmModal(true);
-    } else {
-      handleExtract();
-    }
-  };
 
   return (
     <div className="modal modal-open z-[100] bg-base-300/80 backdrop-blur-sm">
@@ -279,7 +235,7 @@ export function ExportModal({
 
         {/* Two Column Layout */}
         <div className="flex flex-col md:flex-row gap-8 overflow-hidden flex-1">
-          {/* LEFT COLUMN: Filename & Templates */}
+          {/* LEFT COLUMN: Filename, Content & Templates */}
           <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-2">
             {/* Filename Input */}
             <div className="bg-base-200/50 p-4 rounded-xl border border-base-200 flex-shrink-0">
@@ -304,117 +260,82 @@ export function ExportModal({
               </div>
             </div>
 
-            {/* Formats List - Horizontal Rows */}
+            {/* What to include */}
+            <div className="bg-base-200/50 p-4 rounded-xl border border-base-200 flex-shrink-0">
+              <span className="label-text font-bold text-base-content/80 text-xs uppercase tracking-wider">
+                Include
+              </span>
+              <div className="flex flex-wrap gap-x-6 gap-y-2 mt-2">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-xs checkbox-primary rounded"
+                    checked={include.tables === 'all'}
+                    onChange={(e) =>
+                      setInclude((p) => ({ ...p, tables: e.target.checked ? 'all' : 'active' }))
+                    }
+                  />
+                  All tables on each page
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-xs checkbox-primary rounded"
+                    checked={include.fields}
+                    onChange={(e) => setInclude((p) => ({ ...p, fields: e.target.checked }))}
+                  />
+                  Fields (invoice no., totals…)
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-xs checkbox-primary rounded"
+                    checked={include.texts}
+                    onChange={(e) => setInclude((p) => ({ ...p, texts: e.target.checked }))}
+                  />
+                  Text blocks (titles, footers)
+                </label>
+              </div>
+              {include.tables === 'active' && (
+                <p className="text-[10px] text-base-content/60 mt-2">
+                  Only the table currently open on each page will be exported.
+                </p>
+              )}
+            </div>
+
+            {/* Formats list: rendered from the template registry */}
             <div className="flex flex-col gap-2">
-              {/* CSV Row */}
-              <div className="bg-base-200/30 p-2.5 rounded-xl border border-base-200 flex flex-row items-center gap-4">
-                <div className="flex flex-col items-center gap-1.5 opacity-80 min-w-[50px]">
-                  <img
-                    src="/export_images/csv.png"
-                    alt="CSV"
-                    className="w-7 h-7 object-contain"
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                  />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">CSV</span>
+              {FORMATS.map((format) => (
+                <div
+                  key={format.id}
+                  className="bg-base-200/30 p-2.5 rounded-xl border border-base-200 flex flex-row items-center gap-4"
+                >
+                  <div className="flex flex-col items-center gap-1.5 opacity-80 min-w-[50px]">
+                    <img
+                      src={format.iconSrc}
+                      alt={format.label}
+                      className="w-7 h-7 object-contain"
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">
+                      {format.label}
+                    </span>
+                  </div>
+                  <div className="w-px h-12 bg-base-300"></div>
+                  <div className="flex gap-2 overflow-x-auto flex-1 pb-0.5 scrollbar-thin">
+                    {templatesByFormat(format.id).map((t) => (
+                      <TemplateCard
+                        key={t.id}
+                        title={t.label}
+                        tooltip={t.description}
+                        imageSrc={t.previewSrc}
+                        selected={selectedTemplateIds.has(t.id)}
+                        onClick={() => toggleTemplate(t.id)}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="w-px h-12 bg-base-300"></div>
-                <div className="flex gap-2 overflow-x-auto flex-1 pb-0.5 scrollbar-thin">
-                  <TemplateCard
-                    title="Default Template"
-                    imageSrc="/export_images/sample1.png"
-                    selected={selectedTemplates.csv_default}
-                    onClick={() =>
-                      setSelectedTemplates((prev) => ({ ...prev, csv_default: !prev.csv_default }))
-                    }
-                  />
-                  <TemplateCard
-                    title="Simple Template"
-                    imageSrc="/export_images/sample2.png"
-                    selected={selectedTemplates.csv_simple}
-                    onClick={() =>
-                      setSelectedTemplates((prev) => ({ ...prev, csv_simple: !prev.csv_simple }))
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* JSON Row */}
-              <div className="bg-base-200/30 p-2.5 rounded-xl border border-base-200 flex flex-row items-center gap-4">
-                <div className="flex flex-col items-center gap-1.5 opacity-80 min-w-[50px]">
-                  <img
-                    src="/export_images/json.png"
-                    alt="JSON"
-                    className="w-7 h-7 object-contain"
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                  />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">JSON</span>
-                </div>
-                <div className="w-px h-12 bg-base-300"></div>
-                <div className="flex gap-2 overflow-x-auto flex-1 pb-0.5 scrollbar-thin">
-                  <TemplateCard
-                    title="Default Template"
-                    imageSrc="/export_images/sample3.png"
-                    selected={selectedTemplates.json_default}
-                    onClick={() =>
-                      setSelectedTemplates((prev) => ({
-                        ...prev,
-                        json_default: !prev.json_default,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* TXT Row */}
-              <div className="bg-base-200/30 p-2.5 rounded-xl border border-base-200 flex flex-row items-center gap-4">
-                <div className="flex flex-col items-center gap-1.5 opacity-80 min-w-[50px]">
-                  <img
-                    src="/export_images/txt.png"
-                    alt="TXT"
-                    className="w-7 h-7 object-contain"
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                  />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">TXT</span>
-                </div>
-                <div className="w-px h-12 bg-base-300"></div>
-                <div className="flex gap-2 overflow-x-auto flex-1 pb-0.5 scrollbar-thin">
-                  <TemplateCard
-                    title="Default Template"
-                    imageSrc="/export_images/sample1.png"
-                    selected={selectedTemplates.txt_default}
-                    onClick={() =>
-                      setSelectedTemplates((prev) => ({ ...prev, txt_default: !prev.txt_default }))
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* XLSX Row */}
-              <div className="bg-base-200/30 p-2.5 rounded-xl border border-base-200 flex flex-row items-center gap-4">
-                <div className="flex flex-col items-center gap-1.5 opacity-80 min-w-[50px]">
-                  <img
-                    src="/export_images/xls.png"
-                    alt="XLSX"
-                    className="w-7 h-7 object-contain"
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                  />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">XLSX</span>
-                </div>
-                <div className="w-px h-12 bg-base-300"></div>
-                <div className="flex gap-2 overflow-x-auto flex-1 pb-0.5 scrollbar-thin">
-                  <TemplateCard
-                    title="Default Template"
-                    imageSrc="/export_images/sample3.png"
-                    selected={selectedTemplates.xlsx_default}
-                    onClick={() =>
-                      setSelectedTemplates((prev) => ({
-                        ...prev,
-                        xlsx_default: !prev.xlsx_default,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -509,67 +430,43 @@ export function ExportModal({
                 Output Structure
               </h4>
               <div className="flex flex-col gap-2.5">
-                <label className="flex items-start gap-3 cursor-pointer text-sm font-semibold text-base-content hover:text-primary transition-colors">
-                  <input
-                    type="radio"
-                    name="mergeStrategy"
-                    className="radio radio-sm radio-primary mt-0.5"
-                    checked={mergeStrategy === 'single'}
-                    onChange={() => setMergeStrategy('single')}
-                  />
-                  <div className="flex flex-col flex-1 w-full">
-                    <span className="flex items-center justify-between w-full">
-                      <span>Merge into a single file</span>
-                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                        Output: {countForSingle} file{countForSingle !== 1 ? 's' : ''}
+                {STRATEGIES.map((s) => (
+                  <label
+                    key={s.id}
+                    className="flex items-start gap-3 cursor-pointer text-sm font-semibold text-base-content hover:text-primary transition-colors"
+                  >
+                    <input
+                      type="radio"
+                      name="mergeStrategy"
+                      className="radio radio-sm radio-primary mt-0.5"
+                      checked={mergeStrategy === s.id}
+                      onChange={() => setMergeStrategy(s.id)}
+                    />
+                    <div className="flex flex-col flex-1 w-full">
+                      <span className="flex items-center justify-between w-full">
+                        <span>{s.title}</span>
+                        <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                          Output: {counts[s.id]} file{counts[s.id] !== 1 ? 's' : ''}
+                        </span>
                       </span>
-                    </span>
-                    <span className="text-[11px] font-normal opacity-70 leading-none mt-0.5">
-                      All data combined into one file.
-                    </span>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer text-sm font-semibold text-base-content hover:text-primary transition-colors">
-                  <input
-                    type="radio"
-                    name="mergeStrategy"
-                    className="radio radio-sm radio-primary mt-0.5"
-                    checked={mergeStrategy === 'per-file'}
-                    onChange={() => setMergeStrategy('per-file')}
-                  />
-                  <div className="flex flex-col flex-1 w-full">
-                    <span className="flex items-center justify-between w-full">
-                      <span>Export per document</span>
-                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                        Output: {countForPerFile} file{countForPerFile !== 1 ? 's' : ''}
+                      <span className="text-[11px] font-normal opacity-70 leading-none mt-0.5">
+                        {s.description}
                       </span>
-                    </span>
-                    <span className="text-[11px] font-normal opacity-70 leading-none mt-0.5">
-                      One file per source document.
-                    </span>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer text-sm font-semibold text-base-content hover:text-primary transition-colors">
-                  <input
-                    type="radio"
-                    name="mergeStrategy"
-                    className="radio radio-sm radio-primary mt-0.5"
-                    checked={mergeStrategy === 'per-page'}
-                    onChange={() => setMergeStrategy('per-page')}
-                  />
-                  <div className="flex flex-col flex-1 w-full">
-                    <span className="flex items-center justify-between w-full">
-                      <span>Export per page</span>
-                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                        Output: {countForPerPage} file{countForPerPage !== 1 ? 's' : ''}
-                      </span>
-                    </span>
-                    <span className="text-[11px] font-normal opacity-70 leading-none mt-0.5">
-                      One file for every single page.
-                    </span>
-                  </div>
-                </label>
+                    </div>
+                  </label>
+                ))}
               </div>
+              {currentCount > 1 && (
+                <p className="text-[10px] text-base-content/60 mt-3">
+                  {currentCount} files will be bundled into one .zip download.
+                </p>
+              )}
+              {formHintVisible && (
+                <p className="text-[10px] text-warning font-medium mt-2">
+                  Invoice / receipt style templates fill one form per document. Use &quot;Export per
+                  document&quot; so each document gets its own form.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -582,11 +479,7 @@ export function ExportModal({
           </button>
           <button
             className="btn btn-primary font-bold px-8 shadow-lg shadow-primary/30 text-base-100"
-            disabled={
-              !Object.values(selectedTemplates).some(Boolean) ||
-              !isFilenameValid ||
-              selectedPages.size === 0
-            }
+            disabled={selectedTemplateIds.size === 0 || !isFilenameValid || currentCount === 0}
             onClick={handleDownloadClick}
           >
             Download
@@ -617,9 +510,9 @@ export function ExportModal({
               Confirm Download
             </h3>
             <p className="text-sm text-base-content/80 mb-6 leading-relaxed">
-              You are about to generate and download{' '}
-              <strong className="text-base-content font-bold">{currentCount} files</strong>. This
-              might take a few moments. Do you wish to proceed?
+              You are about to generate{' '}
+              <strong className="text-base-content font-bold">{currentCount} files</strong>,
+              delivered as one .zip. This might take a few moments. Do you wish to proceed?
             </p>
             <div className="modal-action mt-2">
               <button
@@ -654,17 +547,20 @@ export function ExportModal({
 // Internal component for the template cards to keep code DRY
 function TemplateCard({
   title,
+  tooltip,
   imageSrc,
   selected,
   onClick,
 }: {
   title: string;
+  tooltip?: string;
   imageSrc: string;
   selected: boolean;
   onClick: () => void;
 }) {
   return (
     <div
+      title={tooltip}
       className={`relative cursor-pointer rounded-xl border-2 overflow-hidden transition-all duration-200 w-36 flex-shrink-0 flex flex-col ${
         selected
           ? 'border-primary ring-2 ring-primary/20 bg-primary/10 shadow-md'
