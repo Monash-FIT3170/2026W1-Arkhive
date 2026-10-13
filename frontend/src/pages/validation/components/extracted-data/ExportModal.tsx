@@ -15,6 +15,12 @@ import {
   type MergeStrategy,
   type PlannerFileGroup,
 } from '../../../../services/export/planner';
+import {
+  applyFieldMapping,
+  DOCUMENT_TYPES,
+  type DocumentType,
+} from '../../../../utils/fieldMapping';
+import { FIELD_MAPPING_PRESETS } from '../../../../utils/fieldMappingPresets';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -59,6 +65,8 @@ export function ExportModal({
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(initialTemplates);
   const [include, setInclude] = useState<ExportInclude>(DEFAULT_INCLUDE);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [mappingType, setMappingType] = useState<DocumentType | ''>('');
+
 
   // Re-seed the selection every time the modal opens, so it follows the page the user is on now.
   const [prevOpen, setPrevOpen] = useState(isOpen);
@@ -169,9 +177,40 @@ export function ExportModal({
     templateIds.some((id) => getTemplate(id)?.form);
 
   const handleExtract = () => {
+    setExportError(null);
     try {
+      const mapping = mappingType ? FIELD_MAPPING_PRESETS[mappingType] : null;
+      let exportGroups = groups;
+      if (mapping) {
+        exportGroups = groups.map((g) => ({
+          ...g,
+          pages: g.pages.map((p) => {
+            const mapped = applyFieldMapping(p.extractedPage, mapping);
+            const otherTables = p.extractedPage.otherTables?.map((t) => ({
+              ...applyFieldMapping(t, mapping),
+              tableId: t.tableId,
+            }));
+            return {
+              ...p,
+              extractedPage: { ...mapped, otherTables },
+            };
+          }),
+        }));
+      }
+
       const plan = planFor(mergeStrategy);
-      deliver(renderPlan(plan, { include }), `${baseName}.zip`);
+      const plannedWithMappedGroups = mapping
+        ? planExport({
+            fileGroups: exportGroups,
+            selectedPages,
+            strategy: mergeStrategy,
+            templateIds,
+            baseName,
+            fileNames: customFileNames,
+          })
+        : plan;
+
+      deliver(renderPlan(plannedWithMappedGroups, { include }), `${baseName}.zip`);
 
       const fileCount = plan.length;
       if (fileCount > 0) {
@@ -183,7 +222,13 @@ export function ExportModal({
         );
       }
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : 'Could not generate the download.');
+      setExportError(
+        err instanceof Error
+          ? err.message
+          : mappingType
+            ? 'Could not apply the column mapping.'
+            : 'Could not generate the download.'
+      );
       return;
     }
     onExport?.();
@@ -258,6 +303,30 @@ export function ExportModal({
                   </span>
                 )}
               </div>
+            </div>
+
+            {/* Column Mapping */}
+            <div className="bg-base-200/50 p-4 rounded-xl border border-base-200 flex-shrink-0">
+              <label className="label px-0 pt-0 pb-1">
+                <span className="label-text font-bold text-base-content/80 text-xs uppercase tracking-wider">
+                  Column Mapping
+                </span>
+              </label>
+              <select
+                className="select select-bordered select-sm w-full font-medium shadow-sm"
+                value={mappingType}
+                onChange={(e) => setMappingType(e.target.value as DocumentType | '')}
+              >
+                <option value="">None (keep original columns)</option>
+                {DOCUMENT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </option>
+                ))}
+              </select>
+              <span className="text-[10px] text-base-content/60 mt-1 block">
+                Renames and reorders columns for the chosen document type.
+              </span>
             </div>
 
             {/* What to include */}
