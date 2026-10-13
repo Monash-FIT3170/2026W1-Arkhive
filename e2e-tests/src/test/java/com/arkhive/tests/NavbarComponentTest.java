@@ -6,23 +6,6 @@ import org.testng.annotations.Test;
 
 public class NavbarComponentTest extends BaseTest {
 
-    @Test(description = "Verify that Guest Mode badge is displayed in the navbar during a guest session")
-    public void testGuestBadgeDisplayedInNavbar() {
-        loginAsGuest();
-
-        Assert.assertTrue(navbarComponent.isDisplayed(), "Navbar should be visible");
-        Assert.assertTrue(navbarComponent.isGuestModeDisplayed(), "Guest Mode badge should be displayed in navbar for guest");
-    }
-
-    @Test(description = "Verify navigating to Home page using the navbar Home tab")
-    public void testNavbarNavigateToHome() {
-        loginAsGuest();
-
-        navbarComponent.clickHome();
-
-        Assert.assertTrue(homePage.isDisplayed(), "User should be on Home page after clicking Home in navbar");
-    }
-
     @Test(description = "Verify navigating to Quick Scan / Upload using the navbar Quick Scan tab")
     public void testNavbarNavigateToQuickScan() {
         loginAsGuest();

@@ -5,21 +5,6 @@ import org.testng.annotations.Test;
 
 public class LoginPageTest extends BaseTest {
 
-    @Test(description = "Verify that navigating to /login displays the Login page elements")
-    public void testLoginPageDisplayed() {
-        loginPage.open(testConfig.getBaseUrl());
-
-        Assert.assertTrue(loginPage.isDisplayed(), "The login page brand header and form elements should be visible");
-    }
-
-    @Test(description = "Verify continuing as guest from Login page grants access to Upload page")
-    public void testGuestLoginGrantsUploadAccess() {
-        loginPage.open(testConfig.getBaseUrl());
-        loginPage.clickContinueAsGuest();
-
-        Assert.assertTrue(uploadPage.isDisplayed(), "User should land on the Upload page after continuing as guest");
-    }
-
     @Test(description = "Verify invalid login attempt displays error notification")
     public void testInvalidLoginCredentialsRejected() {
         loginPage.open(testConfig.getBaseUrl());

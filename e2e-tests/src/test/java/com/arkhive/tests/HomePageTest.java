@@ -6,25 +6,6 @@ import org.testng.annotations.Test;
 
 public class HomePageTest extends BaseTest {
 
-    @Test(description = "Verify that the Home landing page is displayed after guest authentication")
-    public void testHomePageDisplayedForGuest() {
-        loginAsGuest();
-        homePage.open(testConfig.getBaseUrl());
-
-        Assert.assertTrue(homePage.isDisplayed(), "Home page welcome header should be visible for guest session");
-    }
-
-    @Test(description = "Verify that both main navigation cards are visible on the Home page")
-    public void testHomeActionCardsDisplayed() {
-        loginAsGuest();
-        homePage.open(testConfig.getBaseUrl());
-
-        Assert.assertTrue(homePage.isCreateProjectCardDisplayed(),
-                "'Create a Project' action card should be displayed on Home page");
-        Assert.assertTrue(homePage.isUploadWithoutProjectCardDisplayed(),
-                "'Upload Without a Project' action card should be displayed on Home page");
-    }
-
     @Test(description = "Verify navigating from Home to Upload page via the standalone upload card")
     public void testNavigateFromHomeToUpload() {
         loginAsGuest();

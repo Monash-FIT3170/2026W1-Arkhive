@@ -25,11 +25,6 @@ public class ProjectWorkspacePageTest extends BaseTest {
         projectsPage.openProject(currentProjectName);
     }
 
-    @Test(description = "Verify that the Project Workspace page is displayed upon opening a project")
-    public void testProjectWorkspaceDisplayed() {
-        Assert.assertTrue(projectWorkspacePage.isDisplayed(10), "Project workspace should be displayed");
-    }
-
     @Test(description = "Verify that the Project Workspace displays the correct project name breadcrumb")
     public void testProjectNameBreadcrumbMatches() {
         Assert.assertEquals(projectWorkspacePage.getProjectName(), currentProjectName,

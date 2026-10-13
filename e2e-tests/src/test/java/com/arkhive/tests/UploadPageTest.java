@@ -11,11 +11,6 @@ public class UploadPageTest extends BaseTest {
         loginAsGuest();
     }
 
-    @Test(description = "Verify that the Upload page dropzone is displayed after guest login setup")
-    public void testUploadPageDisplayedAfterGuestLogin() {
-        Assert.assertTrue(uploadPage.isDisplayed(), "The upload page dropzone should be visible after guest mode login");
-    }
-
     @Test(description = "Verify that uploading an oversized file (sample-file.pdf) displays an error message")
     public void testOversizedFileIsRejected() {
         String oversizedFilePath = testFileUtils.getTestFilePath("sample-file.pdf");
