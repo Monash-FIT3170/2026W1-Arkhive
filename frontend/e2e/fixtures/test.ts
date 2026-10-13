@@ -6,10 +6,10 @@ type Fixtures = {
 };
 
 export const test = base.extend<Fixtures>({
-  loginPage: async ({ page }, use) => {
+  loginPage: async ({ page }, provide) => {
     const loginPage = new LoginPage(page);
 
-    await use(loginPage);
+    await provide(loginPage);
   },
 });
 
