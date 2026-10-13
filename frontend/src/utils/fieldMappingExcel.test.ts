@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { ExtractedData } from '../models/TableData';
 import { applyFieldMapping } from './fieldMapping';
 import { FIELD_MAPPING_PRESETS } from './fieldMappingPresets';
-import { buildExtractedDataXlsxBytes } from '../services/xlsxDownloadService';
+import { buildExtractedDataXlsxBytes } from '../services/export/xlsxDownloadService';
 
 function sampleData(): ExtractedData {
   return {

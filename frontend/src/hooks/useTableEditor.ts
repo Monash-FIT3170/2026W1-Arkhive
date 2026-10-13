@@ -111,6 +111,25 @@ export function useTableEditor({
     [mutatePage, addHistoryEntry, onColumnRenamed]
   );
 
+  // Changes which column the hierarchy (indent band) is carried by.
+  const setIndentColumn = useCallback(
+    (column: string) => {
+      const from = extractedPagesRef.current[currentPageIndexRef.current]?.itemColumnKey ?? '';
+      const result = mutatePage((page) => tableOps.setItemColumn(page, column));
+      if (!result) return;
+
+      addHistoryEntry({
+        type: 'edit',
+        pageIndex: result.pageIndex,
+        column,
+        oldValue: from,
+        newValue: column,
+        description: `Changed indent column from "${from}" to "${column}" on page ${result.pageIndex + 1}`,
+      });
+    },
+    [mutatePage, addHistoryEntry, extractedPagesRef, currentPageIndexRef]
+  );
+
   const moveRow = useCallback(
     (rowId: string | number, direction: 'up' | 'down') => {
       mutatePage((page) => tableOps.moveRow(page, rowId, direction));
@@ -125,5 +144,15 @@ export function useTableEditor({
     [mutatePage]
   );
 
-  return { editCell, addRow, deleteRow, addColumn, deleteColumn, renameColumn, moveRow, reorderColumns };
+  return {
+    editCell,
+    addRow,
+    deleteRow,
+    addColumn,
+    deleteColumn,
+    renameColumn,
+    moveRow,
+    reorderColumns,
+    setIndentColumn,
+  };
 }

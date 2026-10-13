@@ -1,4 +1,4 @@
-import type { OCRComponent } from '../models/OCRComponent';
+import type { PageOverlay } from './overlays';
 import type { ExtractedPage } from '../models/TableData';
 // Acknowledgment: The contents of this file was generated with the help of Google Gemini
 export interface ValidationPageItem {
@@ -6,7 +6,7 @@ export interface ValidationPageItem {
   globalIndex: number; // 0-based index in the flat array
   imageUrl?: string;
   extractedPage: ExtractedPage;
-  ocrComponents: OCRComponent[];
+  ocrComponents: PageOverlay[];
   pageKey?: string;
 }
 
@@ -24,14 +24,14 @@ export interface FileMetadataInput {
   pageIndices?: number[];
 }
 
-export function calculateAverageConfidence(data: OCRComponent[]): number {
+export function calculateAverageConfidence(data: PageOverlay[]): number {
   const componentsWithConfidence = data.filter((comp) => typeof comp.confidence === 'number');
   if (componentsWithConfidence.length === 0) return 0;
   const total = componentsWithConfidence.reduce((sum, comp) => sum + comp.confidence, 0);
   return total / componentsWithConfidence.length;
 }
 
-function computeFileConfidence(componentsList: OCRComponent[][]): number {
+function computeFileConfidence(componentsList: PageOverlay[][]): number {
   let sum = 0;
   let count = 0;
   for (const comps of componentsList) {
@@ -54,7 +54,7 @@ function computeFileConfidence(componentsList: OCRComponent[][]): number {
  */
 export function groupPagesByFiles(
   pages: ExtractedPage[],
-  ocrPages: OCRComponent[][],
+  ocrPages: PageOverlay[][],
   imageUrls: string[] = [],
   pageKeys?: string[],
   fileMetadata?: FileMetadataInput[]

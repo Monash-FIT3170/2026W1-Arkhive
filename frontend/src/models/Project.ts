@@ -75,6 +75,7 @@ export interface PageSelection {
   pageIndices: number[];
   /** If true, re-run OCR even on pages already marked 'done'. Default false. */
   force?: boolean;
+  docType?: any;
 }
 
 // Result for one page after a batch process call.
