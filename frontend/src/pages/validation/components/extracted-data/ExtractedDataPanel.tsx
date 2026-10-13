@@ -57,6 +57,7 @@ function ExtractedDataPanel({
   editedBlockIds,
   onBlockEdit,
   onBlockHover,
+  docType,
 }: {
   // Props omitted for brevity, keeping identical to original signature
   onHover: (id: string | null) => void;
@@ -64,6 +65,7 @@ function ExtractedDataPanel({
   fileGroups?: ValidationFileGroup[];
   currentGlobalIndex?: number;
   hoveredOverlayIds?: string[];
+  docType?: string;
   onCellEdit?: (fieldId: string, newValue: string) => void;
   onRowAdd?: () => void;
   onRowDelete?: (rowId: string | number) => void;
@@ -965,6 +967,7 @@ function ExtractedDataPanel({
         extractedData={extractedData}
         fileGroups={fileGroups}
         currentGlobalIndex={currentGlobalIndex}
+        docType={docType}
         onExport={() => {
           setExportedFormat(true);
           setTimeout(() => setExportedFormat(false), 2500);
