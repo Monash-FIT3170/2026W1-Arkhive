@@ -60,9 +60,25 @@ describe('Projects Controller', () => {
       };
 
       vi.spyOn(supabase, 'from').mockReturnValue({
+        // Check whether the project name already exists
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            ilike: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          }),
+        }),
+
+        // Create the project
         insert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: mockProject, error: null }),
+            single: vi.fn().mockResolvedValue({
+              data: mockProject,
+              error: null,
+            }),
           }),
         }),
       } as any);
