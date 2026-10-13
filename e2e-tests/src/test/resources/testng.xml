@@ -11,6 +11,7 @@
             <class name="com.arkhive.tests.MobileCapturePageTest"/>
             <class name="com.arkhive.tests.ValidationPageTest"/>
             <class name="com.arkhive.tests.ChatPanelComponentTest"/>
+            <class name="com.arkhive.tests.ExportModalComponentTest"/>
         </classes>
     </test>
 </suite>

@@ -158,5 +158,21 @@ public class ValidationPage extends BasePage {
     public boolean waitForCellEditComplete(int timeoutSeconds) {
         return waitForInvisibility(pageObjects.activeCellTextarea, timeoutSeconds);
     }
+
+    // ── Export Modal ─────────────────────────────────────────────────────────
+
+    /**
+     * Clicks the "Export" button in the Extracted Data toolbar to open the Export modal.
+     */
+    public void openExportModal() {
+        click(pageObjects.exportButton);
+    }
+
+    /**
+     * Returns true if the "Export" button is displayed in the Extracted Data toolbar.
+     */
+    public boolean isExportButtonDisplayed() {
+        return isDisplayed(pageObjects.exportButton, 5);
+    }
 }
 

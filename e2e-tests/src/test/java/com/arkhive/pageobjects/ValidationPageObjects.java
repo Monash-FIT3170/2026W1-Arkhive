@@ -35,4 +35,6 @@ public class ValidationPageObjects {
     public final By splitViewModeButton = By.xpath("//button[@title='Side-by-side Split View']");
     /** Document panel — present in Split and Document modes, absent in Table-only mode */
     public final By documentPanel = By.xpath("//div[.//img[contains(@class,'object-contain')] or .//canvas]");
+    /** "Export" button in Extracted Data panel toolbar */
+    public final By exportButton = By.xpath("//button[normalize-space()='Export' or contains(.,'Export')]");
 }

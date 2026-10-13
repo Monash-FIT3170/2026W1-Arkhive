@@ -19,6 +19,13 @@ import org.openqa.selenium.WebDriver;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.stream.Stream;
+
 /**
  * Base test class owning the TestNG test lifecycle, browser setup, configuration,
  * PageObjectManager initialization, and centralized Page Object reference initialization.
@@ -30,6 +37,7 @@ public abstract class BaseTest {
     protected DriverManager driverManager;
     protected WebDriver driver;
     protected PageObjectManager pageObjectManager;
+    protected Path downloadDir;
 
     // Centralized Page Object references
     protected HomePage homePage;
@@ -50,7 +58,14 @@ public abstract class BaseTest {
     public void setUp() {
         testConfig = new TestConfig();
         testFileUtils = new TestFileUtils(testConfig);
-        driverManager = new DriverManager(testConfig);
+
+        try {
+            downloadDir = Files.createTempDirectory("arkhive-downloads-");
+        } catch (IOException e) {
+            downloadDir = Path.of(System.getProperty("java.io.tmpdir"), "arkhive-downloads");
+        }
+
+        driverManager = new DriverManager(testConfig, downloadDir);
         driverManager.initializeDriver();
         driver = driverManager.getDriver();
         pageObjectManager = new PageObjectManager(driver);
@@ -99,6 +114,8 @@ public abstract class BaseTest {
                 driverManager.quitDriver();
             }
         } finally {
+            cleanupDownloadDir();
+
             driverManager = null;
             driver = null;
             pageObjectManager = null;
@@ -116,5 +133,22 @@ public abstract class BaseTest {
             exportModalComponent = null;
             chatPanelComponent = null;
         }
+    }
+
+    private void cleanupDownloadDir() {
+        if (downloadDir != null && Files.exists(downloadDir)) {
+            try (Stream<Path> stream = Files.walk(downloadDir)) {
+                stream.sorted(Comparator.reverseOrder())
+                      .map(Path::toFile)
+                      .forEach(File::delete);
+            } catch (Exception ignored) {
+            } finally {
+                downloadDir = null;
+            }
+        }
+    }
+
+    public Path getDownloadDir() {
+        return downloadDir;
     }
 }
