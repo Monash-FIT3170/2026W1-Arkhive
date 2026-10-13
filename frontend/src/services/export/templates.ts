@@ -9,6 +9,12 @@ import {
 import { buildWorkbook, type XSheet } from './xlsxWriter';
 import { fillWorkbook, type WorkbookSpec } from './xlsxTemplates';
 import { XLSX_PROFILES } from './profiles';
+import {
+  renderDefaultCsv,
+  renderInvoiceCsv,
+  renderReceiptCsv,
+  renderFormCsv,
+} from './csvTemplates';
 
 /**
  * The template registry. The modal renders cards from TEMPLATES and the planner
@@ -31,6 +37,7 @@ export interface ExportTemplate {
   /** Fills one form per document (invoice, receipt...). */
   form?: boolean;
   defaultSelected?: boolean;
+  docType?: 'invoice' | 'receipt' | 'form' | 'table' | 'generic';
   render(unit: ExportUnit, opts: ExportOptions): string | Uint8Array;
 }
 
@@ -68,33 +75,56 @@ const csvDefault: ExportTemplate = {
   id: 'csv.default',
   format: 'csv',
   label: 'Default Template',
-  description: 'Fields, every table and (optionally) text, stacked with titles.',
+  description: 'Plain tabular data with standard rows and columns without extra formatting.',
   previewSrc: '/export_images/sample1.png',
   extension: 'csv',
   mime: 'text/csv;charset=utf-8',
   fileSuffix: 'default',
   defaultSelected: true,
-  render: (unit, opts) => {
-    const sections = docToSections(buildExportDoc(unit, opts.include));
-    return BOM + sectionsToCsv(sections, sections.length > 1);
-  },
+  docType: 'table',
+  render: (unit, opts) => renderDefaultCsv(buildExportDoc(unit, opts.include), opts.include),
 };
 
-const csvSimple: ExportTemplate = {
-  id: 'csv.simple',
+const csvInvoice: ExportTemplate = {
+  id: 'csv.invoice',
   format: 'csv',
-  label: 'Simple Template',
-  description: 'Tables only: a header row plus rows. No titles, fields or text.',
+  label: 'Invoice Template',
+  description: 'Formatted with invoice header, vendor & billing details, line items table, and totals.',
   previewSrc: '/export_images/sample2.png',
   extension: 'csv',
   mime: 'text/csv;charset=utf-8',
-  fileSuffix: 'simple',
-  render: (unit, opts) => {
-    const sections = docToSections(buildExportDoc(unit, opts.include)).filter(
-      (s) => s.kind === 'table'
-    );
-    return BOM + sectionsToCsv(sections, false);
-  },
+  fileSuffix: 'invoice',
+  form: true,
+  docType: 'invoice',
+  render: (unit, opts) => renderInvoiceCsv(buildExportDoc(unit, opts.include), opts.include),
+};
+
+const csvReceipt: ExportTemplate = {
+  id: 'csv.receipt',
+  format: 'csv',
+  label: 'Receipt Template',
+  description: 'Formatted with merchant info, transaction metadata, itemized list, and payment totals.',
+  previewSrc: '/export_images/sample3.png',
+  extension: 'csv',
+  mime: 'text/csv;charset=utf-8',
+  fileSuffix: 'receipt',
+  form: true,
+  docType: 'receipt',
+  render: (unit, opts) => renderReceiptCsv(buildExportDoc(unit, opts.include), opts.include),
+};
+
+const csvForm: ExportTemplate = {
+  id: 'csv.form',
+  format: 'csv',
+  label: 'Form / Record Template',
+  description: 'Structured form layout with key-value record sections and schedule tables.',
+  previewSrc: '/export_images/sample1.png',
+  extension: 'csv',
+  mime: 'text/csv;charset=utf-8',
+  fileSuffix: 'form',
+  form: true,
+  docType: 'form',
+  render: (unit, opts) => renderFormCsv(buildExportDoc(unit, opts.include), opts.include),
 };
 
 // ───────────── JSON ─────────────
@@ -221,6 +251,7 @@ export function makeXlsxTemplate(spec: WorkbookSpec): ExportTemplate {
     mime: XLSX_MIME,
     fileSuffix: spec.id,
     form: spec.form,
+    docType: spec.id === 'tax_return' ? 'form' : (spec.id as any),
     render: (unit, opts) => buildWorkbook(fillWorkbook(buildExportDoc(unit, opts.include), spec)),
   };
 }
@@ -229,7 +260,9 @@ export function makeXlsxTemplate(spec: WorkbookSpec): ExportTemplate {
 
 export const TEMPLATES: ExportTemplate[] = [
   csvDefault,
-  csvSimple,
+  csvInvoice,
+  csvReceipt,
+  csvForm,
   jsonDefault,
   txtDefault,
   xlsxDefault,
