@@ -31,6 +31,7 @@ vi.mock('../../services/uploadService', () => ({
   processDocuments: vi.fn().mockResolvedValue(undefined),
   getUploadedDocuments: vi.fn().mockResolvedValue([]),
   getProcessedImageUrls: vi.fn().mockResolvedValue([]),
+  getJobs: vi.fn().mockResolvedValue({ batchId: '', jobs: [] }),
 }));
 
 // Mock the child components to simplify testing the UploadPage logic

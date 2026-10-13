@@ -480,4 +480,20 @@ describe('ExtractedDataPanel - Manual Correction', () => {
     fireEvent.drop(secondHeader);
     expect(onColumnReorderMock).toHaveBeenCalledWith(['Field1', 'Field2']);
   });
+
+  it('highlights cell with soft primary blue background and maintains readable black text', () => {
+    render(
+      <ControlledPanel
+        onHover={onHoverMock}
+        extractedData={mockExtractedData}
+        hoveredOverlayIds={['row1:Field1']}
+      />
+    );
+
+    const cell = document.getElementById('cell-row1-Field1');
+    expect(cell).toBeDefined();
+    expect(cell?.className).toContain('bg-primary/20');
+    expect(cell?.className).toContain('text-base-content');
+    expect(cell?.className).not.toContain('text-primary-content');
+  });
 });

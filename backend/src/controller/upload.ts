@@ -5,6 +5,7 @@ import 'express-session';
 import 'multer';
 import fs from 'fs';
 import path from 'path';
+import { processImage, QualityFlags } from '../services/imageProcessor';
 
 declare module 'express-session' {
   interface SessionData {
@@ -18,7 +19,12 @@ declare module 'express-session' {
     documents?: {
       [documentId: string]: {
         label?: string;
-        pages: { [pageIndex: string]: string };
+        pages: { 
+          [pageIndex: string]: {
+            relativePath: string;
+            qualityFlags: QualityFlags;
+          }
+        };
       };
     };
     jobs?: DocumentJob[];
@@ -36,7 +42,7 @@ function calculateAverageConfidence(ocrData: any[]): number {
 
 export default {
   // Upload a single page
-  uploadPage: (req: Request, res: Response) => {
+  uploadPage: async (req: Request, res: Response) => {
     const file = req.file;
     const documentId = req.query.documentId as string;
     const pageIndex = req.query.pageIndex as string;
@@ -56,14 +62,27 @@ export default {
     // Save the file's relative path so we can retrieve it later
     const sessionId = req.session.id;
     const relativePath = path.join(sessionId, documentId, file.filename);
-    req.session.documents[documentId].pages[pageIndex] = relativePath;
+    
+    try {
+      // Process the image on disk using OpenCV
+      const { buffer, qualityFlags } = await processImage(fs.readFileSync(file.path));
+      fs.writeFileSync(file.path, buffer);
+      
+      req.session.documents[documentId].pages[pageIndex] = {
+        relativePath,
+        qualityFlags
+      };
 
-    // Save document label if sent (only needed once per document)
-    if (req.body.label && !req.session.documents[documentId].label) {
-      req.session.documents[documentId].label = req.body.label;
+      // Save document label if sent (only needed once per document)
+      if (req.body.label && !req.session.documents[documentId].label) {
+        req.session.documents[documentId].label = req.body.label;
+      }
+
+      res.json({ success: true, path: relativePath, qualityFlags });
+    } catch (error) {
+      console.error('Failed to process image:', error);
+      res.status(500).json({ error: 'Failed to process image' });
     }
-
-    res.json({ success: true, path: relativePath });
   },
 
   // Delete a specific page
@@ -73,7 +92,7 @@ export default {
     const doc = req.session.documents?.[documentId];
 
     if (doc && doc.pages[pageIndex]) {
-      const relativePath = doc.pages[pageIndex];
+      const relativePath = doc.pages[pageIndex].relativePath;
       const absolutePath = path.join(process.cwd(), 'uploads', relativePath);
 
       if (fs.existsSync(absolutePath)) {
@@ -149,9 +168,9 @@ export default {
 
       const files: { pageIndex: string; path: string }[] = [];
       for (const pageIndex of pages) {
-        const relativePath = doc.pages[pageIndex];
-        if (relativePath) {
-          const absolutePath = path.join(process.cwd(), 'uploads', relativePath);
+        const pageObj = doc.pages[pageIndex];
+        if (pageObj && pageObj.relativePath) {
+          const absolutePath = path.join(process.cwd(), 'uploads', pageObj.relativePath);
           if (fs.existsSync(absolutePath)) {
             files.push({ pageIndex, path: absolutePath });
           }
@@ -228,6 +247,7 @@ export default {
 
             const job: DocumentJob = {
               id: jobId,
+              documentId,
               index,
               fileName,
               imageIndex: index,
@@ -274,6 +294,7 @@ export default {
 
             const job: DocumentJob = {
               id: jobId,
+              documentId,
               index,
               fileName,
               imageIndex: index,
@@ -349,9 +370,10 @@ export default {
   getDocuments: (req: Request, res: Response) => {
     const docs = req.session.documents || {};
     const result = Object.entries(docs).map(([documentId, doc]) => {
-      const pages = Object.keys(doc.pages).map(
-        (pageIndex) => `/api/upload/image/${documentId}/${pageIndex}`
-      );
+      const pages = Object.entries(doc.pages).map(([pageIndex, pageObj]) => ({
+        url: `/api/upload/image/${documentId}/${pageIndex}`,
+        qualityFlags: pageObj.qualityFlags,
+      }));
       return {
         documentId,
         label: doc.label,
@@ -375,12 +397,13 @@ export default {
     const pageIndex = req.params.pageIndex as string;
     const doc = req.session.documents?.[documentId];
 
-    if (!doc || !doc.pages[pageIndex]) {
+    const pageObj = doc?.pages[pageIndex];
+    if (!pageObj || !pageObj.relativePath) {
       res.status(404).json({ error: 'Image not found in session.' });
       return;
     }
 
-    const filePath = path.join(process.cwd(), 'uploads', doc.pages[pageIndex]);
+    const filePath = path.join(process.cwd(), 'uploads', pageObj.relativePath);
     if (!fs.existsSync(filePath)) {
       res.status(404).json({ error: 'Image file not found on disk.' });
       return;
@@ -401,10 +424,13 @@ export default {
       const doc = docs[docId];
       const pageKeys = Object.keys(doc.pages);
       if (pageKeys.length > 0) {
-        const filePath = path.join(process.cwd(), 'uploads', doc.pages[pageKeys[0]]);
-        if (fs.existsSync(filePath)) {
-          res.sendFile(filePath);
-          return;
+        const pageObj = doc.pages[pageKeys[0]];
+        if (pageObj && pageObj.relativePath) {
+          const filePath = path.join(process.cwd(), 'uploads', pageObj.relativePath);
+          if (fs.existsSync(filePath)) {
+            res.sendFile(filePath);
+            return;
+          }
         }
       }
     }

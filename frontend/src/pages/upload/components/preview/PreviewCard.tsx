@@ -71,7 +71,7 @@ export default function PreviewCard({
           <img
             src={thumbnailUrl}
             alt={title}
-            className={`h-full w-full object-cover transition-[filter] ${isBusy ? "grayscale" : ""}`}
+            className={`h-full w-full object-cover`}
             draggable={false}
           />
         ) : isImage ? (
@@ -167,9 +167,14 @@ export default function PreviewCard({
         <span className="truncate" title={title}>
           {caption ?? title}
         </span>
-        {status && (
-          <span className={`badge badge-xs shrink-0 ${status.className}`}>{status.text}</span>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {warningText && (
+            <span className="badge badge-warning badge-xs font-semibold">Warning</span>
+          )}
+          {status && (
+            <span className={`badge badge-xs ${status.className}`}>{status.text}</span>
+          )}
+        </div>
       </div>
 
       {warningText && (

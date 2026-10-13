@@ -15,6 +15,19 @@ export interface BatchUploadResult {
   ocrData?: any[];
 }
 
+export interface QualityFlags {
+  isBlurry: boolean;
+  isDark: boolean;
+  isInvalidSize: boolean;
+  shouldWarn: boolean;
+}
+
+export interface UploadPageResult {
+  success: boolean;
+  key: string;
+  qualityFlags: QualityFlags;
+}
+
 /**
  * Uploads a single page to the backend immediately.
  */
@@ -23,7 +36,7 @@ export async function uploadPageToBackend(
   documentId: string,
   pageIndex: number,
   originalFilename: string
-): Promise<BatchUploadResult | void> {
+): Promise<UploadPageResult> {
   const formData = new FormData();
 
   const res = await fetch(pageSrc);
@@ -50,6 +63,8 @@ export async function uploadPageToBackend(
     const body = await response.json().catch(() => ({}));
     throw new Error(body.error ?? `Upload failed with status ${response.status}`);
   }
+  
+  return await response.json();
 }
 
 /**
@@ -171,11 +186,19 @@ export function getUploadedImageUrl(documentId?: string, pageIndex?: number): st
  * Returns a list of structured documents from the session.
  */
 export async function getUploadedDocuments(): Promise<
-  { documentId: string; label?: string; pages: string[] }[]
+  { documentId: string; label?: string; pages: { url: string; qualityFlags?: QualityFlags }[] }[]
 > {
   const response = await fetch(apiUrl('/api/upload/documents'));
   if (!response.ok) {
     throw new Error('Failed to fetch uploaded documents');
+  }
+  return await response.json();
+}
+
+export async function getJobs(): Promise<{ batchId: string; jobs: any[] }> {
+  const response = await fetch(apiUrl('/api/upload/jobs'));
+  if (!response.ok) {
+    throw new Error('Failed to fetch jobs');
   }
   return await response.json();
 }
@@ -185,7 +208,7 @@ export async function getUploadedDocuments(): Promise<
  */
 export async function getUploadedImageUrls(): Promise<string[]> {
   const docs = await getUploadedDocuments();
-  return docs.flatMap((doc) => doc.pages);
+  return docs.flatMap((doc) => doc.pages.map(page => page.url));
 }
 
 /**

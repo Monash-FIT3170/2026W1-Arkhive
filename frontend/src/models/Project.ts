@@ -29,6 +29,12 @@ export interface DocumentPageRecord {
    */
   extracted_data?: ExtractedPage;
   error_message?: string;
+  quality_flags?: {
+    isBlurry: boolean;
+    isDark: boolean;
+    isInvalidSize: boolean;
+    shouldWarn: boolean;
+  };
   created_at: string;
   updated_at: string;
 }

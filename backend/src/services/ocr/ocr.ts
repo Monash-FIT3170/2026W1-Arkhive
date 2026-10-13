@@ -1,10 +1,11 @@
 import path from 'path';
 import vision from '@google-cloud/vision';
 import fs from 'fs';
-//import { extractStructuredComponents } from './utils/legacy_utils_table_extraction.js';
+
 import { withRetry } from './utils/utils.js';
 import { analyse_result } from './utils/utils_table_extraction_new.js';
 import { getMockOcrResult } from './mockOcrFixture.js';
+import { prepareForOCR } from '../ocrPreprocessor.js';
 
 const sampleImage = 'assets/sample-page-1.png';
 
@@ -72,6 +73,8 @@ export async function testOCR() {
   };
 }
 
+
+
 /** 
  @author Harsha Sharma (33879303)
 */
@@ -81,7 +84,11 @@ async function parseTable(imageBuffer: Buffer) {
   if (process.env.OCR_MODE === 'mock') {
     return getMockOcrResult();
   }
-  return analyse_result(imageBuffer);
+  
+  // Phase 4: JIT OCR Enhancement (sharpening + grayscale)
+  const preprocessedBuffer = await prepareForOCR(imageBuffer);
+  
+  return analyse_result(preprocessedBuffer);
 }
 
 /*
@@ -94,6 +101,4 @@ export async function parseTableWithRetries(
   return await withRetry(() => parseTable(imageBuffer), 1, 3000, onRetry);
 }
 
-export async function batchProcessingOCR(){
-  
-}
+

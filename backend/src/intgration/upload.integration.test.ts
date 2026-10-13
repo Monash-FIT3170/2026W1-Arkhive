@@ -38,7 +38,7 @@ describe('upload -> process integration', () => {
 
     const uploadRes = await agent
       .post(`/api/upload/page?documentId=${documentId}&pageIndex=0`)
-      .attach('page', Buffer.from('fake-image-bytes'), {
+      .attach('page', Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'), {
         filename: 'page-0.png',
         contentType: 'image/png',
       });

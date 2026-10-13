@@ -3,12 +3,13 @@ import { randomUUID } from 'crypto';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { supabase } from '../services/supabaseClient';
 import {
-  generateUploadUrl,
   generateDownloadUrl,
   getObjectBuffer,
   deleteObject,
   deletePrefix,
+  putObject,
 } from '../services/r2Client';
+import { processImage } from '../services/imageProcessor';
 import { parseTableWithRetries } from '../services/ocr/ocr';
 import type { ExtractedPage } from '../models/TableData';
 import type { PageSelection, ProcessedPageResult } from '../models/Project.ts';
@@ -131,20 +132,21 @@ async function processPage(selection: PageSelection, ownerId: string): Promise<P
 
 export default {
   /**
-   * POST /api/documents/upload-url
-   * Generates a presigned PUT URL for a single page's PNG in R2, and ensures
+   * POST /api/documents/upload-page
+   * Uploads a single page's image, processes it, stores it in R2, and ensures
    * both the parent `documents` row and this page's `document_pages` row
-   * exist (status defaults to 'pending' — a fresh upload has no OCR yet).
+   * exist (status defaults to 'pending').
    *
-   * Body: { projectId, filename, contentType?, pageIndex, documentId? }
+   * Body (FormData): projectId, filename, pageIndex, documentId?, file
    */
-  getUploadUrl: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  uploadPage: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const { projectId, filename, contentType, pageIndex, documentId: existingDocId } = req.body;
+      const { projectId, filename, pageIndex, documentId: existingDocId } = req.body;
       const ownerId = req.userId;
+      const file = req.file;
 
-      if (!projectId || !filename) {
-        res.status(400).json({ error: 'projectId and filename are required.' });
+      if (!projectId || !filename || !file) {
+        res.status(400).json({ error: 'projectId, filename, and file are required.' });
         return;
       }
 
@@ -172,14 +174,17 @@ export default {
         return;
       }
 
-      const mimeType = contentType || 'image/png';
       const docId = existingDocId || randomUUID();
       const numericPageIndex = Number(pageIndex);
 
       const storageKey = `${ownerId}/${projectId}/${docId}/page-${numericPageIndex}.png`;
       const baseStoragePath = `${ownerId}/${projectId}/${docId}`;
 
-      const uploadUrl = await generateUploadUrl(storageKey, mimeType, 300);
+      // 1. Process Image
+      const { buffer, qualityFlags } = await processImage(file.buffer);
+
+      // 2. Upload directly to R2
+      await putObject(storageKey, buffer, 'image/png');
 
       if (!existingDocId) {
         const { error: insertError } = await supabase.from('documents').insert({
@@ -196,14 +201,19 @@ export default {
         }
       }
 
-      // Ensure this page has a row to hang status/OCR data off of. If it
-      // already exists (e.g. re-upload of the same page), leave it alone —
-      // upsert with ignoreDuplicates so we don't clobber existing OCR state.
+      // Ensure this page has a row to hang status/OCR data off of.
+      // We upsert and DO NOT ignore duplicates, so if they re-upload page 1, 
+      // it resets status to 'pending' and updates quality flags.
       const { error: pageInsertError } = await supabase
         .from('document_pages')
         .upsert(
-          { document_id: docId, page_index: numericPageIndex, status: 'pending' },
-          { onConflict: 'document_id,page_index', ignoreDuplicates: true }
+          { 
+            document_id: docId, 
+            page_index: numericPageIndex, 
+            status: 'pending',
+            quality_flags: qualityFlags
+          },
+          { onConflict: 'document_id,page_index' }
         );
 
       if (pageInsertError) {
@@ -213,13 +223,13 @@ export default {
       }
 
       res.status(201).json({
-        uploadUrl,
         documentId: docId,
         pageIndex: numericPageIndex,
         storageKey,
+        qualityFlags,
       });
     } catch (err: any) {
-      console.error('Error generating upload URL:', err);
+      console.error('Error in uploadPage:', err);
       res.status(500).json({ error: err.message || 'Internal server error.' });
     }
   },
@@ -363,9 +373,7 @@ export default {
 
   /**
    * PATCH /api/documents/:id/pages/:pageIndex/data
-   * Persists flattened/validated ExtractedData for ONE page and marks it done.
-   * Called after initial OCR flattening and on every subsequent user edit to
-   * that page.
+   * Persists extracted data for ONE page and marks it done.
    */
   saveExtractedData: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
@@ -413,8 +421,7 @@ export default {
   },
   /**
    * PATCH /api/documents/:id/pages/:pageIndex/review
-   * Persists which issues were flagged on a page and which the user resolved.
-   * Body: { reviewState: PageReview | null }   (null clears it, forcing a fresh scan)
+   * Persists which issues were flagged and resolved on a page.
    */
   saveReviewState: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
@@ -505,10 +512,7 @@ export default {
         console.error('Failed to delete document_pages row:', deleteError);
       }
 
-      // Deleting a page can leave the document with zero pages (e.g. the
-      // caller's own page count was stale). Clean up the now-orphaned
-      // document here rather than relying on the caller to have deleted it
-      // via deleteDocument instead.
+      // Clean up orphaned document if no pages remain
       const { count: remainingPages } = await supabase
         .from('document_pages')
         .select('*', { count: 'exact', head: true })

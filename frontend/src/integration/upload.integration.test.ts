@@ -15,12 +15,21 @@ describe('upload -> process integration', () => {
   const documentId = 'itest-doc-1';
 
   it('uploads a page, processes it, and persists the OCR result to the real session', async () => {
-    const fakePng = new Blob(['fake-bytes'], { type: 'image/png' });
-    const pageSrc = URL.createObjectURL(fakePng);
+    const fakePng = new Blob([Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')], { type: 'image/png' });
+    const pageSrc = 'blob:test-image';
 
-    // Upload: proves the frontend's multipart request actually reaches
-    // the real backend and the session cookie is set correctly.
-    await uploadPageToBackend(pageSrc, documentId, 0, 'invoice.png');
+    const originalFetch = global.fetch;
+    global.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+      if (input.toString() === pageSrc) {
+        return new Response(fakePng);
+      }
+      return originalFetch(input, init);
+    };
+
+    try {
+      // Upload: proves the frontend's multipart request actually reaches
+      // the real backend and the session cookie is set correctly.
+      await uploadPageToBackend(pageSrc, documentId, 0, 'invoice.png');
 
     // Process: proves the same session persists across a second call,
     // and that OCR_MODE=mock is correctly routing the backend around
@@ -35,6 +44,9 @@ describe('upload -> process integration', () => {
     // server-side, not just that the response looked right in-flight.
     const docs = await getUploadedDocuments();
     expect(docs.some((d) => d.documentId === documentId)).toBe(true);
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 
   afterAll(() => {
