@@ -10,6 +10,7 @@
             <class name="com.arkhive.tests.NavbarComponentTest"/>
             <class name="com.arkhive.tests.MobileCapturePageTest"/>
             <class name="com.arkhive.tests.ValidationPageTest"/>
+            <class name="com.arkhive.tests.ChatPanelComponentTest"/>
         </classes>
     </test>
 </suite>

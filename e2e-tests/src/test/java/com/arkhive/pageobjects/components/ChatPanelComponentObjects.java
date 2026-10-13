@@ -27,4 +27,10 @@ public class ChatPanelComponentObjects {
     public final By chatBubbles = By.cssSelector(".chat-bubble");
     public final By loadingDots = By.cssSelector(".loading-dots");
     public final By errorAlert = By.xpath("//div[contains(@class,'alert-error')]");
+
+    // Specific Message and Lifecycle Locators
+    public final By userMessageBubbles = By.cssSelector(".chat-end .chat-bubble");
+    public final By assistantMessageBubbles = By.cssSelector(".chat-start .chat-bubble");
+    public final By errorToast = By.xpath("//div[contains(@class,'alert')]//*[contains(@class,'text-error')]/ancestor::div[contains(@class,'alert')]");
+    public final By chatErrorMessage = By.xpath("//div[contains(@class,'chat-bubble') and contains(text(),'Error: Chatbot service failed')]");
 }
