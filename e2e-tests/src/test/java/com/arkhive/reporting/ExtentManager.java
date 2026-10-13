@@ -60,16 +60,29 @@ public class ExtentManager {
         currentTestName.set(testName);
     }
 
-    public static ExtentTest createTest(String testName, String description) {
+    public static ExtentTest createTest(String displayName, String description) {
+        return createTest(displayName, displayName, description);
+    }
+
+    /**
+     * Creates an ExtentTest entry displayed as {@code displayName} in the HTML report,
+     * but tracked internally by {@code qualifiedId} (typically {@code "ClassName.methodName"})
+     * to support reliable deduplication even when test methods share the same simple name.
+     *
+     * @param displayName  human-readable label shown in the HTML report
+     * @param qualifiedId  unique key stored in the ThreadLocal for deduplication checks
+     * @param description  optional test description (may be null or empty)
+     */
+    public static ExtentTest createTest(String displayName, String qualifiedId, String description) {
         ExtentReports reports = getInstance();
         ExtentTest test;
         if (description != null && !description.trim().isEmpty()) {
-            test = reports.createTest(testName, description);
+            test = reports.createTest(displayName, description);
         } else {
-            test = reports.createTest(testName);
+            test = reports.createTest(displayName);
         }
         setTest(test);
-        setTestName(testName);
+        setTestName(qualifiedId);
         return test;
     }
 

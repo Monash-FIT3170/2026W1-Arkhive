@@ -16,6 +16,7 @@ import com.arkhive.pages.components.ExportModalComponent;
 import com.arkhive.pages.components.NavbarComponent;
 import com.arkhive.utils.TestFileUtils;
 import org.openqa.selenium.WebDriver;
+import org.testng.ITestResult;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 
@@ -107,8 +108,29 @@ public abstract class BaseTest {
         loginPage.loginWithEmailPassword(email, password);
     }
 
+    /**
+     * Tears down the test session. Accepts {@code ITestResult} so that a failure
+     * screenshot can be captured <em>before</em> the WebDriver session is closed.
+     *
+     * <p>TestNG injects {@code ITestResult} automatically when it is declared as
+     * the sole parameter of an {@code @AfterMethod}. The TestNG event ordering is:
+     * {@code @AfterMethod} fires first, then {@code ITestListener.onTestFailure()}.
+     * As a result, {@code onTestFailure()} cannot capture screenshots because the
+     * driver is already closed by then. We capture them here instead.
+     */
     @AfterMethod(alwaysRun = true)
-    public void tearDown() {
+    public void tearDown(ITestResult result) {
+        try {
+            // Capture screenshot while the browser is still open, before quitDriver().
+            // ExtentTestListener.onTestFailure() fires after this method returns,
+            // at which point the driver is no longer available.
+            if (result.getStatus() == ITestResult.FAILURE && driver != null) {
+                com.arkhive.reporting.ExtentTestListener.captureScreenshotForResult(result, driver);
+            }
+        } catch (Exception ignored) {
+            // Never allow screenshot capture to prevent WebDriver teardown.
+        }
+
         try {
             if (driverManager != null) {
                 driverManager.quitDriver();
