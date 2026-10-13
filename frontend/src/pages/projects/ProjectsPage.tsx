@@ -184,7 +184,7 @@ export default function ProjectsPage() {
             )}
           </div>
           <p className="text-sm text-base-content/60 mt-0.5">
-            Manage and organize your document extraction workspaces
+            Manage and organise your document extraction workspaces
           </p>
         </div>
 
