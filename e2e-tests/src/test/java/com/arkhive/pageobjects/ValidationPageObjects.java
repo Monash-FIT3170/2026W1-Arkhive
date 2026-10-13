@@ -16,4 +16,16 @@ public class ValidationPageObjects {
     public final By documentViewer = By.xpath("//*[contains(@class,'document') or contains(@class,'Document') or .//canvas or .//img[contains(@class,'object-contain')]]");
     public final By extractedDataViewer = By.xpath("//table | //div[contains(@class,'overflow-x-auto')]");
     public final By confidenceBadge = By.xpath("//div[contains(.,'Confidence:')]");
+
+    // Edit mode
+    /** "Edit Table" / "Done Editing" toggle button in the Extracted Data panel toolbar */
+    public final By editTableButton = By.xpath("//button[contains(.,'Edit Table') or contains(.,'Done Editing')]");
+    /** First data cell in the extracted data table (any tbody td) */
+    public final By firstDataCell = By.xpath("(//table//tbody//td)[1]");
+    /** Active textarea rendered while a cell is being edited */
+    public final By activeCellTextarea = By.xpath("//table//tbody//td//textarea");
+    /** "Table" view-mode button (distinct title to avoid partial-match conflicts with tableViewButton) */
+    public final By tableViewModeButton = By.xpath("//button[@title='Table Full Focus View']");
+    /** "Split" view-mode button via title attribute */
+    public final By splitViewModeButton = By.xpath("//button[@title='Side-by-side Split View']");
 }
