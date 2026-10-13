@@ -366,21 +366,13 @@ export default function ProjectsPage() {
                   <div className="flex items-center justify-between gap-3 p-3.5">
                     {/* Left: Checkbox + Icon + Title */}
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div
-                        className={`transition-opacity duration-150 shrink-0 ${
-                          hasSelection || selectedIds.includes(project.id)
-                            ? 'opacity-100'
-                            : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm checkbox-primary rounded"
-                          aria-label={`Select ${project.name}`}
-                          checked={selectedIds.includes(project.id)}
-                          onChange={() => toggleSelected(project.id)}
-                        />
-                      </div>
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm checkbox-primary rounded shrink-0"
+                        aria-label={`Select ${project.name}`}
+                        checked={selectedIds.includes(project.id)}
+                        onChange={() => toggleSelected(project.id)}
+                      />
 
                       <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                         <FolderOpen className="w-4 h-4" />
