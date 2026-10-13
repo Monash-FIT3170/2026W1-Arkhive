@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ExtractedData, ExtractedPage } from '../../../../models/TableData';
 import type { ValidationFileGroup } from '../../../../utils/fileGrouping';
 import { DEFAULT_INCLUDE, type ExportInclude } from '../../../../services/export/model';
@@ -71,7 +71,23 @@ export function ExportModal({
     }
   }
 
-  if (!isOpen) return null;
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(null), 3000);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
+  const successToast = successMessage ? (
+    <div className="toast toast-top toast-center z-[10000]">
+      <div className="alert alert-success" role="status">
+        <span>{successMessage}</span>
+      </div>
+    </div>
+  ) : null;
+
+  if (!isOpen) return successToast;
 
   // Without file groups, fall back to the active page as a one-page "file".
   const groups: PlannerFileGroup[] = fileGroups ?? [
@@ -156,6 +172,16 @@ export function ExportModal({
     try {
       const plan = planFor(mergeStrategy);
       deliver(renderPlan(plan, { include }), `${baseName}.zip`);
+
+      const fileCount = plan.length;
+      if (fileCount > 0) {
+        const formats = Array.from(new Set(plan.map((p) => p.template.format.toUpperCase())));
+        setSuccessMessage(
+          fileCount === 1
+            ? `${formats[0]} file downloaded successfully`
+            : `${fileCount} files downloaded (${formats.join(', ')})`
+        );
+      }
     } catch (err) {
       setExportError(err instanceof Error ? err.message : 'Could not generate the download.');
       return;
