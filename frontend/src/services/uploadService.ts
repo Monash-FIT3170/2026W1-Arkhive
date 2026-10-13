@@ -106,7 +106,8 @@ export async function deleteDocumentFromBackend(documentId: string): Promise<voi
 export async function processDocuments(
   selected: { documentId: string; pages: string[] }[],
   onRetryMessage?: (msg: string) => void,
-  onProgress?: (event: BatchProgressEvent) => void
+  onProgress?: (event: BatchProgressEvent) => void,
+  signal?: AbortSignal
 ): Promise<BatchUploadResult | void> {
   const response = await fetch(apiUrl('/api/upload/process'), {
     method: 'POST',
@@ -115,6 +116,7 @@ export async function processDocuments(
     },
     credentials: 'include',
     body: JSON.stringify({ selected }),
+    signal,
   });
 
   if (!response.ok) {

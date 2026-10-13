@@ -1,6 +1,7 @@
 // This test file was generated with the assistance of Google Gemini.
 
 // Mocks react router, stepguard, upload service, and child components to check for issues with our own logic
+import { OcrProgressProvider } from '../../context/OcrProgressProvider';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -64,19 +65,23 @@ describe('UploadPage', () => {
 
   it('renders EmptyUploadView initially', () => {
     render(
-      <MemoryRouter>
-        <UploadPage />
-      </MemoryRouter>
-    );
+     <MemoryRouter>
+       <OcrProgressProvider>
+         <UploadPage />
+       </OcrProgressProvider>
+     </MemoryRouter>
+   );
     expect(screen.getByTestId('empty-view')).toBeInTheDocument();
   });
 
   it('transitions to preview state and selects the page when files are added', async () => {
     render(
-      <MemoryRouter>
-        <UploadPage />
-      </MemoryRouter>
-    );
+     <MemoryRouter>
+       <OcrProgressProvider>
+         <UploadPage />
+       </OcrProgressProvider>
+     </MemoryRouter>
+   );
     
     fireEvent.click(screen.getByText('Mock Drop'));
 
@@ -89,10 +94,12 @@ describe('UploadPage', () => {
 
   it('toggles selection when toggle button is clicked', async () => {
     render(
-      <MemoryRouter>
-        <UploadPage />
-      </MemoryRouter>
-    );
+     <MemoryRouter>
+       <OcrProgressProvider>
+         <UploadPage />
+       </OcrProgressProvider>
+     </MemoryRouter>
+   );
     
     fireEvent.click(screen.getByText('Mock Drop'));
 
