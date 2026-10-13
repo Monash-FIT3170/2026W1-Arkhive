@@ -4,6 +4,11 @@
         <classes>
             <class name="com.arkhive.tests.LoginPageTest"/>
             <class name="com.arkhive.tests.UploadPageTest"/>
+            <class name="com.arkhive.tests.HomePageTest"/>
+            <class name="com.arkhive.tests.ProjectsPageTest"/>
+            <class name="com.arkhive.tests.ProjectWorkspacePageTest"/>
+            <class name="com.arkhive.tests.NavbarComponentTest"/>
+            <class name="com.arkhive.tests.MobileCapturePageTest"/>
         </classes>
     </test>
 </suite>

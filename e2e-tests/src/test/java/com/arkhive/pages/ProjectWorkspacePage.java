@@ -40,6 +40,10 @@ public class ProjectWorkspacePage extends BasePage {
         click(pageObjects.backToProjectsButton);
     }
 
+    public boolean isTabsBarDisplayed() {
+        return isDisplayed(pageObjects.filesTabButton, 2);
+    }
+
     public void switchToFilesTab() {
         click(pageObjects.filesTabButton);
     }

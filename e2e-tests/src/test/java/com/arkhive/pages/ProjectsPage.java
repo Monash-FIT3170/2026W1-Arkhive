@@ -32,9 +32,17 @@ public class ProjectsPage extends BasePage {
         return isDisplayed(pageObjects.pageHeading, timeoutSeconds);
     }
 
+    public void enterProjectName(String projectName) {
+        clearAndType(pageObjects.projectNameInput, projectName);
+    }
+
+    public boolean isCreateButtonEnabled() {
+        return isEnabled(pageObjects.createProjectButton);
+    }
+
     public void createNewProject(String projectName) {
         waitForInvisibility(pageObjects.loadingSpinner, 5);
-        clearAndType(pageObjects.projectNameInput, projectName);
+        enterProjectName(projectName);
         click(pageObjects.createProjectButton);
         // Wait until created project card appears or loading finishes
         waitForVisible(pageObjects.projectCardByName(projectName), 10);
