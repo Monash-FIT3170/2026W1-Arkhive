@@ -1,6 +1,7 @@
 package com.arkhive.pages;
 
 import com.arkhive.pageobjects.LoginPageObjects;
+import com.arkhive.reporting.ReportLogger;
 import org.openqa.selenium.WebDriver;
 
 /**
@@ -19,6 +20,7 @@ public class LoginPage extends BasePage {
     public void open(String baseUrl) {
         String target = baseUrl.endsWith("/login") ? baseUrl : baseUrl + "/login";
         driver.get(target);
+        ReportLogger.info("Navigated to Login page");
     }
 
     public boolean isDisplayed() {
@@ -27,10 +29,12 @@ public class LoginPage extends BasePage {
 
     public void switchToLoginTab() {
         click(pageObjects.loginTab);
+        ReportLogger.info("Switched to Login tab");
     }
 
     public void switchToRegisterTab() {
         click(pageObjects.registerTab);
+        ReportLogger.info("Switched to Register tab");
     }
 
     public boolean isRegisterModeDisplayed() {
@@ -42,6 +46,7 @@ public class LoginPage extends BasePage {
         waitForVisible(pageObjects.guestModalTitle);
         click(pageObjects.guestModalConfirmButton);
         waitForInvisibility(pageObjects.guestModalTitle, 5);
+        ReportLogger.info("Confirmed guest access in guest modal");
     }
 
     public void cancelGuestModal() {
@@ -49,6 +54,7 @@ public class LoginPage extends BasePage {
         waitForVisible(pageObjects.guestModalTitle);
         click(pageObjects.guestModalGoBackButton);
         waitForInvisibility(pageObjects.guestModalTitle, 5);
+        ReportLogger.info("Cancelled guest access modal");
     }
 
     public void loginAsGuest(String baseUrl) {
@@ -57,6 +63,7 @@ public class LoginPage extends BasePage {
         }
         if (driver.getCurrentUrl().contains("/login") || isDisplayed()) {
             clickContinueAsGuest();
+            ReportLogger.pass("Guest authentication completed");
         }
     }
 
@@ -67,6 +74,7 @@ public class LoginPage extends BasePage {
         clearAndType(pageObjects.emailInput, email);
         clearAndType(pageObjects.passwordInput, password);
         click(pageObjects.signInButton);
+        ReportLogger.info("Submitted login credentials for user: " + email);
     }
 
     public void register(String displayName, String lastName, String email, String password, String confirmPassword) {
@@ -81,6 +89,7 @@ public class LoginPage extends BasePage {
         clearAndType(pageObjects.passwordInput, password);
         clearAndType(pageObjects.confirmPasswordInput, confirmPassword);
         click(pageObjects.createAccountButton);
+        ReportLogger.info("Submitted registration form for user: " + email);
     }
 
     public boolean hasErrorMessage() {

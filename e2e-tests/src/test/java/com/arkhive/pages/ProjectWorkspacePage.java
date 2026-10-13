@@ -1,10 +1,12 @@
 package com.arkhive.pages;
 
 import com.arkhive.pageobjects.ProjectWorkspacePageObjects;
+import com.arkhive.reporting.ReportLogger;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -38,6 +40,7 @@ public class ProjectWorkspacePage extends BasePage {
 
     public void clickBackToProjects() {
         click(pageObjects.backToProjectsButton);
+        ReportLogger.info("Clicked back to Projects");
     }
 
     public boolean isTabsBarDisplayed() {
@@ -46,10 +49,12 @@ public class ProjectWorkspacePage extends BasePage {
 
     public void switchToFilesTab() {
         click(pageObjects.filesTabButton);
+        ReportLogger.info("Switched to Files tab in project workspace");
     }
 
     public void switchToValidateTab() {
         click(pageObjects.validateTabButton);
+        ReportLogger.info("Switched to Validate tab in project workspace");
     }
 
     public boolean isFilesTabActive() {
@@ -86,18 +91,22 @@ public class ProjectWorkspacePage extends BasePage {
     }
 
     public void uploadFile(String filePath) {
+        String fileName = Path.of(filePath).getFileName().toString();
+        ReportLogger.info("Selected document for upload in project: " + fileName);
         type(pageObjects.fileInput, filePath);
     }
 
     public void selectAllPages() {
         if (isDisplayed(pageObjects.selectAllButton)) {
             click(pageObjects.selectAllButton);
+            ReportLogger.info("Selected all pages in project workspace");
         }
     }
 
     public void deselectAllPages() {
         if (isDisplayed(pageObjects.deselectAllButton)) {
             click(pageObjects.deselectAllButton);
+            ReportLogger.info("Deselected all pages in project workspace");
         }
     }
 
@@ -107,13 +116,16 @@ public class ProjectWorkspacePage extends BasePage {
 
     public void clickProcess() {
         click(pageObjects.processButton);
+        ReportLogger.info("Clicked Process in project workspace");
         // Handle low-quality warning modal if triggered
         if (isDisplayed(pageObjects.lowQualityModalTitle, 3)) {
             click(pageObjects.lowQualityModalConfirmButton);
+            ReportLogger.info("Confirmed low quality warning dialog in project workspace");
         }
         // Handle reprocess confirmation modal if triggered
         if (isDisplayed(pageObjects.reprocessModalTitle, 3)) {
             click(pageObjects.reprocessModalConfirmButton);
+            ReportLogger.info("Confirmed reprocess modal in project workspace");
         }
     }
 

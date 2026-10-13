@@ -2,6 +2,7 @@ package com.arkhive.pages.components;
 
 import com.arkhive.pageobjects.components.ChatPanelComponentObjects;
 import com.arkhive.pages.BasePage;
+import com.arkhive.reporting.ReportLogger;
 import org.openqa.selenium.By;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
@@ -37,6 +38,7 @@ public class ChatPanelComponent extends BasePage {
         if (!isOpen()) {
             click(pageObjects.openAssistantButton);
             waitForVisible(pageObjects.panelHeader, 5);
+            ReportLogger.info("Opened AI Assistant panel");
         }
     }
 
@@ -44,20 +46,24 @@ public class ChatPanelComponent extends BasePage {
         if (isOpen()) {
             click(pageObjects.collapseButton);
             waitForInvisibility(pageObjects.panelHeader, 5);
+            ReportLogger.info("Closed AI Assistant panel");
         }
     }
 
     public void switchToChatTab() {
         click(pageObjects.chatTab);
         waitForVisible(pageObjects.messageTextarea, 5);
+        ReportLogger.info("Switched to Chat tab in AI Assistant");
     }
 
     public void switchToReviewTab() {
         click(pageObjects.reviewTab);
+        ReportLogger.info("Switched to Review tab in AI Assistant");
     }
 
     public void switchToHistoryTab() {
         click(pageObjects.historyTab);
+        ReportLogger.info("Switched to History tab in AI Assistant");
     }
 
     public void typeMessage(String message) {
@@ -67,6 +73,7 @@ public class ChatPanelComponent extends BasePage {
     public void sendMessage(String message) {
         typeMessage(message);
         click(pageObjects.sendMessageButton);
+        ReportLogger.info("Submitted question to AI Assistant");
     }
 
     public boolean isUserMessageDisplayed(String message) {
@@ -127,7 +134,7 @@ public class ChatPanelComponent extends BasePage {
     public boolean waitForAssistantResponse(int timeoutSeconds) {
         try {
             WebDriverWait customWait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
-            return Boolean.TRUE.equals(customWait.until(d -> {
+            boolean completed = Boolean.TRUE.equals(customWait.until(d -> {
                 boolean hasLoading = !d.findElements(pageObjects.loadingDots).isEmpty();
                 if (hasLoading) {
                     return false;
@@ -140,6 +147,10 @@ public class ChatPanelComponent extends BasePage {
                 String text = lastBubble.getText().trim();
                 return !text.isEmpty() && !text.contains("Just a moment");
             }));
+            if (completed) {
+                ReportLogger.pass("Received completed AI Assistant response");
+            }
+            return completed;
         } catch (TimeoutException e) {
             return false;
         }

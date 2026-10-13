@@ -151,4 +151,8 @@ public abstract class BaseTest {
     public Path getDownloadDir() {
         return downloadDir;
     }
+
+    public WebDriver getDriver() {
+        return driver;
+    }
 }

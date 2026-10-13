@@ -2,6 +2,7 @@ package com.arkhive.pages.components;
 
 import com.arkhive.pageobjects.components.NavbarComponentObjects;
 import com.arkhive.pages.BasePage;
+import com.arkhive.reporting.ReportLogger;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 
@@ -23,18 +24,22 @@ public class NavbarComponent extends BasePage {
 
     public void clickBrandLogo() {
         click(pageObjects.brandLogoButton);
+        ReportLogger.info("Clicked brand logo to navigate Home");
     }
 
     public void clickHome() {
         click(pageObjects.homeNavButton);
+        ReportLogger.info("Navigated to Home via navbar");
     }
 
     public void clickQuickScan() {
         click(pageObjects.quickScanNavButton);
+        ReportLogger.info("Navigated to Quick Scan via navbar");
     }
 
     public void clickProjects() {
         click(pageObjects.projectsNavButton);
+        ReportLogger.info("Navigated to Projects via navbar");
     }
 
     public boolean isProjectsNavDisplayed() {
@@ -58,6 +63,7 @@ public class NavbarComponent extends BasePage {
             openUserProfileMenu();
         }
         click(pageObjects.signOutButton);
+        ReportLogger.info("Signed out user session");
     }
 
     public boolean isGuestModeDisplayed() {
@@ -66,6 +72,7 @@ public class NavbarComponent extends BasePage {
 
     public void clickGuestLogIn() {
         click(pageObjects.guestLogInButton);
+        ReportLogger.info("Clicked Log In button in guest banner");
     }
 
     public boolean isAuthenticatedUserDisplayed() {

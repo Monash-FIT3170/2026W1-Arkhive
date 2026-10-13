@@ -1,6 +1,7 @@
 package com.arkhive.pages;
 
 import com.arkhive.pageobjects.DocumentPreviewPageObjects;
+import com.arkhive.reporting.ReportLogger;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -30,12 +31,14 @@ public class DocumentPreviewPage extends BasePage {
     public void selectAllPages() {
         if (isDisplayed(pageObjects.selectAllButton)) {
             click(pageObjects.selectAllButton);
+            ReportLogger.info("Selected all document pages for processing");
         }
     }
 
     public void deselectAllPages() {
         if (isDisplayed(pageObjects.clearSelectionButton)) {
             click(pageObjects.clearSelectionButton);
+            ReportLogger.info("Deselected all document pages");
         }
     }
 
@@ -95,9 +98,11 @@ public class DocumentPreviewPage extends BasePage {
     public void clickProcess() {
         waitForProcessButtonEnabled(10);
         click(pageObjects.processButton);
+        ReportLogger.info("Clicked Process to initiate document OCR processing");
         // If low quality confirmation modal is triggered, confirm to proceed with processing
         if (isDisplayed(pageObjects.lowQualityModal, 3)) {
             click(pageObjects.lowQualityModalConfirmButton);
+            ReportLogger.info("Confirmed low quality image processing dialog");
         }
     }
 

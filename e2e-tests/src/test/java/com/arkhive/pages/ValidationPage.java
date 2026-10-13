@@ -1,6 +1,7 @@
 package com.arkhive.pages;
 
 import com.arkhive.pageobjects.ValidationPageObjects;
+import com.arkhive.reporting.ReportLogger;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -32,7 +33,11 @@ public class ValidationPage extends BasePage {
     }
 
     public boolean isWorkspaceLoaded(int timeoutSeconds) {
-        return isDisplayed(timeoutSeconds);
+        boolean loaded = isDisplayed(timeoutSeconds);
+        if (loaded) {
+            ReportLogger.pass("Validation workspace loaded successfully");
+        }
+        return loaded;
     }
 
     public boolean isDocumentPanelDisplayed() {
@@ -49,14 +54,17 @@ public class ValidationPage extends BasePage {
 
     public void switchToSplitView() {
         click(pageObjects.splitViewButton);
+        ReportLogger.info("Switched to Split view");
     }
 
     public void switchToDocumentView() {
         click(pageObjects.documentViewButton);
+        ReportLogger.info("Switched to Document-only view");
     }
 
     public void switchToTableView() {
         click(pageObjects.tableViewButton);
+        ReportLogger.info("Switched to Table view");
     }
 
     // ── View-mode switching (unambiguous title-based locators) ──────────────
@@ -67,6 +75,7 @@ public class ValidationPage extends BasePage {
      */
     public void switchToTableViewMode() {
         click(pageObjects.tableViewModeButton);
+        ReportLogger.info("Switched Validation workspace to Table-only view");
     }
 
     /**
@@ -74,6 +83,7 @@ public class ValidationPage extends BasePage {
      */
     public void switchToSplitViewMode() {
         click(pageObjects.splitViewModeButton);
+        ReportLogger.info("Switched Validation workspace to Split view");
     }
 
     /**
@@ -101,6 +111,7 @@ public class ValidationPage extends BasePage {
      */
     public void enableEditMode() {
         click(pageObjects.editTableButton);
+        ReportLogger.info("Enabled table edit mode in Validation workspace");
     }
 
     /**
@@ -125,33 +136,19 @@ public class ValidationPage extends BasePage {
     /**
      * Clicks the first data cell to open the inline editor, then replaces its
      * content with {@code newValue} and commits the change with Enter.
-     *
-     * <p><b>Why no select-all keystroke:</b> The textarea is rendered with
-     * {@code autoFocus} and its {@code onFocus} handler calls
-     * {@code e.target.select()}, so the existing text is already selected when
-     * the textarea appears.  Typing the replacement value immediately overwrites
-     * it on all platforms without any Ctrl+A / Cmd+A.
-     *
-     * <p><b>Why Enter, not Tab:</b> Enter triggers {@code handleCellBlur} which
-     * sets {@code editingCellId = null} and unmounts the textarea cleanly.
-     * Tab also commits the current cell but immediately opens the next cell's
-     * textarea, which would still satisfy {@code activeCellTextarea}, making
-     * synchronization unreliable.
      */
     public void editFirstCell(String newValue) {
         click(pageObjects.firstDataCell);
         WebElement textarea = waitForVisible(pageObjects.activeCellTextarea, 5);
         textarea.sendKeys(newValue);
         textarea.sendKeys(Keys.ENTER);
+        ReportLogger.info("Edited table cell value and committed changes");
     }
 
     /**
      * Waits up to {@code timeoutSeconds} for the inline cell textarea to disappear,
      * which happens once the application has committed the edit and re-rendered the
      * cell in read-only mode.
-     *
-     * <p>Call this after {@link #editFirstCell(String)} and before reading the
-     * cell text to avoid asserting against a stale DOM state.
      *
      * @return true if the textarea is gone within the timeout
      */
@@ -166,6 +163,7 @@ public class ValidationPage extends BasePage {
      */
     public void openExportModal() {
         click(pageObjects.exportButton);
+        ReportLogger.info("Opened Export Data modal from Validation workspace");
     }
 
     /**

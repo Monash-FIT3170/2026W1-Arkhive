@@ -1,7 +1,10 @@
 package com.arkhive.pages;
 
 import com.arkhive.pageobjects.UploadPageObjects;
+import com.arkhive.reporting.ReportLogger;
 import org.openqa.selenium.WebDriver;
+
+import java.nio.file.Path;
 
 /**
  * Page Object representing Step 0: Upload Landing Page (/)
@@ -18,6 +21,7 @@ public class UploadPage extends BasePage {
     public void open(String url) {
         String target = url.endsWith("/upload") ? url : url + "/upload";
         driver.get(target);
+        ReportLogger.info("Opened Document Upload page");
     }
 
     public boolean isDisplayed() {
@@ -29,7 +33,9 @@ public class UploadPage extends BasePage {
     }
 
     public void uploadFile(String filePath) {
+        String filename = Path.of(filePath).getFileName().toString();
         type(pageObjects.fileInput, filePath);
+        ReportLogger.info("Selected document for upload: " + filename);
     }
 
     public boolean hasErrorMessage() {

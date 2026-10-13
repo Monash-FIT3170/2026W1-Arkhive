@@ -1,6 +1,7 @@
 package com.arkhive.pages;
 
 import com.arkhive.pageobjects.HomePageObjects;
+import com.arkhive.reporting.ReportLogger;
 import org.openqa.selenium.WebDriver;
 
 /**
@@ -17,6 +18,7 @@ public class HomePage extends BasePage {
 
     public void open(String baseUrl) {
         driver.get(baseUrl);
+        ReportLogger.info("Opened Home page");
     }
 
     public boolean isDisplayed() {
@@ -29,10 +31,12 @@ public class HomePage extends BasePage {
 
     public void clickCreateProject() {
         click(pageObjects.createProjectCard);
+        ReportLogger.info("Clicked Create Project card");
     }
 
     public void clickUploadWithoutProject() {
         click(pageObjects.uploadWithoutProjectCard);
+        ReportLogger.info("Clicked Upload without Project card");
     }
 
     public boolean isCreateProjectCardDisplayed() {

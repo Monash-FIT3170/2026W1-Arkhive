@@ -1,9 +1,11 @@
 package com.arkhive.pages;
 
 import com.arkhive.pageobjects.MobileCapturePageObjects;
+import com.arkhive.reporting.ReportLogger;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -23,6 +25,7 @@ public class MobileCapturePage extends BasePage {
     public void open(String baseUrl, String token) {
         String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         driver.get(base + "/upload/mobile/" + token);
+        ReportLogger.info("Opened Mobile Capture page with token");
     }
 
     public boolean isDisplayed() {
@@ -42,6 +45,8 @@ public class MobileCapturePage extends BasePage {
     }
 
     public void uploadPhoto(String filePath) {
+        String fileName = Path.of(filePath).getFileName().toString();
+        ReportLogger.info("Selected mobile capture photo: " + fileName);
         waitForInvisibility(pageObjects.loadingSpinner, 5);
         type(pageObjects.galleryFileInput, filePath);
     }
@@ -64,6 +69,7 @@ public class MobileCapturePage extends BasePage {
 
     public void clickUpload() {
         click(pageObjects.uploadPhotosButton);
+        ReportLogger.info("Clicked upload photos on mobile capture page");
     }
 
     public boolean isSuccessDisplayed(int timeoutSeconds) {
