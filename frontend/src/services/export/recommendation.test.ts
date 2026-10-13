@@ -131,8 +131,8 @@ describe('recommendTemplate', () => {
           { id: '3', key: 'total', label: 'Total Due', value: '$2,300.00', confidence: 0.96 },
         ],
         texts: [
-          { id: 't1', role: 'header', text: 'TAX INVOICE', confidence: 0.99 },
-          { id: 't2', role: 'body', text: 'Payment is due within 30 days', confidence: 0.95 },
+          { id: 't1', role: 'title', text: 'TAX INVOICE', confidence: 0.99 },
+          { id: 't2', role: 'paragraph', text: 'Payment is due within 30 days', confidence: 0.95 },
         ],
       },
     });
