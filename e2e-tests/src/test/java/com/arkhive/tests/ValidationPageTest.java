@@ -50,6 +50,10 @@ public class ValidationPageTest extends BaseTest {
      * <p>This is a high-value workflow because the view-mode switcher is one of
      * the primary ways users navigate the workspace, and a regression here would
      * prevent users from focusing on the extracted-data table or the document.
+     *
+     * <p>Synchronization: {@code isDocumentPanelAbsent()} uses
+     * {@code waitForInvisibility} so it returns as soon as React removes the
+     * panel from the DOM, rather than blocking for the full default timeout.
      */
     @Test(description = "Verify view-mode switching between Split and Table in the Validation workspace",
           timeOut = 200000)
@@ -64,8 +68,8 @@ public class ValidationPageTest extends BaseTest {
         validationPage.switchToTableViewMode();
         Assert.assertTrue(validationPage.isExtractedDataPanelDisplayed(),
                 "Extracted data table should remain visible after switching to Table view");
-        Assert.assertFalse(validationPage.isDocumentPanelDisplayed(),
-                "Document panel should be hidden after switching to Table-only view");
+        Assert.assertTrue(validationPage.isDocumentPanelAbsent(),
+                "Document panel should be removed from the DOM after switching to Table-only view");
 
         // Switch back to Split view.
         validationPage.switchToSplitViewMode();
@@ -79,12 +83,33 @@ public class ValidationPageTest extends BaseTest {
 
     /**
      * Verifies that the user can edit an extracted text value in the Validation
-     * workspace and that the updated value is persisted in the table.
+     * workspace and that the updated value is displayed in the table.
      *
-     * <p>This tests the core correction workflow: users review OCR output and
-     * manually fix incorrect values.  It does not assert on the original OCR
-     * text (which varies per processing run); it only verifies that the value
-     * displayed after editing matches what was typed.
+     * <p>How the application commits an edit:
+     * <ol>
+     *   <li>Clicking a cell in edit mode opens an inline {@code <textarea>} with
+     *       {@code autoFocus}.  The textarea's {@code onFocus} handler immediately
+     *       calls {@code e.target.select()}, selecting all existing text.</li>
+     *   <li>Typing a replacement value overwrites the selection — no platform-specific
+     *       select-all keystroke (Ctrl+A / Cmd+A) is needed.</li>
+     *   <li>Pressing Enter triggers {@code handleCellBlur}, which saves the new
+     *       value to React's {@code localEdits} state, calls {@code onCellEdit}
+     *       (persisting to the extraction session via the workspace's
+     *       {@code onPersist} callback), and unmounts the textarea by setting
+     *       {@code editingCellId = null}.</li>
+     *   <li>The cell immediately re-renders showing the value from
+     *       {@code localEdits[fieldId]}.</li>
+     * </ol>
+     *
+     * <p>The test asserts the UI-level outcome (cell displays the edited value).
+     * It does not independently verify backend persistence, as that would require
+     * navigating away and re-loading the session — a significant increase in
+     * complexity for marginal additional confidence given that the same path is
+     * exercised by the unit tests for the extraction service.
+     *
+     * <p>Synchronization: {@code waitForCellEditComplete()} blocks until the
+     * textarea is no longer present in the DOM, ensuring React has completed the
+     * re-render before {@code getFirstCellText()} is called.
      */
     @Test(description = "Verify that editing an extracted cell value persists the updated text in the table",
           timeOut = 200000)
@@ -102,12 +127,20 @@ public class ValidationPageTest extends BaseTest {
                 "Edit mode should be active after clicking 'Edit Table'");
 
         // Edit the first cell with a deterministic test value.
+        // The textarea selects all existing text on focus (autoFocus + onFocus: e.target.select()),
+        // so we type the replacement value directly without a select-all keystroke.
+        // Enter commits the change and unmounts the textarea.
         String testValue = "E2E-edited-" + System.currentTimeMillis();
         validationPage.editFirstCell(testValue);
 
-        // After Tab commits the edit, the cell should display the updated value.
+        // Wait for the textarea to disappear before reading the cell text.
+        Assert.assertTrue(validationPage.waitForCellEditComplete(5),
+                "Inline edit textarea should be gone after pressing Enter to commit");
+
+        // The cell should now display the edited value (served from React's localEdits state).
         String actualCellText = validationPage.getFirstCellText();
         Assert.assertEquals(actualCellText, testValue,
                 "First data cell should display the edited value after committing the change");
     }
 }
+
