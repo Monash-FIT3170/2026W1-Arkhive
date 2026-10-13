@@ -27,6 +27,7 @@ function ValidationPage() {
   // (onPersist writes ExtractedPage[]). They carry no blocks, so overlays aren't available then.
   const [savedPages, setSavedPages] = useState<ExtractedPage[] | null>(null);
   const [fileMetadata, setFileMetadata] = useState<FileMetadataInput[]>([]);
+  const [docType, setDocType] = useState<string | undefined>();
 
   useEffect(() => {
     async function loadSession() {
@@ -46,6 +47,14 @@ function ValidationPage() {
 
         if (isStructuredPages(session)) setOcrPages(session);
         else setSavedPages(toExtractedPages(session));
+        if (
+          session &&
+          typeof session === 'object' &&
+          'docType' in session &&
+          typeof (session as any).docType === 'string'
+        ) {
+          setDocType((session as any).docType);
+        }
         setImageUrls(processedUrls.length > 0 ? processedUrls : [getUploadedImageUrl()]);
 
         if (uploadedDocs && uploadedDocs.length > 0) {
@@ -100,6 +109,7 @@ function ValidationPage() {
       ocrPages={ocrPages.map((p) => p.blocks)}
       imageUrls={imageUrls}
       fileMetadata={fileMetadata}
+      docType={docType}
       onPersist={saveExtractionSession}
       heightClassName="lg:h-[calc(100vh-72px)]"
     />

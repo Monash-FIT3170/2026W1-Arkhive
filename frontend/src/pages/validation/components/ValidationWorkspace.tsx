@@ -104,6 +104,8 @@ export interface ValidationWorkspaceProps {
   syncKey?: string;
   /** Optional file metadata describing document boundaries and filenames */
   fileMetadata?: FileMetadataInput[];
+  /** Optional classified document type from OCR / LlamaCloud */
+  docType?: string;
 }
 
 // Everything below "how do we get pages in and where do they get saved" is
@@ -121,6 +123,7 @@ function ValidationWorkspace({
   onReviewChange,
   syncKey,
   fileMetadata,
+  docType,
 }: ValidationWorkspaceProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [splitPercent, setSplitPercent] = useState(50);
@@ -839,6 +842,7 @@ function ValidationWorkspace({
                 extractedData={documentContext}
                 fileGroups={fileGroups}
                 currentGlobalIndex={currentPageIndex}
+                docType={docType}
                 hoveredOverlayIds={hoveredTableFieldIds}
                 onRowIndent={handleRowIndent}
                 onRowOutdent={handleRowOutdent}
