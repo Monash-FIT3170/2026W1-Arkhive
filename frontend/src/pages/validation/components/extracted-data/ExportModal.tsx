@@ -4,11 +4,7 @@ import type { ValidationFileGroup } from '../../../../utils/fileGrouping';
 import { DEFAULT_INCLUDE, type ExportInclude } from '../../../../services/export/model';
 import {
   FORMATS,
-  TEMPLATES,
-  getTemplate,
   templatesByFormat,
-  type ExportFormat,
-  type ExportTemplate,
 } from '../../../../services/export/templates';
 import {
   deliver,
@@ -70,14 +66,6 @@ export function ExportModal({
   const [selectedPages, setSelectedPages] = useState<Set<number>>(() =>
     computeInitialSelection(currentGlobalIndex, fileGroups)
   );
-  const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(() => {
-    const rec = recommendTemplate({ docType, extractedData, fileGroups });
-    const recId = rec.getRecommendedIdForFormat('csv');
-    return new Set<string>([recId || 'csv.default']);
-  });
-  const [include, setInclude] = useState<ExportInclude>(DEFAULT_INCLUDE);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Compute recommendation based on classification and extracted data heuristics
   const recommendation = useMemo(
@@ -85,29 +73,20 @@ export function ExportModal({
     [docType, extractedData, fileGroups]
   );
 
-  // Re-seed selection and recommend best template on modal open
-  useEffect(() => {
-    if (isOpen) {
-      setExportError(null);
-      setShowConfirmModal(false);
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(() => {
+    const recId = recommendation.getRecommendedIdForFormat('csv');
+    return new Set<string>([recId || 'csv.default']);
+  });
 
-      // Pre-select recommended template
-      const recId = recommendation.getRecommendedIdForFormat('csv');
-      if (recId) {
-        setSelectedTemplateIds(new Set([recId]));
-      }
+  const [include, setInclude] = useState<ExportInclude>(DEFAULT_INCLUDE);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-      // Default scope: if multi-page fileGroups exist, select all, otherwise current page
-      const allIndices = fileGroups?.flatMap((g) => g.pages.map((p) => p.globalIndex)) || [];
-      if (allIndices.length > 1) {
-        setScopeMode('all');
-        setSelectedPages(new Set(allIndices));
-      } else {
-        setScopeMode('current');
-        setSelectedPages(new Set(currentGlobalIndex !== undefined ? [currentGlobalIndex] : [0]));
-      }
-    }
-  }, [isOpen]);
+  const handleClose = () => {
+    setExportError(null);
+    setShowConfirmModal(false);
+    onClose();
+  };
 
   useEffect(() => {
     if (!successMessage) return;
@@ -147,8 +126,6 @@ export function ExportModal({
   const isFilenameValid = isValidFilename(customFilename);
   const baseName = customFilename.trim() || 'export';
   const templateIds = [...selectedTemplateIds];
-  const activeTemplate =
-    TEMPLATES.find((t) => selectedTemplateIds.has(t.id)) || TEMPLATES[0];
 
   const togglePageSelection = (globalIndex: number) => {
     setScopeMode('custom');
@@ -277,7 +254,7 @@ export function ExportModal({
       return;
     }
     onExport?.();
-    onClose();
+    handleClose();
   };
 
   const handleDownloadClick = () => {
@@ -304,7 +281,7 @@ export function ExportModal({
           </div>
           <button
             className="btn btn-ghost btn-circle btn-sm bg-base-200 hover:bg-base-300 transition-colors"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close"
           >
             <svg
@@ -600,7 +577,7 @@ export function ExportModal({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button className="btn btn-ghost btn-sm font-semibold px-4 hover:bg-base-200" onClick={onClose}>
+            <button className="btn btn-ghost btn-sm font-semibold px-4 hover:bg-base-200" onClick={handleClose}>
               Cancel
             </button>
             <button
@@ -613,7 +590,7 @@ export function ExportModal({
           </div>
         </div>
       </div>
-      <div className="modal-backdrop bg-base-300/50" onClick={onClose}></div>
+      <div className="modal-backdrop bg-base-300/50" onClick={handleClose}></div>
 
       {/* Confirmation Modal for Bulk Downloads */}
       {showConfirmModal && (

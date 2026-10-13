@@ -50,26 +50,6 @@ export const FORMATS: { id: ExportFormat; label: string; iconSrc: string }[] = [
 
 // ───────────── CSV ─────────────
 
-const BOM = '\uFEFF'; // lets Excel read UTF-8 correctly
-const NUMERIC = /^[+-]?\d[\d,]*\.?\d*$/;
-
-function csvCell(value: string): string {
-  let raw = value;
-  // Excel formula-injection guard (same behaviour as csvDownloadService), but plain numbers like -5 are left alone.
-  if (/^[=+\-@\t\r]/.test(raw) && !NUMERIC.test(raw)) raw = ` ${raw}`;
-  return /[",\n\r]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw;
-}
-
-function sectionsToCsv(sections: ExportSection[], withTitles: boolean): string {
-  const lines: string[] = [];
-  sections.forEach((s, i) => {
-    if (i > 0) lines.push('');
-    if (withTitles) lines.push(`"--- ${s.title.replace(/"/g, '""')} ---"`);
-    lines.push(s.columns.map(csvCell).join(','));
-    for (const row of s.rows) lines.push(row.map(csvCell).join(','));
-  });
-  return lines.join('\n');
-}
 
 const csvDefault: ExportTemplate = {
   id: 'csv.default',
