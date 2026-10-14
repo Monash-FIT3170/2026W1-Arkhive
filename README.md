@@ -33,7 +33,7 @@ Ensure the following software components and cloud service accounts are set up b
 - **Object Storage:** Cloudflare R2 (S3-compatible bucket with direct client-side presigned uploads)
 - **OCR Engine:** Azure Document Intelligence
 - **LLM Engine:** Google Gemini API
-- **Testing:** Vitest, Testing Library, Supertest
+- **Testing:** Vitest, Testing Library, Supertest, Husky
 
 ---
 
