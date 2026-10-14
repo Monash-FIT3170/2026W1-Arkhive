@@ -3,32 +3,6 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { supabase } from '../services/supabaseClient';
 import { deletePrefix } from '../services/r2Client';
 
-async function projectNameExists(
-  ownerId: string,
-  name: string,
-  excludeId?: string
-): Promise<boolean> {
-  const escapedName = name.trim().replace(/[\\%_]/g, '\\$&');
-
-  let query = supabase
-    .from('projects')
-    .select('id')
-    .eq('owner_id', ownerId)
-    .ilike('name', escapedName);
-
-  if (excludeId) {
-    query = query.neq('id', excludeId);
-  }
-
-  const { data, error } = await query.limit(1);
-
-  if (error) {
-    throw error;
-  }
-
-  return (data?.length ?? 0) > 0;
-}
-
 export default {
   /**
    * POST /api/projects
@@ -46,13 +20,6 @@ export default {
 
       if (!ownerId) {
         res.status(401).json({ error: 'Unauthorized.' });
-        return;
-      }
-
-      if (await projectNameExists(ownerId, name)) {
-        res.status(409).json({
-          error: 'A project with this name already exists. Please choose a different name.',
-        });
         return;
       }
 
@@ -266,11 +233,6 @@ export default {
       const { name } = req.body;
       const ownerId = req.userId;
 
-      if (typeof id !== 'string') {
-        res.status(400).json({ error: 'Invalid project ID.' });
-        return;
-      }
-
       if (!name || typeof name !== 'string' || !name.trim()) {
         res.status(400).json({ error: 'Updated project name is required.' });
         return;
@@ -278,13 +240,6 @@ export default {
 
       if (!ownerId) {
         res.status(401).json({ error: 'Unauthorized.' });
-        return;
-      }
-
-      if (await projectNameExists(ownerId, name, id)) {
-        res.status(409).json({
-          error: 'A project with this name already exists. Please choose a different name.',
-        });
         return;
       }
 

@@ -250,7 +250,7 @@ describe('Documents Controller', () => {
     it('downloads from R2, runs OCR pipeline, and persists rawResult with done status', async () => {
       const update = mockOwnedDocument();
       vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('fake-pdf-bytes'));
-      vi.spyOn(ocrService, 'parseTableWithRetries').mockResolvedValue(mockOcrResult as any);
+      vi.spyOn(ocrService, 'parseDocumentWithRetries').mockResolvedValue(mockOcrResult as any);
 
       const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
         selections: [{ documentId: 'doc-123', pageIndices: [0] }],
@@ -278,7 +278,7 @@ describe('Documents Controller', () => {
       const getObjectBufferSpy = vi
         .spyOn(r2Client, 'getObjectBuffer')
         .mockResolvedValue(Buffer.from('page'));
-      vi.spyOn(ocrService, 'parseTableWithRetries').mockResolvedValue(mockOcrResult as any);
+      vi.spyOn(ocrService, 'parseDocumentWithRetries').mockResolvedValue(mockOcrResult as any);
 
       const { req, res } = createMockReqRes('test-user-123', {
         selections: [{ documentId: 'doc-123', pageIndices: [1, 2, 10] }],
@@ -297,7 +297,7 @@ describe('Documents Controller', () => {
         { page_index: 0, status: 'done', review_state: null, raw_ocr_result: mockOcrResult },
       ]);
       const getObjectBufferSpy = vi.spyOn(r2Client, 'getObjectBuffer');
-      vi.spyOn(ocrService, 'parseTableWithRetries');
+      vi.spyOn(ocrService, 'parseDocumentWithRetries');
 
       const { req, res, getJson } = createMockReqRes('test-user-123', {
         selections: [{ documentId: 'doc-123', pageIndices: [0] }],
@@ -322,7 +322,7 @@ describe('Documents Controller', () => {
 
       const update = mockOwnedDocument();
       vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('fake-pdf-bytes'));
-      vi.spyOn(ocrService, 'parseTableWithRetries').mockRejectedValue(new Error('OCR exploded'));
+      vi.spyOn(ocrService, 'parseDocumentWithRetries').mockRejectedValue(new Error('OCR exploded'));
 
       const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
         selections: [{ documentId: 'doc-123', pageIndices: [0] }],

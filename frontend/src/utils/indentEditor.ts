@@ -1,104 +1,246 @@
 import type { ExtractedPage, ExtractedRow } from '../models/TableData';
-// Acknowledgement: Google Gemini was used to help generate this file
+
 export type IndentDirection = 'in' | 'out';
 
-/** One row's "own" item text, lifted out before its depth changes. */
-interface OwnItemCell {
+/**
+ * HOW HIERARCHY IS REPRESENTED IN THE GRID
+ *
+ * The source of truth is each row's `_indentLevel` plus the row's OWN text in
+ * the item column. Everything else about the hierarchy is a derived view of
+ * those two things (this mirrors what flattener.tableToExtractedData produces):
+ *
+ *   - Item band: for a row at depth d, the item column holds the root ancestor's
+ *     text, `SUB_<item>_k` holds the level-k ancestor's text for k <= d, and
+ *     deeper `SUB_` slots are empty. The row's own text sits at depth d.
+ *   - Left-of-item columns (code, category...) inherit the nearest ancestor
+ *     (or self) that has its own non-empty value.
+ *
+ * `restructure()` is the ONE place that re-derives that view. Every operation
+ * that changes levels, order, or ancestor text (indent, outdent, move, delete,
+ * editing an item-band cell) goes through it, so the grid can't drift out of
+ * sync with the hierarchy. It never mutates its input (undo snapshots share
+ * row objects with the live page).
+ */
+
+// ==========================================
+// NAMING / DEPTH HELPERS
+// ==========================================
+
+export function subItemColumnName(itemColumnKey: string, depth: number): string {
+  return `SUB_${itemColumnKey}_${depth}`;
+}
+
+/** Depth of a `SUB_<item>_<n>` column, or null if `column` isn't one. (No regex: item names can contain anything.) */
+export function subItemDepth(column: string, itemColumnKey: string): number | null {
+  const prefix = `SUB_${itemColumnKey}_`;
+  if (!column.startsWith(prefix)) return null;
+  const rest = column.slice(prefix.length);
+  return /^\d+$/.test(rest) ? Number(rest) : null;
+}
+
+/** 0 for the item column, n for `SUB_<item>_n`, null for any other column. */
+export function itemBandDepth(page: { itemColumnKey: string }, column: string): number | null {
+  if (column === page.itemColumnKey) return 0;
+  return subItemDepth(column, page.itemColumnKey);
+}
+
+/** SUB_ columns are managed by indent/outdent — users shouldn't rename or delete them by hand. */
+export function isDerivedColumn(page: { itemColumnKey: string }, column: string): boolean {
+  return subItemDepth(column, page.itemColumnKey) !== null;
+}
+
+const levelOf = (row: ExtractedRow): number => row._indentLevel ?? 0;
+
+/** Index one past the last row of `rows[index]`'s subtree (the row plus every following deeper row). */
+export function subtreeEnd(rows: ExtractedRow[], index: number): number {
+  const level = levelOf(rows[index]);
+  let end = index + 1;
+  while (end < rows.length && levelOf(rows[end]) > level) end++;
+  return end;
+}
+
+/** A row can only nest under the row directly above it, so it can go at most one level deeper than that row. */
+export function canIndentIndex(rows: ExtractedRow[], index: number): boolean {
+  return index > 0 && levelOf(rows[index]) <= levelOf(rows[index - 1]);
+}
+
+export function canOutdentIndex(rows: ExtractedRow[], index: number): boolean {
+  return index >= 0 && index < rows.length && levelOf(rows[index]) > 0;
+}
+
+export function canIndent(page: ExtractedPage, rowId: string | number): boolean {
+  return canIndentIndex(
+    page.rows,
+    page.rows.findIndex((r) => String(r._id) === String(rowId))
+  );
+}
+
+export function canOutdent(page: ExtractedPage, rowId: string | number): boolean {
+  return canOutdentIndex(
+    page.rows,
+    page.rows.findIndex((r) => String(r._id) === String(rowId))
+  );
+}
+
+// ==========================================
+// CELL HELPERS
+// ==========================================
+
+interface OwnCell {
   value: string;
   confidence: number;
   ref?: string;
 }
 
-// ==========================================
-// ITEM-COLUMN / SUB-ITEM-COLUMN HELPERS
-// ==========================================
+/** Reads a row's own item text. `restructure` defaults to reading it from the current item band. */
+type OwnReader = (row: ExtractedRow, itemColumnKey: string) => OwnCell;
 
-function subItemColumnName(itemColumnKey: string, depth: number): string {
-  return `SUB_${itemColumnKey}_${depth}`;
-}
-
-/** Existing `SUB_<itemColumnKey>_<n>` columns, in depth order (index 0 = depth 1). */
-function getExistingSubItemColumns(columns: string[], itemColumnKey: string): string[] {
-  const pattern = new RegExp(`^SUB_${itemColumnKey}_(\\d+)$`);
-  return columns
-    .map((col) => ({ col, match: col.match(pattern) }))
-    .filter((c): c is { col: string; match: RegExpMatchArray } => c.match !== null)
-    .sort((a, b) => Number(a.match[1]) - Number(b.match[1]))
-    .map((c) => c.col);
-}
-
-/**
- * Makes sure there's a sub-item column for every depth up to `maxDepth`,
- * adding new ones to `columns` if needed (right after the deepest existing
- * one). Never removes columns — an outdent leaving a column unused is fine;
- * deleting it could strand data on other rows.
- */
-function ensureSubItemColumns(
-  columns: string[],
-  itemColumnKey: string,
-  maxDepth: number
-): { columns: string[]; subItemColumns: string[] } {
-  const existing = getExistingSubItemColumns(columns, itemColumnKey);
-  if (existing.length >= maxDepth) {
-    return { columns, subItemColumns: existing };
-  }
-
-  const newColumns = [...columns];
-  const insertAfter = existing.length
-    ? newColumns.indexOf(existing[existing.length - 1])
-    : newColumns.indexOf(itemColumnKey);
-
-  const added: string[] = [];
-  for (let depth = existing.length + 1; depth <= maxDepth; depth++) {
-    added.push(subItemColumnName(itemColumnKey, depth));
-  }
-  newColumns.splice(insertAfter + 1, 0, ...added);
-
-  return { columns: newColumns, subItemColumns: [...existing, ...added] };
-}
-
-/** The column that holds a row's own item text at a given depth (0 = root). */
-function itemColumnAt(itemColumnKey: string, subItemColumns: string[], depth: number): string {
-  return depth === 0 ? itemColumnKey : subItemColumns[depth - 1];
-}
-
-function getOwnItemCell(
-  row: ExtractedRow,
-  itemColumnKey: string,
-  subItemColumns: string[]
-): OwnItemCell {
-  const depth = row._indentLevel ?? 0;
-  const col = itemColumnAt(itemColumnKey, subItemColumns, depth);
+function cloneRow(row: ExtractedRow): ExtractedRow {
   return {
-    value: row[col] ?? '',
+    ...row,
+    _cellConfidence: { ...(row._cellConfidence ?? {}) },
+    _cellKeyMap: { ...(row._cellKeyMap ?? {}) },
+  };
+}
+
+/** A row's own item text, read at its CURRENT depth. */
+function readOwnItem(row: ExtractedRow, itemColumnKey: string): OwnCell {
+  const col = levelOf(row) === 0 ? itemColumnKey : subItemColumnName(itemColumnKey, levelOf(row));
+  return {
+    value: String(row[col] ?? ''),
     confidence: row._cellConfidence?.[col] ?? row._confidence ?? 1,
     ref: row._cellKeyMap?.[col],
   };
 }
 
-/** Writes a value into the item-column slot for a specific depth. */
-function setItemCellAt(
+function writeCell(
   row: ExtractedRow,
-  itemColumnKey: string,
-  subItemColumns: string[],
-  depth: number,
-  cell: OwnItemCell
-): void {
-  const col = itemColumnAt(itemColumnKey, subItemColumns, depth);
-  row[col] = cell.value;
-  row._cellConfidence[col] = cell.confidence;
-  if (cell.ref) {
-    row._cellKeyMap = { ...(row._cellKeyMap ?? {}), [col]: cell.ref };
-  }
+  col: string,
+  value: string,
+  confidence: number,
+  ref?: string
+) {
+  row[col] = value;
+  row._cellConfidence[col] = confidence;
+  if (ref) row._cellKeyMap![col] = ref;
+  else delete row._cellKeyMap![col];
 }
 
-/** Blanks every item/sub-item slot on a row before it's recomputed. */
-function clearItemBand(row: ExtractedRow, itemColumnKey: string, subItemColumns: string[]): void {
-  for (const col of [itemColumnKey, ...subItemColumns]) {
-    row[col] = '';
-    row._cellConfidence[col] = row._confidence ?? 1;
-    if (row._cellKeyMap) delete row._cellKeyMap[col];
+/** True when `row` itself (not an ancestor) is the source of its left-column value. */
+function ownsLeftValue(row: ExtractedRow, col: string): boolean {
+  if (String(row[col] ?? '').trim() === '') return false;
+  const ref = row._cellKeyMap?.[col];
+  return ref === undefined || ref.startsWith(`${String(row._id)}:`);
+}
+
+/** Adds `SUB_` columns up to `maxLevel` (placed after the deepest existing one) and drops any deeper than that. */
+function syncSubColumns(columns: string[], itemColumnKey: string, maxLevel: number): string[] {
+  const next = columns.filter((c) => {
+    const d = subItemDepth(c, itemColumnKey);
+    return d === null || d <= maxLevel;
+  });
+  for (let depth = 1; depth <= maxLevel; depth++) {
+    const name = subItemColumnName(itemColumnKey, depth);
+    if (next.includes(name)) continue;
+    const anchor = depth === 1 ? itemColumnKey : subItemColumnName(itemColumnKey, depth - 1);
+    const at = next.indexOf(anchor);
+    next.splice(at === -1 ? next.length : at + 1, 0, name);
   }
+  return next;
+}
+
+// ==========================================
+// RESTRUCTURE
+// ==========================================
+
+/**
+ * Applies `transform` to a copy of the rows (reorder, remove, change
+ * `_indentLevel`...), then re-derives the item band and inherited left columns
+ * so they match the new levels/order. Each row keeps its own item text, wherever
+ * it ends up.
+ *
+ * `transform` receives deep-enough clones it may freely mutate; it must not add
+ * rows (their own text would be unknown).
+ *
+ * `readOwn` says where each row's own item text currently lives. The default
+ * reads it from the existing item band; `setItemColumn` overrides it because
+ * the new item column has no band yet.
+ */
+export function restructure(
+  page: ExtractedPage,
+  transform: (rows: ExtractedRow[]) => ExtractedRow[],
+  readOwn: OwnReader = readOwnItem
+): ExtractedPage {
+  const itemKey = page.itemColumnKey;
+  if (!itemKey || !page.columns.includes(itemKey)) {
+    return { ...page, rows: transform(page.rows.map(cloneRow)) };
+  }
+
+  // 1. Each row's own item text, captured at its CURRENT level, before anything moves.
+  const own = new Map<string, OwnCell>();
+  for (const r of page.rows) own.set(String(r._id), readOwn(r, itemKey));
+
+  // 2. Transform clones, then force levels to be valid (first row 0, never > previous + 1).
+  const rows = transform(page.rows.map(cloneRow));
+  let prev = -1;
+  for (const r of rows) {
+    r._indentLevel = Math.min(Math.max(0, levelOf(r)), prev + 1);
+    prev = r._indentLevel;
+  }
+  const maxLevel = rows.reduce((m, r) => Math.max(m, levelOf(r)), 0);
+
+  const columns = syncSubColumns(page.columns, itemKey, maxLevel);
+  const itemIdx = columns.indexOf(itemKey);
+  const leftCols = columns.filter((c, i) => i < itemIdx && subItemDepth(c, itemKey) === null);
+  const droppedSubCols = page.columns.filter(
+    (c) => !columns.includes(c) && subItemDepth(c, itemKey) !== null
+  );
+
+  // 3. Re-derive each row's band + inherited left columns from its ancestors.
+  const path: ExtractedRow[] = []; // path[k] = ancestor at level k (path[level] = the row itself)
+  for (const row of rows) {
+    const level = levelOf(row);
+    path.length = level;
+    path.push(row);
+
+    for (let k = 0; k <= maxLevel; k++) {
+      const col = k === 0 ? itemKey : subItemColumnName(itemKey, k);
+      const rowConfidence = row._confidence ?? 1;
+      if (k > level) {
+        writeCell(row, col, '', rowConfidence);
+        continue;
+      }
+      const src = own.get(String(path[k]._id)) ?? readOwn(path[k], itemKey);
+      const absent = src.value === '' && !src.ref;
+      writeCell(row, col, src.value, absent ? rowConfidence : src.confidence, src.ref);
+    }
+
+    for (const col of leftCols) {
+      if (ownsLeftValue(row, col)) continue; // its own value stays
+      let from: ExtractedRow | undefined;
+      for (let k = level - 1; k >= 0; k--) {
+        if (ownsLeftValue(path[k], col)) {
+          from = path[k];
+          break;
+        }
+      }
+      if (from) {
+        // Always stamp an owner ref so descendants never mistake the copy for an own value.
+        const ref = from._cellKeyMap![col] ?? `${String(from._id)}:${col}`;
+        writeCell(row, col, String(from[col]), from._cellConfidence[col], ref);
+      } else {
+        writeCell(row, col, '', row._confidence ?? 1);
+      }
+    }
+
+    for (const col of droppedSubCols) {
+      delete row[col];
+      delete row._cellConfidence[col];
+      delete row._cellKeyMap![col];
+    }
+  }
+
+  return { ...page, columns, rows };
 }
 
 // ==========================================
@@ -106,81 +248,103 @@ function clearItemBand(row: ExtractedRow, itemColumnKey: string, subItemColumns:
 // ==========================================
 
 /**
- * Moves one row (and, implicitly, its whole subtree — every following row
- * deeper than it) in or out by one level, and repositions each affected
- * row's own text into the item/sub-item column matching its new depth.
+ * Moves one row — and its whole subtree (every following row deeper than it) —
+ * in or out by one level. Returns the SAME page object when nothing can change
+ * (first row, already at max/min depth), which usePageMutation treats as a no-op.
  *
- * Everything else on every row — cell edits, extra columns, row order,
- * confidences on unrelated columns — is left exactly as-is. This is a
- * transform on `page`, never a re-flatten from OCR.
+ * Note on outdent: later siblings that were at the row's old level stay where
+ * they are, so they become children of the outdented row — the standard outline
+ * behaviour (Workflowy, Notion, Docs).
  */
 export function reindentRow(
   page: ExtractedPage,
   rowId: string | number,
   direction: IndentDirection
 ): ExtractedPage {
-  const { rows, itemColumnKey } = page;
-  const rowIndex = rows.findIndex((r) => r._id === rowId);
-  if (rowIndex === -1) return page;
+  const index = page.rows.findIndex((r) => String(r._id) === String(rowId));
+  if (index === -1) return page;
 
-  const oldLevel = rows[rowIndex]._indentLevel ?? 0;
-  const levelAbove = rowIndex > 0 ? (rows[rowIndex - 1]._indentLevel ?? 0) : 0;
+  const allowed =
+    direction === 'in' ? canIndentIndex(page.rows, index) : canOutdentIndex(page.rows, index);
+  if (!allowed) return page;
 
-  const newLevel =
-    direction === 'in'
-      ? Math.min(oldLevel + 1, levelAbove + 1) // can't jump deeper than 1 below the row above
-      : Math.max(0, oldLevel - 1);
+  const delta = direction === 'in' ? 1 : -1;
+  const end = subtreeEnd(page.rows, index);
 
-  if (newLevel === oldLevel) return page; // nothing to do (e.g. already at max/min depth)
+  return restructure(page, (rows) => {
+    for (let i = index; i < end; i++) rows[i]._indentLevel = levelOf(rows[i]) + delta;
+    return rows;
+  });
+}
 
-  const delta = newLevel - oldLevel;
+// ==========================================
+// CHOOSING THE INDENT COLUMN
+// ==========================================
 
-  // The subtree is this row plus every following row deeper than it —
-  // those rows move by the same delta so their relative nesting under this
-  // row is preserved.
-  let subtreeEnd = rowIndex + 1;
-  while (subtreeEnd < rows.length && (rows[subtreeEnd]._indentLevel ?? 0) > oldLevel) {
-    subtreeEnd++;
+/**
+ * Makes `newKey` the column the hierarchy is carried by. Row levels are kept;
+ * only the text that fills the item band changes.
+ *
+ *  1. Capture each row's own text in the NEW column (if it sat left of the old
+ *     item column, child-row values there are inherited copies, not own text).
+ *  2. Collapse the old band: own text goes back into the old item column and
+ *     the SUB_ columns are dropped. The old column is now an ordinary column.
+ *  3. Re-derive the band from the new column via `restructure`.
+ *
+ * Returns the SAME page when nothing can change.
+ */
+export function setItemColumn(page: ExtractedPage, newKey: string): ExtractedPage {
+  const oldKey = page.itemColumnKey;
+  if (
+    newKey === oldKey ||
+    !page.columns.includes(newKey) ||
+    !page.columns.includes(oldKey) ||
+    isDerivedColumn(page, newKey)
+  ) {
+    return page;
   }
 
-  const deepestNewLevel = Math.max(
-    ...rows.slice(rowIndex, subtreeEnd).map((r) => (r._indentLevel ?? 0) + delta)
-  );
-  const { columns, subItemColumns } = ensureSubItemColumns(
-    page.columns,
-    itemColumnKey,
-    deepestNewLevel
-  );
-
-  // Capture each subtree row's own text BEFORE mutating anything — once we
-  // start clearing item-band columns we'd lose it.
-  const ownCells = rows
-    .slice(rowIndex, subtreeEnd)
-    .map((r) => getOwnItemCell(r, itemColumnKey, subItemColumns));
-
-  const newRows = rows.map((r) => ({ ...r, _cellConfidence: { ...r._cellConfidence } }));
-
-  for (let i = rowIndex; i < subtreeEnd; i++) {
-    newRows[i]._indentLevel = (rows[i]._indentLevel ?? 0) + delta;
-    clearItemBand(newRows[i], itemColumnKey, subItemColumns);
+  const wasLeft = page.columns.indexOf(newKey) < page.columns.indexOf(oldKey);
+  const ownNew = new Map<string, OwnCell>();
+  for (const r of page.rows) {
+    const owns = !wasLeft || ownsLeftValue(r, newKey);
+    ownNew.set(String(r._id), {
+      value: owns ? String(r[newKey] ?? '') : '',
+      confidence: r._cellConfidence?.[newKey] ?? r._confidence ?? 1,
+      ref: owns ? r._cellKeyMap?.[newKey] : undefined,
+    });
   }
 
-  // Re-fill each subtree row's item band: its own text at its new depth,
-  // plus its ancestors' text (found by walking backwards through the rows
-  // that precede it) at every shallower depth.
-  for (let i = rowIndex; i < subtreeEnd; i++) {
-    const level = newRows[i]._indentLevel ?? 0;
-    setItemCellAt(newRows[i], itemColumnKey, subItemColumns, level, ownCells[i - rowIndex]);
-
-    let neededDepth = level - 1;
-    for (let j = i - 1; j >= 0 && neededDepth >= 0; j--) {
-      if ((newRows[j]._indentLevel ?? 0) === neededDepth) {
-        const ancestorCell = getOwnItemCell(newRows[j], itemColumnKey, subItemColumns);
-        setItemCellAt(newRows[i], itemColumnKey, subItemColumns, neededDepth, ancestorCell);
-        neededDepth--;
+  const derived = page.columns.filter((c) => isDerivedColumn(page, c));
+  const collapsed: ExtractedPage = {
+    ...page,
+    itemColumnKey: newKey,
+    columns: page.columns.filter((c) => !derived.includes(c)),
+    rows: page.rows.map((r) => {
+      const row = cloneRow(r);
+      const own = readOwnItem(r, oldKey);
+      for (const c of derived) {
+        delete row[c];
+        delete row._cellConfidence[c];
+        delete row._cellKeyMap![c];
       }
-    }
-  }
+      writeCell(row, oldKey, own.value, own.confidence, own.ref);
+      return row;
+    }),
+  };
 
-  return { ...page, columns, rows: newRows };
+  return restructure(
+    collapsed,
+    (rows) => rows,
+    (r) => ownNew.get(String(r._id))!
+  );
+}
+
+/**
+ * Every row's level, keyed by row id. Feed this to the flattener as
+ * `manualIndentLevels` (a COMPLETE override, so detected and manual levels are
+ * never mixed on different scales).
+ */
+export function indentLevelsOf(page: ExtractedPage): Record<string, number> {
+  return Object.fromEntries(page.rows.map((r) => [String(r._id), levelOf(r)]));
 }
