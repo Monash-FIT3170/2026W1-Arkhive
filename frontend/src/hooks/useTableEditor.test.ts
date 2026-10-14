@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useTableEditor } from './useTableEditor';
 import type { ExtractedPage } from '../models/TableData';
+import type { HistoryEntry } from '../models/HistoryEntry';
 // This test file was generated with the assistance of Google Gemini.
 function createMockPage(): ExtractedPage {
   return {
@@ -37,18 +39,18 @@ describe('useTableEditor', () => {
   let initialPages: ExtractedPage[];
   let pagesRef: { current: ExtractedPage[] };
   let pageIndexRef: { current: number };
-  let onPagesChange: ReturnType<typeof vi.fn>;
-  let onPersist: ReturnType<typeof vi.fn>;
-  let addHistoryEntry: ReturnType<typeof vi.fn>;
-  let pushUndo: ReturnType<typeof vi.fn>;
-  let onCellEdited: ReturnType<typeof vi.fn>;
-  let onColumnRenamed: ReturnType<typeof vi.fn>;
+  let onPagesChange: Mock<(updater: (pages: ExtractedPage[]) => ExtractedPage[]) => void>;
+  let onPersist: Mock<(pages: ExtractedPage[]) => void>;
+  let addHistoryEntry: Mock<(entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => void>;
+  let pushUndo: Mock<(snapshot: ExtractedPage[]) => void>;
+  let onCellEdited: Mock<(fieldId: string) => void>;
+  let onColumnRenamed: Mock<(oldName: string, newName: string) => void>;
 
   beforeEach(() => {
     initialPages = [createMockPage()];
     pagesRef = { current: initialPages };
     pageIndexRef = { current: 0 };
-    onPagesChange = vi.fn((updater) => {
+    onPagesChange = vi.fn((updater: (pages: ExtractedPage[]) => ExtractedPage[]) => {
       pagesRef.current = updater(pagesRef.current);
     });
     onPersist = vi.fn();

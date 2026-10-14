@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useUndoRedo } from './useUndoRedo';
-// This test file was generated with the assistance of Google Gemini.
+
 describe('useUndoRedo', () => {
   let currentRef: { current: string };
-  let onApply: ReturnType<typeof vi.fn>;
+  let onApply: Mock<(val: string, direction: 'undo' | 'redo') => void>;
 
   beforeEach(() => {
     currentRef = { current: 'state-0' };
