@@ -78,6 +78,16 @@ export default function ProjectCard({
     day: 'numeric',
   });
 
+  const docCount =
+    project.document_count ??
+    (preview?.status === 'ready' ? preview.detail.documents.length : project.documents?.length ?? 0);
+
+  const pagesCount =
+    project.page_count ??
+    (preview?.status === 'ready'
+      ? pageCount(preview.detail)
+      : project.documents?.reduce((sum, doc) => sum + (doc.pages?.length ?? 0), 0) ?? 0);
+
   return (
     <div
       className={`group relative flex flex-col rounded-xl border bg-base-100 transition-all duration-200 overflow-hidden ${
@@ -201,14 +211,10 @@ export default function ProjectCard({
               <Calendar className="w-3.5 h-3.5" />
               {formattedDate}
             </span>
-            {preview?.status === 'ready' && (
-              <>
-                <span>·</span>
-                <span className="badge badge-ghost badge-xs">
-                  {preview.detail.documents.length} doc{preview.detail.documents.length === 1 ? '' : 's'}
-                </span>
-              </>
-            )}
+            <span>·</span>
+            <span className="badge badge-ghost badge-xs">
+              {docCount} {docCount === 1 ? 'doc' : 'docs'} · {pagesCount} {pagesCount === 1 ? 'page' : 'pages'}
+            </span>
           </div>
         </div>
       </div>
@@ -223,11 +229,7 @@ export default function ProjectCard({
         }}
       >
         <span className="font-medium">
-          {preview?.status === 'ready'
-            ? `${preview.detail.documents.length} document${
-                preview.detail.documents.length === 1 ? '' : 's'
-              } · ${pageCount(preview.detail)} page${pageCount(preview.detail) === 1 ? '' : 's'}`
-            : 'Preview contents'}
+          {docCount} {docCount === 1 ? 'document' : 'documents'} · {pagesCount} {pagesCount === 1 ? 'page' : 'pages'}
         </span>
         <ChevronDown
           className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${

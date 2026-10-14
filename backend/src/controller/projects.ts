@@ -91,7 +91,7 @@ export default {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data: projects, error } = await supabase
         .from('projects')
         .select('*')
         .eq('owner_id', ownerId)
@@ -103,7 +103,78 @@ export default {
         return;
       }
 
-      res.json(data || []);
+      if (!projects || projects.length === 0) {
+        res.json([]);
+        return;
+      }
+
+      const projectIds = projects.map((p) => p.id);
+
+      const { data: documents, error: docsError } = await supabase
+        .from('documents')
+        .select('id, project_id, filename, storage_path, created_at')
+        .in('project_id', projectIds)
+        .order('created_at', { ascending: false });
+
+      if (docsError) {
+        console.error('Failed to list project documents:', docsError);
+        res.json(
+          projects.map((p) => ({
+            ...p,
+            document_count: 0,
+            page_count: 0,
+            documents: [],
+          }))
+        );
+        return;
+      }
+
+      const documentIds = (documents || []).map((d) => d.id);
+      let pagesByDocument = new Map<string, unknown[]>();
+
+      if (documentIds.length > 0) {
+        const { data: pages, error: pagesError } = await supabase
+          .from('document_pages')
+          .select('id, document_id, page_index, status')
+          .in('document_id', documentIds)
+          .order('page_index', { ascending: true });
+
+        if (!pagesError && pages) {
+          pagesByDocument = pages.reduce((map, page) => {
+            const list = map.get(page.document_id) ?? [];
+            list.push(page);
+            map.set(page.document_id, list);
+            return map;
+          }, new Map<string, unknown[]>());
+        }
+      }
+
+      const docsByProject = new Map<string, any[]>();
+      (documents || []).forEach((doc) => {
+        const docWithPages = {
+          ...doc,
+          pages: pagesByDocument.get(doc.id) ?? [],
+        };
+        const list = docsByProject.get(doc.project_id) ?? [];
+        list.push(docWithPages);
+        docsByProject.set(doc.project_id, list);
+      });
+
+      const result = projects.map((project) => {
+        const projectDocs = docsByProject.get(project.id) ?? [];
+        const pageCount = projectDocs.reduce(
+          (sum: number, doc: any) => sum + (doc.pages?.length || 0),
+          0
+        );
+        return {
+          ...project,
+          document_count: projectDocs.length,
+          page_count: pageCount,
+          documents: projectDocs,
+        };
+      });
+
+      res.json(result);
     } catch (err: any) {
       console.error('Unexpected error in listProjects:', err);
       res.status(500).json({ error: err.message || 'Internal server error.' });

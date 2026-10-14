@@ -6,6 +6,9 @@ export interface Project {
   name: string;
   owner_id: string;
   created_at: string;
+  document_count?: number;
+  page_count?: number;
+  documents?: DocumentRecord[];
 }
 
 export type PageStatus = 'pending' | 'processing' | 'done' | 'error';

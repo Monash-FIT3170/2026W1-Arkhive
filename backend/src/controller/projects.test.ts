@@ -112,26 +112,78 @@ describe('Projects Controller', () => {
   });
 
   describe('listProjects', () => {
-    it('returns all projects for the user', async () => {
+    it('returns all projects for the user with document and page counts', async () => {
       const mockProjects = [
         { id: 'proj-1', name: 'P1', owner_id: 'test-user-123' },
         { id: 'proj-2', name: 'P2', owner_id: 'test-user-123' },
       ];
+      const mockDocs = [{ id: 'doc-1', project_id: 'proj-1', filename: 'invoice.pdf' }];
+      const mockPages = [
+        { id: 'page-1', document_id: 'doc-1', page_index: 0, status: 'pending' },
+        { id: 'page-2', document_id: 'doc-1', page_index: 1, status: 'done' },
+      ];
 
-      vi.spyOn(supabase, 'from').mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: mockProjects, error: null }),
-          }),
-        }),
-      } as any);
+      vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+        if (table === 'projects') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: mockProjects, error: null }),
+              }),
+            }),
+          } as any;
+        }
+        if (table === 'documents') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: mockDocs, error: null }),
+              }),
+            }),
+          } as any;
+        }
+        if (table === 'document_pages') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: mockPages, error: null }),
+              }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
 
       const { req, res, getStatus, getJson } = createMockReqRes('test-user-123');
 
       await projectsController.listProjects(req, res);
 
       expect(getStatus()).toBe(200);
-      expect(getJson()).toEqual(mockProjects);
+      expect(getJson()).toEqual([
+        {
+          id: 'proj-1',
+          name: 'P1',
+          owner_id: 'test-user-123',
+          document_count: 1,
+          page_count: 2,
+          documents: [
+            {
+              id: 'doc-1',
+              project_id: 'proj-1',
+              filename: 'invoice.pdf',
+              pages: mockPages,
+            },
+          ],
+        },
+        {
+          id: 'proj-2',
+          name: 'P2',
+          owner_id: 'test-user-123',
+          document_count: 0,
+          page_count: 0,
+          documents: [],
+        },
+      ]);
     });
   });
 

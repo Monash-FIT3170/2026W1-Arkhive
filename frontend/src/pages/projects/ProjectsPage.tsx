@@ -419,14 +419,24 @@ export default function ProjectsPage() {
                             {project.name}
                           </button>
                         )}
-                        <span className="text-xs text-base-content/40 flex items-center gap-1 mt-0.5">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(project.created_at).toLocaleDateString(undefined, {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </span>
+                        <div className="text-xs text-base-content/50 flex items-center gap-2 mt-0.5">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(project.created_at).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </span>
+                          <span>·</span>
+                          <span className="badge badge-ghost badge-xs">
+                            {project.document_count ?? project.documents?.length ?? 0} docs ·{' '}
+                            {project.page_count ??
+                              project.documents?.reduce((sum, d) => sum + (d.pages?.length ?? 0), 0) ??
+                              0}{' '}
+                            pages
+                          </span>
+                        </div>
                       </div>
                     </div>
 
