@@ -138,7 +138,7 @@ cd 2026W1-Arkhive
    npm install
    ```
 
-   Create a `.env` file in the `backend/` directory (refer to `.env.example` in the root directory) and populate it with your credentials:
+   Create a `.env` file in the `backend/` directory (refer to `.env.example` in the root directory) and populate it with your credentials (You may also use a secrets manager for this):
 
    ```env
    # LLM & OCR Service Credentials
