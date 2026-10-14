@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
-  FolderOpen,
   Search,
   LayoutGrid,
   List,
@@ -13,8 +12,8 @@ import {
   Pencil,
   ArrowUpRight,
   FolderPlus,
+  FolderOpen,
 } from 'lucide-react';
-import { AlertCircle, FolderOpen } from 'lucide-react';
 import { useProjects } from '../../hooks/useProjects';
 import { useProjectPreview } from '../../hooks/useProjectPreview';
 import CreateProjectModal from './components/CreateProjectModal';
@@ -25,13 +24,6 @@ import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 type SortOption = 'newest' | 'oldest' | 'name-asc' | 'name-desc';
 type ViewMode = 'grid' | 'list';
 
-/**
- * Projects list page — list/create/rename/delete, plus an in-place preview
- * so a project's contents can be checked without opening the workspace.
- *
- * Guest access is blocked upstream by the RequireUser route guard (see
- * App.tsx) — this component can assume a real user is always present.
- */
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const { projects, isLoading, error, setError, create, rename, remove } = useProjects();
@@ -208,14 +200,98 @@ export default function ProjectsPage() {
 
       {/* Global Error Banner */}
       {error && (
-        <div className="alert alert-error text-sm">
-          <AlertCircle className="w-4 h-4" />
-          {error}
+        <div
+          role="alert"
+          className="alert alert-error flex items-center justify-between gap-3 text-sm py-2 px-4 shadow-sm"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs shrink-0"
+            onClick={() => setError(null)}
+            aria-label="Dismiss error"
+            title="Dismiss error"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
-      <CreateProjectForm onCreate={create} onError={setError} />
+      {/* Consolidated Toolbar: Search, Sort, View Switcher */}
+      {!isLoading && projects.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Search bar with clear button */}
+          <div className="relative flex-1 min-w-0">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-40 pointer-events-none" />
+            <input
+              type="search"
+              placeholder="Search projects..."
+              className="input input-bordered input-sm sm:input-md w-full pl-9 pr-8 text-sm"
+              aria-label="Search projects"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs btn-circle absolute right-2 top-1/2 -translate-y-1/2 text-base-content/50 hover:text-base-content"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear search"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
+          {/* Right controls: Sort and View mode */}
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+            <select
+              className="select select-bordered select-sm sm:select-md text-sm"
+              aria-label="Sort projects"
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value as SortOption)}
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="name-asc">Name: A-Z</option>
+              <option value="name-desc">Name: Z-A</option>
+            </select>
+
+            <div className="join" role="group" aria-label="Project view">
+              <button
+                type="button"
+                className={`btn btn-sm sm:btn-md join-item ${
+                  viewMode === 'grid' ? 'btn-active btn-neutral' : 'btn-ghost'
+                }`}
+                onClick={() => changeView('grid')}
+                aria-pressed={viewMode === 'grid'}
+                title="Grid view"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                className={`btn btn-sm sm:btn-md join-item ${
+                  viewMode === 'list' ? 'btn-active btn-neutral' : 'btn-ghost'
+                }`}
+                onClick={() => changeView('list')}
+                aria-pressed={viewMode === 'list'}
+                title="List view"
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
       {isLoading ? (
         <div className="flex justify-center py-20">
           <span className="loading loading-spinner loading-lg text-primary" />
@@ -241,20 +317,177 @@ export default function ProjectsPage() {
             Create Project
           </button>
         </div>
+      ) : filteredProjects.length === 0 ? (
+        /* Empty State: No search results */
+        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center border border-base-300 rounded-xl bg-base-100/50">
+          <Search className="w-8 h-8 text-base-content/30" />
+          <div>
+            <p className="font-medium text-base-content">No projects match &ldquo;{searchQuery}&rdquo;</p>
+            <p className="text-xs text-base-content/50 mt-1">Try adjusting your search query or sorting options.</p>
+          </div>
+          <button className="btn btn-ghost btn-sm mt-1" onClick={() => setSearchQuery('')}>
+            Clear search
+          </button>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-          {projects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              isExpanded={isExpanded(project.id)}
-              preview={getPreview(project.id)}
-              onNavigate={(id) => navigate(`/projects/${id}`)}
-              onToggleExpand={toggleExpand}
-              onDeleteRequest={setDeleteConfirmId}
-              onRename={rename}
-              onError={setError}
-            />
+        /* Projects List / Grid */
+        <div
+          className={
+            viewMode === 'grid'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start'
+              : 'flex flex-col gap-2.5'
+          }
+        >
+          {filteredProjects.map((project) => (
+            <div key={project.id} className="w-full min-w-0">
+              {viewMode === 'grid' ? (
+                <ProjectCard
+                  project={project}
+                  isExpanded={isExpanded(project.id)}
+                  preview={getPreview(project.id)}
+                  onNavigate={(id) => navigate(`/projects/${id}`)}
+                  onToggleExpand={toggleExpand}
+                  onDeleteRequest={setDeleteConfirmId}
+                  onRename={rename}
+                  onError={setError}
+                  isSelected={selectedIds.includes(project.id)}
+                  onToggleSelect={toggleSelected}
+                />
+              ) : (
+                /* Polished List View Item */
+                <div
+                  className={`group rounded-xl border bg-base-100 transition-all duration-200 overflow-hidden ${
+                    selectedIds.includes(project.id)
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-sm'
+                      : 'border-base-300 hover:border-primary/40 hover:shadow-sm'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3 p-3.5">
+                    {/* Left: Checkbox + Icon + Title */}
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm checkbox-primary rounded shrink-0"
+                        aria-label={`Select ${project.name}`}
+                        checked={selectedIds.includes(project.id)}
+                        onChange={() => toggleSelected(project.id)}
+                      />
+
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <FolderOpen className="w-4 h-4" />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        {renamingId === project.id ? (
+                          <div className="flex items-center gap-1.5 max-w-sm">
+                            <input
+                              autoFocus
+                              type="text"
+                              className="input input-bordered input-xs flex-1 min-w-0"
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveListRename(project.id);
+                                if (e.key === 'Escape') setRenamingId(null);
+                              }}
+                              disabled={isSavingRename}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs text-success px-1"
+                              disabled={isSavingRename}
+                              onClick={() => saveListRename(project.id)}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs px-1"
+                              disabled={isSavingRename}
+                              onClick={() => setRenamingId(null)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="font-semibold text-sm truncate text-left hover:text-primary transition-colors block max-w-full"
+                            onClick={() => navigate(`/projects/${project.id}`)}
+                          >
+                            {project.name}
+                          </button>
+                        )}
+                        <div className="text-xs text-base-content/50 flex items-center gap-2 mt-0.5">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(project.created_at).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </span>
+                          <span>·</span>
+                          <span className="badge badge-ghost badge-xs">
+                            {project.document_count ?? project.documents?.length ?? 0} docs ·{' '}
+                            {project.page_count ??
+                              project.documents?.reduce((sum, d) => sum + (d.pages?.length ?? 0), 0) ??
+                              0}{' '}
+                            pages
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Quick actions */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs text-xs font-medium"
+                        onClick={() => toggleExpand(project)}
+                        aria-expanded={isExpanded(project.id)}
+                      >
+                        {isExpanded(project.id) ? 'Hide details' : 'Details'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs btn-circle text-base-content/60 hover:text-base-content"
+                        title="Rename project"
+                        onClick={() => startListRename(project.id, project.name)}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs btn-circle text-base-content/60 hover:text-error hover:bg-error/10"
+                        title="Delete project"
+                        onClick={() => setDeleteConfirmId(project.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-xs gap-1 ml-1"
+                        onClick={() => navigate(`/projects/${project.id}`)}
+                      >
+                        Open
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* List View Expandable Preview Panel */}
+                  {isExpanded(project.id) && (
+                    <div className="border-t border-base-300">
+                      <ProjectPreviewPanel preview={getPreview(project.id)} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -314,6 +547,21 @@ export default function ProjectsPage() {
           isLoading={isDeleting}
           onCancel={() => setDeleteConfirmId(null)}
           onConfirm={confirmDelete}
+        />
+      )}
+
+      {/* Bulk Delete Confirm Modal */}
+      {showBulkConfirm && (
+        <ConfirmDeleteModal
+          title={`Delete ${selectedIds.length} Projects?`}
+          description={`You are about to permanently delete ${selectedIds.length} selected projects and all their documents. This action cannot be undone.`}
+          isLoading={isBulkDeleting}
+          onCancel={() => {
+            if (!isBulkDeleting) {
+              setShowBulkConfirm(false);
+            }
+          }}
+          onConfirm={confirmBulkDelete}
         />
       )}
     </div>

@@ -23,6 +23,8 @@ interface ProjectCardProps {
   onDeleteRequest: (id: string) => void;
   onRename: (id: string, name: string) => Promise<unknown>;
   onError: (message: string) => void;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 export default function ProjectCard({
@@ -34,6 +36,8 @@ export default function ProjectCard({
   onDeleteRequest,
   onRename,
   onError,
+  isSelected = false,
+  onToggleSelect,
 }: ProjectCardProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
@@ -122,6 +126,7 @@ export default function ProjectCard({
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
+
                 <button
                   type="button"
                   className="btn btn-ghost btn-xs btn-circle text-base-content/60 hover:text-error hover:bg-error/10"
@@ -129,6 +134,15 @@ export default function ProjectCard({
                   onClick={() => onDeleteRequest(project.id)}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs btn-circle text-base-content/60 hover:text-primary"
+                  title="Open workspace"
+                  onClick={() => onNavigate(project.id)}
+                >
+                  <ArrowUpRight className="w-4 h-4" />
                 </button>
               </>
             )}
