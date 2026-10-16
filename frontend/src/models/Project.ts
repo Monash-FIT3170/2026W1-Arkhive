@@ -6,6 +6,9 @@ export interface Project {
   name: string;
   owner_id: string;
   created_at: string;
+  document_count?: number;
+  page_count?: number;
+  documents?: DocumentRecord[];
 }
 
 export type PageStatus = 'pending' | 'processing' | 'done' | 'error';
@@ -75,6 +78,7 @@ export interface PageSelection {
   pageIndices: number[];
   /** If true, re-run OCR even on pages already marked 'done'. Default false. */
   force?: boolean;
+  docType?: any;
 }
 
 // Result for one page after a batch process call.

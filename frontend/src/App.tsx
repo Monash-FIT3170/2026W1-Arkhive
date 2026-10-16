@@ -1,6 +1,8 @@
 import './App.css';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthProvider';
+import { OcrProgressProvider } from './context/OcrProgressProvider';
+import OcrProgressPopup from './components/ocr-progress/OcrProgressPopup';
 import { AuthGuard } from './components/auth/AuthGuard';
 import { RequireUser } from './components/auth/RequireUser';
 import LoginPage from './pages/login/LoginPage';
@@ -17,10 +19,12 @@ import MobileCapture from './pages/upload/MobileCapture';
 function AppContent() {
   const location = useLocation();
   const isMobileCapture = location.pathname.startsWith('/upload/mobile/');
+  const isValidationPage = location.pathname.startsWith('/validation');
 
   return (
     <div className="min-h-screen bg-base-100 text-base-content flex flex-col">
       {!isMobileCapture && <Navbar />}
+      {!isMobileCapture && !isValidationPage && <OcrProgressPopup />}
       <div className="flex-1 flex flex-col">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -50,9 +54,11 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <OcrProgressProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </OcrProgressProvider>
     </AuthProvider>
   );
 }
