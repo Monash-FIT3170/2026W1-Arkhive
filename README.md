@@ -28,12 +28,12 @@ Ensure the following software components and cloud service accounts are set up b
 ## 🛠️ Tech Stack
 
 - **Frontend:** React.js, TypeScript, Vite, Tailwind CSS, DaisyUI, Lucide Icons, PDF.js
-- **Backend:** Node.js, Express, TypeScript, AWS SDK (S3 client for R2)
+- **Backend:** Node.js, Express, TypeScript, AWS SDK (S3 client for R2), OpenCV (`@techstark/opencv-js`), Sharp
 - **Database & Authentication:** Supabase (PostgreSQL with Row-Level Security, Supabase Auth)
 - **Object Storage:** Cloudflare R2 (S3-compatible bucket with direct client-side presigned uploads)
-- **OCR Engine:** Azure Document Intelligence
-- **LLM Engine:** Google Gemini API
-- **Testing:** Vitest, Testing Library, Supertest, Husky
+- **OCR Engine:** Azure Document Intelligence (`prebuilt-layout`) with OpenCV Unsharp Masking & Profile-Driven Extraction
+- **LLM Engine:** Google Gemini Flash Lite (`gemini-flash-lite-latest` & `gemini-3.5-flash-lite`)
+- **Testing:** Vitest, Testing Library, Supertest, Playwright (E2E), Husky
 
 ---
 
@@ -44,10 +44,12 @@ Ensure the following software components and cloud service accounts are set up b
 - **Direct Cloud Storage:** Secure, high-performance direct browser-to-R2 image uploads using presigned URLs.
 - **Project & Document Management:** Persistent user workspaces with projects, documents, and individual page tracking.
 - **Authentication & User Profiles:** Supabase Auth supporting Email/Password, Google OAuth, and isolated Guest mode.
-- **Intelligent OCR & Table Extraction:** Extraction of raw text, tabular structures (rows/columns), and per-cell confidence scoring.
-- **Interactive AI Chat:** Side-by-side verification allowing users to ask Google Gemini questions to refine columns, fix formatting, or extract specific metrics.
+- **Intelligent Pre-OCR Filtering:** OpenCV-powered Unsharp Masking and grayscale noise reduction to crispen text strokes and table lines.
+- **Profile-Driven OCR Pipeline:** Specialized profiles (`table`, `receipt`, `invoice`, `generic`) combining Azure Document Intelligence with Gemini Flash Lite for field extraction, floating tables, and parent-child row hierarchies.
+- **Real-Time OCR Progress Tracking:** Background tracking across document pages with persistent toasts and status dialogs.
+- **Interactive AI Chat:** Side-by-side verification allowing users to ask Google Gemini Flash Lite questions to refine columns, fix formatting, or resolve review queue issues.
 - **Reprocessing & Granular Control:** Re-run OCR on specific document pages without re-uploading.
-- **Flexible Data Export:** Export verified data into CSV (with headers) or raw TXT formats.
+- **Modular Data Export:** Export verified data into CSV, formatted Excel (`.XLSX`), JSON, or raw TXT with customizable business templates.
 
 ---
 
@@ -241,6 +243,10 @@ Arkhive includes a multi-stage [`Dockerfile`](./Dockerfile) and Google Cloud Bui
   ```bash
   cd frontend && npm run test:integration
   ```
+- **Frontend End-to-End Tests (Playwright):**
+  ```bash
+  cd frontend && npm run test:e2e
+  ```
 - **Typechecking & Linting:**
   ```bash
   cd backend && npm run typecheck && npm run lint
@@ -253,9 +259,9 @@ Arkhive includes a multi-stage [`Dockerfile`](./Dockerfile) and Google Cloud Bui
 
 1. **Create or Open a Project:** Create a new project in the dashboard to organize your uploaded files, or use **Guest Mode** / **Mobile QR Capture** for quick ephemeral sessions.
 2. **Upload Documents:** Upload single or multi-page documents (PDF, JPG, PNG, HEIC, HEIF up to 10MB). The frontend splits PDFs into individual page previews, checks image quality (blur/glare/contrast), and uploads each page to Cloudflare R2 (or local session storage for guests).
-3. **Run OCR & Table Extraction:** Select documents or specific pages and trigger processing. Review extracted tables and bounding boxes alongside the original document in the side-by-side viewer.
-4. **Interactive Verification & Chat:** Use Google Gemini in the verification chat to refine detected column headers, query specific rows, or resolve low-confidence cells in the review queue.
-5. **Export:** Export finalized tabular data to `.CSV`, `.XLSX`, or `.TXT`.
+3. **Run OCR & Table Extraction:** Select documents or specific pages and trigger processing. Review extracted tables and bounding boxes alongside the original document in the side-by-side viewer. Background progress is tracked in real-time across pages.
+4. **Interactive Verification & Chat:** Use Google Gemini Flash Lite in the verification chat to refine detected column headers, query specific rows, or resolve low-confidence cells in the review queue.
+5. **Export:** Export finalized tabular data to `.CSV`, `.XLSX`, `.JSON`, or `.TXT` using modular templates.
 
 ---
 
@@ -265,10 +271,11 @@ For an in-depth technical reference on how Arkhive is structured and how data fl
 
 New developers joining the project should review **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** for:
 
-- **Repository Layout & Directory Roles:** Detailed breakdown of [`frontend/`](./frontend) (`pages`, `components`, `context`, `hooks`, `services`, `utils`, `models`) and [`backend/`](./backend) (`middleware`, `routes`, `controller`, `services/ocr`, `services/llm`, `supabase/migrations`).
-- **State Management & API Conventions:** How [`AuthProvider`](./frontend/src/context/AuthProvider.tsx) manages Supabase JWTs and Guest sessions, how custom hooks (`useTableEditor`, `useUndoRedo`, `useReviewQueue`) manage local state, and how `frontend/src/services/` communicates with the Express backend.
+- **Repository Layout & Directory Roles:** Detailed breakdown of [`frontend/`](./frontend) (`pages`, `components`, `context`, `hooks`, `services/export`, `utils`, `models`, `e2e`) and [`backend/`](./backend) (`middleware`, `routes`, `controller`, `services/ocr/pipeline`, `services/llm`, `supabase/migrations`).
+- **State Management & API Conventions:** How [`AuthProvider`](./frontend/src/context/AuthProvider.tsx) manages Supabase JWTs and Guest sessions, how [`OcrProgressProvider`](./frontend/src/context/OcrProgressProvider.tsx) coordinates background page tasks, how custom hooks (`useTableEditor`, `useUndoRedo`, `useReviewQueue`) manage local state, and how `frontend/src/services/` communicates with the Express backend.
+- **Modular OCR & Computer Vision Pipeline:** How images are preprocessed via Sharp and OpenCV unsharp masking, analyzed via Azure Document Intelligence (`prebuilt-layout`), and structured using profile-driven extractors with **Google Gemini Flash Lite** (`gemini-flash-lite-latest` and `gemini-3.5-flash-lite`).
 - **Dual Workflow Architecture:** Comparison between the **Authenticated Cloud Pipeline** (Supabase PostgreSQL with Row-Level Security + Cloudflare R2 persistent storage) and the **Ephemeral Guest & Mobile QR Pipeline** (`express-session` + temporary disk storage with automated 12-hour cleanup).
-- **"Where Do I Put...?" Decision Matrix:** A practical cheat sheet in [Section 7 of `ARCHITECTURE.md`](./ARCHITECTURE.md#7-where-do-i-put-decision-matrix) answering where to add new API endpoints, UI screens, database migrations, export formats, OpenCV/Sharp quality heuristics, and Gemini LLM tools.
+- **"Where Do I Put...?" Decision Matrix:** A practical cheat sheet in [Section 7 of `ARCHITECTURE.md`](./ARCHITECTURE.md#7-where-do-i-put-decision-matrix) answering where to add new API endpoints, UI screens, database migrations, document profiles, export formats/templates, OpenCV heuristics, and Gemini LLM tools.
 
 ---
 

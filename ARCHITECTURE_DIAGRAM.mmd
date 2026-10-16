@@ -19,6 +19,7 @@ flowchart TD
       EDITOR["Table Editor & Undo/Redo<br/><code>useTableEditor, useUndoRedo</code>"]
       SCANNER["OCR Issue Scanner<br/><code>useReviewQueue, useReviewScanner</code>"]
       PDF_UTIL["PDF Page Splitter<br/><code>pdfjs-dist, HTML5 Canvas</code>"]
+      OCR_PROG["OCR Progress Tracker<br/><code>context/OcrProgressProvider</code>"]
     end
 
     subgraph CLIENT_SERVICES["Frontend Services (services/)"]
@@ -26,7 +27,7 @@ flowchart TD
       C_PROJ_SVC["projectService.ts"]
       C_UPL_SVC["uploadService.ts"]
       C_LLM_SVC["llmService.ts"]
-      C_EXP_SVC["batchExportService.ts"]
+      C_EXP_SVC["export/ (batchExportService, templates, writers)"]
       C_SUBA_SDK["supabaseClient.ts (Anon Key)"]
     end
   end
@@ -57,13 +58,15 @@ flowchart TD
   end
 
   subgraph BACKEND_SERVICES["Domain Logic & Processing (backend/src/services)"]
-    IMG_PROC["Image Processor<br/><code>imageProcessor.ts (Sharp + OpenCV)</code><br/><i>Resize & Blur/Darkness Checks</i>"]
-    PRE_OCR["OCR Preprocessor<br/><code>ocrPreprocessor.ts</code><br/><i>JIT Sharpen & Grayscale</i>"]
-    OCR_PIPE["OCR Pipeline Engine<br/><code>ocr/ocr.ts + utils_table_extraction_new.ts</code><br/><i>Poller, Retries & Fallbacks</i>"]
-    HYDRATE["Bounding Box Hydrator<br/><code>ocr/utils/experimental.ts</code><br/><i>OpenRedaction + Gemini Mapping</i>"]
+    IMG_PROC["Image Processor<br/><code>imageProcessor.ts (Sharp + OpenCV)</code><br/><i>Resize & Quality Checks (Blur/Glare/Contrast)</i>"]
+    PRE_OCR["OCR Preprocessor<br/><code>ocrPreprocessor.ts (Sharp + OpenCV)</code><br/><i>Unsharp Masking (Gaussian Blur + Weighted Diff) & Grayscale</i>"]
+    OCR_COORD["OCR Coordinator<br/><code>ocr/ocr.ts + utils/analyseBuffer.ts</code><br/><i>Azure DI Client, Retries & Buffer Prep</i>"]
+    OCR_PIPE["Document Structuring Pipeline<br/><code>ocr/pipeline/pipeline.ts</code><br/><i>Profile Registry: table, receipt, invoice, generic</i>"]
+    OCR_EXT["Pipeline Extractors<br/><code>ocr/pipeline/extractors.ts</code><br/><i>nativeTableExtractor, plainTextExtractor, llmStructurer</i>"]
+    OCR_HIER["Hierarchy & Layout Engine<br/><code>ocr/pipeline/hierarchy.ts + layout.ts</code><br/><i>Indentation, Parent-Child Rows & Polygon Union</i>"]
     R2_SVC["Object Storage Client<br/><code>r2Client.ts (AWS S3 SDK)</code>"]
     SUBA_SVC["Database Client<br/><code>supabaseClient.ts (Service Role)</code>"]
-    AI_SVC["LLM Service<br/><code>llm/aiService.ts (Google GenAI)</code>"]
+    AI_SVC["LLM Service<br/><code>llm/aiService.ts (Google GenAI)</code><br/><i>Chat, Cell & Bulk Corrections, Format Profiling</i>"]
     QR_SVC["QR Session Store<br/><code>qrService.ts</code>"]
   end
 
@@ -81,7 +84,7 @@ flowchart TD
 
     subgraph AI_SERVICES["Cognitive & AI Cloud Services"]
       AZURE_DI["Azure Document Intelligence<br/><i>prebuilt-layout model</i>"]
-      GEMINI_API["Google Gemini LLM<br/><i>Gemini 2.x Flash / Pro</i>"]
+      GEMINI_API["Google Gemini LLM<br/><i>Gemini Flash Lite (gemini-flash-lite-latest & gemini-3.5-flash-lite)</i>"]
     end
   end
 
@@ -123,20 +126,25 @@ flowchart TD
   C_DOC --> IMG_PROC
   C_DOC --> R2_SVC
   C_DOC --> SUBA_SVC
-  C_DOC --> OCR_PIPE
+  C_DOC --> OCR_COORD
   C_UPL --> IMG_PROC
-  C_UPL --> OCR_PIPE
+  C_UPL --> OCR_COORD
   C_QR --> QR_SVC
   C_LLM --> AI_SVC
 
   %% Service processing pipelines
   IMG_PROC -->|"Optimized PNG Buffer"| R2_SVC
   IMG_PROC -->|"Local Disk Cache"| LOCAL_FS
-  OCR_PIPE --> PRE_OCR --> AZURE_DI
-  AZURE_DI -->|"Raw Layout & Cells"| HYDRATE
-  HYDRATE -->|"Table Structuring"| GEMINI_API
-  HYDRATE -->|"Structured Table + Bounding Boxes"| C_DOC
-  AI_SVC -->|"Field Corrections & Chat"| GEMINI_API
+  OCR_COORD -->|"Preprocess Image Buffer"| PRE_OCR
+  PRE_OCR -->|"Sharpened Grayscale Buffer"| AZURE_DI
+  AZURE_DI -->|"Raw Layout & Geometry"| OCR_COORD
+  OCR_COORD -->|"Layout Analysis Output"| OCR_PIPE
+  OCR_PIPE -->|"Sequential Claiming"| OCR_EXT
+  OCR_EXT -->|"Indent & Virtual Row Hierarchy"| OCR_HIER
+  OCR_PIPE -.->|"Classification & Floating Table Extraction"| GEMINI_API
+  OCR_PIPE -->|"StructuredDocument (Blocks, Tables, Fields)"| C_DOC
+  OCR_PIPE -->|"StructuredDocument"| C_UPL
+  AI_SVC -->|"Field Corrections, Format Profiling & Chat"| GEMINI_API
 
   %% Services to Persistence
   R2_SVC -->|"Put / Get Presigned URL"| R2_BUCKET
