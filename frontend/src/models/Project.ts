@@ -1,3 +1,4 @@
+import type { HistoryEntry } from './HistoryEntry';
 import type { PageReview } from './IssueReview';
 import type { ExtractedPage } from './TableData';
 
@@ -32,6 +33,7 @@ export interface DocumentPageRecord {
    */
   extracted_data?: ExtractedPage;
   error_message?: string;
+  history_entries?: HistoryEntry[];
   quality_flags?: {
     isBlurry: boolean;
     isDark: boolean;

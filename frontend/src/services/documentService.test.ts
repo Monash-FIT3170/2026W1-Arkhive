@@ -224,6 +224,48 @@ describe('documentService', () => {
         })
       );
     });
+
+    it('patches extracted table data and history entries for a specific page', async () => {
+      const mockExtractedPage: any = {
+        pageIndex: 0,
+        itemColumnKey: 'DESCRIPTION',
+        rows: [{ id: 'r1', indentLevel: 0, cells: { DESCRIPTION: { text: 'Item 1' } } }],
+      };
+
+      const mockHistory: any = [
+        {
+          id: 'hist-1',
+          type: 'edit',
+          timestamp: '2026-10-17T00:00:00.000Z',
+          description: 'Edited cell',
+        },
+      ];
+
+      const mockResponse = {
+        page: {
+          id: 'p-1',
+          page_index: 0,
+          extracted_data: mockExtractedPage,
+          history_entries: mockHistory,
+        },
+      };
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      } as any);
+
+      const res = await saveExtractedData('doc-1', 0, mockExtractedPage, mockHistory);
+
+      expect(res).toEqual(mockResponse.page);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('/api/documents/doc-1/pages/0/data'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ extractedData: mockExtractedPage, historyEntries: mockHistory }),
+        })
+      );
+    });
   });
 
   describe('saveReviewState', () => {
