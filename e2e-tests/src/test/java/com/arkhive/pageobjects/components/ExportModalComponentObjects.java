@@ -31,8 +31,7 @@ public class ExportModalComponentObjects {
 
     // Footer actions
     public final By cancelButton = By.xpath("//div[contains(@class,'modal-open')]//button[contains(@class,'btn-ghost') and normalize-space()='Cancel']");
-    public final By downloadButton = By.xpath("//div[contains(@class,'modal-open')]//button[contains(@class,'btn-primary') and normalize-space()='Download']");
-
+    public final By downloadButton = By.xpath("//div[contains(@class,'modal-open')]//button[contains(@class,'btn-primary') and starts-with(normalize-space(.), 'Download')]");
     // Confirmation dialog
     public final By confirmDialogTitle = By.xpath("//h3[contains(text(),'Confirm Download')]");
     public final By confirmDialogYesButton = By.xpath("//button[contains(text(),'Yes, download')]");
