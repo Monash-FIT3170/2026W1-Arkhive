@@ -54,11 +54,11 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <OcrProgressProvider>
-        <Router>
+      <Router>
+        <OcrProgressProvider>
           <AppContent />
-        </Router>
-      </OcrProgressProvider>
+        </OcrProgressProvider>
+      </Router>
     </AuthProvider>
   );
 }
