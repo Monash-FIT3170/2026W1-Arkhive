@@ -11,6 +11,7 @@ export interface EnqueueOcrOptions {
 }
 
 export interface OcrProgressContextType {
+  projectID?: string;
   tasks: OcrTask[];
   isMinimised: boolean;
   setMinimised: (minimised: boolean) => void;
