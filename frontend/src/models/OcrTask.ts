@@ -23,7 +23,7 @@ export type OcrTask = {
 };
 
 export type EnqueueOcrOptions = {
-  projectId: string; // Required when adding a task
+  projectId?: string; //
   selection: Array<{ pages: any[] }>;
   label?: string;
   onSettled?: (task: OcrTask, result: BatchUploadResult | void) => void;
@@ -35,7 +35,7 @@ export function isTaskActive(task: OcrTask): boolean {
 
 /** Overall progress summary for a single project */
 export type ProjectOcrProgress = {
-  projectId: string;
+  projectId?: string;
   tasks: OcrTask[];
   totalTasks: number;
   completedTasks: number;

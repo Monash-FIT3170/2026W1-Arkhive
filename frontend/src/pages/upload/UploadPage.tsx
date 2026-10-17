@@ -710,31 +710,28 @@ function UploadPageInner() {
 
         // Matched by documentId + page (not by list position) because the list may
         // have changed — or this page may have unmounted — while OCR was running.
-        setPreviewItems((prev) =>
-          prev.map((item) => {
-            if (
-              !item.isQueued ||
-              item.documentId === undefined ||
-              item.backendPageIndex === undefined ||
-              !queuedKeys.has(pageKey(item.documentId, item.backendPageIndex))
-            ) {
-              return item;
-            }
-            const job = jobs.find((j) => j.documentId === item.documentId);
-            if (job) {
-              return job.status === 'failed'
-                ? { ...item, isQueued: false, isProcessed: false, errorText: job.errorMessage || 'Processing failed' }
-                : { ...item, isQueued: false, isProcessed: true, errorText: undefined };
-            }
-            if (task.status === 'completed') {
-              return { ...item, isQueued: false, isProcessed: true, errorText: undefined };
-            }
-            return {
-              ...item,
-              isQueued: false,
-              errorText: task.status === 'failed' ? task.error || 'Processing failed' : undefined,
-            };
-          })
+        setPreviewItems((prev) => prev.map((item) => {
+          if (!item.isQueued ||
+            item.documentId === undefined ||
+            item.backendPageIndex === undefined ||
+            !queuedKeys.has(pageKey(item.documentId, item.backendPageIndex))) {
+            return item;
+          }
+          const job = jobs.find((j) => j.documentId === item.documentId);
+          if (job) {
+            return job.status === 'failed'
+              ? { ...item, isQueued: false, isProcessed: false, errorText: job.errorMessage || 'Processing failed' }
+              : { ...item, isQueued: false, isProcessed: true, errorText: undefined };
+          }
+          if (task.status === 'completed') {
+            return { ...item, isQueued: false, isProcessed: true, errorText: undefined };
+          }
+          return {
+            ...item,
+            isQueued: false,
+            errorText: task.status === 'failed' ? task.error || 'Processing failed' : undefined,
+          };
+        })
         );
 
         if (task.status === 'completed' && task.failedDocuments === 0) {
@@ -745,6 +742,7 @@ function UploadPageInner() {
           setUploadError(task.error); // US-1.4: show the error near the upload area
         }
       },
+      projectId: ''
     });
   }
 

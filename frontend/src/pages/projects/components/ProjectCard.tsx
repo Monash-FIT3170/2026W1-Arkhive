@@ -3,6 +3,7 @@ import { Trash2, FolderOpen, Pencil, Check, X, ChevronDown } from 'lucide-react'
 import type { Project } from '../../../models/Project';
 import ProjectPreviewPanel from './ProjectPreviewPanel';
 import { pageCount, type PreviewState } from '../../../hooks/useProjectPreview';
+import { useOcrProgress } from '../../../context/OcrProgressContext';
 
 interface ProjectCardProps {
   project: Project;
@@ -28,6 +29,8 @@ export default function ProjectCard({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
   const [isSaving, setIsSaving] = useState(false);
+  const { getProjectProgress } = useOcrProgress();
+  const progress = getProjectProgress(project.id);
 
   function startRename() {
     setRenameValue(project.name);
@@ -58,11 +61,13 @@ export default function ProjectCard({
   }
 
   return (
+    <>
     <div className="flex flex-col rounded-xl border border-base-300 bg-base-200/40 transition-colors hover:border-base-content/20 overflow-hidden">
       <div
         className={`flex flex-col gap-2 p-4 ${isRenaming ? '' : 'cursor-pointer'}`}
         onClick={() => !isRenaming && onNavigate(project.id)}
       >
+        
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <FolderOpen className="w-4 h-4 shrink-0 text-primary" />
@@ -81,7 +86,16 @@ export default function ProjectCard({
                 disabled={isSaving}
               />
             ) : (
-              <span className="font-medium truncate">{project.name}</span>
+              <>
+                <span className="font-medium truncate">{project.name}</span>
+                {progress.isProcessing && (
+                  <span className="badge badge-primary badge-xs gap-1 shrink-0 font-mono animate-pulse">
+                    <span className="loading loading-spinner loading-xs" />
+                    {progress.overallProgressPercent}%
+                  </span>
+                )}
+              </>
+              
             )}
           </div>
 
@@ -171,5 +185,6 @@ export default function ProjectCard({
 
       {isExpanded && <ProjectPreviewPanel preview={preview} />}
     </div>
+    </>
   );
 }

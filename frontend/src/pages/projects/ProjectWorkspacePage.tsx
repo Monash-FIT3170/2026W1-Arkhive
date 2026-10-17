@@ -37,6 +37,8 @@ import type { ExtractedPage } from '../../models/TableData';
 import type { Block, StructuredPage } from '../../models/Document';
 import { makePageKey, parsePageKey } from '../../utils/keys';
 import type { PageReview } from '../../models/IssueReview';
+import OcrProgressPopup from '../../components/ocr-progress/OcrProgressPopup';
+import { useOcrProgress } from '../../context/OcrProgressContext';
 
 // The OCR backend stores one page's result per document_pages row
 // (raw_ocr_result). With the Block IR that result is a StructuredPage
@@ -101,6 +103,7 @@ function statusBadgeClass(status: PageStatus): string {
 export default function ProjectWorkspacePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { enqueue: enqueueOcr } = useOcrProgress();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -480,7 +483,7 @@ export default function ProjectWorkspacePage() {
   // existing data), otherwise processes immediately like before.
   function handleProcessClick() {
     if (selectedKeys.size === 0 || isProcessing) return;
-
+    
     let hasWarnings = false;
     documents.forEach((doc) => {
       (doc.pages || []).forEach((page) => {
@@ -515,63 +518,89 @@ export default function ProjectWorkspacePage() {
     if (selectedKeys.size === 0 || isProcessing) return;
     setShowReprocessConfirm(false);
     setIsProcessing(true);
-    setProcessingKeys(new Set(selectedKeys));
     setActionError(null);
 
-    try {
-      const byDoc = new Map<string, number[]>();
-      selectedKeys.forEach((key) => {
-        const [documentId, pageIndexStr] = key.split(':');
-        if (!byDoc.has(documentId)) byDoc.set(documentId, []);
-        byDoc.get(documentId)!.push(Number(pageIndexStr));
-      });
+    // 1. Capture the selected keys before clearing UI selection
+    const queuedKeys = new Set(selectedKeys);
 
-      // force:true is a no-op for pages that aren't already 'done', so it's
-      // safe to set unconditionally — it only matters for the reprocess case.
-      const selections: PageSelection[] = Array.from(byDoc.entries()).map(
-        ([documentId, pageIndices]) => ({ documentId, pageIndices, force: true })
-      );
+    // 2. Group selected keys by documentId
+    const byDoc = new Map<string, number[]>();
+    selectedKeys.forEach((key) => {
+      const [documentId, pageIndexStr] = key.split(':');
+      if (!byDoc.has(documentId)) byDoc.set(documentId, []);
+      byDoc.get(documentId)!.push(Number(pageIndexStr));
+    });
 
-      const { results } = await processPages(selections);
+    // 3. Format selection for enqueueOcr using 'pages' property
+    const selection = Array.from(byDoc.entries()).map(([documentId, pages]) => ({
+      documentId,
+      pages,
+      force: true,
+    }));
 
-      setDocuments((prev) =>
-        prev.map((doc) => {
-          const docResults = results.filter((r) => r.documentId === doc.id);
-          if (docResults.length === 0) return doc;
-          return {
-            ...doc,
-            pages: (doc.pages || []).map((page) => {
-              const result = docResults.find((r) => r.pageIndex === page.page_index);
-              if (!result) return page;
-              return {
-                ...page,
-                status: result.status,
-                raw_ocr_result: result.rawResult ?? page.raw_ocr_result,
-                // fresh OCR replaces any earlier edits for this page
-                extracted_data:
-                  result.status !== 'error' && result.rawResult !== undefined
-                    ? undefined
-                    : page.extracted_data,
-                error_message: result.errorMessage,
-              };
-            }),
-          };
-        })
-      );
+    // 4. Set document pages to 'processing' status visually
+    setDocuments((prev) =>
+      prev.map((doc) => {
+        if (!byDoc.has(doc.id)) return doc;
+        return {
+          ...doc,
+          pages: (doc.pages || []).map((page) =>
+            queuedKeys.has(makePageKey(doc.id, page.page_index))
+              ? { ...page, status: 'processing' as PageStatus }
+              : page
+          ),
+        };
+      })
+    );
 
-      const anySucceeded = results.some((r) => r.status !== 'error');
-      setSelectedKeys(new Set());
-      if (anySucceeded) {
-        setDataVersion((v) => v + 1);
-        setMode('validate');
-        setHasEnteredValidate(true);
-      }
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to process pages.');
-    } finally {
-      setIsProcessing(false);
-      setProcessingKeys(new Set());
-    }
+    setSelectedKeys(new Set());
+
+    // 5. Enqueue background task
+    enqueueOcr({
+      projectId: project?.id ?? id ?? '',
+      selection,
+      label: project?.name ? `${project.name} (${selection.length} files)` : 'Project Documents',
+      onSettled: (task, result) => {
+        setIsProcessing(false);
+        const jobs = result?.jobs ?? [];
+
+        setDocuments((prev) =>
+          prev.map((doc) => {
+            if (!byDoc.has(doc.id)) return doc;
+            return {
+              ...doc,
+              pages: (doc.pages || []).map((page) => {
+                const pageKey = makePageKey(doc.id, page.page_index);
+                if (!queuedKeys.has(pageKey)) return page;
+
+                const job = jobs.find((j) => j.documentId === doc.id);
+                if (job) {
+                  return {
+                    ...page,
+                    status: job.status === 'failed' ? ('error' as PageStatus) : ('done' as PageStatus),
+                    error_message: job.errorMessage,
+                  };
+                }
+
+                return {
+                  ...page,
+                  status: task.status === 'completed' ? ('done' as PageStatus) : ('error' as PageStatus),
+                  error_message: task.error,
+                };
+              }),
+            };
+          })
+        );
+
+        if (task.status === 'completed') {
+          setDataVersion((v) => v + 1);
+          setMode('validate');
+          setHasEnteredValidate(true);
+        } else if (task.error) {
+          setActionError(task.error);
+        }
+      },
+    });
   }
 
   // ── Delete ─────────────────────────────────────────────────────────────
@@ -788,6 +817,7 @@ export default function ProjectWorkspacePage() {
             <span className="loading loading-spinner loading-xs" /> Uploading...
           </div>
         )}
+        <OcrProgressPopup/>
 
         <div className="flex-1 overflow-y-auto p-6">
           <div className="flex flex-col gap-6">
@@ -945,3 +975,4 @@ function warningTextForPage(flags: any): string | undefined {
   if (flags.isBlurry) return 'Might be blurry';
   return 'Might be too dark';
 }
+

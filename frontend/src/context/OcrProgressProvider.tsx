@@ -1,38 +1,56 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { OcrProgressContext, type EnqueueOcrOptions } from './OcrProgressContext';
-import { isTaskActive, type OcrTask } from '../models/OcrTask';
+import { isTaskActive, type OcrTask, type ProjectOcrProgress } from '../models/OcrTask';
 import type { BatchProgressEvent } from '../models/Job';
 import { processDocuments, type BatchUploadResult } from '../services/uploadService';
 import { unlockStep } from '../services/stepGuard';
 import { estimateExpectedMs } from '../utils/ocrProgress';
 
-type QueueEntry = EnqueueOcrOptions & { id: string };
+type QueueEntry = EnqueueOcrOptions & {
+  id: string;
+  userId?: string;
+  ownerType: 'guest' | 'user';
+};
 
-/**
- * Owns the OCR queue for the whole app (it lives above the router), so progress
- * keeps updating when the user leaves the preview page.
- *
- * Tasks run one at a time. The backend stores a session's jobs/extraction in a
- * single slot that each batch overwrites, so running two batches at once would
- * make them clobber each other's results. Running them in order keeps every
- * batch's results intact while still letting the user queue more work.
- */
-export function OcrProgressProvider({ children }: { children: ReactNode }) {
-  const [tasks, setTasks] = useState<OcrTask[]>([]);
+interface OcrProgressProviderProps {
+  children: ReactNode;
+  userId?: string | null; // Pass your logged-in user ID here (null/undefined for guests)
+}
+
+export function OcrProgressProvider({ children, userId }: OcrProgressProviderProps) {
+  const [allTasks, setAllTasks] = useState<OcrTask[]>([]);
   const [isMinimised, setMinimised] = useState(false);
 
-  // tasksRef is the source of truth so event handlers never read stale state.
   const tasksRef = useRef<OcrTask[]>([]);
   const queueRef = useRef<QueueEntry[]>([]);
   const runningRef = useRef<{ id: string; controller: AbortController } | null>(null);
   const counterRef = useRef(0);
-  // Measured ms-per-page from finished tasks, so later estimates get closer to reality.
   const learnedMsPerPageRef = useRef<number | null>(null);
 
   const commit = useCallback((next: OcrTask[]) => {
     tasksRef.current = next;
-    setTasks(next);
+    setAllTasks(next);
   }, []);
+
+  // Filter tasks to only those belonging to current context (user or guest)
+  const visibleTasks = useMemo(() => {
+    if (userId) {
+      return allTasks.filter((t) => t.userId === userId || t.ownerType === 'guest');
+    }
+    return allTasks.filter((t) => t.ownerType === 'guest');
+  }, [allTasks, userId]);
+
+  // When guest logs in, migrate in-memory guest tasks to user context
+  useEffect(() => {
+    if (userId) {
+      const migrated = tasksRef.current.map((task) =>
+        task.ownerType === 'guest'
+          ? { ...task, ownerType: 'user' as const, userId }
+          : task
+      );
+      commit(migrated);
+    }
+  }, [userId, commit]);
 
   const patch = useCallback(
     (id: string, update: Partial<OcrTask> | ((task: OcrTask) => Partial<OcrTask>)) => {
@@ -81,16 +99,11 @@ export function OcrProgressProvider({ children }: { children: ReactNode }) {
     [patch]
   );
 
-  const settle = useCallback(
-    (entry: QueueEntry, result: BatchUploadResult | void) => {
-      const task = tasksRef.current.find((t) => t.id === entry.id);
-      if (task) entry.onSettled?.(task, result);
-    },
-    []
-  );
+  const settle = useCallback((entry: QueueEntry, result: BatchUploadResult | void) => {
+    const task = tasksRef.current.find((t) => t.id === entry.id);
+    if (task) entry.onSettled?.(task, result);
+  }, []);
 
-  // Runs queued tasks one after another. A plain loop (rather than the function
-  // calling itself) keeps exactly one task in flight even if onSettled enqueues more work.
   const pump = useCallback(async () => {
     if (runningRef.current) return;
 
@@ -98,6 +111,7 @@ export function OcrProgressProvider({ children }: { children: ReactNode }) {
     while ((entry = queueRef.current.shift())) {
       const controller = new AbortController();
       runningRef.current = { id: entry.id, controller };
+
       patch(entry.id, (task) => ({
         status: 'processing',
         startedAt: Date.now(),
@@ -168,8 +182,13 @@ export function OcrProgressProvider({ children }: { children: ReactNode }) {
   const enqueue = useCallback(
     (options: EnqueueOcrOptions) => {
       const id = `ocr-task-${Date.now()}-${counterRef.current++}`;
+      const ownerType = userId ? 'user' : 'guest';
+
       const task: OcrTask = {
         id,
+        projectId: options.projectId,
+        ownerType,
+        userId: userId ?? undefined,
         label: options.label,
         documentCount: options.selection.length,
         totalPages: options.selection.reduce((sum, doc) => sum + doc.pages.length, 0),
@@ -183,13 +202,14 @@ export function OcrProgressProvider({ children }: { children: ReactNode }) {
         failedDocuments: 0,
         createdAt: Date.now(),
       };
+
       commit([...tasksRef.current, task]);
-      queueRef.current.push({ ...options, id });
-      setMinimised(false); // pop the window open whenever new work starts
+      queueRef.current.push({ ...options, id, userId: userId ?? undefined, ownerType });
+      setMinimised(false);
       void pump();
       return id;
     },
-    [commit, pump]
+    [commit, pump, userId]
   );
 
   const cancelTask = useCallback(
@@ -212,13 +232,96 @@ export function OcrProgressProvider({ children }: { children: ReactNode }) {
     tasksRef.current.filter(isTaskActive).forEach((task) => cancelTask(task.id));
   }, [cancelTask]);
 
+  const cancelProjectTasks = useCallback(
+    (projectId: string) => {
+      tasksRef.current
+        .filter((task) => task.projectId === projectId && isTaskActive(task))
+        .forEach((task) => cancelTask(task.id));
+    },
+    [cancelTask]
+  );
+
   const clearFinished = useCallback(() => {
     commit(tasksRef.current.filter(isTaskActive));
   }, [commit]);
 
+  // Aggregates progress for a specific project ID
+  const getProjectProgress = useCallback(
+    (projectId?: string): ProjectOcrProgress => {
+      // If no projectId is passed (or empty string), return default non-processing state
+      if (!projectId) {
+        return {
+          projectId: '',
+          tasks: [],
+          totalTasks: 0,
+          completedTasks: 0,
+          activeTasks: 0,
+          failedTasks: 0,
+          totalDocuments: 0,
+          documentsDone: 0,
+          failedDocuments: 0,
+          overallProgressPercent: 0,
+          isProcessing: false,
+        };
+      }
+
+      // Match string conversion to prevent number vs string ID mismatches
+      const projectTasks = visibleTasks.filter(
+        (t) => t.projectId && String(t.projectId) === String(projectId)
+      );
+
+      const totalDocuments = projectTasks.reduce((sum, t) => sum + t.documentCount, 0);
+      const documentsDone = projectTasks.reduce((sum, t) => sum + t.documentsDone, 0);
+      const failedDocuments = projectTasks.reduce((sum, t) => sum + t.failedDocuments, 0);
+
+      const completedTasks = projectTasks.filter((t) => t.status === 'completed').length;
+      const failedTasks = projectTasks.filter((t) => t.status === 'failed').length;
+      const activeTasks = projectTasks.filter(
+        (t) => t.status === 'processing' || t.status === 'queued'
+      ).length;
+
+      const overallProgressPercent =
+        totalDocuments > 0 ? Math.round((documentsDone / totalDocuments) * 100) : 0;
+
+      return {
+        projectId,
+        tasks: projectTasks,
+        totalTasks: projectTasks.length,
+        completedTasks,
+        activeTasks,
+        failedTasks,
+        totalDocuments,
+        documentsDone,
+        failedDocuments,
+        overallProgressPercent,
+        isProcessing: activeTasks > 0,
+      };
+    },
+    [visibleTasks]
+  );
+
   const value = useMemo(
-    () => ({ tasks, isMinimised, setMinimised, enqueue, cancelTask, cancelAll, clearFinished }),
-    [tasks, isMinimised, enqueue, cancelTask, cancelAll, clearFinished]
+    () => ({
+      tasks: visibleTasks,
+      isMinimised,
+      setMinimised,
+      enqueue,
+      cancelTask,
+      cancelAll,
+      cancelProjectTasks,
+      clearFinished,
+      getProjectProgress,
+    }),
+    [
+      visibleTasks,
+      isMinimised,
+      enqueue,
+      cancelTask,
+      cancelAll,
+      cancelProjectTasks,
+      clearFinished,
+      getProjectProgress,
+    ]
   );
 
   return <OcrProgressContext.Provider value={value}>{children}</OcrProgressContext.Provider>;
