@@ -5,9 +5,9 @@
     </listeners>
     <test name="E2E Tests">
         <classes>
-            <class name="com.arkhive.tests.LoginPageTest">
+            <class name="com.arkhive.tests.ComprehensiveWorkflowTest">
     <methods>
-        <include name="testInvalidLoginCredentialsRejected"/>
+        <include name="testCompleteDocumentProcessingWorkflow"/>
     </methods>
 </class>
             <!-- <class name="com.arkhive.tests.UploadPageTest"/>

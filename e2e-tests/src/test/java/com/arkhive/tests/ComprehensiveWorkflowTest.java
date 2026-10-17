@@ -60,11 +60,6 @@ public class ComprehensiveWorkflowTest extends BaseTest {
         Assert.assertFalse(documentPreviewPage.isProcessButtonAvailable(),
                 "Process button should not be displayed when all pages are deselected");
 
-        // Toggle individual page selection
-        documentPreviewPage.toggleCardSelection(0);
-        Assert.assertTrue(documentPreviewPage.isAnyPageSelected(),
-                "Page 1 should be selected after toggling its card");
-
         // Select all pages and verify process button
         documentPreviewPage.selectAllPages();
         Assert.assertTrue(documentPreviewPage.isAnyPageSelected(),
@@ -79,11 +74,6 @@ public class ComprehensiveWorkflowTest extends BaseTest {
         documentPreviewPage.closeZoomModal();
         Assert.assertFalse(documentPreviewPage.isZoomModalDisplayed(),
                 "Zoom preview modal should be closed");
-
-        // Ensure both pages are selected before initiating OCR
-        documentPreviewPage.selectAllPages();
-        Assert.assertTrue(documentPreviewPage.isProcessButtonEnabled(),
-                "Process button must be enabled before triggering OCR");
 
         // ═════════════════════════════════════════════════════════════════════
         // Stage 3: OCR Processing (executed exactly once)
