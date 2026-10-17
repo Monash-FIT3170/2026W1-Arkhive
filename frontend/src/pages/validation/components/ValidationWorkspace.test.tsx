@@ -4,9 +4,19 @@ import ValidationWorkspace from './ValidationWorkspace';
 import type { ExtractedPage } from '../../../models/TableData';
 import type { Block } from '../../../models/Document';
 
+import * as docService from '../../../services/documentService';
+
 // Mock child panels that have heavy dependencies
 vi.mock('./chat/ChatPanel', () => ({
-  default: () => <div data-testid="chat-panel" />,
+  default: (props: any) => (
+    <div data-testid="chat-panel" data-history-count={props.history?.length ?? 0}>
+      {props.history?.map((h: any) => (
+        <span key={h.id} data-testid="history-entry">
+          {h.description}
+        </span>
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock('../../../hooks/useReviewQueue', () => ({
@@ -224,4 +234,71 @@ describe('ValidationWorkspace - File Separation & Adaptive View Modes', () => {
     // Re-scan button updates its scope to page 2
     expect(screen.getByRole('button', { name: /Re-scan page 2/i })).toBeInTheDocument();
   });
+
+  it('hydrates initialHistory into the chat/history panel', () => {
+    const mockInitialHistory = [
+      {
+        id: 'hist-1',
+        type: 'edit' as const,
+        timestamp: '2026-10-17T00:00:00.000Z',
+        description: 'Previously edited ITEM',
+      },
+    ];
+
+    render(
+      <ValidationWorkspace
+        pages={mockPages}
+        ocrPages={mockOcrPages}
+        imageUrls={mockImageUrls}
+        fileMetadata={mockFileMetadata}
+        onPersist={mockPersist}
+        initialHistory={mockInitialHistory}
+      />
+    );
+
+    const chatPanel = screen.getByTestId('chat-panel');
+    expect(chatPanel).toHaveAttribute('data-history-count', '1');
+    expect(screen.getByText('Previously edited ITEM')).toBeInTheDocument();
+  });
+
+  it('persists history entries using saveExtractedData when edits occur', async () => {
+    const saveSpy = vi.spyOn(docService, 'saveExtractedData').mockResolvedValue({} as any);
+
+    render(
+      <ValidationWorkspace
+        pages={mockPages}
+        ocrPages={mockOcrPages}
+        imageUrls={mockImageUrls}
+        fileMetadata={mockFileMetadata}
+        pageKeys={['doc-1:0', 'doc-1:1', 'doc-2:0']}
+        onPersist={mockPersist}
+      />
+    );
+
+    // Toggle edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    // Find Rename Column button
+    const renameBtns = screen.getAllByTitle('Rename Column');
+    fireEvent.click(renameBtns[0]);
+
+    const input = screen.getByPlaceholderText('Column name');
+    fireEvent.change(input, { target: { value: 'PRODUCT_NAME' } });
+
+    const confirmBtns = screen.getAllByRole('button', { name: 'Rename Column' });
+    fireEvent.click(confirmBtns[confirmBtns.length - 1]);
+
+    expect(saveSpy).toHaveBeenCalledWith(
+      'doc-1',
+      0,
+      expect.anything(),
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'edit',
+          description: expect.stringContaining('PRODUCT_NAME'),
+        }),
+      ])
+    );
+  });
 });
+
