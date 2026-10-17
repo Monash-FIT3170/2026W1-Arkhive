@@ -274,12 +274,6 @@ function ValidationWorkspace({
     historyRef.current = history;
   }, [history]);
 
-  useEffect(() => {
-    if (initialHistory && initialHistory.length > 0) {
-      setHistory(initialHistory);
-    }
-  }, [initialHistory]);
-
   const persistPageHistory = useCallback(
     (targetIndex: number, newHistory: HistoryEntry[]) => {
       const key = pageKeys?.[targetIndex];
