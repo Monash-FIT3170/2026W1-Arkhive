@@ -358,14 +358,11 @@ function ValidationWorkspace({
   // just say what "apply a snapshot" means for this workspace's state.
   const { push: pushUndo, undo: handleUndo } = useUndoRedo(extractedPagesRef, {
     onApply: (updatedPages, direction) => {
+      extractedPagesRef.current = updatedPages;
       setExtractedPages(updatedPages);
       onPersist(updatedPages);
       setEditedCells(new Set());
       setTableKey((k) => k + 1);
-      // addHistoryEntry({
-      //   type: direction,
-      //   description: direction === 'undo' ? 'Undid last change' : 'Redid last change',
-      // });
       undoRedoHistoryEntry(direction);
     },
   });

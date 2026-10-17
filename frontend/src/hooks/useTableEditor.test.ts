@@ -127,6 +127,11 @@ describe('useTableEditor', () => {
       expect(onPersist).toHaveBeenCalledTimes(1);
       const updatedPages = onPersist.mock.calls[0][0];
       expect(updatedPages[0].rows).toHaveLength(3);
+      expect(addHistoryEntry).toHaveBeenCalledWith({
+        type: 'edit',
+        pageIndex: 0,
+        description: 'Added row on page 1',
+      });
     });
 
     it('deleteRow removes the target row by id', () => {
@@ -141,6 +146,12 @@ describe('useTableEditor', () => {
       const updatedPages = onPersist.mock.calls[0][0];
       expect(updatedPages[0].rows).toHaveLength(1);
       expect(updatedPages[0].rows[0]._id).toBe('r2');
+      expect(addHistoryEntry).toHaveBeenCalledWith({
+        type: 'edit',
+        pageIndex: 0,
+        fieldId: 'r1',
+        description: 'Deleted row on page 1',
+      });
     });
   });
 
@@ -156,6 +167,13 @@ describe('useTableEditor', () => {
       expect(onPersist).toHaveBeenCalledTimes(1);
       const updatedPages = onPersist.mock.calls[0][0];
       expect(updatedPages[0].columns).toContain('TAX');
+      expect(addHistoryEntry).toHaveBeenCalledWith({
+        type: 'edit',
+        pageIndex: 0,
+        column: 'TAX',
+        newValue: 'TAX',
+        description: 'Added column "TAX" on page 1',
+      });
     });
 
     it('deleteColumn removes a column and its cell values', () => {
@@ -170,6 +188,14 @@ describe('useTableEditor', () => {
       const updatedPages = onPersist.mock.calls[0][0];
       expect(updatedPages[0].columns).not.toContain('PRICE');
       expect(updatedPages[0].rows[0].PRICE).toBeUndefined();
+
+      expect(addHistoryEntry).toHaveBeenCalledWith({
+        type: 'edit',
+        pageIndex: 0,
+        column: 'PRICE',
+        oldValue: 'PRICE',
+        description: 'Deleted column "PRICE" on page 1',
+      });
     });
 
     it('renameColumn renames a column, adds history entry, and calls onColumnRenamed', () => {
@@ -235,6 +261,12 @@ describe('useTableEditor', () => {
       const updatedPages = onPersist.mock.calls[0][0];
       expect(updatedPages[0].rows[0]._id).toBe('r2');
       expect(updatedPages[0].rows[1]._id).toBe('r1');
+      expect(addHistoryEntry).toHaveBeenCalledWith({
+        type: 'edit',
+        pageIndex: 0,
+        fieldId: 'r1',
+        description: 'Moved row down on page 1',
+      });
     });
 
     it('reorderColumns sets new column order', () => {
@@ -248,6 +280,11 @@ describe('useTableEditor', () => {
       expect(onPersist).toHaveBeenCalledTimes(1);
       const updatedPages = onPersist.mock.calls[0][0];
       expect(updatedPages[0].columns).toEqual(['PRICE', 'QTY', 'ITEM']);
+      expect(addHistoryEntry).toHaveBeenCalledWith({
+        type: 'edit',
+        pageIndex: 0,
+        description: 'Reordered columns on page 1',
+      });
     });
   });
 
