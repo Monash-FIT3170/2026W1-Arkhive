@@ -1,19 +1,26 @@
 import { useRef } from "react";
 import type { ChangeEvent } from "react";
 import { Upload } from "lucide-react";
-import { filterValidFiles } from "../dropzone/dropZoneUtils";
+import { filterValidFiles, partitionBySize, MAX_FILE_SIZE_MB } from "../dropzone/dropZoneUtils";
 
 type UploadMoreButtonProps = {
   onFilesSelected: (files: File[]) => void;
+  onError?: (msg: string) => void;
 };
 
-function UploadMoreButton({ onFilesSelected }: UploadMoreButtonProps) {
+function UploadMoreButton({ onFilesSelected, onError }: UploadMoreButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleUploadMoreChange(event: ChangeEvent<HTMLInputElement>) {
     const validFiles = filterValidFiles(event.target.files);
-    if (validFiles.length > 0) {
-      onFilesSelected(validFiles);
+    const { accepted, rejected } = partitionBySize(validFiles);
+    
+    if (rejected.length > 0 && onError) {
+      onError(`One or more files exceed the ${MAX_FILE_SIZE_MB}MB limit.`);
+    }
+
+    if (accepted.length > 0) {
+      onFilesSelected(accepted);
     }
 
     if (inputRef.current) {
