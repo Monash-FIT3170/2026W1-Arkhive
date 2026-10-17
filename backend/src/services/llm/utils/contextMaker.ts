@@ -4,7 +4,7 @@ import { ExtractedData } from '../../../models/TableData';
 type ColumnTypeGuess = 'numeric' | 'currency' | 'date' | 'text' | 'unknown';
 
 // Function that infers the data type of the cell via regular expressions of a list of values
-function inferColumnType(values: string[]): ColumnTypeGuess {
+export function inferColumnType(values: string[]): ColumnTypeGuess {
   const nonEmpty = values.filter((v) => v !== undefined && v !== null && String(v).trim() !== '');
   if (nonEmpty.length === 0) return 'unknown';
 
@@ -34,10 +34,31 @@ function inferColumnType(values: string[]): ColumnTypeGuess {
   return topCount / total >= 0.6 ? topType : 'text';
 }
 
+// The value in the same column of the row directly above and below. This is
+// what lets the model continue a sequence (e.g. row numbering) for a blank cell.
+// Row ids are compared as strings: _id can be a number while the id that comes
+// back from the client / LLM is a string.
+export function rowNeighbours(
+  documentContext: ExtractedData,
+  rowId: string | number,
+  column: string
+) {
+  const rowIndex = documentContext.rows.findIndex((r) => String(r._id) === String(rowId));
+  return {
+    rowIndex,
+    previousRowValue: rowIndex > 0 ? (documentContext.rows[rowIndex - 1]?.[column] ?? null) : null,
+    nextRowValue: rowIndex >= 0 ? (documentContext.rows[rowIndex + 1]?.[column] ?? null) : null,
+  };
+}
+
 // Function that given the document context and the review field
 // returns the specfically the items in the same row, and items in the same column
 export function buildFocusedContext(documentContext: ExtractedData, field: ReviewField) {
-  const rowIndex = documentContext.rows.findIndex((r) => r._id === field.rowId);
+  const { rowIndex, previousRowValue, nextRowValue } = rowNeighbours(
+    documentContext,
+    field.rowId,
+    field.column
+  );
   const targetRow = documentContext.rows[rowIndex];
 
   const otherFieldsInRow = documentContext.columns
@@ -56,5 +77,12 @@ export function buildFocusedContext(documentContext: ExtractedData, field: Revie
 
   const columnType = inferColumnType(columnValuesFromOtherRows.map((r) => String(r.value)));
 
-  return { rowIndex, otherFieldsInRow, columnValuesFromOtherRows, columnType };
+  return {
+    rowIndex,
+    otherFieldsInRow,
+    columnValuesFromOtherRows,
+    columnType,
+    previousRowValue,
+    nextRowValue,
+  };
 }

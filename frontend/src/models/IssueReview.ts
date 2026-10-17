@@ -1,3 +1,5 @@
+import { Shapes, Gauge, type LucideIcon } from 'lucide-react';
+
 export interface OcrIssue {
   fieldId: string;
   fieldName: string;
@@ -47,3 +49,42 @@ export interface PageReview {
  * index string in quick scan.
  */
 export type ReviewsByPage = Readonly<Record<string, PageReview>>;
+
+/**
+ * Issue Type UI Meta Data
+ */
+
+/** Derived from the model, so adding a new issue type there forces an entry below. */
+export type IssueType = NonNullable<OcrIssue['issueType']>;
+
+export interface IssueTypeMeta {
+  /** Short name shown in the badge. */
+  label: string;
+  Icon: LucideIcon;
+  /**
+   * Full class strings (not built dynamically) so Tailwind can see them.
+   * Only the border and icon use the status colour; text stays `base-content`
+   * so contrast is safe on any daisyUI theme, including Nord's pale yellows.
+   */
+  borderClass: string;
+  iconClass: string;
+  /** One sentence, shown in the tooltip. Keep it short. */
+  tip: string;
+}
+
+export const ISSUE_TYPES: Record<IssueType, IssueTypeMeta> = {
+  confidence: {
+    label: 'Low confidence',
+    Icon: Gauge,
+    borderClass: 'border-warning',
+    iconClass: 'text-warning',
+    tip: "OCR wasn't sure it read this correctly. Flagged when its score is under 60% or well below the page average.",
+  },
+  format: {
+    label: 'Format mismatch',
+    Icon: Shapes,
+    borderClass: 'border-secondary',
+    iconClass: 'text-secondary',
+    tip: "Doesn't match the format most values in this column share, as worked out by AI.",
+  },
+};

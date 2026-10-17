@@ -1,6 +1,6 @@
 import { useCallback, useState, type RefObject } from 'react';
 import type { ExtractedPage } from '../models/TableData';
-import { getOverlayIdForField } from '../utils/tableOperations';
+import { findTableIdForField, getOverlayIdForField } from '../utils/tableOperations';
 
 // Shallow-equal check for string[]. Lets callers pass a freshly-created array
 // each render/call without forcing a state update (and downstream re-render)
@@ -20,6 +20,9 @@ interface UseFieldHoverNavigation {
   pagesRef: RefObject<ExtractedPage[]>;
   // Called only when the slide's page differs from currentPageIndexRef.current.
   onPageChange: (pageIndex: number) => void;
+  // Called when the slide's fields live in a table that is NOT the one currently loaded into
+  // that page's grid. The caller applies switchActiveTable(page, tableId) to its page state.
+  onTableChange?: (pageIndex: number, tableId: string) => void;
 }
 
 // Replaces the near-identical onHover blocks in ProjectWorkspacePage,
@@ -78,12 +81,20 @@ export function useFieldHover(
         handleMultiHover(fieldIds);
         return;
       }
-      const { currentPageIndexRef, pagesRef, onPageChange } = navigation;
+      const { currentPageIndexRef, pagesRef, onPageChange, onTableChange } = navigation;
       if (pageIndex !== undefined && pageIndex !== currentPageIndexRef.current) {
         onPageChange(pageIndex);
       }
       const contextPageIndex = pageIndex !== undefined ? pageIndex : currentPageIndexRef.current;
-      handleMultiHover(fieldIds, pagesRef.current[contextPageIndex]);
+      const page = pagesRef.current[contextPageIndex];
+
+      // Which table do these fields belong to? Derived from the field ids, so slides don't
+      // have to report a tableId. Must also run for the CURRENT page: a page has several tables.
+      const tableId = fieldIds.map((id) => findTableIdForField(page, id)).find(Boolean);
+      if (page && tableId && tableId !== page.tableId) onTableChange?.(contextPageIndex, tableId);
+
+      // Overlay lookup searches every table on the page, so this works before the switch lands.
+      handleMultiHover(fieldIds, page);
     },
     [navigation, handleMultiHover]
   );

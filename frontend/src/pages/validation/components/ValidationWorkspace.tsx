@@ -13,9 +13,16 @@ import DocumentPanel from './document/DocumentPanel';
 import DocumentPreviewPiP from './document/DocumentPreviewPiP';
 import ExtractedDataPanel from './extracted-data/ExtractedDataPanel';
 import ChatPanel, { type AssistantDockMode } from './chat/ChatPanel';
-import type { OCRComponent } from '../../../models/OCRComponent';
+import type { Block } from '../../../models/Document';
 import type { ExtractedPage } from '../../../models/TableData';
+import { listTables, switchActiveTable } from '../../../utils/flattener';
+import {
+  blocksToOverlays,
+  averageOverlayConfidence,
+  type PageOverlay,
+} from '../../../utils/overlays';
 import type { HistoryEntry } from '../../../models/HistoryEntry';
+import { saveExtractedData } from '../../../services/documentService';
 import { useUndoRedo } from '../../../hooks/useUndoRedo';
 import { useFieldHover } from '../../../hooks/useFieldHover';
 import { useChatSuggestionFlow } from '../../../hooks/useChat';
@@ -26,7 +33,6 @@ import {
   groupPagesByFiles,
   getGlobalIndex,
   getFileAndLocalPage,
-  calculateAverageConfidence,
   type FileMetadataInput,
 } from '../../../utils/fileGrouping';
 import type { PageReview, ReviewsByPage } from '../../../models/IssueReview';
@@ -64,8 +70,11 @@ function useIsWide(ref: React.RefObject<HTMLElement | null>, minWidth: number, e
 export interface ValidationWorkspaceProps {
   /** The pages to validate, adopted into internal state whenever `syncKey` changes. */
   pages: ExtractedPage[];
-  /** Raw OCR components per page, aligned index-for-index with `pages`. */
-  ocrPages: OCRComponent[][];
+  /**
+   * Structured blocks per page (StructuredPage.blocks), aligned index-for-index
+   * with `pages`. Converted internally to highlightable overlays.
+   */
+  ocrPages: Block[][];
   /** Image URL per page, aligned index-for-index with `pages`. */
   imageUrls: string[];
   /**
@@ -88,6 +97,10 @@ export interface ValidationWorkspaceProps {
   initialReviews?: ReviewsByPage;
   /** Called with a page's new review whenever it changes. */
   onReviewChange?: (pageKey: string, review: PageReview) => void;
+  /** Persisted history entries to hydrate from. Keep the reference stable (useMemo). */
+  initialHistory?: HistoryEntry[];
+  /** Called with updated history whenever it changes. */
+  onHistoryChange?: (history: HistoryEntry[]) => void;
   /**
    * Changes whenever the *set* of pages changes shape (a page was added or
    * removed) — NOT on every parent re-render. When it changes, `pages` is
@@ -96,6 +109,8 @@ export interface ValidationWorkspaceProps {
   syncKey?: string;
   /** Optional file metadata describing document boundaries and filenames */
   fileMetadata?: FileMetadataInput[];
+  /** Optional classified document type from OCR / LlamaCloud */
+  docType?: string;
 }
 
 // Everything below "how do we get pages in and where do they get saved" is
@@ -111,8 +126,11 @@ function ValidationWorkspace({
   pageKeys,
   initialReviews,
   onReviewChange,
+  initialHistory,
+  onHistoryChange,
   syncKey,
   fileMetadata,
+  docType,
 }: ValidationWorkspaceProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [splitPercent, setSplitPercent] = useState(50);
@@ -124,7 +142,10 @@ function ValidationWorkspace({
   const [prevSyncKey, setPrevSyncKey] = useState(syncKey);
 
   const documentContext: ExtractedPage | null = extractedPages[currentPageIndex] ?? null;
-  const ocrData: OCRComponent[] = ocrPages[currentPageIndex] ?? [];
+  // Block IR -> highlightable regions for the document panel. Recomputed only
+  // when the blocks themselves change (cell edits don't move regions).
+  const overlayPages = useMemo<PageOverlay[][]>(() => ocrPages.map(blocksToOverlays), [ocrPages]);
+  const overlays: PageOverlay[] = overlayPages[currentPageIndex] ?? [];
   const documentImageURL: string | undefined = imageUrls[currentPageIndex];
 
   const isDragging = useRef(false);
@@ -135,7 +156,8 @@ function ValidationWorkspace({
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedCells, setEditedCells] = useState<Set<string>>(new Set());
   const [chatActiveTab, setChatActiveTab] = useState<ChatTab>('chat');
-
+  const [editedBlockIds, setEditedBlockIds] = useState<Set<string>>(new Set());
+  const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
   // Docked = side panel that takes layout space. Floating = movable window
   // over the page that takes none. Remembered between sessions.
   const [dockMode, setDockMode] = useState<AssistantDockMode>(() => {
@@ -173,6 +195,7 @@ function ValidationWorkspace({
     currentPageIndexRef.current = currentPageIndex;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditedCells(new Set());
+    setEditedBlockIds(new Set());
   }, [currentPageIndex]);
 
   const handlePagesChange = useCallback((action: React.SetStateAction<ExtractedPage[]>) => {
@@ -189,10 +212,28 @@ function ValidationWorkspace({
     });
   }, []);
 
+  const handleTableChange = useCallback(
+    (pageIndex: number, tableId: string) =>
+      handlePagesChange((prev) =>
+        prev.map((p, i) => (i === pageIndex ? switchActiveTable(p, tableId) : p))
+      ),
+    [handlePagesChange]
+  );
+
+  const navigation = useMemo(
+    () => ({
+      currentPageIndexRef,
+      pagesRef: extractedPagesRef,
+      onPageChange: handlePageIndexChange,
+      onTableChange: handleTableChange,
+    }),
+    [handlePageIndexChange, handleTableChange]
+  );
+
   // ── File Grouping & Scoped Navigation ────────────────────────────────────
   const fileGroups = useMemo(
-    () => groupPagesByFiles(extractedPages, ocrPages, imageUrls, pageKeys, fileMetadata),
-    [extractedPages, ocrPages, imageUrls, pageKeys, fileMetadata]
+    () => groupPagesByFiles(extractedPages, overlayPages, imageUrls, pageKeys, fileMetadata),
+    [extractedPages, overlayPages, imageUrls, pageKeys, fileMetadata]
   );
 
   const { fileIndex: activeFileIndex, pageIndexInFile: activePageIndexInFile } = useMemo(
@@ -222,23 +263,55 @@ function ValidationWorkspace({
   );
 
   // Confidence calculation for top toolbar
-  const averageConfidence = calculateAverageConfidence(ocrData);
-  const confidencePercent = Math.round(averageConfidence * 100);
+  const averageConfidence = averageOverlayConfidence(overlays);
+  const confidencePercent = averageConfidence === null ? null : Math.round(averageConfidence * 100);
 
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>(() => initialHistory ?? []);
   const [historyRedo, setRedoHistory] = useState<HistoryEntry[]>([]);
+  const historyRef = useRef<HistoryEntry[]>(history);
 
-  const addHistoryEntry = useCallback((entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
-    setHistory((prev) => [
-      {
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
+
+  const persistPageHistory = useCallback(
+    (targetIndex: number, newHistory: HistoryEntry[]) => {
+      const key = pageKeys?.[targetIndex];
+      if (!key) return;
+      const idx = key.indexOf(':');
+      if (idx === -1) return;
+      const documentId = key.slice(0, idx);
+      const pageIndex = Number(key.slice(idx + 1));
+      const pageData = extractedPagesRef.current[targetIndex];
+      const pageEntries = newHistory.filter(
+        (h) => (h.pageIndex ?? currentPageIndexRef.current) === targetIndex
+      );
+      saveExtractedData(documentId, pageIndex, pageData, pageEntries).catch((err) =>
+        console.error('Failed to save history entries:', err)
+      );
+    },
+    [pageKeys]
+  );
+
+  const addHistoryEntry = useCallback(
+    (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
+      const targetIndex = entry.pageIndex ?? currentPageIndexRef.current;
+      const newEntry: HistoryEntry = {
         ...entry,
+        pageIndex: targetIndex,
         id: crypto.randomUUID(),
         timestamp: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
-    setRedoHistory([]);
-  }, []);
+      };
+      setHistory((prev) => {
+        const next = [newEntry, ...prev];
+        onHistoryChange?.(next);
+        persistPageHistory(targetIndex, next);
+        return next;
+      });
+      setRedoHistory([]);
+    },
+    [onHistoryChange, persistPageHistory]
+  );
 
   const undoRedoHistoryEntry = useCallback(
     (direction: 'undo' | 'redo') => {
@@ -247,7 +320,13 @@ function ValidationWorkspace({
 
         if (!undoChange) return;
 
-        setHistory((prev) => prev.slice(1));
+        const targetIndex = undoChange.pageIndex ?? currentPageIndexRef.current;
+        setHistory((prev) => {
+          const next = prev.slice(1);
+          onHistoryChange?.(next);
+          persistPageHistory(targetIndex, next);
+          return next;
+        });
 
         setRedoHistory((prev) => [undoChange, ...prev]);
       } else {
@@ -255,33 +334,35 @@ function ValidationWorkspace({
 
         if (!redoChange) return;
 
+        const redoneEntry: HistoryEntry = {
+          ...redoChange,
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+        };
+
         setRedoHistory((prev) => prev.slice(1));
 
-        setHistory((prev) => [
-          {
-            ...redoChange,
-            id: crypto.randomUUID(),
-            timestamp: new Date().toISOString(),
-          },
-          ...prev,
-        ]);
+        const targetIndex = redoneEntry.pageIndex ?? currentPageIndexRef.current;
+        setHistory((prev) => {
+          const next = [redoneEntry, ...prev];
+          onHistoryChange?.(next);
+          persistPageHistory(targetIndex, next);
+          return next;
+        });
       }
     },
-    [history, historyRedo]
+    [history, historyRedo, onHistoryChange, persistPageHistory]
   );
 
   // UNDO/REDO PIPELINE — stack + keyboard shortcuts live in the hook; we
   // just say what "apply a snapshot" means for this workspace's state.
   const { push: pushUndo, undo: handleUndo } = useUndoRedo(extractedPagesRef, {
     onApply: (updatedPages, direction) => {
+      extractedPagesRef.current = updatedPages;
       setExtractedPages(updatedPages);
       onPersist(updatedPages);
       setEditedCells(new Set());
       setTableKey((k) => k + 1);
-      // addHistoryEntry({
-      //   type: direction,
-      //   description: direction === 'undo' ? 'Undid last change' : 'Redid last change',
-      // });
       undoRedoHistoryEntry(direction);
     },
   });
@@ -350,11 +431,7 @@ function ValidationWorkspace({
   // bounding box hover state — table field <-> document overlay sync,
   // plus carousel-driven page navigation via handleSlideChange
   const { hoveredTableFieldIds, hoveredDocumentOverlayIds, handleHover, handleSlideChange } =
-    useFieldHover(documentContext, {
-      currentPageIndexRef,
-      pagesRef: extractedPagesRef,
-      onPageChange: handlePageIndexChange,
-    });
+    useFieldHover(documentContext, navigation);
 
   // AI-suggestion propose/accept/reject flow (chat messages live here too,
   // since they only ever get created in response to accept/reject).
@@ -366,6 +443,13 @@ function ValidationWorkspace({
       onPagesChange: handlePagesChange,
       onPersist,
       pushUndo,
+      addHistoryEntry,
+      onCellsEdited: (cells) => {
+        const ids = cells.map((c) => `${c.rowId}:${c.column}`);
+        setEditedCells((prev) => new Set([...prev, ...ids]));
+        ids.forEach(handleCellEdited);
+      },
+      onBlocksEdited: (ids) => setEditedBlockIds((prev) => new Set([...prev, ...ids])),
     });
 
   // Row indent/outdent
@@ -388,6 +472,7 @@ function ValidationWorkspace({
     renameColumn,
     moveRow,
     reorderColumns,
+    setIndentColumn,
   } = useTableEditor({
     currentPageIndexRef,
     extractedPagesRef,
@@ -413,6 +498,54 @@ function ValidationWorkspace({
       handleColumnRenamed(oldName, newName);
     },
   });
+
+  // ── Multi-table + field/text blocks ──────────────────────────────────────
+  const tableTabs = useMemo(
+    () => (documentContext ? listTables(documentContext) : []),
+    [documentContext]
+  );
+
+  // Switching tables only changes which table is loaded into the grid; it is
+  // not a data edit, so it is neither persisted nor pushed onto the undo stack.
+  const handleSelectTable = useCallback(
+    (tableId: string) => {
+      handlePagesChange((prev) =>
+        prev.map((p, i) => (i === currentPageIndexRef.current ? switchActiveTable(p, tableId) : p))
+      );
+      setEditedCells(new Set());
+    },
+    [handlePagesChange]
+  );
+
+  // Field values and text blocks aren't touched by the table hooks, so edits
+  // are applied here, then undo-snapshotted and persisted like any other edit.
+  const handleBlockEdit = useCallback(
+    (blockId: string, newValue: string) => {
+      // pushUndo();
+      handlePagesChange((prev) =>
+        prev.map((p, i) =>
+          i !== currentPageIndexRef.current
+            ? p
+            : {
+                ...p,
+                fields: p.fields?.map((f) => (f.id === blockId ? { ...f, value: newValue } : f)),
+                texts: p.texts?.map((t) => (t.id === blockId ? { ...t, text: newValue } : t)),
+              }
+        )
+      );
+      onPersist(extractedPagesRef.current);
+      setEditedBlockIds((prev) => new Set(prev).add(blockId));
+    },
+    [handlePagesChange, onPersist]
+  );
+
+  // Field/text hover has no table cell behind it, so it bypasses useFieldHover
+  // and highlights the block's own overlay (overlay id === block id).
+  const documentHighlightIds = useMemo(
+    () =>
+      hoveredBlockId ? [...hoveredDocumentOverlayIds, hoveredBlockId] : hoveredDocumentOverlayIds,
+    [hoveredDocumentOverlayIds, hoveredBlockId]
+  );
 
   if (!documentContext) {
     return (
@@ -574,14 +707,16 @@ function ValidationWorkspace({
             <span>Confidence:</span>
             <span
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-                confidencePercent >= 85
-                  ? 'border-success text-success bg-base-100'
-                  : confidencePercent >= 70
-                    ? 'border-warning text-warning bg-base-100'
-                    : 'border-error text-error bg-base-100'
+                confidencePercent === null
+                  ? 'border-base-300 text-base-content/50 bg-base-100'
+                  : confidencePercent >= 85
+                    ? 'border-success text-success bg-base-100'
+                    : confidencePercent >= 70
+                      ? 'border-warning text-warning bg-base-100'
+                      : 'border-error text-error bg-base-100'
               }`}
             >
-              {confidencePercent}%
+              {confidencePercent === null ? '—' : `${confidencePercent}%`}
             </span>
           </div>
 
@@ -706,9 +841,9 @@ function ValidationWorkspace({
               }
             >
               <DocumentPanel
-                hoveredOverlayIds={hoveredDocumentOverlayIds}
+                hoveredOverlayIds={documentHighlightIds}
                 documentImageUrl={documentImageURL}
-                ocrData={ocrData}
+                ocrData={overlays}
                 imageUrls={imageUrls}
                 currentPageIndex={currentPageIndex}
                 onPageChange={handlePageIndexChange}
@@ -743,7 +878,7 @@ function ValidationWorkspace({
             >
               <ExtractedDataPanel
                 onUndoLast={handleUndo}
-                key={`${tableKey}-${currentPageIndex}`}
+                key={`${tableKey}-${currentPageIndex}-${documentContext.tableId ?? 'none'}`}
                 isEditMode={isEditMode}
                 onEditModeChange={setIsEditMode}
                 editedCells={editedCells}
@@ -754,6 +889,7 @@ function ValidationWorkspace({
                 extractedData={documentContext}
                 fileGroups={fileGroups}
                 currentGlobalIndex={currentPageIndex}
+                docType={docType}
                 hoveredOverlayIds={hoveredTableFieldIds}
                 onRowIndent={handleRowIndent}
                 onRowOutdent={handleRowOutdent}
@@ -765,15 +901,24 @@ function ValidationWorkspace({
                 onColumnRename={renameColumn}
                 onRowMove={moveRow}
                 onColumnReorder={reorderColumns}
+                onIndentColumnChange={setIndentColumn}
+                tables={tableTabs}
+                activeTableId={documentContext.tableId}
+                onSelectTable={handleSelectTable}
+                fields={documentContext.fields}
+                texts={documentContext.texts}
+                editedBlockIds={editedBlockIds}
+                onBlockEdit={handleBlockEdit}
+                onBlockHover={setHoveredBlockId}
               />
 
               {/* Picture-in-Picture (PiP) mini document preview when in Table Focus Mode */}
               {viewMode === 'table' && isPiPOpen && (
                 <DocumentPreviewPiP
                   documentImageUrl={documentImageURL}
-                  ocrData={ocrData}
+                  ocrData={overlays}
                   currentPageIndex={currentPageIndex}
-                  hoveredOverlayIds={hoveredDocumentOverlayIds}
+                  hoveredOverlayIds={documentHighlightIds}
                   onClose={() => setIsPiPOpen(false)}
                   containerRef={containerRef}
                 />

@@ -2,11 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ValidationWorkspace from './ValidationWorkspace';
 import type { ExtractedPage } from '../../../models/TableData';
-import type { OCRComponent } from '../../../models/OCRComponent';
+import type { Block } from '../../../models/Document';
+
+import * as docService from '../../../services/documentService';
 
 // Mock child panels that have heavy dependencies
 vi.mock('./chat/ChatPanel', () => ({
-  default: () => <div data-testid="chat-panel" />,
+  default: (props: any) => (
+    <div data-testid="chat-panel" data-history-count={props.history?.length ?? 0}>
+      {props.history?.map((h: any) => (
+        <span key={h.id} data-testid="history-entry">
+          {h.description}
+        </span>
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock('../../../hooks/useReviewQueue', () => ({
@@ -40,10 +50,10 @@ describe('ValidationWorkspace - File Separation & Adaptive View Modes', () => {
     { pageIndex: 2, columns: ['QTY'], itemColumnKey: 'QTY', rows: [{ _id: '3', QTY: 'Item 2A', _cellConfidence: {} }] },
   ];
 
-  const mockOcrPages: OCRComponent[][] = [
-    [{ id: 'c1', type: 'TABLE_ROW', indentation: 0, y: 0, layer: 0, text: 't1', confidence: 0.95 }],
-    [{ id: 'c2', type: 'TABLE_ROW', indentation: 0, y: 0, layer: 0, text: 't2', confidence: 0.9 }],
-    [{ id: 'c3', type: 'TABLE_ROW', indentation: 0, y: 0, layer: 0, text: 't3', confidence: 0.85 }],
+  const mockOcrPages: Block[][] = [
+    [{ kind: 'text', id: 'c1', role: 'paragraph', text: 't1', confidence: 0.95 }],
+    [{ kind: 'text', id: 'c2', role: 'paragraph', text: 't2', confidence: 0.9 }],
+    [{ kind: 'text', id: 'c3', role: 'paragraph', text: 't3', confidence: 0.85 }],
   ];
 
   const mockImageUrls = ['http://img/1.png', 'http://img/2.png', 'http://img/3.png'];
@@ -224,4 +234,71 @@ describe('ValidationWorkspace - File Separation & Adaptive View Modes', () => {
     // Re-scan button updates its scope to page 2
     expect(screen.getByRole('button', { name: /Re-scan page 2/i })).toBeInTheDocument();
   });
+
+  it('hydrates initialHistory into the chat/history panel', () => {
+    const mockInitialHistory = [
+      {
+        id: 'hist-1',
+        type: 'edit' as const,
+        timestamp: '2026-10-17T00:00:00.000Z',
+        description: 'Previously edited ITEM',
+      },
+    ];
+
+    render(
+      <ValidationWorkspace
+        pages={mockPages}
+        ocrPages={mockOcrPages}
+        imageUrls={mockImageUrls}
+        fileMetadata={mockFileMetadata}
+        onPersist={mockPersist}
+        initialHistory={mockInitialHistory}
+      />
+    );
+
+    const chatPanel = screen.getByTestId('chat-panel');
+    expect(chatPanel).toHaveAttribute('data-history-count', '1');
+    expect(screen.getByText('Previously edited ITEM')).toBeInTheDocument();
+  });
+
+  it('persists history entries using saveExtractedData when edits occur', async () => {
+    const saveSpy = vi.spyOn(docService, 'saveExtractedData').mockResolvedValue({} as any);
+
+    render(
+      <ValidationWorkspace
+        pages={mockPages}
+        ocrPages={mockOcrPages}
+        imageUrls={mockImageUrls}
+        fileMetadata={mockFileMetadata}
+        pageKeys={['doc-1:0', 'doc-1:1', 'doc-2:0']}
+        onPersist={mockPersist}
+      />
+    );
+
+    // Toggle edit mode
+    fireEvent.click(screen.getByTitle('Toggle Edit Mode'));
+
+    // Find Rename Column button
+    const renameBtns = screen.getAllByTitle('Rename Column');
+    fireEvent.click(renameBtns[0]);
+
+    const input = screen.getByPlaceholderText('Column name');
+    fireEvent.change(input, { target: { value: 'PRODUCT_NAME' } });
+
+    const confirmBtns = screen.getAllByRole('button', { name: 'Rename Column' });
+    fireEvent.click(confirmBtns[confirmBtns.length - 1]);
+
+    expect(saveSpy).toHaveBeenCalledWith(
+      'doc-1',
+      0,
+      expect.anything(),
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'edit',
+          description: expect.stringContaining('PRODUCT_NAME'),
+        }),
+      ])
+    );
+  });
 });
+

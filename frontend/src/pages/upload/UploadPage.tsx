@@ -15,6 +15,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trash2, RefreshCw } from 'lucide-react';
 import { unlockStep } from '../../services/stepGuard.ts';
+import { useOcrProgress } from '../../context/OcrProgressContext';
 
 import type { PreviewItem } from './types';
 import { buildPreviewItemsForFiles } from './components/preview/previewHelpers';
@@ -33,7 +34,6 @@ import {
 import {
   uploadPageToBackend,
   deletePageFromBackend,
-  processDocuments,
   getUploadedDocuments,
   getProcessedImageUrls,
   getJobs,
@@ -43,6 +43,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 
 function UploadPageInner() {
   const navigate = useNavigate();
+  const { enqueue: enqueueOcr } = useOcrProgress();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
@@ -54,7 +55,7 @@ function UploadPageInner() {
   //   fileName: string;
   //   status: string;
   // } | null>(null);
-  const [retryMessage, setRetryMessage] = useState<string | null>(null);
+  //const [retryMessage, setRetryMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [replaceConfirm, setReplaceConfirm] = useState<{
@@ -318,7 +319,9 @@ function UploadPageInner() {
 
   function selectAllPages() {
     setSelectedPages(
-      new Set(previewItems.map((item, i) => (item.hasFile ? i : -1)).filter((i) => i >= 0))
+      new Set(
+        previewItems.map((item, i) => (item.hasFile && !item.isQueued ? i : -1)).filter((i) => i >= 0)
+      )
     );
   }
 
@@ -654,80 +657,95 @@ function UploadPageInner() {
     }
   }
 
-  async function executeProcess() {
+  // Hands the selected pages to the shared OCR queue (see OcrProgressProvider) and
+  // returns straight away, so the user can keep working — or queue more pages —
+  // while the progress popup tracks the run.
+  function executeProcess() {
     setProcessConfirmWarning(false);
-    setIsProcessing(true);
     setUploadError(null); // US-1.4: clear any previous error before retrying
-    setRetryMessage(null);
     setUploadSuccess(false); // US-1.5: clear any previous success before retrying
 
-    try {
-      const selectedItemsMap = new Map<string, { pages: string[] }>();
+    const selectedItemsMap = new Map<string, { pages: string[]; label: string }>();
+    const queuedKeys = new Set<string>();
 
-      const sortedSelectedIndices = [...selectedPages].sort((a, b) => a - b);
-
-      sortedSelectedIndices.forEach((index) => {
+    [...selectedPages]
+      .sort((a, b) => a - b)
+      .forEach((index) => {
         const item = previewItems[index];
-        if (item?.hasFile && item.backendPageIndex !== undefined && item.documentId) {
-          const docId = item.documentId;
-          if (!selectedItemsMap.has(docId)) {
-            selectedItemsMap.set(docId, { pages: [] });
+        if (item?.hasFile && !item.isQueued && item.backendPageIndex !== undefined && item.documentId) {
+          if (!selectedItemsMap.has(item.documentId)) {
+            selectedItemsMap.set(item.documentId, { pages: [], label: item.label });
           }
-          selectedItemsMap.get(docId)!.pages.push(item.backendPageIndex.toString());
+          selectedItemsMap.get(item.documentId)!.pages.push(item.backendPageIndex.toString());
+          queuedKeys.add(pageKey(item.documentId, item.backendPageIndex));
         }
       });
 
-      const selectedPayload = Array.from(selectedItemsMap.entries()).map(([documentId, data]) => ({
-        documentId,
-        pages: data.pages,
-      }));
+    if (selectedItemsMap.size === 0) return;
 
-      const result = await processDocuments(selectedPayload, (msg) => {
-        setRetryMessage(msg);
-      });
+    const selection = Array.from(selectedItemsMap.entries()).map(([documentId, data]) => ({
+      documentId,
+      pages: data.pages,
+    }));
+    const labels = Array.from(selectedItemsMap.values()).map((entry) => entry.label);
+    const label = labels.length > 1 ? `${labels[0]} +${labels.length - 1} more` : labels[0];
 
-      let allSucceeded = true;
+    // Lock the queued pages so they can't be selected, replaced or removed mid-run.
+    setPreviewItems((prev) =>
+      prev.map((item) =>
+        item.documentId !== undefined &&
+        item.backendPageIndex !== undefined &&
+        queuedKeys.has(pageKey(item.documentId, item.backendPageIndex))
+          ? { ...item, isQueued: true, errorText: undefined }
+          : item
+      )
+    );
+    setSelectedPages(new Set());
 
-      setPreviewItems((prev) => {
-        const next = [...prev];
-        [...selectedPages].forEach((index) => {
-          if (next[index] && next[index].documentId !== undefined && next[index].backendPageIndex !== undefined) {
-            // Find job result if it exists
-            const job = result?.jobs?.find(j => 
-               j.documentId === next[index].documentId
-            );
-            if (job && job.status === 'failed') {
-               allSucceeded = false;
-               next[index] = { ...next[index], isProcessed: false, errorText: job.errorMessage || 'Processing failed' };
-            } else {
-               next[index] = { ...next[index], isProcessed: true, errorText: undefined };
+    enqueueOcr({
+      selection,
+      label,
+      onSettled: (task, result) => {
+        const jobs = result?.jobs ?? [];
+
+        // Matched by documentId + page (not by list position) because the list may
+        // have changed — or this page may have unmounted — while OCR was running.
+        setPreviewItems((prev) =>
+          prev.map((item) => {
+            if (
+              !item.isQueued ||
+              item.documentId === undefined ||
+              item.backendPageIndex === undefined ||
+              !queuedKeys.has(pageKey(item.documentId, item.backendPageIndex))
+            ) {
+              return item;
             }
-          }
-        });
-        return next;
-      });
+            const job = jobs.find((j) => j.documentId === item.documentId);
+            if (job) {
+              return job.status === 'failed'
+                ? { ...item, isQueued: false, isProcessed: false, errorText: job.errorMessage || 'Processing failed' }
+                : { ...item, isQueued: false, isProcessed: true, errorText: undefined };
+            }
+            if (task.status === 'completed') {
+              return { ...item, isQueued: false, isProcessed: true, errorText: undefined };
+            }
+            return {
+              ...item,
+              isQueued: false,
+              errorText: task.status === 'failed' ? task.error || 'Processing failed' : undefined,
+            };
+          })
+        );
 
-      if (!allSucceeded) {
-         setUploadError('Some files failed to process. Please review the errors on the items.');
-         return;
-      }
-
-      // US-1.5: detect successful upload and show success notification
-      unlockStep(2);
-      setUploadSuccess(true);
-      setTimeout(() => {
-        navigate('/validation');
-      }, 1200);
-    } catch (err) {
-      // US-1.4: store error message in state to display near upload area
-      const message =
-        err instanceof Error ? err.message : 'An unexpected error occurred during processing.';
-      setUploadError(message);
-      setRetryMessage(null); // Clear retry message when error is shown
-      console.error('Processing failed:', err);
-    } finally {
-      setIsProcessing(false);
-    }
+        if (task.status === 'completed' && task.failedDocuments === 0) {
+          setUploadSuccess(true); // US-1.5: success notification
+        } else if (task.status === 'completed') {
+          setUploadError('Some files failed to process. Please review the errors on the items.');
+        } else if (task.status === 'failed' && task.error) {
+          setUploadError(task.error); // US-1.4: show the error near the upload area
+        }
+      },
+    });
   }
 
   // Helper to render global notifications
@@ -746,19 +764,9 @@ function UploadPageInner() {
       return (
         <Toast
           open={true}
-          message="Files successfully uploaded and processed! Redirecting to validation..."
+          message="Pages processed! Open the progress window and choose “Review results” to continue."
           type="success"
           onDismiss={() => setUploadSuccess(false)}
-        />
-      );
-    }
-    if (retryMessage) {
-      return (
-        <Toast
-          open={true}
-          message={retryMessage}
-          type="warning"
-          onDismiss={() => setRetryMessage(null)}
         />
       );
     }
@@ -1014,12 +1022,25 @@ function UploadPageInner() {
                     title={item.subtitle ? `${item.label} - ${item.subtitle}` : item.label}
                     caption={caption}
                     isSelectable={item.hasFile}
+                    isBusy={item.isQueued}
                     isSelected={selectedPages.has(originalIndex)}
                     thumbnailUrl={item.previewSrc}
                     isImage={item.isImage}
                     status={{
-                      text: item.errorText ? 'error' : item.isProcessed ? 'done' : 'pending',
-                      className: item.errorText ? 'badge-error' : item.isProcessed ? 'badge-success' : 'badge-ghost',
+                      text: item.isQueued
+                        ? 'processing'
+                        : item.errorText
+                          ? 'error'
+                          : item.isProcessed
+                            ? 'done'
+                            : 'pending',
+                      className: item.isQueued
+                        ? 'badge-info'
+                        : item.errorText
+                          ? 'badge-error'
+                          : item.isProcessed
+                            ? 'badge-success'
+                            : 'badge-ghost',
                     }}
                     warningText={warningTextFor(item)}
                     errorText={item.errorText}
@@ -1035,6 +1056,10 @@ function UploadPageInner() {
       </div>
     </div>
   );
+}
+
+function pageKey(documentId: string, backendPageIndex: number): string {
+  return `${documentId}::${backendPageIndex}`;
 }
 
 function warningTextFor(item: PreviewItem): string | undefined {

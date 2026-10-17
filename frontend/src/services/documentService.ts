@@ -8,7 +8,10 @@ import type {
   ProcessDocumentResponse,
 } from '../models/Project';
 import type { ExtractedPage } from '../models/TableData';
+import type { DocType, StructuredDocument } from '../models/Document';
 import type { PageReview } from '../models/IssueReview';
+import type { HistoryEntry } from '../models/HistoryEntry';
+import { pageToExtractedPage } from '../utils/flattener';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
@@ -44,7 +47,7 @@ export async function uploadPageToR2(
   formData.append('projectId', projectId);
   formData.append('filename', filename);
   formData.append('pageIndex', pageIndex.toString());
-  
+
   if (documentId) {
     formData.append('documentId', documentId);
   }
@@ -65,7 +68,7 @@ export async function uploadPageToR2(
   }
 
   const data = await response.json();
-  
+
   return {
     documentId: data.documentId,
     storageKey: data.storageKey,
@@ -147,27 +150,63 @@ export async function processPages(selections: PageSelection[]): Promise<Process
 export async function processDocumentPages(
   documentId: string,
   pageIndices: number[],
-  force = false
+  force = false,
+  docType?: DocType // skip server-side classification when the user already knows the type
 ): Promise<ProcessDocumentResponse> {
-  return processPages([{ documentId, pageIndices, force }]);
+  return processPages([{ documentId, pageIndices, force, docType }]);
 }
 
 /**
- * Persists extracted data for one page and marks it done.
+ * Type guard for a stored/returned raw OCR result. Rows OCR'd before the
+ * structured pipeline hold the legacy shape and fail this check; callers
+ * should treat that as "needs re-processing" (processPages with force: true).
+ */
+export function isStructuredDocument(raw: unknown): raw is StructuredDocument {
+  const d = raw as StructuredDocument | null | undefined;
+  return (
+    !!d &&
+    typeof d === 'object' &&
+    !Array.isArray(d) &&
+    typeof d.docType === 'string' &&
+    Array.isArray(d.pages) &&
+    d.pages.every((p) => typeof p?.pageIndex === 'number' && Array.isArray(p.blocks))
+  );
+}
+
+/**
+ * Converts a page's raw OCR result (StructuredDocument) into the grid shape the
+ * validation workspace edits. Returns null for missing / legacy-format results.
+ * Pass `manualIndentLevels` (row id -> level) to re-apply the user's indent edits.
+ */
+export function rawResultToExtractedPages(
+  raw: unknown,
+  manualIndentLevels?: Record<string, number>
+): ExtractedPage[] | null {
+  if (!isStructuredDocument(raw)) return null;
+  return raw.pages.map((page) => pageToExtractedPage(page, { manualIndentLevels }));
+}
+
+/**
+ * Persists extracted data and/or history entries for one page and marks it done.
  */
 export async function saveExtractedData(
   documentId: string,
   pageIndex: number,
-  extractedData: ExtractedPage
+  extractedData?: ExtractedPage,
+  historyEntries?: HistoryEntry[]
 ): Promise<DocumentPageRecord> {
   const headers = await getAuthHeaders();
+  const body: { extractedData?: ExtractedPage; historyEntries?: HistoryEntry[] } = {};
+  if (extractedData !== undefined) body.extractedData = extractedData;
+  if (historyEntries !== undefined) body.historyEntries = historyEntries;
+
   const response = await fetch(
     apiUrl(`/api/documents/${encodeURIComponent(documentId)}/pages/${pageIndex}/data`),
     {
       method: 'PATCH',
       headers,
       credentials: 'include',
-      body: JSON.stringify({ extractedData }),
+      body: JSON.stringify(body),
     }
   );
 
