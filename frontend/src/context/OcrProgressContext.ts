@@ -12,15 +12,27 @@ export interface OcrProgressContextValue {
   clearFinished: () => void;
   
   // Project-level helpers
-  getProjectProgress: (projectId: string) => ProjectOcrProgress;
+  getProjectProgress: (projectId?: string) => ProjectOcrProgress;
 }
 
 export const OcrProgressContext = createContext<OcrProgressContextValue | null>(null);
 
-export function useOcrProgress() {
+// In OcrProgressProvider.tsx:
+export function useOcrProgress(scopedProjectId?: string) {
   const context = useContext(OcrProgressContext);
   if (!context) {
     throw new Error('useOcrProgress must be used within an OcrProgressProvider');
   }
+
+  // If scopedProjectId is provided, return context with filtered tasks
+  if (scopedProjectId) {
+    return {
+      ...context,
+      tasks: context.tasks.filter(
+        (task) => String(task.projectId) === String(scopedProjectId)
+      ),
+    };
+  }
+
   return context;
 }

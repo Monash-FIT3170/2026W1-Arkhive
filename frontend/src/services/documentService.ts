@@ -136,10 +136,23 @@ export async function processPages(selections: PageSelection[]): Promise<Process
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.error || `Failed to process documents (${response.status})`);
+    throw new Error(errorBody.error || errorBody.message || `Server returned ${response.status}`);
   }
 
-  return await response.json();
+  const data = await response.json();
+
+  // Safely guarantee results and jobs array exist
+  const safeResults = Array.isArray(data?.results)
+    ? data.results
+    : Array.isArray(data?.jobs)
+    ? data.jobs
+    : [];
+
+  return {
+    ...data,
+    results: safeResults,
+    jobs: safeResults,
+  };
 }
 
 /**

@@ -5,6 +5,8 @@ import type { BatchProgressEvent } from '../models/Job';
 import { processDocuments, type BatchUploadResult } from '../services/uploadService';
 import { unlockStep } from '../services/stepGuard';
 import { estimateExpectedMs } from '../utils/ocrProgress';
+import { processDocumentPages, processPages } from '../services/documentService';
+import type { ProcessDocumentResponse } from '../models/Project';
 
 type QueueEntry = EnqueueOcrOptions & {
   id: string;
@@ -99,10 +101,13 @@ export function OcrProgressProvider({ children, userId }: OcrProgressProviderPro
     [patch]
   );
 
-  const settle = useCallback((entry: QueueEntry, result: BatchUploadResult | void) => {
-    const task = tasksRef.current.find((t) => t.id === entry.id);
-    if (task) entry.onSettled?.(task, result);
-  }, []);
+const settle = useCallback(
+    (entry: QueueEntry, result: ProcessDocumentResponse | BatchUploadResult | void) => {
+      const task = tasksRef.current.find((t) => t.id === entry.id);
+      if (task) entry.onSettled?.(task, result as any);
+    },
+    []
+  );
 
   const pump = useCallback(async () => {
     if (runningRef.current) return;
@@ -119,14 +124,13 @@ export function OcrProgressProvider({ children, userId }: OcrProgressProviderPro
         message: 'Starting OCR…',
       }));
 
-      let result: BatchUploadResult | void = undefined;
+      let result: ProcessDocumentResponse | BatchUploadResult | void = undefined;
       try {
-        result = await processDocuments(
-          entry.selection,
-          undefined,
-          (event) => applyEvent(entry!.id, event),
-          controller.signal
-        );
+        if (entry.projectId) {
+          result = await processPages(entry.selection as any);
+        } else {
+          result = await processDocuments(entry.selection as any);
+        }
 
         const jobs = result?.jobs ?? [];
         const failedFromJobs = jobs.filter((job) => job.status === 'failed');
@@ -177,8 +181,9 @@ export function OcrProgressProvider({ children, userId }: OcrProgressProviderPro
         runningRef.current = null;
       }
     }
-  }, [applyEvent, patch, settle]);
+  }, [patch, settle]);
 
+  
   const enqueue = useCallback(
     (options: EnqueueOcrOptions) => {
       const id = `ocr-task-${Date.now()}-${counterRef.current++}`;

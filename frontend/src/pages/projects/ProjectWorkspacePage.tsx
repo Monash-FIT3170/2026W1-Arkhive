@@ -354,6 +354,7 @@ export default function ProjectWorkspacePage() {
   }
 
   async function handleFilesCaptured(capturedFiles: File[]) {
+    console.log('Files captured:', capturedFiles);
     if (!project) return;
     setIsUploading(true);
     setActionError(null);
@@ -520,25 +521,23 @@ export default function ProjectWorkspacePage() {
     setIsProcessing(true);
     setActionError(null);
 
-    // 1. Capture the selected keys before clearing UI selection
     const queuedKeys = new Set(selectedKeys);
-
-    // 2. Group selected keys by documentId
     const byDoc = new Map<string, number[]>();
+
+    // Parse keys like "docId:0" cleanly into documentId and pageIndex
     selectedKeys.forEach((key) => {
-      const [documentId, pageIndexStr] = key.split(':');
+      const parts = key.split(':');
+      const documentId = parts[0];
+      const pageIdx = parseInt(parts[1], 10);
       if (!byDoc.has(documentId)) byDoc.set(documentId, []);
-      byDoc.get(documentId)!.push(Number(pageIndexStr));
+      if (!isNaN(pageIdx)) byDoc.get(documentId)!.push(pageIdx);
     });
 
-    // 3. Format selection for enqueueOcr using 'pages' property
     const selection = Array.from(byDoc.entries()).map(([documentId, pages]) => ({
       documentId,
       pages,
-      force: true,
     }));
 
-    // 4. Set document pages to 'processing' status visually
     setDocuments((prev) =>
       prev.map((doc) => {
         if (!byDoc.has(doc.id)) return doc;
@@ -555,14 +554,14 @@ export default function ProjectWorkspacePage() {
 
     setSelectedKeys(new Set());
 
-    // 5. Enqueue background task
     enqueueOcr({
       projectId: project?.id ?? id ?? '',
       selection,
       label: project?.name ? `${project.name} (${selection.length} files)` : 'Project Documents',
       onSettled: (task, result) => {
         setIsProcessing(false);
-        const jobs = result?.jobs ?? [];
+        const rawJobs = (result as any)?.results ?? (result as any)?.jobs ?? [];
+        const jobs = Array.isArray(rawJobs) ? rawJobs : [];
 
         setDocuments((prev) =>
           prev.map((doc) => {
@@ -573,7 +572,7 @@ export default function ProjectWorkspacePage() {
                 const pageKey = makePageKey(doc.id, page.page_index);
                 if (!queuedKeys.has(pageKey)) return page;
 
-                const job = jobs.find((j) => j.documentId === doc.id);
+                const job = jobs.find((j: any) => j.documentId === doc.id);
                 if (job) {
                   return {
                     ...page,
@@ -817,8 +816,6 @@ export default function ProjectWorkspacePage() {
             <span className="loading loading-spinner loading-xs" /> Uploading...
           </div>
         )}
-        <OcrProgressPopup/>
-
         <div className="flex-1 overflow-y-auto p-6">
           <div className="flex flex-col gap-6">
             {documents

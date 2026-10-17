@@ -78,8 +78,6 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      <OCRProgressThing></OCRProgressThing>
-
       {deleteConfirmId && (
         <ConfirmDeleteModal
           title="Delete Project"
