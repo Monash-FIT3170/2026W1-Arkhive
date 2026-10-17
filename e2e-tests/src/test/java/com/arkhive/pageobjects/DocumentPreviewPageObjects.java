@@ -24,4 +24,6 @@ public class DocumentPreviewPageObjects {
     public final By zoomedImage = By.xpath("//div[contains(@class,'fixed')]//img[contains(@class,'shadow-2xl')]");
     public final By closeZoomButton = By.xpath("//button[@aria-label='Close zoomed image']");
     public final By processSpinner = By.cssSelector(".loading-spinner");
+    public final By ocrProgressModal = By.xpath("//div[@data-testid='ocr-progress-window' or @aria-label='OCR progress']");
+    public final By reviewResultsButton = By.xpath("//button[contains(.,'Review results')]");
 }

@@ -147,4 +147,17 @@ public class DocumentPreviewPage extends BasePage {
             ReportLogger.info("Toggled selection for preview card " + (index + 1));
         }
     }
+
+    public boolean waitForOcrProgressModal(int timeoutSeconds) {
+        return isDisplayed(pageObjects.ocrProgressModal, timeoutSeconds);
+    }
+
+    public boolean waitForOcrComplete(int timeoutSeconds) {
+        return isDisplayed(pageObjects.reviewResultsButton, timeoutSeconds);
+    }
+
+    public void clickReviewResults() {
+        click(pageObjects.reviewResultsButton);
+        ReportLogger.info("Clicked 'Review results' to navigate to the Validation workspace");
+    }
 }

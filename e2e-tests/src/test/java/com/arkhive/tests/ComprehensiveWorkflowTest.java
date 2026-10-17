@@ -80,9 +80,18 @@ public class ComprehensiveWorkflowTest extends BaseTest {
         // ═════════════════════════════════════════════════════════════════════
         documentPreviewPage.clickProcess();
 
+        Assert.assertTrue(documentPreviewPage.waitForOcrProgressModal(10),
+                "OCR progress modal should appear after clicking Process");
+
         int ocrTimeoutSeconds = Math.max(testConfig.getProcessingTimeoutSeconds() * 2, 240);
-        Assert.assertTrue(validationPage.isWorkspaceLoaded(ocrTimeoutSeconds),
-                "Validation workspace should load within " + ocrTimeoutSeconds + " seconds after OCR processing");
+        Assert.assertTrue(documentPreviewPage.waitForOcrComplete(ocrTimeoutSeconds),
+                "OCR processing should complete and 'Review results' button should appear within "
+                        + ocrTimeoutSeconds + " seconds");
+
+        documentPreviewPage.clickReviewResults();
+
+        Assert.assertTrue(validationPage.isWorkspaceLoaded(15),
+                "Validation workspace should load after clicking 'Review results'");
         Assert.assertTrue(validationPage.isExtractedDataPanelDisplayed(),
                 "Extracted OCR data panel should be displayed in the Validation workspace");
 
