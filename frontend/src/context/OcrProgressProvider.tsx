@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { OcrProgressContext, type EnqueueOcrOptions } from './OcrProgressContext';
 import { isTaskActive, type OcrTask, type ProjectOcrProgress } from '../models/OcrTask';
-import type { BatchProgressEvent } from '../models/Job';
 import { processDocuments, type BatchUploadResult } from '../services/uploadService';
 import { unlockStep } from '../services/stepGuard';
 import { estimateExpectedMs } from '../utils/ocrProgress';
-import { processDocumentPages, processPages } from '../services/documentService';
+import { processPages } from '../services/documentService';
 import type { ProcessDocumentResponse } from '../models/Project';
 
 type QueueEntry = EnqueueOcrOptions & {
@@ -16,7 +15,7 @@ type QueueEntry = EnqueueOcrOptions & {
 
 interface OcrProgressProviderProps {
   children: ReactNode;
-  userId?: string | null; // Pass your logged-in user ID here (null/undefined for guests)
+  userId?: string | null;
 }
 
 export function OcrProgressProvider({ children, userId }: OcrProgressProviderProps) {
@@ -24,8 +23,15 @@ export function OcrProgressProvider({ children, userId }: OcrProgressProviderPro
   const [isMinimised, setMinimised] = useState(false);
 
   const tasksRef = useRef<OcrTask[]>([]);
-  const queueRef = useRef<QueueEntry[]>([]);
-  const runningRef = useRef<{ id: string; controller: AbortController } | null>(null);
+  
+  // Independent queue stores
+  const userQueueRef = useRef<QueueEntry[]>([]);
+  const guestQueueRef = useRef<QueueEntry[]>([]);
+
+  // Independent execution locks for parallel processing
+  const userRunningRef = useRef<{ id: string; controller: AbortController } | null>(null);
+  const guestRunningRef = useRef<{ id: string; controller: AbortController } | null>(null);
+
   const counterRef = useRef(0);
   const learnedMsPerPageRef = useRef<number | null>(null);
 
@@ -34,25 +40,12 @@ export function OcrProgressProvider({ children, userId }: OcrProgressProviderPro
     setAllTasks(next);
   }, []);
 
-  // Filter tasks to only those belonging to current context (user or guest)
   const visibleTasks = useMemo(() => {
     if (userId) {
-      return allTasks.filter((t) => t.userId === userId || t.ownerType === 'guest');
+      return allTasks.filter((t) => t.userId === userId);
     }
     return allTasks.filter((t) => t.ownerType === 'guest');
   }, [allTasks, userId]);
-
-  // When guest logs in, migrate in-memory guest tasks to user context
-  useEffect(() => {
-    if (userId) {
-      const migrated = tasksRef.current.map((task) =>
-        task.ownerType === 'guest'
-          ? { ...task, ownerType: 'user' as const, userId }
-          : task
-      );
-      commit(migrated);
-    }
-  }, [userId, commit]);
 
   const patch = useCallback(
     (id: string, update: Partial<OcrTask> | ((task: OcrTask) => Partial<OcrTask>)) => {
@@ -67,41 +60,7 @@ export function OcrProgressProvider({ children, userId }: OcrProgressProviderPro
     [commit]
   );
 
-  const applyEvent = useCallback(
-    (id: string, event: BatchProgressEvent) => {
-      switch (event.type) {
-        case 'job_progress':
-          patch(id, { message: `Reading ${event.fileName ?? 'document'}…` });
-          break;
-        case 'retry':
-          patch(id, {
-            message: `Retrying (attempt ${event.attempt} of ${event.maxRetries}) — ${event.fileName ?? 'document'}`,
-          });
-          break;
-        case 'job_completed':
-          patch(id, (task) => {
-            const documentsDone = Math.min(task.documentsDone + 1, task.documentCount);
-            return {
-              documentsDone,
-              message: `${documentsDone} of ${task.documentCount} ${task.documentCount === 1 ? 'document' : 'documents'} finished`,
-            };
-          });
-          break;
-        case 'job_failed':
-          patch(id, (task) => ({
-            documentsDone: Math.min(task.documentsDone + 1, task.documentCount),
-            failedDocuments: task.failedDocuments + 1,
-            message: `Could not read ${event.fileName ?? 'a document'}`,
-          }));
-          break;
-        default:
-          break;
-      }
-    },
-    [patch]
-  );
-
-const settle = useCallback(
+  const settle = useCallback(
     (entry: QueueEntry, result: ProcessDocumentResponse | BatchUploadResult | void) => {
       const task = tasksRef.current.find((t) => t.id === entry.id);
       if (task) entry.onSettled?.(task, result as any);
@@ -109,13 +68,11 @@ const settle = useCallback(
     []
   );
 
-  const pump = useCallback(async () => {
-    if (runningRef.current) return;
-
-    let entry: QueueEntry | undefined;
-    while ((entry = queueRef.current.shift())) {
+  // Unified single-entry execution engine
+  const processQueueEntry = useCallback(
+    async (entry: QueueEntry, runningLock: React.MutableRefObject<{ id: string; controller: AbortController } | null>) => {
       const controller = new AbortController();
-      runningRef.current = { id: entry.id, controller };
+      runningLock.current = { id: entry.id, controller };
 
       patch(entry.id, (task) => ({
         status: 'processing',
@@ -132,9 +89,9 @@ const settle = useCallback(
           result = await processDocuments(entry.selection as any);
         }
 
-        const jobs = result?.jobs ?? [];
+        const jobs = (result && 'jobs' in result && Array.isArray(result.jobs)) ? result.jobs : [];
         const failedFromJobs = jobs.filter((job) => job.status === 'failed');
-        const current = tasksRef.current.find((t) => t.id === entry!.id);
+        const current = tasksRef.current.find((t) => t.id === entry.id);
         const failedDocuments = jobs.length > 0 ? failedFromJobs.length : (current?.failedDocuments ?? 0);
         const allFailed = current !== undefined && failedDocuments >= current.documentCount;
 
@@ -173,25 +130,41 @@ const settle = useCallback(
           patch(entry.id, { status: 'failed', error: message, message: 'OCR failed', finishedAt: Date.now() });
           console.error('Processing failed:', err);
         }
-      }
-
-      try {
-        settle(entry, result);
       } finally {
-        runningRef.current = null;
+        settle(entry, result);
+        runningLock.current = null;
       }
-    }
-  }, [patch, settle]);
+    },
+    [patch, settle]
+  );
 
-  
+  // Worker for Logged-In User Queue
+  const pumpUser = useCallback(async () => {
+    if (userRunningRef.current) return;
+    while (userQueueRef.current.length > 0) {
+      const entry = userQueueRef.current.shift();
+      if (entry) await processQueueEntry(entry, userRunningRef);
+    }
+  }, [processQueueEntry]);
+
+  // Worker for Guest Queue
+  const pumpGuest = useCallback(async () => {
+    if (guestRunningRef.current) return;
+    while (guestQueueRef.current.length > 0) {
+      const entry = guestQueueRef.current.shift();
+      if (entry) await processQueueEntry(entry, guestRunningRef);
+    }
+  }, [processQueueEntry]);
+
+  // Dual Enqueue mechanism
   const enqueue = useCallback(
     (options: EnqueueOcrOptions) => {
       const id = `ocr-task-${Date.now()}-${counterRef.current++}`;
-      const ownerType = userId ? 'user' : 'guest';
+      const ownerType: 'user' | 'guest' = userId ? 'user' : 'guest';
 
       const task: OcrTask = {
         id,
-        projectId: options.projectId,
+        projectId: options.projectId ?? '',
         ownerType,
         userId: userId ?? undefined,
         label: options.label,
@@ -209,25 +182,46 @@ const settle = useCallback(
       };
 
       commit([...tasksRef.current, task]);
-      queueRef.current.push({ ...options, id, userId: userId ?? undefined, ownerType });
-      setMinimised(false);
-      void pump();
+
+      const queueEntry: QueueEntry = { ...options, id, userId: userId ?? undefined, ownerType };
+
+      if (ownerType === 'user') {
+        userQueueRef.current.push(queueEntry);
+        setMinimised(false);
+        void pumpUser();
+      } else {
+        guestQueueRef.current.push(queueEntry);
+        setMinimised(false);
+        void pumpGuest();
+      }
+
       return id;
     },
-    [commit, pump, userId]
+    [commit, pumpUser, pumpGuest, userId]
   );
 
   const cancelTask = useCallback(
     (id: string) => {
-      const queuedIndex = queueRef.current.findIndex((entry) => entry.id === id);
+      let queuedIndex = userQueueRef.current.findIndex((entry) => entry.id === id);
       if (queuedIndex !== -1) {
-        const [entry] = queueRef.current.splice(queuedIndex, 1);
+        const [entry] = userQueueRef.current.splice(queuedIndex, 1);
         patch(id, { status: 'cancelled', message: 'Cancelled', finishedAt: Date.now() });
         settle(entry, undefined);
         return;
       }
-      if (runningRef.current?.id === id) {
-        runningRef.current.controller.abort();
+
+      queuedIndex = guestQueueRef.current.findIndex((entry) => entry.id === id);
+      if (queuedIndex !== -1) {
+        const [entry] = guestQueueRef.current.splice(queuedIndex, 1);
+        patch(id, { status: 'cancelled', message: 'Cancelled', finishedAt: Date.now() });
+        settle(entry, undefined);
+        return;
+      }
+
+      if (userRunningRef.current?.id === id) {
+        userRunningRef.current.controller.abort();
+      } else if (guestRunningRef.current?.id === id) {
+        guestRunningRef.current.controller.abort();
       }
     },
     [patch, settle]
@@ -250,10 +244,8 @@ const settle = useCallback(
     commit(tasksRef.current.filter(isTaskActive));
   }, [commit]);
 
-  // Aggregates progress for a specific project ID
   const getProjectProgress = useCallback(
     (projectId?: string): ProjectOcrProgress => {
-      // If no projectId is passed (or empty string), return default non-processing state
       if (!projectId) {
         return {
           projectId: '',
@@ -270,7 +262,6 @@ const settle = useCallback(
         };
       }
 
-      // Match string conversion to prevent number vs string ID mismatches
       const projectTasks = visibleTasks.filter(
         (t) => t.projectId && String(t.projectId) === String(projectId)
       );
@@ -307,6 +298,7 @@ const settle = useCallback(
 
   const value = useMemo(
     () => ({
+      allTasks, // exposed so popups can filter by ownerType explicitly
       tasks: visibleTasks,
       isMinimised,
       setMinimised,
@@ -318,6 +310,7 @@ const settle = useCallback(
       getProjectProgress,
     }),
     [
+      allTasks,
       visibleTasks,
       isMinimised,
       enqueue,

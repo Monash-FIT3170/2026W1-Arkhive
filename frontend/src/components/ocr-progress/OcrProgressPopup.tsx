@@ -82,11 +82,22 @@ function TaskRow({
   );
 }
 
-export default function OcrProgressPopup() {
+interface OcrProgressPopupProps {
+  filterOwnerType?: 'user' | 'guest';
+}
+
+export default function OcrProgressPopup({ filterOwnerType }: OcrProgressPopupProps = {}) {
   const navigate = useNavigate();
-  const { tasks, isMinimised, setMinimised, cancelTask, cancelAll, clearFinished } = useOcrProgress();
+  const context = useOcrProgress() as any;
+  const { isMinimised, setMinimised, cancelTask, cancelAll, clearFinished } = context;
+
+  // Filter tasks based on ownerType if specified, otherwise fall back to context tasks
+  const tasks: OcrTask[] = filterOwnerType && context.allTasks
+    ? context.allTasks.filter((t: OcrTask) => t.ownerType === filterOwnerType)
+    : context.tasks;
+
   const { rect, dragProps, resizeProps } = useFloatingWindow({
-    storageKey: 'arkhive_ocr_progress_window',
+    storageKey: `arkhive_ocr_progress_window_${filterOwnerType ?? 'default'}`,
     defaultSize: { width: 380, height: 360 },
     minSize: { width: 320, height: 220 },
   });

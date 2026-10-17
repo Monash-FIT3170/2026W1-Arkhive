@@ -6,7 +6,6 @@ import { useProjectPreview } from '../../hooks/useProjectPreview';
 import CreateProjectForm from './components/CreateProjectForm';
 import ProjectCard from './components/ProjectCard';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
-import OCRProgressThing from '../../context/OCRProgressProject';
 
 /**
  * Projects list page — list/create/rename/delete, plus an in-place preview
