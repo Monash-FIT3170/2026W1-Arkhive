@@ -22,6 +22,7 @@ import {
   type PageOverlay,
 } from '../../../utils/overlays';
 import type { HistoryEntry } from '../../../models/HistoryEntry';
+import { saveExtractedData } from '../../../services/documentService';
 import { useUndoRedo } from '../../../hooks/useUndoRedo';
 import { useFieldHover } from '../../../hooks/useFieldHover';
 import { useChatSuggestionFlow } from '../../../hooks/useChat';
@@ -96,6 +97,10 @@ export interface ValidationWorkspaceProps {
   initialReviews?: ReviewsByPage;
   /** Called with a page's new review whenever it changes. */
   onReviewChange?: (pageKey: string, review: PageReview) => void;
+  /** Persisted history entries to hydrate from. Keep the reference stable (useMemo). */
+  initialHistory?: HistoryEntry[];
+  /** Called with updated history whenever it changes. */
+  onHistoryChange?: (history: HistoryEntry[]) => void;
   /**
    * Changes whenever the *set* of pages changes shape (a page was added or
    * removed) — NOT on every parent re-render. When it changes, `pages` is
@@ -121,6 +126,8 @@ function ValidationWorkspace({
   pageKeys,
   initialReviews,
   onReviewChange,
+  initialHistory,
+  onHistoryChange,
   syncKey,
   fileMetadata,
   docType,
@@ -259,20 +266,52 @@ function ValidationWorkspace({
   const averageConfidence = averageOverlayConfidence(overlays);
   const confidencePercent = averageConfidence === null ? null : Math.round(averageConfidence * 100);
 
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>(() => initialHistory ?? []);
   const [historyRedo, setRedoHistory] = useState<HistoryEntry[]>([]);
+  const historyRef = useRef<HistoryEntry[]>(history);
 
-  const addHistoryEntry = useCallback((entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
-    setHistory((prev) => [
-      {
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
+
+  const persistPageHistory = useCallback(
+    (targetIndex: number, newHistory: HistoryEntry[]) => {
+      const key = pageKeys?.[targetIndex];
+      if (!key) return;
+      const idx = key.indexOf(':');
+      if (idx === -1) return;
+      const documentId = key.slice(0, idx);
+      const pageIndex = Number(key.slice(idx + 1));
+      const pageData = extractedPagesRef.current[targetIndex];
+      const pageEntries = newHistory.filter(
+        (h) => (h.pageIndex ?? currentPageIndexRef.current) === targetIndex
+      );
+      saveExtractedData(documentId, pageIndex, pageData, pageEntries).catch((err) =>
+        console.error('Failed to save history entries:', err)
+      );
+    },
+    [pageKeys]
+  );
+
+  const addHistoryEntry = useCallback(
+    (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
+      const targetIndex = entry.pageIndex ?? currentPageIndexRef.current;
+      const newEntry: HistoryEntry = {
         ...entry,
+        pageIndex: targetIndex,
         id: crypto.randomUUID(),
         timestamp: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
-    setRedoHistory([]);
-  }, []);
+      };
+      setHistory((prev) => {
+        const next = [newEntry, ...prev];
+        onHistoryChange?.(next);
+        persistPageHistory(targetIndex, next);
+        return next;
+      });
+      setRedoHistory([]);
+    },
+    [onHistoryChange, persistPageHistory]
+  );
 
   const undoRedoHistoryEntry = useCallback(
     (direction: 'undo' | 'redo') => {
@@ -281,7 +320,13 @@ function ValidationWorkspace({
 
         if (!undoChange) return;
 
-        setHistory((prev) => prev.slice(1));
+        const targetIndex = undoChange.pageIndex ?? currentPageIndexRef.current;
+        setHistory((prev) => {
+          const next = prev.slice(1);
+          onHistoryChange?.(next);
+          persistPageHistory(targetIndex, next);
+          return next;
+        });
 
         setRedoHistory((prev) => [undoChange, ...prev]);
       } else {
@@ -289,33 +334,35 @@ function ValidationWorkspace({
 
         if (!redoChange) return;
 
+        const redoneEntry: HistoryEntry = {
+          ...redoChange,
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+        };
+
         setRedoHistory((prev) => prev.slice(1));
 
-        setHistory((prev) => [
-          {
-            ...redoChange,
-            id: crypto.randomUUID(),
-            timestamp: new Date().toISOString(),
-          },
-          ...prev,
-        ]);
+        const targetIndex = redoneEntry.pageIndex ?? currentPageIndexRef.current;
+        setHistory((prev) => {
+          const next = [redoneEntry, ...prev];
+          onHistoryChange?.(next);
+          persistPageHistory(targetIndex, next);
+          return next;
+        });
       }
     },
-    [history, historyRedo]
+    [history, historyRedo, onHistoryChange, persistPageHistory]
   );
 
   // UNDO/REDO PIPELINE — stack + keyboard shortcuts live in the hook; we
   // just say what "apply a snapshot" means for this workspace's state.
   const { push: pushUndo, undo: handleUndo } = useUndoRedo(extractedPagesRef, {
     onApply: (updatedPages, direction) => {
+      extractedPagesRef.current = updatedPages;
       setExtractedPages(updatedPages);
       onPersist(updatedPages);
       setEditedCells(new Set());
       setTableKey((k) => k + 1);
-      // addHistoryEntry({
-      //   type: direction,
-      //   description: direction === 'undo' ? 'Undid last change' : 'Redid last change',
-      // });
       undoRedoHistoryEntry(direction);
     },
   });
