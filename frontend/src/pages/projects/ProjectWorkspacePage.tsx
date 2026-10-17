@@ -961,6 +961,8 @@ export default function ProjectWorkspacePage() {
           </div>
         </div>
       )}
+
+      <OcrProgressPopup filterOwnerType="user" />
     </div>
   );
 }

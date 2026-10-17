@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import ValidationWorkspace from './components/ValidationWorkspace';
 import type { StructuredPage } from '../../models/Document';
 import type { ExtractedPage } from '../../models/TableData';
@@ -16,24 +17,31 @@ import {
 } from '../../services/extractionService';
 import type { FileMetadataInput } from '../../utils/fileGrouping';
 
-// Single-session Upload/Validation flow. This page's only job is knowing
-// where the data comes from (the current extraction session) and where it
-// gets saved (saveExtractionSession) — everything about editing, review, and
-// chat lives in <ValidationWorkspace>, shared with ProjectWorkspacePage.
-function ValidationPage() {
-  const [imageUrls, setImageUrls] = useState<string[]>([]); // one image URL per page
-  const [ocrPages, setOcrPages] = useState<StructuredPage[]>([]); // raw structured OCR, one entry per page
-  // Set instead of ocrPages when the session already holds the editor's saved pages
-  // (onPersist writes ExtractedPage[]). They carry no blocks, so overlays aren't available then.
+interface LocationState {
+  taskId?: string;
+  projectId?: string;
+}
+
+export default function ValidationPage() {
+  const location = useLocation();
+  const navState = location.state as LocationState | null;
+
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [ocrPages, setOcrPages] = useState<StructuredPage[]>([]);
   const [savedPages, setSavedPages] = useState<ExtractedPage[] | null>(null);
   const [fileMetadata, setFileMetadata] = useState<FileMetadataInput[]>([]);
   const [docType, setDocType] = useState<string | undefined>();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadSession() {
+      setIsLoading(true);
       try {
+        const targetTaskId = navState?.taskId;
+
+        // Safely call helpers with 0 arguments to match their existing declarations
         const [session, processedUrls, batchData, uploadedDocs] = await Promise.all([
-          getExtractionSession(),
+          getExtractionSession(targetTaskId),
           typeof getProcessedImageUrls === 'function'
             ? getProcessedImageUrls().catch(() => [])
             : Promise.resolve([]),
@@ -46,7 +54,8 @@ function ValidationPage() {
         ]);
 
         if (isStructuredPages(session)) setOcrPages(session);
-        else setSavedPages(toExtractedPages(session));
+        else if (session) setSavedPages(toExtractedPages(session));
+
         if (
           session &&
           typeof session === 'object' &&
@@ -55,6 +64,7 @@ function ValidationPage() {
         ) {
           setDocType((session as any).docType);
         }
+
         setImageUrls(processedUrls.length > 0 ? processedUrls : [getUploadedImageUrl()]);
 
         if (uploadedDocs && uploadedDocs.length > 0) {
@@ -76,24 +86,33 @@ function ValidationPage() {
         }
       } catch (error) {
         console.error('Failed to load extraction session', error);
+      } finally {
+        setIsLoading(false);
       }
     }
-    loadSession();
-  }, []);
 
-  // Flatten ALL pages whenever the raw OCR data changes (toExtractedPages is the single
-  // place that calls pageToExtractedPage). Previously saved pages are used as-is so
-  // reloading never discards edits. Once this feeds ValidationWorkspace, further edits are the
-  // workspace's concern (they get reported back here only via onPersist).
+    loadSession();
+  }, [navState?.taskId]);
+
   const extractedPages: ExtractedPage[] = useMemo(
     () => savedPages ?? toExtractedPages(ocrPages),
     [savedPages, ocrPages]
   );
 
-  if (extractedPages.length === 0) {
+  if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center font-semibold text-lg">
-        Loading...
+        <span className="loading loading-spinner loading-md mr-2" />
+        Loading validation session...
+      </div>
+    );
+  }
+
+  if (extractedPages.length === 0) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-2 font-semibold text-base-content/60">
+        <p className="text-lg">No validation data found for this session.</p>
+        <p className="text-sm">Try processing the document again from the upload screen.</p>
       </div>
     );
   }
@@ -115,5 +134,3 @@ function ValidationPage() {
     />
   );
 }
-
-export default ValidationPage;
