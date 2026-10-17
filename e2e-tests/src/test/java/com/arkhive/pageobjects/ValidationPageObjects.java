@@ -37,4 +37,13 @@ public class ValidationPageObjects {
     public final By documentPanel = By.xpath("//div[.//img[contains(@class,'object-contain')] or .//canvas]");
     /** "Export" button in Extracted Data panel toolbar */
     public final By exportButton = By.xpath("//button[normalize-space()='Export' or contains(.,'Export')]");
+
+    // Multi-page navigation in Validation Workspace
+    public final By nextPageButton = By.xpath("//button[@title='Next Page' or @aria-label='Next Page']");
+    public final By prevPageButton = By.xpath("//button[@title='Previous Page' or @aria-label='Previous Page']");
+    public final By pageNavigationContainer = By.xpath("//div[contains(@class,'flex') and .//span[normalize-space()='Page']]");
+    public final By activePageButton = By.xpath("//div[contains(@class,'flex') and .//span[normalize-space()='Page']]//button[contains(@class,'btn-primary')]");
+
+    // OCR text overlay polygons
+    public final By ocrBoundingBoxes = By.xpath("//*[local-name()='svg']//*[local-name()='polygon']");
 }

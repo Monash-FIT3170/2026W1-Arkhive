@@ -113,4 +113,38 @@ public class DocumentPreviewPage extends BasePage {
     public String getErrorMessage() {
         return getText(pageObjects.errorAlert);
     }
+
+    public void zoomFirstCard() {
+        List<WebElement> cards = driver.findElements(pageObjects.previewCards);
+        if (!cards.isEmpty()) {
+            org.openqa.selenium.interactions.Actions actions = new org.openqa.selenium.interactions.Actions(driver);
+            actions.moveToElement(cards.get(0)).perform();
+            click(pageObjects.zoomButton);
+            ReportLogger.info("Opened zoom preview for document card");
+        }
+    }
+
+    public boolean isZoomModalDisplayed() {
+        return isDisplayed(pageObjects.zoomedImage, 5);
+    }
+
+    public void closeZoomModal() {
+        if (isDisplayed(pageObjects.closeZoomButton, 3)) {
+            click(pageObjects.closeZoomButton);
+            waitForInvisibility(pageObjects.zoomedImage, 5);
+            ReportLogger.info("Closed zoom preview modal");
+        }
+    }
+
+    public boolean isProcessingIndicatorDisplayed() {
+        return isDisplayed(pageObjects.processSpinner, 5);
+    }
+
+    public void toggleCardSelection(int index) {
+        List<WebElement> cards = driver.findElements(pageObjects.previewCards);
+        if (index >= 0 && index < cards.size()) {
+            cards.get(index).click();
+            ReportLogger.info("Toggled selection for preview card " + (index + 1));
+        }
+    }
 }

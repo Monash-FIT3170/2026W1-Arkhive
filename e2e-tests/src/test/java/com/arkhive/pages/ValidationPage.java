@@ -2,9 +2,13 @@ package com.arkhive.pages;
 
 import com.arkhive.pageobjects.ValidationPageObjects;
 import com.arkhive.reporting.ReportLogger;
+import org.openqa.selenium.By;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.interactions.Actions;
+
+import java.util.List;
 
 /**
  * Page Object representing Step 2: Validation Page (/validation)
@@ -171,6 +175,55 @@ public class ValidationPage extends BasePage {
      */
     public boolean isExportButtonDisplayed() {
         return isDisplayed(pageObjects.exportButton, 5);
+    }
+
+    // ── Multi-page Navigation ────────────────────────────────────────────────
+
+    public boolean isPageNavigationDisplayed() {
+        return isDisplayed(pageObjects.nextPageButton, 5) || isDisplayed(pageObjects.pageNavigationContainer, 5);
+    }
+
+    public void navigateToNextPage() {
+        click(pageObjects.nextPageButton);
+        ReportLogger.info("Navigated to next page in Validation workspace");
+    }
+
+    public void navigateToPreviousPage() {
+        click(pageObjects.prevPageButton);
+        ReportLogger.info("Navigated to previous page in Validation workspace");
+    }
+
+    public void switchToPage(int pageNumber) {
+        By pageBtn = By.xpath("//div[contains(@class,'flex') and .//span[normalize-space()='Page']]//button[normalize-space()='" + pageNumber + "']");
+        click(pageBtn);
+        ReportLogger.info("Switched to page " + pageNumber + " in Validation workspace");
+    }
+
+    public String getActivePageNumber() {
+        if (isDisplayed(pageObjects.activePageButton, 3)) {
+            return getText(pageObjects.activePageButton);
+        }
+        return "1";
+    }
+
+    // ── OCR Overlays & Interaction ───────────────────────────────────────────
+
+    public boolean hasOcrBoundingBoxes() {
+        try {
+            waitForPresence(pageObjects.ocrBoundingBoxes);
+            List<WebElement> boxes = driver.findElements(pageObjects.ocrBoundingBoxes);
+            return !boxes.isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public void hoverFirstDataCell() {
+        if (isDisplayed(pageObjects.firstDataCell, 5)) {
+            Actions actions = new Actions(driver);
+            actions.moveToElement(waitForVisible(pageObjects.firstDataCell, 5)).perform();
+            ReportLogger.info("Hovered over first data cell to trigger OCR text highlighting");
+        }
     }
 }
 

@@ -20,4 +20,8 @@ public class DocumentPreviewPageObjects {
     public final By lowQualityModalConfirmButton = By.xpath("//div[contains(@class,'modal-open')]//button[contains(text(),'Yes, process anyway')]");
     public final By lowQualityModalCancelButton = By.xpath("//div[contains(@class,'modal-open')]//button[contains(text(),'Cancel')]");
     public final By errorAlert = By.xpath("//div[contains(@class,'alert')]");
+    public final By zoomButton = By.xpath("//button[@title='Zoom' or contains(@aria-label,'Zoom')]");
+    public final By zoomedImage = By.xpath("//div[contains(@class,'fixed')]//img[contains(@class,'shadow-2xl')]");
+    public final By closeZoomButton = By.xpath("//button[@aria-label='Close zoomed image']");
+    public final By processSpinner = By.cssSelector(".loading-spinner");
 }

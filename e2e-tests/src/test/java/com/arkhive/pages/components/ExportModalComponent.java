@@ -34,6 +34,11 @@ public class ExportModalComponent extends BasePage {
         return isDisplayed(pageObjects.modalTitle, timeoutSeconds);
     }
 
+    public boolean isFormatOptionsDisplayed() {
+        return isDisplayed(pageObjects.csvDefaultTemplate, 5)
+                && isDisplayed(pageObjects.jsonDefaultTemplate, 5);
+    }
+
     /**
      * Opens the Export modal by clicking the Export button in the workspace toolbar
      * if the modal is not already open.
