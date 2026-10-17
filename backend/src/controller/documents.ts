@@ -14,6 +14,7 @@ import { parseDocumentWithRetries } from '../services/ocr/ocr';
 import type { DocType } from '../models/Document';
 import type { ExtractedPage } from '../models/TableData';
 import type { PageSelection, ProcessedPageResult } from '../models/Project.ts';
+import type { HistoryEntry } from '../models/HistoryEntry';
 import { PageReview } from '../models/IssueReview';
 
 /**
@@ -398,12 +399,17 @@ export default {
 
   /**
    * PATCH /api/documents/:id/pages/:pageIndex/data
-   * Persists extracted data for ONE page and marks it done.
+   * Persists extracted data and/or history entries for ONE page and marks it done.
    */
   saveExtractedData: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { id, pageIndex } = req.params as { id: string; pageIndex: string };
-      const { extractedData } = req.body as { extractedData?: ExtractedPage };
+      const { extractedData, historyEntries, history } = req.body as {
+        extractedData?: ExtractedPage;
+        historyEntries?: HistoryEntry[];
+        history?: HistoryEntry[];
+      };
+      const entriesToSave = historyEntries ?? history;
       const ownerId = req.userId;
 
       if (!ownerId) {
@@ -411,8 +417,18 @@ export default {
         return;
       }
 
-      if (!extractedData || typeof extractedData !== 'object' || Array.isArray(extractedData)) {
+      if (!extractedData && entriesToSave === undefined) {
+        res.status(400).json({ error: 'extractedData or historyEntries must be provided.' });
+        return;
+      }
+
+      if (extractedData && (typeof extractedData !== 'object' || Array.isArray(extractedData))) {
         res.status(400).json({ error: 'extractedData must be a single ExtractedData object.' });
+        return;
+      }
+
+      if (entriesToSave !== undefined && !Array.isArray(entriesToSave)) {
+        res.status(400).json({ error: 'historyEntries must be an array.' });
         return;
       }
 
@@ -422,9 +438,19 @@ export default {
         return;
       }
 
+      const updateData: Record<string, any> = {};
+      if (extractedData) {
+        updateData.extracted_data = extractedData;
+        updateData.status = 'done';
+        updateData.error_message = null;
+      }
+      if (entriesToSave !== undefined) {
+        updateData.history_entries = entriesToSave;
+      }
+
       const { data: updatedPage, error: updateError } = await supabase
         .from('document_pages')
-        .update({ extracted_data: extractedData, status: 'done', error_message: null })
+        .update(updateData)
         .eq('document_id', id)
         .eq('page_index', Number(pageIndex))
         .select()
