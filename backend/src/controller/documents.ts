@@ -49,7 +49,9 @@ async function processPage(
   selection: PageSelection,
   ownerId: string
 ): Promise<ProcessedPageResult[]> {
-  const { documentId, pageIndices, force } = selection;
+  const documentId = selection.documentId;
+  const pageIndices = selection.pages ?? (selection as any).pageIndices ?? [];
+  const force = selection.force;
   // Optional hint from the client; skips classification in the OCR pipeline.
   // Validated because it ends up in a model prompt.
   const docType: DocType | undefined =

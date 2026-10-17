@@ -67,6 +67,8 @@ export interface DownloadUrlResponse {
 export interface PageSelection {
   documentId: string;
   pageIndices: number[];
+  /** Optional alias for pageIndices */
+  pages?: number[];
   /** If true, re-run OCR even on pages already marked 'done'. Default false. */
   force?: boolean;
   docType?: any;
