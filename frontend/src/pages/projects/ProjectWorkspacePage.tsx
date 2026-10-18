@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Trash2, Columns2, FileText as FilesTabIcon } from 'lucide-react';
 import { getProject } from '../../services/projectService';
 import {
@@ -40,13 +40,6 @@ import type { PageReview } from '../../models/IssueReview';
 import OcrProgressPopup from '../../components/ocr-progress/OcrProgressPopup';
 import { useOcrProgress } from '../../context/OcrProgressContext';
 
-// The OCR backend stores one page's result per document_pages row
-// (raw_ocr_result). With the Block IR that result is a StructuredPage
-// ({ pageIndex, blocks }), but depending on the pipeline/mock it may also come
-// back wrapped as a StructuredDocument ({ pages: [...] }) or as a bare Block[].
-// Unwrap defensively so any of those renders. Pages stored in the old
-// OCRComponent shape can't be converted — they come back empty (and are logged)
-// until they're reprocessed.
 function isBlock(x: unknown): x is Block {
   const kind = (x as { kind?: unknown } | null)?.kind;
   return kind === 'table' || kind === 'field' || kind === 'text';
@@ -56,7 +49,6 @@ function extractStructuredPage(raw: unknown, pageIndex: number): StructuredPage 
   const empty: StructuredPage = { pageIndex, blocks: [] };
   if (!raw || typeof raw !== 'object') return empty;
 
-  // Bare Block[]
   if (Array.isArray(raw)) {
     if (raw.every(isBlock)) return { pageIndex, blocks: raw };
     console.warn('raw_ocr_result is in a legacy shape; reprocess this page to view it.');
@@ -65,11 +57,8 @@ function extractStructuredPage(raw: unknown, pageIndex: number): StructuredPage 
 
   const obj = raw as { blocks?: unknown; pages?: unknown };
 
-  // StructuredPage
   if (Array.isArray(obj.blocks)) return { pageIndex, blocks: obj.blocks.filter(isBlock) };
 
-  // StructuredDocument — one page's result per row, so take the matching page
-  // (or the only one).
   if (Array.isArray(obj.pages)) {
     const pages = obj.pages as StructuredPage[];
     const match = pages.find((p) => p?.pageIndex === pageIndex) ?? pages[0];
@@ -78,14 +67,6 @@ function extractStructuredPage(raw: unknown, pageIndex: number): StructuredPage 
 
   return empty;
 }
-
-// Project workspace: upload pages into the project, batch-process them with
-// OCR, then validate/edit the extracted table per page. The validate mode
-// renders <ValidationWorkspace>, the same component ValidationPage uses —
-// this page's job is just knowing where the data comes from (documents/pages
-// on the project) and where edits get saved (saveExtractedData, per page).
-// Pages are flattened across all of the project's documents for validation
-// (one continuous carousel).
 
 function statusBadgeClass(status: PageStatus): string {
   switch (status) {
@@ -104,6 +85,7 @@ export default function ProjectWorkspacePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { enqueue: enqueueOcr } = useOcrProgress();
+  const location = useLocation();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -118,42 +100,52 @@ export default function ProjectWorkspacePage() {
   const [showReprocessConfirm, setShowReprocessConfirm] = useState(false);
   const [showWarningConfirm, setShowWarningConfirm] = useState(false);
 
-  // Delete confirmation covers both a single hover-triggered card delete and
-  // the toolbar's bulk "Delete Selected" action, sharing one modal/handler.
   const [deleteTarget, setDeleteTarget] = useState<
     { type: 'single'; documentId: string; pageIndex: number } | { type: 'bulk' } | null
   >(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [mode, setMode] = useState<'files' | 'validate'>('files');
+  const navState = location.state as { mode?: string } | null;
+  const initialMode = navState?.mode === 'validate' ? 'validate' : 'files';
+  const [mode, setMode] = useState<'files' | 'validate'>(initialMode);
 
   const [imageUrlMap, setImageUrlMap] = useState<Record<string, string>>({});
   const createdUrlsRef = useRef<string[]>([]);
 
-  // Keeps track of which (documentId, pageIndex) each index in the flat
-  // pages array passed to <ValidationWorkspace> corresponds to, so
-  // persistPages can save each edited page back to the right place.
-  const validationListRef = useRef<typeof validationList>([]);
-  const [hasEnteredValidate, setHasEnteredValidate] = useState(false);
-  // Bumped whenever (re)processing replaces pages' OCR data, so the workspace
-  // re-syncs even though the set of page keys is unchanged.
+  const validationListRef = useRef<{ documentId: string; pageIndex: number; filename: string }[]>([]);
+  const [hasEnteredValidate, setHasEnteredValidate] = useState<boolean>(initialMode === 'validate');
   const [dataVersion, setDataVersion] = useState(0);
 
-  // ── Load project ───────────────────────────────────────────────────────
+  // Force the mode to update if the user clicks the popup while already on this page
+  useEffect(() => {
+    const currentState = location.state as { mode?: string } | null;
+    if (currentState?.mode === 'validate') {
+      setMode('validate');
+      setHasEnteredValidate(true);
+    }
+  }, [location.state]);
+
+  // Fallback to files mode if trapped in validate mode with nothing to validate
+  useEffect(() => {
+    if (mode === 'validate' && documents.length > 0) {
+      const hasProcessedPages = documents.some((doc) =>
+        (doc.pages || []).some((page) => page.raw_ocr_result || page.extracted_data)
+      );
+      if (!hasProcessedPages) {
+        setMode('files');
+      }
+    }
+  }, [mode, documents]);
+
   useEffect(() => {
     if (!id) return;
     let isMounted = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     getProject(id)
       .then((data) => {
         if (!isMounted) return;
         setProject(data);
         setDocuments(data.documents || []);
-        // Seed hasEnteredValidate from already-processed pages (e.g. reopening
-        // a project from a previous session) — otherwise it only ever flips on
-        // after a successful in-session "Process" call, leaving the Validate
-        // tab blank for documents that were already processed earlier.
         const hasProcessedPages = (data.documents || []).some((doc) =>
           (doc.pages || []).some((page) => page.raw_ocr_result || page.extracted_data)
         );
@@ -170,7 +162,6 @@ export default function ProjectWorkspacePage() {
     };
   }, [id]);
 
-  // Clean up any object URLs created for local previews when leaving.
   useEffect(() => {
     const urls = createdUrlsRef.current;
     return () => {
@@ -178,7 +169,6 @@ export default function ProjectWorkspacePage() {
     };
   }, []);
 
-  // Every page across every document, sorted for stable rendering.
   const allPages = useMemo(() => {
     const list: {
       document: DocumentRecord;
@@ -202,7 +192,6 @@ export default function ProjectWorkspacePage() {
     return list;
   }, [documents]);
 
-  // Pages ready for validation, flattened across all documents.
   const validationList = useMemo(() => {
     const list: { documentId: string; pageIndex: number; filename: string }[] = [];
     documents.forEach((doc) => {
@@ -235,15 +224,10 @@ export default function ProjectWorkspacePage() {
     validationListRef.current = validationList;
   }, [validationList]);
 
-  // A cheap signature of *which* pages are validate-able (not their content),
-  // so the flat extractedPages array only gets rebuilt from `documents` when
-  // pages are added/removed — not on every edit (edits flow the other way,
-  // through persistPages, so they aren't clobbered by this effect).
   const validationKeysSignature =
     validationList.map((entry) => makePageKey(entry.documentId, entry.pageIndex)).join('|') +
     `#${dataVersion}`;
 
-  // Lazily resolve a viewable image URL for every known page.
   useEffect(() => {
     allPages.forEach(({ document, pageIndex }) => {
       const key = makePageKey(document.id, pageIndex);
@@ -252,16 +236,8 @@ export default function ProjectWorkspacePage() {
         .then((url) => setImageUrlMap((prev) => (prev[key] ? prev : { ...prev, [key]: url })))
         .catch((err) => console.error('Failed to load page image', err));
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPages]);
 
-  // What <ValidationWorkspace> consumes, built index-for-index from validationList
-  // (pages / ocrPages / imageUrls / pageKeys must stay aligned):
-  //   pages    — the user's saved edits (extracted_data) if there are any,
-  //              otherwise the page's raw OCR flattened for the grid
-  //   ocrPages — the page's raw blocks, which drive the document highlights
-  // Edits are only ever read back from extracted_data; the workspace ignores
-  // changes to `pages` unless syncKey changes, so rebuilding here is cheap and safe.
   const { validationPages, validationBlocks } = useMemo(() => {
     const validationPages: ExtractedPage[] = [];
     const validationBlocks: Block[][] = [];
@@ -282,12 +258,6 @@ export default function ProjectWorkspacePage() {
     return { validationPages, validationBlocks };
   }, [documents, validationList, hasEnteredValidate]);
 
-  // Persist a full pages array back to each page's document/pageIndex pair
-  // (the project workspace saves per-page, unlike ValidationPage's single
-  // saveExtractionSession call), and mirror the change into `documents` so
-  // the Files view and future validate-mode entries stay in sync. This is
-  // the one bit of domain knowledge <ValidationWorkspace> doesn't have —
-  // everything else about editing/review lives there.
   const persistPages = useCallback((pages: ExtractedPage[]) => {
     const entries = validationListRef.current;
 
@@ -317,9 +287,9 @@ export default function ProjectWorkspacePage() {
     });
   }, []);
 
-  // ── Upload ─────────────────────────────────────────────────────────────
   async function handleQrUploaded(docId?: string) {
     setIsUploading(true);
+    setMode('files');
     setActionError(null);
     try {
       const sessionDocs = await getUploadedDocuments();
@@ -342,7 +312,7 @@ export default function ProjectWorkspacePage() {
         await deleteDocumentFromBackend(doc.documentId).catch(console.error);
       }
 
-      setIsUploading(false); // handleFilesCaptured will set it to true again
+      setIsUploading(false);
       if (files.length > 0) {
         await handleFilesCaptured(files);
       }
@@ -357,6 +327,7 @@ export default function ProjectWorkspacePage() {
     console.log('Files captured:', capturedFiles);
     if (!project) return;
     setIsUploading(true);
+    setMode('files');
     setActionError(null);
 
     const validFiles = filterValidFiles(capturedFiles);
@@ -444,7 +415,6 @@ export default function ProjectWorkspacePage() {
     }
   }
 
-  // ── Selection ──────────────────────────────────────────────────────────
   function toggleSelected(documentId: string, pageIndex: number) {
     const key = makePageKey(documentId, pageIndex);
     setSelectedKeys((prev) => {
@@ -463,10 +433,6 @@ export default function ProjectWorkspacePage() {
     setSelectedKeys(new Set());
   }
 
-  // ── Process ────────────────────────────────────────────────────────────
-  // Counts how many currently-selected pages are already 'done' — used to
-  // decide whether processing needs an "are you sure" confirmation, since
-  // reprocessing overwrites their existing extracted data.
   function countSelectedAlreadyProcessed(): number {
     let count = 0;
     documents.forEach((doc) => {
@@ -479,9 +445,6 @@ export default function ProjectWorkspacePage() {
     return count;
   }
 
-  // Entry point for the "Process" button — routes through a confirmation
-  // modal first if any selected page would be reprocessed (overwriting
-  // existing data), otherwise processes immediately like before.
   function handleProcessClick() {
     if (selectedKeys.size === 0 || isProcessing) return;
     
@@ -524,7 +487,6 @@ export default function ProjectWorkspacePage() {
     const queuedKeys = new Set(selectedKeys);
     const byDoc = new Map<string, number[]>();
 
-    // Parse keys like "docId:0" cleanly into documentId and pageIndex
     selectedKeys.forEach((key) => {
       const parts = key.split(':');
       const documentId = parts[0];
@@ -593,8 +555,7 @@ export default function ProjectWorkspacePage() {
 
         if (task.status === 'completed') {
           setDataVersion((v) => v + 1);
-          setMode('validate');
-          setHasEnteredValidate(true);
+          setHasEnteredValidate(true); 
         } else if (task.error) {
           setActionError(task.error);
         }
@@ -602,9 +563,6 @@ export default function ProjectWorkspacePage() {
     });
   }
 
-  // ── Delete ─────────────────────────────────────────────────────────────
-  // Removes deleted pages from `documents`, dropping a document entirely once
-  // its last page is gone so the Files view doesn't show an empty section.
   function removePagesFromState(keys: Set<string>) {
     setDocuments((prev) =>
       prev
@@ -644,8 +602,6 @@ export default function ProjectWorkspacePage() {
       await Promise.all(
         Array.from(byDoc.entries()).map(([documentId, pageIndices]) => {
           const totalPages = documents.find((d) => d.id === documentId)?.pages?.length ?? 0;
-          // Deleting every page of a document removes the document row too,
-          // instead of leaving an empty orphan that resurfaces on reload.
           if (totalPages > 0 && pageIndices.length === totalPages) {
             return deleteDocument(documentId);
           }
@@ -682,7 +638,6 @@ export default function ProjectWorkspacePage() {
     );
   }, []);
 
-  // ── Render ─────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="flex justify-center py-24">
@@ -757,8 +712,7 @@ export default function ProjectWorkspacePage() {
   const imageUrls = hasEnteredValidate
     ? validationList.map((e) => imageUrlMap[makePageKey(e.documentId, e.pageIndex)] || '')
     : [];
-  // stable per-page identity for useReviewQueue, so appending pages later
-  // doesn't retrigger detection on pages already processed
+
   const pageKeys = hasEnteredValidate
     ? validationList.map((e) => makePageKey(e.documentId, e.pageIndex))
     : [];
@@ -783,7 +737,6 @@ export default function ProjectWorkspacePage() {
     },
   ];
 
-  // ── Files/Validation view ─────────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col">
       {header}
@@ -794,7 +747,6 @@ export default function ProjectWorkspacePage() {
         type="error"
         onDismiss={() => setActionError(null)}
       />
-      {/* FILE VIEW AND UPLOAD */}
       <div className={mode === 'files' ? 'flex-1 flex flex-col' : 'hidden'}>
         <PageToolbar
           selectedCount={selectedKeys.size}
@@ -860,7 +812,6 @@ export default function ProjectWorkspacePage() {
         </div>
       </div>
 
-      {/* VALIDATION WORKSPACE */}
       {hasEnteredValidate && validationList.length > 0 && (
         <div className={mode === 'validate' ? 'flex-1 flex flex-col' : 'hidden'}>
           <ValidationWorkspace
@@ -878,7 +829,6 @@ export default function ProjectWorkspacePage() {
         </div>
       )}
 
-      {/* Delete confirmation */}
       {deleteTarget && (
         <div className="modal modal-open z-50">
           <div className="modal-box">
@@ -907,7 +857,6 @@ export default function ProjectWorkspacePage() {
         </div>
       )}
 
-      {/* Reprocess confirmation */}
       {showReprocessConfirm && (
         <div className="modal modal-open z-50">
           <div className="modal-box">
@@ -940,7 +889,6 @@ export default function ProjectWorkspacePage() {
         </div>
       )}
 
-      {/* Warning confirmation */}
       {showWarningConfirm && (
         <div className="modal modal-open z-50">
           <div className="modal-box">
@@ -974,4 +922,3 @@ function warningTextForPage(flags: any): string | undefined {
   if (flags.isBlurry) return 'Might be blurry';
   return 'Might be too dark';
 }
-

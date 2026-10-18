@@ -10,7 +10,7 @@ import { useOcrProgress } from '../../context/OcrProgressContext';
 import { isTaskActive, type OcrTask } from '../../models/OcrTask';
 import { useFloatingWindow } from '../../hooks/useFloatingWindow';
 import { estimateRemainingMs, formatRemaining, progressPercent } from '../../utils/ocrProgress';
-
+// Add this import (adjust the path if stepGuard.ts is located elsewhere)
 function progressClass(task: OcrTask): string {
   switch (task.status) {
     case 'completed':
@@ -147,23 +147,23 @@ export default function OcrProgressPopup({ filterOwnerType }: OcrProgressPopupPr
   }, [hasProcessing]);
 
   function handleTaskClick(task: OcrTask) {
-  if (task.status !== 'completed') return;
+    if (task.status !== 'completed') return;
 
-  setMinimised(true);
+    setMinimised(true);
 
-  // Extract the actual backend job/batch ID from task result if available
-  const resultId = (task.result as any)?.batchId || (task.result as any)?.id || task.id;
+    // Extract the actual backend job/batch ID from task result if available
+    const resultId = (task as any).result?.batchId || (task as any).result?.id || task.id;
 
-  if (task.projectId) {
-    navigate(`/projects/${task.projectId}`, {
-      state: { mode: 'validate', taskId: resultId },
-    });
-  } else {
-    navigate('/validation', {
-      state: { taskId: resultId },
-    });
+    if (task.projectId) {
+      navigate(`/projects/${task.projectId}`, {
+        state: { mode: 'validate', taskId: resultId },
+      });
+    } else {
+      navigate('/validation', {
+        state: { taskId: resultId },
+      });
+    }
   }
-}
 
   function reviewResults() {
     setMinimised(true);
