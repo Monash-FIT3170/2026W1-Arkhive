@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { OcrProgressContext, type EnqueueOcrOptions } from './OcrProgressContext';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { OcrProgressContext } from './OcrProgressContext'
+import { type EnqueueOcrOptions } from '../models/OcrTask';
 import { isTaskActive, type OcrTask, type ProjectOcrProgress } from '../models/OcrTask';
 import { processDocuments, type BatchUploadResult } from '../services/uploadService';
 import { unlockStep } from '../services/stepGuard';

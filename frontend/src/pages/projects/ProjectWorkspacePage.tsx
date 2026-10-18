@@ -5,7 +5,6 @@ import { getProject } from '../../services/projectService';
 import {
   uploadPageToR2,
   getDownloadUrl,
-  processPages,
   saveExtractedData,
   deletePage,
   deleteDocument,
@@ -31,7 +30,6 @@ import type {
   ProjectDetail,
   DocumentRecord,
   PageStatus,
-  PageSelection,
 } from '../../models/Project';
 import type { ExtractedPage } from '../../models/TableData';
 import type { Block, StructuredPage } from '../../models/Document';
@@ -95,7 +93,7 @@ export default function ProjectWorkspacePage() {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingKeys, setProcessingKeys] = useState<Set<string>>(new Set());
+  //const [processingKeys, setProcessingKeys] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
   const [showReprocessConfirm, setShowReprocessConfirm] = useState(false);
   const [showWarningConfirm, setShowWarningConfirm] = useState(false);
