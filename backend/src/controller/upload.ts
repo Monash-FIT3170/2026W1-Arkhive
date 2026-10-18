@@ -1,12 +1,18 @@
 import { Request, Response } from 'express';
 import { parseDocumentWithRetries } from '../services/ocr/ocr';
 import { DocumentJob } from '../models/Job';
+import {
+  ProcessedPagesByDocument,
+  ProcessedPageUpdate,
+  retainProcessedPages,
+  type SessionDocuments,
+} from '../services/upload/processedPageSession';
+import type { StructuredPage } from '../models/Document';
 import 'express-session';
 import 'multer';
 import fs from 'fs';
 import path from 'path';
 import { processImage, QualityFlags } from '../services/imageProcessor';
-import type { StructuredPage } from '../models/Document';
 
 declare module 'express-session' {
   interface SessionData {
@@ -32,7 +38,27 @@ declare module 'express-session' {
     jobs?: DocumentJob[];
     batchId?: string;
     activeJobIndex?: number;
+    processedPages?: ProcessedPagesByDocument;
   }
+}
+
+function saveRetainedExtraction(req: Request, updates: ProcessedPageUpdate[] = []) {
+  const retained = retainProcessedPages({
+    documents: (req.session.documents || {}) as unknown as SessionDocuments,
+    processedPages: req.session.processedPages,
+    updates,
+    createdAt: req.session.extraction?.createdAt,
+  });
+  const ocrData = retained.ocrData.map((page, i) => ({ ...page, pageIndex: i }));
+  req.session.processedPages = retained.processedPages;
+  req.session.jobs = retained.jobs;
+  req.session.extraction = {
+    ocrData,
+    processedImages: retained.processedImages,
+    createdAt: retained.createdAt,
+    updatedAt: retained.updatedAt,
+  };
+  return { ...retained, ocrData };
 }
 
 function calculateAverageConfidence(pages: StructuredPage[]): number {
@@ -118,6 +144,7 @@ export default {
         delete req.session.documents![documentId];
       }
     }
+    if (req.session.processedPages) saveRetainedExtraction(req);
     res.json({ success: true });
   },
 
@@ -139,6 +166,7 @@ export default {
 
       delete req.session.documents[documentId];
     }
+    if (req.session.processedPages) saveRetainedExtraction(req);
     res.json({ success: true });
   },
 
@@ -201,7 +229,7 @@ export default {
       res.setHeader('Transfer-Encoding', 'chunked');
 
       // Process each *document* (which may span multiple pages) as one job in the batch
-      const jobs: DocumentJob[] = await Promise.all(
+      const outcomes = await Promise.all(
         documentsToProcess.map(async (docEntry, index) => {
           const { documentId, label, files } = docEntry;
           const fileName = label || documentId;
@@ -239,15 +267,17 @@ export default {
                 );
                 // One image should yield one page; keep a placeholder if the
                 // pipeline returns none so page order stays aligned with images.
-                return result.pages.length > 0
-                  ? result.pages
-                  : [{ pageIndex: pageOffset, blocks: [] }];
+                const ocrData =
+                  result.pages.length > 0
+                    ? result.pages
+                    : [{ pageIndex: pageOffset, blocks: [] }];
+                return { pageIndex: file.pageIndex, ocrData };
               })
             );
 
             // Promise.all preserves input order, so pages stay in the same order as
             // `files` (and therefore as the processed image URLs built below).
-            const ocrComponents: StructuredPage[] = pageResults.flat();
+            const ocrComponents: StructuredPage[] = pageResults.flatMap((page) => page.ocrData);
             const confidence = calculateAverageConfidence(ocrComponents);
 
             const job: DocumentJob = {
@@ -275,7 +305,14 @@ export default {
               }) + '\n'
             );
 
-            return job;
+            return {
+              job,
+              pages: pageResults.map((page) => ({
+                documentId,
+                pageIndex: page.pageIndex,
+                ocrData: page.ocrData,
+              })),
+            };
           } catch (e: any) {
             console.error(
               `OCR failed for batch job ${index + 1}/${totalDocuments} (${fileName})`,
@@ -312,35 +349,16 @@ export default {
               updatedAt: Date.now(),
             };
 
-            return job;
+            return { job, pages: [] as ProcessedPageUpdate[] };
           }
         })
       );
 
-      // Save jobs array to session
-      req.session.jobs = jobs;
-
-      // Save combined extraction into session for single-doc / backward compatibility.
-      // Failed jobs are excluded from BOTH lists so pages and images stay index-aligned,
-      // and pageIndex is renumbered globally (each document's own pages start at 0).
-      const completedJobs = jobs.filter((job) => job.status === 'completed');
-      const combinedOcrData: StructuredPage[] = completedJobs
-        .flatMap((job) => job.ocrData)
-        .map((page, i) => ({ ...page, pageIndex: i }));
-
-      // Get every page from all successfully processed documents, in the same order
-      const allProcessedImages = documentsToProcess
-        .filter((doc) => completedJobs.some((job) => job.documentId === doc.documentId))
-        .flatMap((doc) =>
-          doc.files.map((file) => `/api/upload/image/${doc.documentId}/${file.pageIndex}`)
-        );
-
-      req.session.extraction = {
-        ocrData: combinedOcrData,
-        processedImages: allProcessedImages,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
+      const retained = saveRetainedExtraction(
+        req,
+        outcomes.flatMap((outcome) => outcome.pages)
+      );
+      const combinedOcrData = retained.ocrData;
 
       const debugDir = path.join(process.cwd(), 'tmp');
       fs.mkdirSync(debugDir, { recursive: true });
@@ -355,7 +373,7 @@ export default {
             success: true,
             batchId,
             pageCount: totalDocuments,
-            jobs,
+            jobs: outcomes.map((outcome) => outcome.job),
             ocrData: combinedOcrData,
           },
         }) + '\n'
