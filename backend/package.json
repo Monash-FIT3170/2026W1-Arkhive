@@ -5,7 +5,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "seed:e2e-user": "tsx scripts/seedE2eUser.ts",
+    "cleanup:e2e-projects": "tsx scripts/cleanupE2eProjects.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

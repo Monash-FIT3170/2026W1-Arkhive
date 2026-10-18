@@ -45,6 +45,11 @@ export class LoginPage {
     await this.passwordInput.fill(password);
   }
 
+  async signIn(email: string, password: string) {
+    await this.fillLoginForm(email, password);
+    await this.signInButton.click();
+  }
+
   async openRegister() {
   await this.registerTab.click();
   }
