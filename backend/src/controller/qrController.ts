@@ -1,4 +1,6 @@
 // backend/src/controller/qrController.ts
+import fs from 'fs';
+import { processImage } from '../services/imageProcessor';
 import { Request, Response } from 'express';
 import path from 'path';
 import {
@@ -125,11 +127,21 @@ export default {
 
       // NEW: write every uploaded file in as its own page, same shape as controller/upload.ts
       const imageUrls: string[] = [];
-      files.forEach((file, index) => {
-        const relativePath = path.join(desktopSessionId, documentId, file.filename);
-        desktopSessionData.documents[documentId].pages[String(index)] = relativePath;
+      const uploadsRoot = path.join(process.cwd(), 'uploads');
+      for (const [index, file] of files.entries()) {
+        // Derive the path from where multer actually saved the file, so it always matches
+        const relativePath = path.relative(uploadsRoot, file.path);
+
+        // Same image processing as a normal desktop upload (also gives us qualityFlags)
+        const { buffer, qualityFlags } = await processImage(fs.readFileSync(file.path));
+        fs.writeFileSync(file.path, buffer);
+
+        desktopSessionData.documents[documentId].pages[String(index)] = {
+          relativePath,
+          qualityFlags,
+        };
         imageUrls.push(`/api/upload/image/${documentId}/${index}`);
-      });
+      }
 
       await saveDesktopSession(req.sessionStore, desktopSessionId, desktopSessionData);
 
