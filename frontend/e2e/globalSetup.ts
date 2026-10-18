@@ -44,6 +44,18 @@ function waitForBackendReady(child: ChildProcessWithoutNullStreams): Promise<voi
     child.once('exit', (code) => {
       if (code !== null && code !== 0) {
         clearTimeout(timeout);
+        if (stderrBuffer.includes('EADDRINUSE')) {
+          reject(
+            new Error(
+              'Port 3000 is already in use, so the E2E backend could not start. ' +
+                "This is usually a leftover backend process from a previous Playwright run that didn't " +
+                'shut down cleanly (e.g. it was interrupted). Find and stop it (Windows: ' +
+                '`netstat -ano | findstr :3000` then `taskkill /PID <pid> /F`), or stop your own ' +
+                '`npm run dev` backend if that\'s what\'s running, then retry.'
+            )
+          );
+          return;
+        }
         reject(new Error(`Backend exited early (code ${code}).\nstderr:\n${stderrBuffer}`));
       }
     });
@@ -82,8 +94,18 @@ export default async function globalSetup() {
     }
   );
 
-  await waitForBackendReady(child);
-  await runSeedScript();
+  // If anything below fails, the child must still be killed here — once
+  // globalSetup throws, Playwright never calls the teardown function
+  // (it's only returned on success), so a failure that didn't kill the
+  // child itself would leak an orphaned backend process squatting on
+  // port 3000 for every subsequent run.
+  try {
+    await waitForBackendReady(child);
+    await runSeedScript();
+  } catch (err) {
+    child.kill();
+    throw err;
+  }
 
   return async () => {
     child.kill();
