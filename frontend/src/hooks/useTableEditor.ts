@@ -67,28 +67,62 @@ export function useTableEditor({
   );
 
   const addRow = useCallback(() => {
-    mutatePage((page) => tableOps.addRow(page));
-  }, [mutatePage]);
+    const result = mutatePage((page) => tableOps.addRow(page));
+    if (!result) return;
+
+    addHistoryEntry({
+      type: 'edit',
+      pageIndex: result.pageIndex,
+      description: `Added row on page ${result.pageIndex + 1}`,
+    });
+  }, [mutatePage, addHistoryEntry]);
 
   const deleteRow = useCallback(
     (rowId: string | number) => {
-      mutatePage((page) => tableOps.deleteRow(page, rowId));
+      const result = mutatePage((page) => tableOps.deleteRow(page, rowId));
+      if (!result) return;
+
+      addHistoryEntry({
+        type: 'edit',
+        pageIndex: result.pageIndex,
+        fieldId: String(rowId),
+        description: `Deleted row on page ${result.pageIndex + 1}`,
+      });
     },
-    [mutatePage]
+    [mutatePage, addHistoryEntry]
   );
 
   const addColumn = useCallback(
     (columnName: string) => {
-      mutatePage((page) => tableOps.addColumn(page, columnName));
+      const trimmed = columnName.trim();
+      const result = mutatePage((page) => tableOps.addColumn(page, trimmed));
+      if (!result) return;
+
+      addHistoryEntry({
+        type: 'edit',
+        pageIndex: result.pageIndex,
+        column: trimmed,
+        newValue: trimmed,
+        description: `Added column "${trimmed}" on page ${result.pageIndex + 1}`,
+      });
     },
-    [mutatePage]
+    [mutatePage, addHistoryEntry]
   );
 
   const deleteColumn = useCallback(
     (columnName: string) => {
-      mutatePage((page) => tableOps.deleteColumn(page, columnName));
+      const result = mutatePage((page) => tableOps.deleteColumn(page, columnName));
+      if (!result) return;
+
+      addHistoryEntry({
+        type: 'edit',
+        pageIndex: result.pageIndex,
+        column: columnName,
+        oldValue: columnName,
+        description: `Deleted column "${columnName}" on page ${result.pageIndex + 1}`,
+      });
     },
-    [mutatePage]
+    [mutatePage, addHistoryEntry]
   );
 
   const renameColumn = useCallback(
@@ -111,19 +145,63 @@ export function useTableEditor({
     [mutatePage, addHistoryEntry, onColumnRenamed]
   );
 
+  // Changes which column the hierarchy (indent band) is carried by.
+  const setIndentColumn = useCallback(
+    (column: string) => {
+      const from = extractedPagesRef.current[currentPageIndexRef.current]?.itemColumnKey ?? '';
+      const result = mutatePage((page) => tableOps.setItemColumn(page, column));
+      if (!result) return;
+
+      addHistoryEntry({
+        type: 'edit',
+        pageIndex: result.pageIndex,
+        column,
+        oldValue: from,
+        newValue: column,
+        description: `Changed indent column from "${from}" to "${column}" on page ${result.pageIndex + 1}`,
+      });
+    },
+    [mutatePage, addHistoryEntry, extractedPagesRef, currentPageIndexRef]
+  );
+
   const moveRow = useCallback(
     (rowId: string | number, direction: 'up' | 'down') => {
-      mutatePage((page) => tableOps.moveRow(page, rowId, direction));
+      const result = mutatePage((page) => tableOps.moveRow(page, rowId, direction));
+      if (!result) return;
+
+      addHistoryEntry({
+        type: 'edit',
+        pageIndex: result.pageIndex,
+        fieldId: String(rowId),
+        description: `Moved row ${direction} on page ${result.pageIndex + 1}`,
+      });
     },
-    [mutatePage]
+    [mutatePage, addHistoryEntry]
   );
 
   const reorderColumns = useCallback(
     (newColumns: string[]) => {
-      mutatePage((page) => tableOps.reorderColumns(page, newColumns));
+      const result = mutatePage((page) => tableOps.reorderColumns(page, newColumns));
+      if (!result) return;
+
+      addHistoryEntry({
+        type: 'edit',
+        pageIndex: result.pageIndex,
+        description: `Reordered columns on page ${result.pageIndex + 1}`,
+      });
     },
-    [mutatePage]
+    [mutatePage, addHistoryEntry]
   );
 
-  return { editCell, addRow, deleteRow, addColumn, deleteColumn, renameColumn, moveRow, reorderColumns };
+  return {
+    editCell,
+    addRow,
+    deleteRow,
+    addColumn,
+    deleteColumn,
+    renameColumn,
+    moveRow,
+    reorderColumns,
+    setIndentColumn,
+  };
 }

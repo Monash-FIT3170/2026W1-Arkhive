@@ -99,6 +99,7 @@ vi.mock('@google/generative-ai', () => {
 
 describe('aiService', () => {
   const dummyContext = {
+    pageIndex: 0,
     columns: ['ITEM', 'QTY', 'PRICE'],
     itemColumnKey: 'ITEM',
     rows: [

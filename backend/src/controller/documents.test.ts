@@ -24,6 +24,15 @@ const PNG_HEADER = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
 ]);
 
+vi.mock('../services/imageProcessor', () => {
+  return {
+    processImage: vi.fn().mockResolvedValue({
+      buffer: Buffer.from('processed_mock'),
+      qualityFlags: { isBlurry: false, isDark: false, isInvalidSize: false, shouldWarn: false }
+    })
+  };
+});
+
 function createMockReqRes(
   userId: string | null = 'test-user-123',
   body = {},
@@ -57,6 +66,8 @@ function createMockReqRes(
 describe('Documents Controller', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(r2Client, 'putObject').mockResolvedValue(undefined);
   });
 
   describe('getUploadUrl', () => {
@@ -108,50 +119,47 @@ describe('Documents Controller', () => {
         documentId: 'doc-123', // Pass documentId so randomUUID() is skipped
       });
 
-      await documentsController.getUploadUrl(req, res);
+      req.file = { buffer: PNG_HEADER, mimetype: 'image/png' } as Express.Multer.File;
+      await documentsController.uploadPage(req, res);
 
       expect(getStatus()).toBe(201);
-      expect(getJson().uploadUrl).toBe('https://r2.test/upload-presigned');
+      expect(getJson().qualityFlags).toBeDefined();
       expect(getJson().documentId).toBe('doc-123');
       expect(getJson().storageKey).toContain('test-user-123/proj-1/');
     });
 
-    it('returns 400 when the requested content type is not image/png', async () => {
-      const generateSpy = vi
-        .spyOn(r2Client, 'generateUploadUrl')
-        .mockResolvedValue('https://r2.test/should-not-be-used');
+    it('returns 400 when the uploaded file is not an image', async () => {
+      const putSpy = vi.spyOn(r2Client, 'putObject').mockResolvedValue(undefined);
 
       const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
         projectId: 'proj-1',
         filename: 'page.html',
-        contentType: 'text/html',
         pageIndex: 0,
       });
+      req.file = { buffer: Buffer.from('<html></html>'), mimetype: 'text/html' } as Express.Multer.File;
 
-      await documentsController.getUploadUrl(req, res);
+      await documentsController.uploadPage(req, res);
 
       expect(getStatus()).toBe(400);
       expect(getJson()).toEqual({ error: UNSUPPORTED_FILE_TYPE_ERROR });
-      expect(generateSpy).not.toHaveBeenCalled();
+      expect(putSpy).not.toHaveBeenCalled();
     });
 
-    it('returns 400 when the requested content type is application/pdf', async () => {
-      const generateSpy = vi
-        .spyOn(r2Client, 'generateUploadUrl')
-        .mockResolvedValue('https://r2.test/should-not-be-used');
+    it('returns 400 when the uploaded file is a PDF', async () => {
+      const putSpy = vi.spyOn(r2Client, 'putObject').mockResolvedValue(undefined);
 
       const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
         projectId: 'proj-1',
         filename: 'report.pdf',
-        contentType: 'application/pdf',
         pageIndex: 0,
       });
+      req.file = { buffer: Buffer.from('%PDF-1.4'), mimetype: 'application/pdf' } as Express.Multer.File;
 
-      await documentsController.getUploadUrl(req, res);
+      await documentsController.uploadPage(req, res);
 
       expect(getStatus()).toBe(400);
       expect(getJson()).toEqual({ error: UNSUPPORTED_FILE_TYPE_ERROR });
-      expect(generateSpy).not.toHaveBeenCalled();
+      expect(putSpy).not.toHaveBeenCalled();
     });
 
     it('returns 403 if project is not owned by user', async () => {
@@ -171,7 +179,9 @@ describe('Documents Controller', () => {
         pageIndex: 0, // Added required pageIndex
       });
 
-      await documentsController.getUploadUrl(req, res);
+      req.file = { buffer: PNG_HEADER, mimetype: 'image/png' } as Express.Multer.File;
+
+      await documentsController.uploadPage(req, res);
 
       expect(getStatus()).toBe(403);
     });
@@ -282,7 +292,7 @@ describe('Documents Controller', () => {
     it('downloads from R2, runs OCR pipeline, and persists rawResult with done status', async () => {
       const update = mockOwnedDocument();
       vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(PNG_HEADER);
-      vi.spyOn(ocrService, 'parseTableWithRetries').mockResolvedValue(mockOcrResult as any);
+      vi.spyOn(ocrService, 'parseDocumentWithRetries').mockResolvedValue(mockOcrResult as any);
 
       const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
         selections: [{ documentId: 'doc-123', pageIndices: [0] }],
@@ -310,7 +320,7 @@ describe('Documents Controller', () => {
       const getObjectBufferSpy = vi
         .spyOn(r2Client, 'getObjectBuffer')
         .mockResolvedValue(PNG_HEADER);
-      vi.spyOn(ocrService, 'parseTableWithRetries').mockResolvedValue(mockOcrResult as any);
+      vi.spyOn(ocrService, 'parseDocumentWithRetries').mockResolvedValue(mockOcrResult as any);
 
       const { req, res } = createMockReqRes('test-user-123', {
         selections: [{ documentId: 'doc-123', pageIndices: [1, 2, 10] }],
@@ -329,7 +339,7 @@ describe('Documents Controller', () => {
         { page_index: 0, status: 'done', review_state: null, raw_ocr_result: mockOcrResult },
       ]);
       const getObjectBufferSpy = vi.spyOn(r2Client, 'getObjectBuffer');
-      vi.spyOn(ocrService, 'parseTableWithRetries');
+      vi.spyOn(ocrService, 'parseDocumentWithRetries');
 
       const { req, res, getJson } = createMockReqRes('test-user-123', {
         selections: [{ documentId: 'doc-123', pageIndices: [0] }],
@@ -354,7 +364,7 @@ describe('Documents Controller', () => {
 
       const update = mockOwnedDocument();
       vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(PNG_HEADER);
-      vi.spyOn(ocrService, 'parseTableWithRetries').mockRejectedValue(new Error('OCR exploded'));
+      vi.spyOn(ocrService, 'parseDocumentWithRetries').mockRejectedValue(new Error('OCR exploded'));
 
       const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
         selections: [{ documentId: 'doc-123', pageIndices: [0] }],
@@ -378,7 +388,7 @@ describe('Documents Controller', () => {
       const update = mockOwnedDocument();
       vi.spyOn(r2Client, 'getObjectBuffer').mockResolvedValue(Buffer.from('fake-image-bytes'));
       const deleteSpy = vi.spyOn(r2Client, 'deleteObject').mockResolvedValue(undefined);
-      const ocrSpy = vi.spyOn(ocrService, 'parseTableWithRetries');
+      const ocrSpy = vi.spyOn(ocrService, 'parseDocumentWithRetries');
 
       const { req, res, getStatus, getJson } = createMockReqRes('test-user-123', {
         selections: [{ documentId: 'doc-123', pageIndices: [0] }],
@@ -472,6 +482,80 @@ describe('Documents Controller', () => {
 
       expect(getStatus()).toBe(400);
       expect(getJson().error).toContain('extractedData');
+    });
+
+    it('writes extracted_data and history_entries when both are provided', async () => {
+      const mockHistory = [
+        {
+          id: 'hist-1',
+          type: 'edit',
+          timestamp: '2026-10-17T00:00:00.000Z',
+          description: 'Edited cell',
+        },
+      ];
+      const updatedPage = {
+        document_id: 'doc-123',
+        page_index: 0,
+        status: 'done',
+        extracted_data: extractedData,
+        history_entries: mockHistory,
+      };
+      let updatePayload: any;
+      vi.spyOn(supabase, 'from').mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: mockDoc, error: null }),
+            }),
+          }),
+        }),
+        update: vi.fn().mockImplementation((payload) => {
+          updatePayload = payload;
+          return {
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                select: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({ data: updatedPage, error: null }),
+                }),
+              }),
+            }),
+          };
+        }),
+      } as any);
+
+      const { req, res, getStatus, getJson } = createMockReqRes(
+        'test-user-123',
+        { extractedData, historyEntries: mockHistory },
+        { id: 'doc-123', pageIndex: '0' }
+      );
+
+      await documentsController.saveExtractedData(req, res);
+
+      expect(getStatus()).toBe(200);
+      expect(updatePayload).toEqual({
+        extracted_data: extractedData,
+        status: 'done',
+        error_message: null,
+        history_entries: mockHistory,
+      });
+      expect(getJson()).toEqual({
+        success: true,
+        documentId: 'doc-123',
+        page: updatedPage,
+      });
+    });
+
+    it('returns 400 when historyEntries is not an array', async () => {
+      const { req, res, getStatus, getJson } = createMockReqRes(
+        'test-user-123',
+        { extractedData, historyEntries: 'not-an-array' },
+        { id: 'doc-123', pageIndex: '0' }
+      );
+
+      await documentsController.saveExtractedData(req, res);
+
+      expect(getStatus()).toBe(400);
+      expect(getJson().error).toContain('historyEntries');
     });
 
     it('returns 404 when document does not exist or user does not own it', async () => {
@@ -569,7 +653,8 @@ describe('Documents Controller', () => {
         contentType: 'image/png',
       });
 
-      await documentsController.getUploadUrl(req, res);
+      req.file = { buffer: PNG_HEADER, mimetype: 'image/png' } as Express.Multer.File;
+      await documentsController.uploadPage(req, res);
 
       expect(getStatus()).toBe(201);
       expect(getJson().pageIndex).toBe(1);

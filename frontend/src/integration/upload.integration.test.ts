@@ -15,15 +15,29 @@ describe('upload -> process integration', () => {
   const documentId = 'itest-doc-1';
 
   it('uploads a page, processes it, and persists the OCR result to the real session', async () => {
-    const pngHeader = new Uint8Array([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
-    ]);
-    const fakePng = new Blob([pngHeader], { type: 'image/png' });
-    const pageSrc = URL.createObjectURL(fakePng);
+    const fakePng = new Blob(
+      [
+        Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+          'base64'
+        ),
+      ],
+      { type: 'image/png' }
+    );
+    const pageSrc = 'blob:test-image';
 
-    // Upload: proves the frontend's multipart request actually reaches
-    // the real backend and the session cookie is set correctly.
-    await uploadPageToBackend(pageSrc, documentId, 0, 'invoice.png');
+    const originalFetch = global.fetch;
+    global.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+      if (input.toString() === pageSrc) {
+        return new Response(fakePng);
+      }
+      return originalFetch(input, init);
+    };
+
+    try {
+      // Upload: proves the frontend's multipart request actually reaches
+      // the real backend and the session cookie is set correctly.
+      await uploadPageToBackend(pageSrc, documentId, 0, 'invoice.png');
 
     // Process: proves the same session persists across a second call,
     // and that OCR_MODE=mock is correctly routing the backend around
@@ -32,12 +46,19 @@ describe('upload -> process integration', () => {
     const result = await processDocuments([{ documentId, pages: ['0'] }]);
 
     expect(result?.success).toBe(true);
-    expect(result?.ocrData?.[0]?.text).toBe('Invoice total');
+    const block = result?.ocrData?.[0]?.blocks?.[0];
+    expect(block?.kind).toBe('table');
+    if (block?.kind === 'table') {
+      expect(block.rows[0]?.cells?.DESCRIPTION?.text).toBe('Invoice total');
+    }
 
     // Read-back: proves the processed result actually persisted
     // server-side, not just that the response looked right in-flight.
     const docs = await getUploadedDocuments();
     expect(docs.some((d) => d.documentId === documentId)).toBe(true);
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 
   afterAll(() => {

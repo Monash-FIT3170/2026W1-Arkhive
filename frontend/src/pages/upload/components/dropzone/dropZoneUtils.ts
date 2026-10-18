@@ -20,7 +20,7 @@ export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
  * @param fileList - The raw FileList from an input or drop event
  * @returns An array of validated File objects
  */
-export function filterValidFiles(fileList: FileList | null): File[] {
+export function filterValidFiles(fileList: FileList | File[] | null): File[] {
   if (!fileList) return [];
 
   const filesArray = Array.from(fileList);

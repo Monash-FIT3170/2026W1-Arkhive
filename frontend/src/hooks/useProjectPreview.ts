@@ -33,6 +33,37 @@ export function useProjectPreview() {
 
     if (isOpen || previews[project.id]) return;
 
+    if (project.documents) {
+      const detail: ProjectDetail = {
+        id: project.id,
+        name: project.name,
+        owner_id: project.owner_id,
+        created_at: project.created_at,
+        documents: project.documents,
+      };
+
+      setPreviews((prev) => ({
+        ...prev,
+        [project.id]: { status: 'ready', detail, thumbnailUrl: null },
+      }));
+
+      const firstDoc = detail.documents[0];
+      const firstPage = firstDoc?.pages?.slice().sort((a, b) => a.page_index - b.page_index)[0];
+      if (firstDoc && firstPage) {
+        getDownloadUrl(firstDoc.id, firstPage.page_index)
+          .then((thumbnailUrl) => {
+            setPreviews((prev) => ({
+              ...prev,
+              [project.id]: { status: 'ready', detail, thumbnailUrl },
+            }));
+          })
+          .catch(() => {
+            // Thumbnail is non-blocking
+          });
+      }
+      return;
+    }
+
     setPreviews((prev) => ({ ...prev, [project.id]: { status: 'loading' } }));
     try {
       const detail = await getProject(project.id);
