@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import { QrSession } from '../models/QrSession';
 
 const QR_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes, matches "expire after an appropriate period"
-const PUBLIC_APP_URL = 'https://two026w1-arkhive.onrender.com/'; // the public URL used to build QR upload links
+const PUBLIC_APP_URL = 'https://two026w1-arkhive.onrender.com'; // the public URL used to build QR upload links
 
 // In-memory map, mirroring the app's existing MemoryStore approach for sessions.
 const qrSessions = new Map<string, QrSession>();
