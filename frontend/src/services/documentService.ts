@@ -3,13 +3,15 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 import type {
   DocumentRecord,
   DocumentPageRecord,
-  UploadUrlResponse,
   DownloadUrlResponse,
   PageSelection,
   ProcessDocumentResponse,
 } from '../models/Project';
 import type { ExtractedPage } from '../models/TableData';
+import type { DocType, StructuredDocument } from '../models/Document';
 import type { PageReview } from '../models/IssueReview';
+import type { HistoryEntry } from '../models/HistoryEntry';
+import { pageToExtractedPage } from '../utils/flattener';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
@@ -30,93 +32,48 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-/**
- * Requests a presigned PUT URL from the backend to upload a single page image
- * directly to Cloudflare R2. Documents are always stored as per-page PNGs
- * (page-{pageIndex}.png) — pageIndex is required to match how the backend
- * builds storage keys and creates the page's document_pages row.
- *
- * Pass `documentId` when uploading additional pages to a document that
- * already has a row (created by the first page's upload).
- */
-export async function getUploadUrl(
-  projectId: string,
-  filename: string,
-  pageIndex: number,
-  contentType: string = 'image/png',
-  documentId?: string
-): Promise<UploadUrlResponse> {
-  const headers = await getAuthHeaders();
-  const response = await fetch(apiUrl('/api/documents/upload-url'), {
-    method: 'POST',
-    headers,
-    credentials: 'include',
-    body: JSON.stringify({
-      projectId,
-      filename,
-      contentType,
-      pageIndex,
-      ...(documentId ? { documentId } : {}),
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.error || `Failed to generate upload URL (${response.status})`);
-  }
-
-  return await response.json();
-}
-
-/**
- * Uploads a file or blob directly to Cloudflare R2 using a presigned PUT URL.
- * File bytes bypass the Express backend entirely.
- */
-export async function uploadToR2(
-  uploadUrl: string,
-  fileOrBlob: Blob | File,
-  contentType: string = 'image/png'
-): Promise<void> {
-  const response = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': contentType,
-    },
-    body: fileOrBlob,
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to upload file directly to R2 (${response.status})`);
-  }
-}
-
-/**
- * Requests a presigned URL for a page and uploads it to R2. Call once per
- * page; pass the returned documentId back in on subsequent pages of the
- * same document so they're grouped under one document row instead of
- * creating a new one each time.
- */
 export async function uploadPageToR2(
   projectId: string,
   fileOrBlob: Blob | File,
   filename: string,
   pageIndex: number,
-  contentType: string = 'image/png',
   documentId?: string
-): Promise<{ documentId: string; storageKey: string; pageIndex: number }> {
-  const {
-    uploadUrl,
-    documentId: docId,
-    storageKey,
-    pageIndex: returnedPageIndex,
-  } = await getUploadUrl(projectId, filename, pageIndex, contentType, documentId);
+): Promise<{ documentId: string; storageKey: string; pageIndex: number; qualityFlags?: any }> {
+  const headers = await getAuthHeaders();
+  const formData = new FormData();
 
-  await uploadToR2(uploadUrl, fileOrBlob, contentType);
+  const finalFilename = filename.replace(/\.[^/.]+$/, '') + '.png';
+  formData.append('page', fileOrBlob, finalFilename);
+  formData.append('projectId', projectId);
+  formData.append('filename', filename);
+  formData.append('pageIndex', pageIndex.toString());
+
+  if (documentId) {
+    formData.append('documentId', documentId);
+  }
+
+  // Remove Content-Type from headers so fetch can set the multipart boundary automatically
+  delete headers['Content-Type'];
+
+  const response = await fetch(apiUrl('/api/documents/upload-page'), {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.error || `Failed to upload page (${response.status})`);
+  }
+
+  const data = await response.json();
 
   return {
-    documentId: docId,
-    storageKey,
-    pageIndex: returnedPageIndex ?? pageIndex,
+    documentId: data.documentId,
+    storageKey: data.storageKey,
+    pageIndex: data.pageIndex,
+    qualityFlags: data.qualityFlags,
   };
 }
 
@@ -147,10 +104,7 @@ export async function getDownloadUrl(documentId: string, pageIndex?: number): Pr
 }
 
 /**
- * Retrieves document metadata plus every page's status/extracted_data
- * (ordered by page_index). Use this on project/document open: check each
- * page's `status`/`extracted_data` to decide whether it can skip straight
- * to validation instead of being re-sent to OCR.
+ * Retrieves document metadata plus every page's status/extracted_data.
  */
 export async function getDocument(documentId: string): Promise<DocumentRecord> {
   const headers = await getAuthHeaders();
@@ -169,14 +123,8 @@ export async function getDocument(documentId: string): Promise<DocumentRecord> {
 }
 
 /**
- * Triggers backend OCR processing across one or more documents in a single
- * batch call — each selection picks specific page indices from one
- * document, so pages from several files can be processed together.
- *
- * Pages already marked 'done' are skipped server-side unless `force` is set
- * on that selection (see PageSelection). Raw OCR output is persisted onto
- * each page's row as it completes, so it's safe even if the caller never
- * gets a response (e.g. navigation away mid-request).
+ * Triggers backend OCR processing across one or more documents in a single batch call.
+ * Completed pages are skipped server-side unless `force` is set.
  */
 export async function processPages(selections: PageSelection[]): Promise<ProcessDocumentResponse> {
   const headers = await getAuthHeaders();
@@ -202,29 +150,63 @@ export async function processPages(selections: PageSelection[]): Promise<Process
 export async function processDocumentPages(
   documentId: string,
   pageIndices: number[],
-  force = false
+  force = false,
+  docType?: DocType // skip server-side classification when the user already knows the type
 ): Promise<ProcessDocumentResponse> {
-  return processPages([{ documentId, pageIndices, force }]);
+  return processPages([{ documentId, pageIndices, force, docType }]);
 }
 
 /**
- * Persists flattened (and/or user-edited) extracted data for ONE page and
- * marks it done. Call this once after OCR + flattening for that page, and
- * again on every subsequent edit so changes survive a reload.
+ * Type guard for a stored/returned raw OCR result. Rows OCR'd before the
+ * structured pipeline hold the legacy shape and fail this check; callers
+ * should treat that as "needs re-processing" (processPages with force: true).
+ */
+export function isStructuredDocument(raw: unknown): raw is StructuredDocument {
+  const d = raw as StructuredDocument | null | undefined;
+  return (
+    !!d &&
+    typeof d === 'object' &&
+    !Array.isArray(d) &&
+    typeof d.docType === 'string' &&
+    Array.isArray(d.pages) &&
+    d.pages.every((p) => typeof p?.pageIndex === 'number' && Array.isArray(p.blocks))
+  );
+}
+
+/**
+ * Converts a page's raw OCR result (StructuredDocument) into the grid shape the
+ * validation workspace edits. Returns null for missing / legacy-format results.
+ * Pass `manualIndentLevels` (row id -> level) to re-apply the user's indent edits.
+ */
+export function rawResultToExtractedPages(
+  raw: unknown,
+  manualIndentLevels?: Record<string, number>
+): ExtractedPage[] | null {
+  if (!isStructuredDocument(raw)) return null;
+  return raw.pages.map((page) => pageToExtractedPage(page, { manualIndentLevels }));
+}
+
+/**
+ * Persists extracted data and/or history entries for one page and marks it done.
  */
 export async function saveExtractedData(
   documentId: string,
   pageIndex: number,
-  extractedData: ExtractedPage
+  extractedData?: ExtractedPage,
+  historyEntries?: HistoryEntry[]
 ): Promise<DocumentPageRecord> {
   const headers = await getAuthHeaders();
+  const body: { extractedData?: ExtractedPage; historyEntries?: HistoryEntry[] } = {};
+  if (extractedData !== undefined) body.extractedData = extractedData;
+  if (historyEntries !== undefined) body.historyEntries = historyEntries;
+
   const response = await fetch(
     apiUrl(`/api/documents/${encodeURIComponent(documentId)}/pages/${pageIndex}/data`),
     {
       method: 'PATCH',
       headers,
       credentials: 'include',
-      body: JSON.stringify({ extractedData }),
+      body: JSON.stringify(body),
     }
   );
 
@@ -238,8 +220,7 @@ export async function saveExtractedData(
 }
 
 /**
- * Removes a single page image from R2 and its document_pages row (e.g. user
- * deletes one page of a multi-page document before or after processing).
+ * Removes a single page image from R2 and its document_pages row.
  */
 export async function deletePage(documentId: string, pageIndex: number): Promise<void> {
   const headers = await getAuthHeaders();
@@ -259,8 +240,7 @@ export async function deletePage(documentId: string, pageIndex: number): Promise
 }
 
 /**
- * Deletes a document — removes all of its page objects from R2 and its
- * database row (document_pages rows cascade automatically).
+ * Deletes a document and its pages from R2 storage and the database.
  */
 export async function deleteDocument(documentId: string): Promise<void> {
   const headers = await getAuthHeaders();
@@ -277,9 +257,7 @@ export async function deleteDocument(documentId: string): Promise<void> {
 }
 
 /**
- * Persists (or clears, with null) the review state for ONE page: which issues
- * were flagged and which the user has resolved. This is what stops a
- * validated page from being re-flagged when the project is reopened.
+ * Persists the review state for one page.
  */
 export async function saveReviewState(
   documentId: string,

@@ -61,6 +61,9 @@ uploadRouter.get('/documents', uploadController.getDocuments);
 // Endpoint to get the images that were processed in the current session
 uploadRouter.get('/processed-images', uploadController.getProcessedImages);
 
+// Endpoint to get the jobs (per-document OCR results) from the most recent batch run
+uploadRouter.get('/jobs', uploadController.getJobs);
+
 // Backward compatibility: get extraction result
 uploadRouter.get('/', (req, res) => {
   return res.status(204).send(req.session.extraction ?? "");
