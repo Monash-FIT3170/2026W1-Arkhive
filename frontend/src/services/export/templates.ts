@@ -115,7 +115,7 @@ const jsonDefault: ExportTemplate = {
   format: 'json',
   label: 'Default Template',
   description: 'Nested: pages → fields, texts, tables (with row indent levels).',
-  previewSrc: '/export_images/sample3.png',
+  previewSrc: '/export_images/json/json_default.png',
   extension: 'json',
   mime: 'application/json;charset=utf-8',
   fileSuffix: 'default',
