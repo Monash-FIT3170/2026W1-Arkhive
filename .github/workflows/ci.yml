@@ -57,7 +57,14 @@ jobs:
 
   docker-build:
     runs-on: ubuntu-latest
-    needs: [frontend-tests, backend-tests, backend-integration-tests, frontend-integration-tests]
+    needs:
+      [
+        frontend-tests,
+        backend-tests,
+        backend-integration-tests,
+        frontend-integration-tests,
+        e2e-tests,
+      ]
     permissions:
       contents: read
       security-events: write
@@ -154,3 +161,63 @@ jobs:
         env:
           SUPABASE_URL: https://placeholder.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key
+
+  # End-to-end (Playwright) tests: broader and slower than the unit/
+  # integration tests above, so they run after both integration suites pass
+  # but before docker-build, gating the image build on the full pipeline
+  # being green — unit -> integration -> e2e -> build.
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: [backend-integration-tests, frontend-integration-tests]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - uses: supabase/setup-cli@v3
+
+      # Boots a fresh, fully isolated Postgres + Auth instance inside this
+      # runner from backend/supabase/{config.toml,migrations} and throws it
+      # away when the job ends — never touches the team's real Supabase
+      # project, so this is safe to run on every push/PR. The exported
+      # values are the Supabase CLI's standard local-dev demo keys (the
+      # same on every machine that runs `supabase start`), not secrets.
+      #
+      # Both the backend (SUPABASE_URL/SERVICE_ROLE_KEY, for the admin seed
+      # script and token verification) and the frontend (VITE_SUPABASE_URL/
+      # VITE_SUPABASE_ANON_KEY, which the browser uses to call Supabase Auth
+      # directly) must point at this same local instance, or login fails
+      # with "Invalid email or password" against whichever one is wrong.
+      - name: Start local Supabase and export its credentials
+        working-directory: backend
+        run: |
+          supabase start
+          eval "$(supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+          echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+
+      - name: Run Playwright E2E tests
+        working-directory: frontend
+        run: npx playwright test
+        env:
+          E2E_TEST_USER_EMAIL: e2e-ci@arkhive.local
+          E2E_TEST_USER_PASSWORD: ArkhiveE2E!CI2026
