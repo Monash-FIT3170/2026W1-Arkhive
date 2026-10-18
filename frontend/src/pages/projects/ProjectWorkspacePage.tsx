@@ -630,6 +630,20 @@ export default function ProjectWorkspacePage() {
     [project]
   );
 
+  const initialHistory = useMemo(() => {
+    const entries: HistoryEntry[] = [];
+    (documents ?? []).forEach((doc) => {
+      (doc.pages ?? []).forEach((page) => {
+        if (Array.isArray(page.history_entries)) {
+          entries.push(...page.history_entries);
+        }
+      });
+    });
+    return entries.sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, [documents]);
+
   const handleReviewChange = useCallback((pageKey: string, review: PageReview) => {
     const parsed = parsePageKey(pageKey);
     if (!parsed) return;
@@ -821,6 +835,7 @@ export default function ProjectWorkspacePage() {
             pageKeys={pageKeys}
             initialReviews={initialReviews}
             onReviewChange={handleReviewChange}
+            initialHistory={initialHistory}
             fileMetadata={fileMetadata}
             syncKey={validationKeysSignature}
             onPersist={persistPages}

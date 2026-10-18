@@ -10,6 +10,7 @@ import type {
 import type { ExtractedPage } from '../models/TableData';
 import type { DocType, StructuredDocument } from '../models/Document';
 import type { PageReview } from '../models/IssueReview';
+import type { HistoryEntry } from '../models/HistoryEntry';
 import { pageToExtractedPage } from '../utils/flattener';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
@@ -199,21 +200,26 @@ export function rawResultToExtractedPages(
 }
 
 /**
- * Persists extracted data for one page and marks it done.
+ * Persists extracted data and/or history entries for one page and marks it done.
  */
 export async function saveExtractedData(
   documentId: string,
   pageIndex: number,
-  extractedData: ExtractedPage
+  extractedData?: ExtractedPage,
+  historyEntries?: HistoryEntry[]
 ): Promise<DocumentPageRecord> {
   const headers = await getAuthHeaders();
+  const body: { extractedData?: ExtractedPage; historyEntries?: HistoryEntry[] } = {};
+  if (extractedData !== undefined) body.extractedData = extractedData;
+  if (historyEntries !== undefined) body.historyEntries = historyEntries;
+
   const response = await fetch(
     apiUrl(`/api/documents/${encodeURIComponent(documentId)}/pages/${pageIndex}/data`),
     {
       method: 'PATCH',
       headers,
       credentials: 'include',
-      body: JSON.stringify({ extractedData }),
+      body: JSON.stringify(body),
     }
   );
 
