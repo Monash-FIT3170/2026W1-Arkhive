@@ -230,7 +230,7 @@ export default {
           try {
             // Run OCR on every page belonging to this document, in parallel,
             // then combine the results into a single set of components.
-            const pageResults = await Promise.all(
+            const pageResults: { pageIndex: string; ocrData: any[] }[] = await Promise.all(
               files.map(async (file) => {
                 const buffer = fs.readFileSync(file.path);
                 const text = await parseTableWithRetries(buffer, (attempt, max) => {
@@ -342,7 +342,7 @@ export default {
             success: true,
             batchId,
             pageCount: totalDocuments,
-            jobs: retained.jobs,
+            jobs: outcomes.map((outcome) => outcome.job),
             ocrData: combinedOcrData,
           },
         }) + '\n'
