@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import type { StructuredPage } from '../../models/Document';
 import { retainProcessedPages } from './processedPageSession';
+
+const fieldValues = (pages: StructuredPage[]) =>
+  pages.map((item) => {
+    const block = item.blocks[0];
+    if (!block || block.kind !== 'field') throw new Error('expected a field block');
+    return block.value;
+  });
 
 const page = (text: string) => ({
   pageIndex: 0,
@@ -37,7 +45,7 @@ describe('retainProcessedPages', () => {
       '/api/upload/image/fileA/0',
       '/api/upload/image/fileB/0',
     ]);
-    expect(second.ocrData.map((item) => item.blocks[0].value)).toEqual(['page A0', 'page B0']);
+    expect(fieldValues(second.ocrData)).toEqual(['page A0', 'page B0']);
   });
 
   it('replaces a page when that same page is processed again', () => {
@@ -55,7 +63,7 @@ describe('retainProcessedPages', () => {
       updates: [{ documentId: 'fileA', pageIndex: '0', ocrData: [page('new')] }],
     });
 
-    expect(again.ocrData.map((item) => item.blocks[0].value)).toEqual(['new', 'keep']);
+    expect(fieldValues(again.ocrData)).toEqual(['new', 'keep']);
   });
 
   it('drops a processed page once it is no longer uploaded', () => {
@@ -75,6 +83,6 @@ describe('retainProcessedPages', () => {
       processedPages: retained.processedPages,
     });
 
-    expect(afterDelete.ocrData.map((item) => item.blocks[0].value)).toEqual(['stay']);
+    expect(fieldValues(afterDelete.ocrData)).toEqual(['stay']);
   });
 });
