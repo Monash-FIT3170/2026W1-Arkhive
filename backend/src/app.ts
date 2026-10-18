@@ -8,6 +8,7 @@ import uploadRouter from './routes/upload';
 import projectsRouter from './routes/projectRoutes';
 import documentsRouter from './routes/documentRoutes';
 import qrRouter from './routes/qr';
+import { resolveSessionSecret } from './services/security/sessionSecret';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,7 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'arkhive-dev-secret',
+    secret: resolveSessionSecret(),
     resave: false,
     saveUninitialized: false,
     cookie: {

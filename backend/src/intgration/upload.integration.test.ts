@@ -5,6 +5,16 @@ import fs from 'fs';
 import path from 'path';
 import app from '../app';
 import type { StructuredDocument } from '../models/Document';
+import {
+  INVALID_FILE_CONTENTS_ERROR,
+  INVALID_UPLOAD_PATH_ERROR,
+} from '../services/security/fileValidation';
+
+/** 1x1 PNG. A bare signature is not enough once image processing runs for real. */
+const TINY_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64'
+);
 
 // The one real external boundary this flow hits: Azure + Gemini, behind
 // parseDocumentWithRetries. Everything else (session, disk storage, image
@@ -36,7 +46,7 @@ describe('upload -> process integration', () => {
 
     const uploadRes = await agent
       .post(`/api/upload/page?documentId=${documentId}&pageIndex=0`)
-      .attach('page', Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'), {
+      .attach('page', TINY_PNG, {
         filename: 'page-0.png',
         contentType: 'image/png',
       });
@@ -58,6 +68,40 @@ describe('upload -> process integration', () => {
     const extractionRes = await agent.get('/api/extraction');
     expect(extractionRes.status).toBe(200);
     expect(extractionRes.body[0].blocks[0].value).toBe('Invoice total: $42.00');
+  });
+
+  it('rejects a page whose contents do not match the claimed PNG type', async () => {
+    const documentId = 'itest-doc-fake';
+
+    const uploadRes = await agent
+      .post(`/api/upload/page?documentId=${documentId}&pageIndex=0`)
+      .attach('page', Buffer.from('fake-image-bytes'), {
+        filename: 'page-0.png',
+        contentType: 'image/png',
+      });
+
+    expect(uploadRes.status).toBe(400);
+    expect(uploadRes.body.error).toBe(INVALID_FILE_CONTENTS_ERROR);
+
+    const docsRes = await agent.get('/api/upload/documents');
+    expect(docsRes.status).toBe(200);
+    const fakeDoc = docsRes.body.find((doc: { documentId: string }) => doc.documentId === documentId);
+    expect(fakeDoc).toBeUndefined();
+  });
+
+  it('rejects a documentId that tries to leave the session folder', async () => {
+    const uploadRes = await agent
+      .post('/api/upload/page?documentId=../secret&pageIndex=0')
+      .attach('page', TINY_PNG, {
+        filename: 'page-0.png',
+        contentType: 'image/png',
+      });
+
+    expect(uploadRes.status).toBe(400);
+    expect(uploadRes.body.error).toBe(INVALID_UPLOAD_PATH_ERROR);
+
+    const uploadsRoot = path.join(process.cwd(), 'uploads');
+    expect(fs.existsSync(path.join(uploadsRoot, 'secret'))).toBe(false);
   });
 
   afterAll(() => {

@@ -1,7 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import uploadController from './upload';
+import {
+  INVALID_FILE_CONTENTS_ERROR,
+  INVALID_UPLOAD_PATH_ERROR,
+} from '../services/security/fileValidation';
 // This test file was generated with the assistance of Google Gemini.
 vi.mock('../services/imageProcessor', () => ({
   processImage: vi.fn(),
@@ -13,6 +18,28 @@ vi.mock('../services/ocr/ocr', () => ({
 
 import { processImage } from '../services/imageProcessor';
 import { parseDocumentWithRetries } from '../services/ocr/ocr';
+
+const PNG_HEADER = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
+]);
+
+const tempDirs: string[] = [];
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  for (const dir of tempDirs) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  tempDirs.length = 0;
+});
+
+function writeTempFile(data: Buffer, filename: string) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'arkhive-upload-'));
+  tempDirs.push(dir);
+  const filePath = path.join(dir, filename);
+  fs.writeFileSync(filePath, data);
+  return filePath;
+}
 
 function createMockReqRes(options: {
   session?: any;
@@ -77,6 +104,76 @@ function createMockReqRes(options: {
   };
 }
 
+describe('uploadPage file signature check', () => {
+  it('keeps a file whose bytes match the claimed PNG type', async () => {
+    const filePath = writeTempFile(PNG_HEADER, 'page-0.png');
+    vi.mocked(processImage).mockResolvedValue({
+      buffer: PNG_HEADER,
+      qualityFlags: { isBlurry: false, isDark: false, isInvalidSize: false, shouldWarn: false },
+    });
+
+    const { req, res, getStatusCode, getJsonResponse } = createMockReqRes({
+      session: { id: 'test-session' },
+      file: { path: filePath, filename: 'page-0.png', mimetype: 'image/png' },
+      query: { documentId: 'doc-1', pageIndex: '0' },
+    });
+
+    await uploadController.uploadPage(req, res);
+
+    expect(getStatusCode()).toBe(200);
+    expect(getJsonResponse().success).toBe(true);
+    expect(fs.existsSync(filePath)).toBe(true);
+    expect(req.session.documents['doc-1']).toBeDefined();
+  });
+
+  it('rejects and deletes a file labelled PNG whose contents are fake', async () => {
+    const filePath = writeTempFile(Buffer.from('fake-image-bytes'), 'page-0.png');
+    const { req, res, getStatusCode, getJsonResponse } = createMockReqRes({
+      session: { id: 'test-session' },
+      file: { path: filePath, filename: 'page-0.png', mimetype: 'image/png' },
+      query: { documentId: 'doc-1', pageIndex: '0' },
+    });
+
+    await uploadController.uploadPage(req, res);
+
+    expect(getStatusCode()).toBe(400);
+    expect(getJsonResponse()).toEqual({ error: INVALID_FILE_CONTENTS_ERROR });
+    expect(fs.existsSync(filePath)).toBe(false);
+    expect(req.session.documents).toBeUndefined();
+  });
+});
+
+describe('uploadPage path traversal check', () => {
+  it('rejects a documentId that walks out of the session folder', async () => {
+    const filePath = writeTempFile(PNG_HEADER, 'page-0.png');
+    const { req, res, getStatusCode, getJsonResponse } = createMockReqRes({
+      session: { id: 'test-session' },
+      file: { path: filePath, filename: 'page-0.png', mimetype: 'image/png' },
+      query: { documentId: '../secret', pageIndex: '0' },
+    });
+
+    await uploadController.uploadPage(req, res);
+
+    expect(getStatusCode()).toBe(400);
+    expect(getJsonResponse()).toEqual({ error: INVALID_UPLOAD_PATH_ERROR });
+    expect(req.session.documents).toBeUndefined();
+  });
+
+  it('rejects a pageIndex that is not a small whole number', async () => {
+    const filePath = writeTempFile(PNG_HEADER, 'page-0.png');
+    const { req, res, getStatusCode, getJsonResponse } = createMockReqRes({
+      session: { id: 'test-session' },
+      file: { path: filePath, filename: 'page-0.png', mimetype: 'image/png' },
+      query: { documentId: 'doc-1', pageIndex: '0/../../x' },
+    });
+
+    await uploadController.uploadPage(req, res);
+
+    expect(getStatusCode()).toBe(400);
+    expect(getJsonResponse()).toEqual({ error: INVALID_UPLOAD_PATH_ERROR });
+  });
+});
+
 describe('Upload Controller', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -110,12 +207,13 @@ describe('Upload Controller', () => {
         qualityFlags: mockQualityFlags,
       });
 
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(Buffer.from('raw-image'));
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(PNG_HEADER);
       const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
 
       const mockFile = {
         path: '/tmp/upload-xyz.png',
         filename: 'upload-xyz.png',
+        mimetype: 'image/png',
       };
 
       const session: any = { id: 'session-456' };
@@ -143,10 +241,10 @@ describe('Upload Controller', () => {
     });
 
     it('returns 500 when image processing throws an error', async () => {
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(Buffer.from('raw-image'));
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(PNG_HEADER);
       vi.mocked(processImage).mockRejectedValueOnce(new Error('OpenCV error'));
 
-      const mockFile = { path: '/tmp/upload.png', filename: 'upload.png' };
+      const mockFile = { path: '/tmp/upload.png', filename: 'upload.png', mimetype: 'image/png' };
       const { req, res, getStatusCode, getJsonResponse } = createMockReqRes({
         file: mockFile,
         query: { documentId: 'doc-1', pageIndex: '0' },

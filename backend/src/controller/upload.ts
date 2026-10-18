@@ -1,6 +1,13 @@
 import { Request, Response } from 'express';
 import { parseDocumentWithRetries } from '../services/ocr/ocr';
 import { DocumentJob } from '../models/Job';
+import {
+  hasValidFileSignature,
+  INVALID_FILE_CONTENTS_ERROR,
+  INVALID_UPLOAD_PATH_ERROR,
+  isSafeDocumentId,
+  isSafePageIndex,
+} from '../services/security/fileValidation';
 import 'express-session';
 import 'multer';
 import fs from 'fs';
@@ -53,6 +60,32 @@ export default {
       return;
     }
 
+    if (!isSafeDocumentId(documentId) || !isSafePageIndex(pageIndex)) {
+      res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+      return;
+    }
+
+    // Multer already wrote the file. Check the real bytes before we keep it.
+    let contents: Buffer;
+    try {
+      contents = fs.readFileSync(file.path);
+    } catch {
+      res.status(400).json({ error: INVALID_FILE_CONTENTS_ERROR });
+      return;
+    }
+
+    if (!hasValidFileSignature(contents, file.mimetype)) {
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      } catch {
+        // Best-effort cleanup; still reject the upload.
+      }
+      res.status(400).json({ error: INVALID_FILE_CONTENTS_ERROR });
+      return;
+    }
+
     if (!req.session.documents) {
       req.session.documents = {};
     }
@@ -90,6 +123,12 @@ export default {
   deletePage: (req: Request, res: Response) => {
     const documentId = req.params.documentId as string;
     const pageIndex = req.params.pageIndex as string;
+
+    if (!isSafeDocumentId(documentId) || !isSafePageIndex(pageIndex)) {
+      res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+      return;
+    }
+
     const doc = req.session.documents?.[documentId];
 
     if (doc && doc.pages[pageIndex]) {
@@ -124,6 +163,11 @@ export default {
   // Delete an entire document
   deleteDocument: (req: Request, res: Response) => {
     const documentId = req.params.documentId as string;
+
+    if (!isSafeDocumentId(documentId)) {
+      res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+      return;
+    }
 
     if (req.session.documents?.[documentId]) {
       const sessionId = req.session.id;
@@ -163,11 +207,13 @@ export default {
 
     for (const selection of selected) {
       const { documentId, pages } = selection;
+      if (!isSafeDocumentId(documentId)) continue;
       const doc = sessionDocs[documentId];
       if (!doc) continue;
 
       const files: { pageIndex: string; path: string }[] = [];
       for (const pageIndex of pages) {
+        if (!isSafePageIndex(pageIndex)) continue;
         const pageObj = doc.pages[pageIndex];
         if (pageObj && pageObj.relativePath) {
           const absolutePath = path.join(process.cwd(), 'uploads', pageObj.relativePath);
@@ -409,6 +455,12 @@ export default {
   getImage: (req: Request, res: Response) => {
     const documentId = req.params.documentId as string;
     const pageIndex = req.params.pageIndex as string;
+
+    if (!isSafeDocumentId(documentId) || !isSafePageIndex(pageIndex)) {
+      res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+      return;
+    }
+
     const doc = req.session.documents?.[documentId];
 
     const pageObj = doc?.pages[pageIndex];

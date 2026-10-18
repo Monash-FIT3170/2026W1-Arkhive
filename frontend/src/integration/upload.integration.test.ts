@@ -15,7 +15,15 @@ describe('upload -> process integration', () => {
   const documentId = 'itest-doc-1';
 
   it('uploads a page, processes it, and persists the OCR result to the real session', async () => {
-    const fakePng = new Blob([Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')], { type: 'image/png' });
+    const fakePng = new Blob(
+      [
+        Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+          'base64'
+        ),
+      ],
+      { type: 'image/png' }
+    );
     const pageSrc = 'blob:test-image';
 
     const originalFetch = global.fetch;

@@ -12,6 +12,11 @@ import {
 import { processImage } from '../services/imageProcessor';
 import { parseDocumentWithRetries } from '../services/ocr/ocr';
 import type { DocType } from '../models/Document';
+import {
+  hasValidFileSignature,
+  INVALID_FILE_CONTENTS_ERROR,
+  UNSUPPORTED_FILE_TYPE_ERROR,
+} from '../services/security/fileValidation';
 import type { ExtractedPage } from '../models/TableData';
 import type { PageSelection, ProcessedPageResult } from '../models/Project.ts';
 import type { HistoryEntry } from '../models/HistoryEntry';
@@ -116,6 +121,29 @@ async function processPage(
       try {
         const key = `${document.storage_path}/page-${pageIndex}.png`;
         const buffer = await getObjectBuffer(key);
+
+        // The object was stored before OCR. Reject bytes that are not a real PNG.
+        if (!hasValidFileSignature(buffer, 'image/png')) {
+          try {
+            await deleteObject(key);
+          } catch {
+            // Best-effort cleanup; still reject the page.
+          }
+
+          await supabase
+            .from('document_pages')
+            .update({ status: 'error', error_message: INVALID_FILE_CONTENTS_ERROR })
+            .eq('document_id', documentId)
+            .eq('page_index', pageIndex);
+
+          return {
+            documentId,
+            pageIndex,
+            status: 'error',
+            errorMessage: INVALID_FILE_CONTENTS_ERROR,
+          };
+        }
+
         // rawResult is a StructuredDocument. pageOffset is the REAL page index
         // so the blocks' regions/pageIndex line up with this page's image.
         const rawResult = await parseDocumentWithRetries(buffer, {
@@ -185,6 +213,25 @@ export default {
 
       if (!ownerId) {
         res.status(401).json({ error: 'Unauthorized.' });
+        return;
+      }
+
+      const allowedPageTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/tiff',
+        'image/webp',
+        'image/heic',
+        'image/heif',
+      ];
+      if (!allowedPageTypes.includes(file.mimetype)) {
+        res.status(400).json({ error: UNSUPPORTED_FILE_TYPE_ERROR });
+        return;
+      }
+
+      // The client can label any file as an image. Check the bytes before storing it.
+      if (!hasValidFileSignature(file.buffer, file.mimetype)) {
+        res.status(400).json({ error: INVALID_FILE_CONTENTS_ERROR });
         return;
       }
 
