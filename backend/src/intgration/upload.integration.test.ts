@@ -104,6 +104,43 @@ describe('upload -> process integration', () => {
     expect(fs.existsSync(path.join(uploadsRoot, 'secret'))).toBe(false);
   });
 
+  it('keeps an earlier processed page when another page is processed later', async () => {
+    const guest = request.agent(app);
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64'
+    );
+
+    for (const documentId of ['keep-a', 'keep-b']) {
+      const uploadRes = await guest
+        .post(`/api/upload/page?documentId=${documentId}&pageIndex=0`)
+        .attach('page', png, {
+          filename: `${documentId}.png`,
+          contentType: 'image/png',
+        });
+      expect(uploadRes.status).toBe(200);
+    }
+
+    const first = await guest
+      .post('/api/upload/process')
+      .send({ selected: [{ documentId: 'keep-a', pages: ['0'] }] });
+    expect(first.status).toBe(200);
+
+    const second = await guest
+      .post('/api/upload/process')
+      .send({ selected: [{ documentId: 'keep-b', pages: ['0'] }] });
+    expect(second.status).toBe(200);
+
+    const images = await guest.get('/api/upload/processed-images');
+    expect(images.body).toEqual([
+      '/api/upload/image/keep-a/0',
+      '/api/upload/image/keep-b/0',
+    ]);
+
+    const extraction = await guest.get('/api/extraction');
+    expect(extraction.body).toHaveLength(2);
+  });
+
   afterAll(() => {
     const uploadsRoot = path.join(process.cwd(), 'uploads');
     if (fs.existsSync(uploadsRoot)) {

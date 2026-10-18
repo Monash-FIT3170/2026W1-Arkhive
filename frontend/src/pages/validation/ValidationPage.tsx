@@ -15,6 +15,7 @@ import {
   toExtractedPages,
 } from '../../services/extractionService';
 import type { FileMetadataInput } from '../../utils/fileGrouping';
+import { fileMetadataFromProcessedImages } from './processedFileMetadata';
 
 // Single-session Upload/Validation flow. This page's only job is knowing
 // where the data comes from (the current extraction session) and where it
@@ -57,7 +58,13 @@ function ValidationPage() {
         }
         setImageUrls(processedUrls.length > 0 ? processedUrls : [getUploadedImageUrl()]);
 
-        if (uploadedDocs && uploadedDocs.length > 0) {
+        const processedMetadata = fileMetadataFromProcessedImages(
+          processedUrls,
+          uploadedDocs ?? []
+        );
+        if (processedMetadata) {
+          setFileMetadata(processedMetadata);
+        } else if (uploadedDocs && uploadedDocs.length > 0) {
           setFileMetadata(
             uploadedDocs.map((doc, i) => ({
               fileId: doc.documentId || `doc-${i}`,
