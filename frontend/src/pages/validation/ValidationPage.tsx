@@ -16,6 +16,7 @@ import {
   toExtractedPages,
 } from '../../services/extractionService';
 import type { FileMetadataInput } from '../../utils/fileGrouping';
+import { fileMetadataFromProcessedImages } from './processedFileMetadata';
 
 interface LocationState {
   taskId?: string;
@@ -67,7 +68,13 @@ export default function ValidationPage() {
 
         setImageUrls(processedUrls.length > 0 ? processedUrls : [getUploadedImageUrl()]);
 
-        if (uploadedDocs && uploadedDocs.length > 0) {
+        const processedMetadata = fileMetadataFromProcessedImages(
+          processedUrls,
+          uploadedDocs ?? []
+        );
+        if (processedMetadata) {
+          setFileMetadata(processedMetadata);
+        } else if (uploadedDocs && uploadedDocs.length > 0) {
           setFileMetadata(
             uploadedDocs.map((doc, i) => ({
               fileId: doc.documentId || `doc-${i}`,
