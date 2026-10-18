@@ -4,7 +4,12 @@ import QRCode from 'qrcode';
 import { QrSession } from '../models/QrSession';
 
 const QR_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes, matches "expire after an appropriate period"
-const PUBLIC_APP_URL = 'https://two026w1-arkhive.onrender.com'; // the public URL used to build QR upload links
+// The public URL used to build QR upload links, so a phone on the same
+// network can reach it. Falls back to the frontend dev server's own URL,
+// since in local dev the frontend (vite) and backend run on separate ports,
+// unlike production where the backend serves the built frontend from the
+// same origin (see Dockerfile).
+const PUBLIC_APP_URL = process.env.PUBLIC_APP_URL || 'http://localhost:5173';
 
 // In-memory map, mirroring the app's existing MemoryStore approach for sessions.
 const qrSessions = new Map<string, QrSession>();
