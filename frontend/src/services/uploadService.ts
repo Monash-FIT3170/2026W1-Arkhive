@@ -1,4 +1,5 @@
 import type { BatchProgressEvent, DocumentJob } from '../models/Job';
+import type { StructuredPage } from '../models/Document';
 import { apiUrl } from './apiBase';
 
 export interface UploadPageInput {
@@ -12,7 +13,21 @@ export interface BatchUploadResult {
   batchId?: string;
   pageCount: number;
   jobs?: DocumentJob[];
-  ocrData?: any[];
+  /** Pages from every completed job, in upload order, with pageIndex renumbered 0..n-1 across the batch. */
+  ocrData?: StructuredPage[];
+}
+
+export interface QualityFlags {
+  isBlurry: boolean;
+  isDark: boolean;
+  isInvalidSize: boolean;
+  shouldWarn: boolean;
+}
+
+export interface UploadPageResult {
+  success: boolean;
+  key: string;
+  qualityFlags: QualityFlags;
 }
 
 /**
@@ -23,7 +38,7 @@ export async function uploadPageToBackend(
   documentId: string,
   pageIndex: number,
   originalFilename: string
-): Promise<BatchUploadResult | void> {
+): Promise<UploadPageResult> {
   const formData = new FormData();
 
   const res = await fetch(pageSrc);
@@ -50,16 +65,21 @@ export async function uploadPageToBackend(
     const body = await response.json().catch(() => ({}));
     throw new Error(body.error ?? `Upload failed with status ${response.status}`);
   }
+
+  return await response.json();
 }
 
 /**
  * Deletes a single page from the backend.
  */
 export async function deletePageFromBackend(documentId: string, pageIndex: number): Promise<void> {
-  const response = await fetch(apiUrl(`/api/upload/page/${encodeURIComponent(documentId)}/${pageIndex}`), {
-    method: 'DELETE',
-    credentials: 'include',
-  });
+  const response = await fetch(
+    apiUrl(`/api/upload/page/${encodeURIComponent(documentId)}/${pageIndex}`),
+    {
+      method: 'DELETE',
+      credentials: 'include',
+    }
+  );
 
   if (!response.ok) {
     console.error(`Failed to delete page ${pageIndex} of document ${documentId}`);
@@ -86,7 +106,8 @@ export async function deleteDocumentFromBackend(documentId: string): Promise<voi
 export async function processDocuments(
   selected: { documentId: string; pages: string[] }[],
   onRetryMessage?: (msg: string) => void,
-  onProgress?: (event: BatchProgressEvent) => void
+  onProgress?: (event: BatchProgressEvent) => void,
+  signal?: AbortSignal
 ): Promise<BatchUploadResult | void> {
   const response = await fetch(apiUrl('/api/upload/process'), {
     method: 'POST',
@@ -95,6 +116,7 @@ export async function processDocuments(
     },
     credentials: 'include',
     body: JSON.stringify({ selected }),
+    signal,
   });
 
   if (!response.ok) {
@@ -171,11 +193,19 @@ export function getUploadedImageUrl(documentId?: string, pageIndex?: number): st
  * Returns a list of structured documents from the session.
  */
 export async function getUploadedDocuments(): Promise<
-  { documentId: string; label?: string; pages: string[] }[]
+  { documentId: string; label?: string; pages: { url: string; qualityFlags?: QualityFlags }[] }[]
 > {
   const response = await fetch(apiUrl('/api/upload/documents'));
   if (!response.ok) {
     throw new Error('Failed to fetch uploaded documents');
+  }
+  return await response.json();
+}
+
+export async function getJobs(): Promise<{ batchId: string; jobs: DocumentJob[] }> {
+  const response = await fetch(apiUrl('/api/upload/jobs'));
+  if (!response.ok) {
+    throw new Error('Failed to fetch jobs');
   }
   return await response.json();
 }
@@ -185,7 +215,7 @@ export async function getUploadedDocuments(): Promise<
  */
 export async function getUploadedImageUrls(): Promise<string[]> {
   const docs = await getUploadedDocuments();
-  return docs.flatMap((doc) => doc.pages);
+  return docs.flatMap((doc) => doc.pages.map((page) => page.url));
 }
 
 /**

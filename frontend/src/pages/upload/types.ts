@@ -9,8 +9,11 @@ export type PreviewItem = {
   fileIndex?: number;  // each preview card shares the same index as its parent file, not necessarily the index in the files array
   isBlurry?: boolean;
   isDark?: boolean;
+  isInvalidSize?: boolean;
   shouldWarn?: boolean;
   backendPageIndex?: number; // Stable identifier for the page in the backend
   documentId?: string; // Unique identifier for the document
+  isQueued?: boolean; // True while the page is waiting in / running through the OCR progress queue
   isProcessed?: boolean; // True if the file has been successfully processed by OCR
+  errorText?: string; // Error from backend
 };
