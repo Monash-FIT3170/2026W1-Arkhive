@@ -37,13 +37,19 @@ export function useProjects() {
 
   const create = useCallback(async (name: string): Promise<Project> => {
     const project = await createProject(name);
-    setProjects((prev) => [project, ...prev]);
-    return project;
+    const newProject: Project = {
+      document_count: 0,
+      page_count: 0,
+      documents: [],
+      ...project,
+    };
+    setProjects((prev) => [newProject, ...prev]);
+    return newProject;
   }, []);
 
   const rename = useCallback(async (id: string, name: string): Promise<Project> => {
     const updated = await updateProject(id, name);
-    setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
     return updated;
   }, []);
 

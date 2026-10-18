@@ -414,6 +414,80 @@ describe('Documents Controller', () => {
       expect(getJson().error).toContain('extractedData');
     });
 
+    it('writes extracted_data and history_entries when both are provided', async () => {
+      const mockHistory = [
+        {
+          id: 'hist-1',
+          type: 'edit',
+          timestamp: '2026-10-17T00:00:00.000Z',
+          description: 'Edited cell',
+        },
+      ];
+      const updatedPage = {
+        document_id: 'doc-123',
+        page_index: 0,
+        status: 'done',
+        extracted_data: extractedData,
+        history_entries: mockHistory,
+      };
+      let updatePayload: any;
+      vi.spyOn(supabase, 'from').mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: mockDoc, error: null }),
+            }),
+          }),
+        }),
+        update: vi.fn().mockImplementation((payload) => {
+          updatePayload = payload;
+          return {
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                select: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({ data: updatedPage, error: null }),
+                }),
+              }),
+            }),
+          };
+        }),
+      } as any);
+
+      const { req, res, getStatus, getJson } = createMockReqRes(
+        'test-user-123',
+        { extractedData, historyEntries: mockHistory },
+        { id: 'doc-123', pageIndex: '0' }
+      );
+
+      await documentsController.saveExtractedData(req, res);
+
+      expect(getStatus()).toBe(200);
+      expect(updatePayload).toEqual({
+        extracted_data: extractedData,
+        status: 'done',
+        error_message: null,
+        history_entries: mockHistory,
+      });
+      expect(getJson()).toEqual({
+        success: true,
+        documentId: 'doc-123',
+        page: updatedPage,
+      });
+    });
+
+    it('returns 400 when historyEntries is not an array', async () => {
+      const { req, res, getStatus, getJson } = createMockReqRes(
+        'test-user-123',
+        { extractedData, historyEntries: 'not-an-array' },
+        { id: 'doc-123', pageIndex: '0' }
+      );
+
+      await documentsController.saveExtractedData(req, res);
+
+      expect(getStatus()).toBe(400);
+      expect(getJson().error).toContain('historyEntries');
+    });
+
     it('returns 404 when document does not exist or user does not own it', async () => {
       vi.spyOn(supabase, 'from').mockReturnValue({
         select: vi.fn().mockReturnValue({
