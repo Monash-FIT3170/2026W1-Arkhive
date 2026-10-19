@@ -14,6 +14,27 @@ import {
 } from '../services/qrService';
 import { QrPollResponse } from '../models/QrSession';
 
+// processImage re-encodes the photo, so the saved file's extension must match
+// the bytes we write. Otherwise the file is served with the wrong Content-Type
+// (e.g. PNG bytes labelled image/jpeg) and later validation rejects it.
+function extensionForBytes(buf: Buffer, fallback: string): string {
+  if (
+    buf.length >= 8 &&
+    buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  ) {
+    return '.png';
+  }
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return '.jpg';
+  if (
+    buf.length >= 12 &&
+    buf.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    buf.subarray(8, 12).toString('ascii') === 'WEBP'
+  ) {
+    return '.webp';
+  }
+  return fallback;
+}
+
 export default {
   // Desktop calls this to get a QR code + token for a brand-new document upload
   generateQr: async (req: Request, res: Response) => {
@@ -129,12 +150,23 @@ export default {
       const imageUrls: string[] = [];
       const uploadsRoot = path.join(process.cwd(), 'uploads');
       for (const [index, file] of files.entries()) {
-        // Derive the path from where multer actually saved the file, so it always matches
-        const relativePath = path.relative(uploadsRoot, file.path);
-
         // Same image processing as a normal desktop upload (also gives us qualityFlags)
         const { buffer, qualityFlags } = await processImage(fs.readFileSync(file.path));
-        fs.writeFileSync(file.path, buffer);
+
+        // Save under an extension that matches the processed bytes, and remove the
+        // original if the name changed (e.g. IMG_1234.jpg -> IMG_1234.png).
+        const parsed = path.parse(file.path);
+        const finalPath = path.join(
+          parsed.dir,
+          parsed.name + extensionForBytes(buffer, parsed.ext)
+        );
+        fs.writeFileSync(finalPath, buffer);
+        if (finalPath !== file.path) {
+          fs.unlinkSync(file.path);
+        }
+
+        // Derive the path from where the file was actually saved, so it always matches
+        const relativePath = path.relative(uploadsRoot, finalPath);
 
         desktopSessionData.documents[documentId].pages[String(index)] = {
           relativePath,
