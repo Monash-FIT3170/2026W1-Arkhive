@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Trash2,
+  Folder,
   FolderOpen,
   Pencil,
   Check,
@@ -90,41 +91,26 @@ export default function ProjectCard({
       : project.documents?.reduce((sum, doc) => sum + (doc.pages?.length ?? 0), 0) ?? 0);
 
   return (
-    <>
-    <div className="flex flex-col rounded-xl border border-base-300 bg-base-200/40 transition-colors hover:border-base-content/20 overflow-hidden">
+    <div
+      className={`group relative flex flex-col rounded-xl border bg-base-100 transition-all duration-200 overflow-hidden ${
+        isSelected
+          ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-sm'
+          : 'border-base-300 hover:border-primary/40 hover:shadow-md'
+      }`}
+    >
+      {/* Top Header & Main Click Area */}
       <div
         className={`flex flex-col gap-3 p-4 text-left ${isRenaming ? '' : 'cursor-pointer'}`}
         onClick={() => !isRenaming && onNavigate(project.id)}
       >
-        
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <FolderOpen className="w-4 h-4 shrink-0 text-primary" />
-            {isRenaming ? (
-              <input
-                autoFocus
-                type="text"
-                className="input input-bordered input-xs flex-1 min-w-0"
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveRename();
-                  if (e.key === 'Escape') cancelRename();
-                }}
-                disabled={isSaving}
-              />
+        {/* Top Row: Folder Icon in Top-Left Corner, Actions & Always-Visible Checkbox in Top-Right */}
+        <div className="flex items-center justify-between gap-2">
+          {/* Folder Icon sits flush in the top-left corner */}
+          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            {isExpanded ? (
+              <FolderOpen className="w-5 h-5" />
             ) : (
-              <>
-                <span className="font-medium truncate">{project.name}</span>
-                {progress.isProcessing && (
-                  <span className="badge badge-primary badge-xs gap-1 shrink-0 font-mono animate-pulse">
-                    <span className="loading loading-spinner loading-xs" />
-                    {progress.overallProgressPercent}%
-                  </span>
-                )}
-              </>
-              
+              <Folder className="w-5 h-5" />
             )}
           </div>
 
@@ -217,9 +203,17 @@ export default function ProjectCard({
               </button>
             </div>
           ) : (
-            <span className="font-semibold text-base text-base-content truncate block text-left group-hover:text-primary transition-colors max-w-full">
-              {project.name}
-            </span>
+            <div className="flex items-center gap-2 max-w-full">
+              <span className="font-semibold text-base text-base-content truncate block text-left group-hover:text-primary transition-colors">
+                {project.name}
+              </span>
+              {progress.isProcessing && (
+                <span className="badge badge-primary badge-xs gap-1 shrink-0 font-mono animate-pulse">
+                  <span className="loading loading-spinner loading-xs" />
+                  {progress.overallProgressPercent}%
+                </span>
+              )}
+            </div>
           )}
 
           <div className="flex items-center justify-start gap-2 text-xs text-base-content/50 text-left">
@@ -256,6 +250,5 @@ export default function ProjectCard({
 
       {isExpanded && <ProjectPreviewPanel preview={preview} />}
     </div>
-    </>
   );
 }
