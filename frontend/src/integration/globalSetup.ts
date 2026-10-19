@@ -8,9 +8,14 @@ const __dirname = path.dirname(__filename);
 const BACKEND_DIR = path.resolve(__dirname, '../../../backend');
 
 export default async function setup() {
+  const isNode22OrAbove = parseInt(process.versions.node.split('.')[0], 10) >= 22;
+  const nodeArgs = isNode22OrAbove
+    ? ['--import', 'tsx', 'app.ts']
+    : ['--experimental-websocket', '--import', 'tsx', 'app.ts'];
+
   const child: ChildProcessWithoutNullStreams = spawn(
     'node',
-    ['--import', 'tsx', 'app.ts'],
+    nodeArgs,
     {
       cwd: BACKEND_DIR,
       env: {

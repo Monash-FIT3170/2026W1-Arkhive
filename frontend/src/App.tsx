@@ -24,11 +24,13 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-base-100 text-base-content flex flex-col">
       {!isMobileCapture && <Navbar />}
-      {!isMobileCapture && !isValidationPage && <OcrProgressPopup />}
+      {!isMobileCapture && !isValidationPage &&<>
+          <OcrProgressPopup filterOwnerType="user" />
+          <OcrProgressPopup filterOwnerType="guest" />
+        </>}
       <div className="flex-1 flex flex-col">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          {/* No auth guard — the phone proves access via its QR token, not a login */}
           <Route path="/upload/mobile/:token" element={<MobileCapture />} />
           <Route element={<AuthGuard />}>
             <Route path="/" element={<HomePage />} />
@@ -54,11 +56,11 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <OcrProgressProvider>
-        <Router>
+      <Router>
+        <OcrProgressProvider>
           <AppContent />
-        </Router>
-      </OcrProgressProvider>
+        </OcrProgressProvider>
+      </Router>
     </AuthProvider>
   );
 }
