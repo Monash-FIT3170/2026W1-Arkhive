@@ -500,6 +500,7 @@ export default function ProjectWorkspacePage() {
     const selection = Array.from(byDoc.entries()).map(([documentId, pages]) => ({
       documentId,
       pages,
+      force: true,
     }));
 
     setDocuments((prev) =>
@@ -911,7 +912,6 @@ export default function ProjectWorkspacePage() {
               <button
                 className="btn btn-warning"
                 onClick={handleProcessSelected}
-                disabled={isProcessing}
               >
                 {isProcessing ? (
                   <span className="loading loading-spinner loading-sm" />
