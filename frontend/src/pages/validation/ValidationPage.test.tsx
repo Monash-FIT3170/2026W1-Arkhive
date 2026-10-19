@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import ValidationPage from './ValidationPage';
 
 const { mockJobs } = vi.hoisted(() => ({
@@ -117,7 +118,11 @@ describe('ValidationPage', () => {
   });
 
   it('loads session data on mount and renders panels', async () => {
-    render(<ValidationPage />);
+    render(
+      <MemoryRouter>
+        <ValidationPage />
+      </MemoryRouter>
+    );
 
     // Wait for session data to be loaded and ValidationWorkspace panels to render
     await waitFor(() => {

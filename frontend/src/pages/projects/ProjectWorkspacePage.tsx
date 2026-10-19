@@ -35,6 +35,7 @@ import type { ExtractedPage } from '../../models/TableData';
 import type { Block, StructuredPage } from '../../models/Document';
 import { makePageKey, parsePageKey } from '../../utils/keys';
 import type { PageReview } from '../../models/IssueReview';
+import type { HistoryEntry } from '../../models/HistoryEntry';
 import OcrProgressPopup from '../../components/ocr-progress/OcrProgressPopup';
 import { useOcrProgress } from '../../context/OcrProgressContext';
 
@@ -93,7 +94,6 @@ export default function ProjectWorkspacePage() {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  //const [processingKeys, setProcessingKeys] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
   const [showReprocessConfirm, setShowReprocessConfirm] = useState(false);
   const [showWarningConfirm, setShowWarningConfirm] = useState(false);
@@ -118,10 +118,11 @@ export default function ProjectWorkspacePage() {
   useEffect(() => {
     const currentState = location.state as { mode?: string } | null;
     if (currentState?.mode === 'validate') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMode('validate');
       setHasEnteredValidate(true);
     }
-  }, [location.state]);
+  }, [location]);
 
   // Fallback to files mode if trapped in validate mode with nothing to validate
   useEffect(() => {
@@ -130,6 +131,7 @@ export default function ProjectWorkspacePage() {
         (doc.pages || []).some((page) => page.raw_ocr_result || page.extracted_data)
       );
       if (!hasProcessedPages) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMode('files');
       }
     }
@@ -138,6 +140,7 @@ export default function ProjectWorkspacePage() {
   useEffect(() => {
     if (!id) return;
     let isMounted = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     getProject(id)
       .then((data) => {
@@ -234,6 +237,7 @@ export default function ProjectWorkspacePage() {
         .then((url) => setImageUrlMap((prev) => (prev[key] ? prev : { ...prev, [key]: url })))
         .catch((err) => console.error('Failed to load page image', err));
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPages]);
 
   const { validationPages, validationBlocks } = useMemo(() => {
@@ -532,12 +536,15 @@ export default function ProjectWorkspacePage() {
                 const pageKey = makePageKey(doc.id, page.page_index);
                 if (!queuedKeys.has(pageKey)) return page;
 
-                const job = jobs.find((j: any) => j.documentId === doc.id);
+                const job =
+                  jobs.find((j: any) => j.documentId === doc.id && j.pageIndex === page.page_index) ||
+                  jobs.find((j: any) => j.documentId === doc.id);
                 if (job) {
                   return {
                     ...page,
-                    status: job.status === 'failed' ? ('error' as PageStatus) : ('done' as PageStatus),
+                    status: (job.status === 'failed' || job.status === 'error') ? ('error' as PageStatus) : ('done' as PageStatus),
                     error_message: job.errorMessage,
+                    raw_ocr_result: job.rawResult ?? page.raw_ocr_result,
                   };
                 }
 
@@ -550,6 +557,22 @@ export default function ProjectWorkspacePage() {
             };
           })
         );
+
+        const currentProjectId = project?.id ?? id;
+        if (currentProjectId) {
+          getProject(currentProjectId)
+            .then((data) => {
+              setProject(data);
+              setDocuments(data.documents || []);
+              const hasProcessedPages = (data.documents || []).some((doc) =>
+                (doc.pages || []).some((p) => p.raw_ocr_result || p.extracted_data)
+              );
+              if (hasProcessedPages) {
+                setHasEnteredValidate(true);
+              }
+            })
+            .catch((err) => console.error('Failed to reload project data after OCR:', err));
+        }
 
         if (task.status === 'completed') {
           setDataVersion((v) => v + 1);
@@ -792,7 +815,7 @@ export default function ProjectWorkspacePage() {
                     .map((page) => {
                       const key = makePageKey(doc.id, page.page_index);
                       const imageUrl = imageUrlMap[key];
-                      const isBeingProcessed = processingKeys.has(key);
+                      const isBeingProcessed = page.status === 'processing';
                       return (
                         <PreviewCard
                           key={key}

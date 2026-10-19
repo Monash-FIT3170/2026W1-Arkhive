@@ -148,6 +148,7 @@ describe('documentService', () => {
         success: true,
         summary: { totalRequested: 2, succeeded: 2, skipped: 0, failed: 0 },
         results: [],
+        jobs: [],
       };
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
