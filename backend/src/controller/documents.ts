@@ -39,39 +39,6 @@ async function getOwnedDocument(documentId: string, ownerId: string) {
   return document;
 }
 
-/**
- * Identifies an image by its leading bytes instead of trusting the MIME type the
- * client (or an intermediate fetch) attached to it. Returns null if the bytes
- * are not one of the supported image formats.
- */
-function sniffImageMime(buf: Buffer): string | null {
-  if (!buf || buf.length < 12) return null;
-  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
-  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
-    return 'image/png';
-  }
-  if (
-    buf.subarray(0, 4).toString('ascii') === 'RIFF' &&
-    buf.subarray(8, 12).toString('ascii') === 'WEBP'
-  ) {
-    return 'image/webp';
-  }
-  const head4 = buf.subarray(0, 4);
-  if (
-    head4.equals(Buffer.from([0x49, 0x49, 0x2a, 0x00])) ||
-    head4.equals(Buffer.from([0x4d, 0x4d, 0x00, 0x2a]))
-  ) {
-    return 'image/tiff';
-  }
-  if (buf.subarray(4, 8).toString('ascii') === 'ftyp') {
-    const brand = buf.subarray(8, 12).toString('ascii');
-    if (['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1'].includes(brand)) {
-      return 'image/heic';
-    }
-  }
-  return null;
-}
-
 const VALID_DOC_TYPES: ReadonlySet<string> = new Set<DocType>([
   'table',
   'receipt',
@@ -259,22 +226,14 @@ export default {
         'image/heic',
         'image/heif',
       ];
-      // The client can label any file as an image, and labels get lost or mangled
-      // when photos pass through other requests (e.g. phone -> QR -> desktop -> here).
-      // So decide the type from the bytes themselves, not from file.mimetype.
-      const detectedType = sniffImageMime(file.buffer);
-      if (!detectedType) {
-        console.warn('uploadPage rejected: unrecognised image bytes', {
-          declaredType: file.mimetype,
-          originalName: file.originalname,
-          size: file.size,
-          head: file.buffer?.subarray(0, 12).toString('hex'),
-        });
-        res.status(400).json({ error: INVALID_FILE_CONTENTS_ERROR });
+      if (!allowedPageTypes.includes(file.mimetype)) {
+        res.status(400).json({ error: UNSUPPORTED_FILE_TYPE_ERROR });
         return;
       }
-      if (!allowedPageTypes.includes(detectedType)) {
-        res.status(400).json({ error: UNSUPPORTED_FILE_TYPE_ERROR });
+
+      // The client can label any file as an image. Check the bytes before storing it.
+      if (!hasValidFileSignature(file.buffer, file.mimetype)) {
+        res.status(400).json({ error: INVALID_FILE_CONTENTS_ERROR });
         return;
       }
 
