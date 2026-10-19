@@ -26,11 +26,7 @@ import {
   partitionBySize,
   MAX_FILE_SIZE_MB,
 } from '../upload/components/dropzone/dropZoneUtils';
-import type {
-  ProjectDetail,
-  DocumentRecord,
-  PageStatus,
-} from '../../models/Project';
+import type { ProjectDetail, DocumentRecord, PageStatus } from '../../models/Project';
 import type { ExtractedPage } from '../../models/TableData';
 import type { Block, StructuredPage } from '../../models/Document';
 import { makePageKey, parsePageKey } from '../../utils/keys';
@@ -93,7 +89,6 @@ export default function ProjectWorkspacePage() {
 
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showReprocessConfirm, setShowReprocessConfirm] = useState(false);
   const [showWarningConfirm, setShowWarningConfirm] = useState(false);
@@ -110,7 +105,9 @@ export default function ProjectWorkspacePage() {
   const [imageUrlMap, setImageUrlMap] = useState<Record<string, string>>({});
   const createdUrlsRef = useRef<string[]>([]);
 
-  const validationListRef = useRef<{ documentId: string; pageIndex: number; filename: string }[]>([]);
+  const validationListRef = useRef<{ documentId: string; pageIndex: number; filename: string }[]>(
+    []
+  );
   const [hasEnteredValidate, setHasEnteredValidate] = useState<boolean>(initialMode === 'validate');
   const [dataVersion, setDataVersion] = useState(0);
 
@@ -448,8 +445,8 @@ export default function ProjectWorkspacePage() {
   }
 
   function handleProcessClick() {
-    if (selectedKeys.size === 0 || isProcessing) return;
-    
+    if (selectedKeys.size === 0) return;
+
     let hasWarnings = false;
     documents.forEach((doc) => {
       (doc.pages || []).forEach((page) => {
@@ -481,9 +478,8 @@ export default function ProjectWorkspacePage() {
   }
 
   async function handleProcessSelected() {
-    if (selectedKeys.size === 0 || isProcessing) return;
+    if (selectedKeys.size === 0) return;
     setShowReprocessConfirm(false);
-    setIsProcessing(true);
     setActionError(null);
 
     const queuedKeys = new Set(selectedKeys);
@@ -524,7 +520,6 @@ export default function ProjectWorkspacePage() {
       selection,
       label: project?.name ? `${project.name} (${selection.length} files)` : 'Project Documents',
       onSettled: (task, result) => {
-        setIsProcessing(false);
         const rawJobs = (result as any)?.results ?? (result as any)?.jobs ?? [];
         const jobs = Array.isArray(rawJobs) ? rawJobs : [];
 
@@ -538,12 +533,16 @@ export default function ProjectWorkspacePage() {
                 if (!queuedKeys.has(pageKey)) return page;
 
                 const job =
-                  jobs.find((j: any) => j.documentId === doc.id && j.pageIndex === page.page_index) ||
-                  jobs.find((j: any) => j.documentId === doc.id);
+                  jobs.find(
+                    (j: any) => j.documentId === doc.id && j.pageIndex === page.page_index
+                  ) || jobs.find((j: any) => j.documentId === doc.id);
                 if (job) {
                   return {
                     ...page,
-                    status: (job.status === 'failed' || job.status === 'error') ? ('error' as PageStatus) : ('done' as PageStatus),
+                    status:
+                      job.status === 'failed' || job.status === 'error'
+                        ? ('error' as PageStatus)
+                        : ('done' as PageStatus),
                     error_message: job.errorMessage,
                     raw_ocr_result: job.rawResult ?? page.raw_ocr_result,
                   };
@@ -551,7 +550,8 @@ export default function ProjectWorkspacePage() {
 
                 return {
                   ...page,
-                  status: task.status === 'completed' ? ('done' as PageStatus) : ('error' as PageStatus),
+                  status:
+                    task.status === 'completed' ? ('done' as PageStatus) : ('error' as PageStatus),
                   error_message: task.error,
                 };
               }),
@@ -577,7 +577,7 @@ export default function ProjectWorkspacePage() {
 
         if (task.status === 'completed') {
           setDataVersion((v) => v + 1);
-          setHasEnteredValidate(true); 
+          setHasEnteredValidate(true);
         } else if (task.error) {
           setActionError(task.error);
         }
@@ -759,7 +759,7 @@ export default function ProjectWorkspacePage() {
       label: `Delete (${selectedKeys.size})`,
       icon: <Trash2 className="w-3.5 h-3.5" />,
       tone: 'error',
-      disabled: isProcessing || isDeleting,
+      disabled: isDeleting,
       onClick: () => setDeleteTarget({ type: 'bulk' }),
     },
     {
@@ -767,8 +767,7 @@ export default function ProjectWorkspacePage() {
       label: `Process (${selectedKeys.size})`,
       tone: 'primary',
       text: 'text-base-100',
-      disabled: isProcessing || isDeleting,
-      isBusy: isProcessing,
+      disabled: isDeleting,
       onClick: handleProcessClick,
     },
   ];
@@ -902,22 +901,11 @@ export default function ProjectWorkspacePage() {
               {`${countSelectedAlreadyProcessed()} of the ${selectedKeys.size} selected page(s) have already been processed. Reprocessing will overwrite their existing extracted data. This cannot be undone.`}
             </p>
             <div className="modal-action">
-              <button
-                className="btn btn-ghost"
-                onClick={() => setShowReprocessConfirm(false)}
-                disabled={isProcessing}
-              >
+              <button className="btn btn-ghost" onClick={() => setShowReprocessConfirm(false)}>
                 Cancel
               </button>
-              <button
-                className="btn btn-warning"
-                onClick={handleProcessSelected}
-              >
-                {isProcessing ? (
-                  <span className="loading loading-spinner loading-sm" />
-                ) : (
-                  'Reprocess'
-                )}
+              <button className="btn btn-warning" onClick={handleProcessSelected}>
+                Reprocess
               </button>
             </div>
           </div>
