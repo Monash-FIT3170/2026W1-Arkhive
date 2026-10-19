@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import ValidationWorkspace from './components/ValidationWorkspace';
-import type { Pages } from '../../models/OCRComponent';
+import type { StructuredPage } from '../../models/Document';
 import type { ExtractedPage } from '../../models/TableData';
 import {
   getProcessedImageUrls,
@@ -11,24 +12,37 @@ import {
   getExtractionSession,
   saveExtractionSession,
   getBatchJobs,
+  isStructuredPages,
+  toExtractedPages,
 } from '../../services/extractionService';
-import { flatten } from '../../utils/flattener';
 import type { FileMetadataInput } from '../../utils/fileGrouping';
+import { fileMetadataFromProcessedImages } from './processedFileMetadata';
 
-// Single-session Upload/Validation flow. This page's only job is knowing
-// where the data comes from (the current extraction session) and where it
-// gets saved (saveExtractionSession) — everything about editing, review, and
-// chat lives in <ValidationWorkspace>, shared with ProjectWorkspacePage.
-function ValidationPage() {
-  const [imageUrls, setImageUrls] = useState<string[]>([]); // one image URL per page
-  const [ocrPages, setOcrPages] = useState<Pages>([]); // raw OCR, one array per page
+interface LocationState {
+  taskId?: string;
+  projectId?: string;
+}
+
+export default function ValidationPage() {
+  const location = useLocation();
+  const navState = location.state as LocationState | null;
+
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [ocrPages, setOcrPages] = useState<StructuredPage[]>([]);
+  const [savedPages, setSavedPages] = useState<ExtractedPage[] | null>(null);
   const [fileMetadata, setFileMetadata] = useState<FileMetadataInput[]>([]);
+  const [docType, setDocType] = useState<string | undefined>();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadSession() {
+      setIsLoading(true);
       try {
-        const [ocrData, processedUrls, batchData, uploadedDocs] = await Promise.all([
-          getExtractionSession(),
+        const targetTaskId = navState?.taskId;
+
+        // Safely call helpers with 0 arguments to match their existing declarations
+        const [session, processedUrls, batchData, uploadedDocs] = await Promise.all([
+          getExtractionSession(targetTaskId),
           typeof getProcessedImageUrls === 'function'
             ? getProcessedImageUrls().catch(() => [])
             : Promise.resolve([]),
@@ -40,12 +54,27 @@ function ValidationPage() {
             : Promise.resolve([]),
         ]);
 
-        setOcrPages(ocrData);
-        setImageUrls(
-          processedUrls.length > 0 ? processedUrls : [getUploadedImageUrl()]
-        );
+        if (isStructuredPages(session)) setOcrPages(session);
+        else if (session) setSavedPages(toExtractedPages(session));
 
-        if (uploadedDocs && uploadedDocs.length > 0) {
+        if (
+          session &&
+          typeof session === 'object' &&
+          'docType' in session &&
+          typeof (session as any).docType === 'string'
+        ) {
+          setDocType((session as any).docType);
+        }
+
+        setImageUrls(processedUrls.length > 0 ? processedUrls : [getUploadedImageUrl()]);
+
+        const processedMetadata = fileMetadataFromProcessedImages(
+          processedUrls,
+          uploadedDocs ?? []
+        );
+        if (processedMetadata) {
+          setFileMetadata(processedMetadata);
+        } else if (uploadedDocs && uploadedDocs.length > 0) {
           setFileMetadata(
             uploadedDocs.map((doc, i) => ({
               fileId: doc.documentId || `doc-${i}`,
@@ -64,28 +93,33 @@ function ValidationPage() {
         }
       } catch (error) {
         console.error('Failed to load extraction session', error);
+      } finally {
+        setIsLoading(false);
       }
     }
-    loadSession();
-  }, []);
 
-  // Flatten ALL pages whenever the raw OCR data changes. This is the single
-  // source of truth for extractedPages — nothing else should call flatten()
-  // directly. Once this feeds ValidationWorkspace, further edits are the
-  // workspace's concern (they get reported back here only via onPersist).
+    loadSession();
+  }, [navState?.taskId]);
+
   const extractedPages: ExtractedPage[] = useMemo(
-    () =>
-      ocrPages.map((page) => ({
-        ...flatten(page.components),
-        pageIndex: page.page_num - 1,
-      })),
-    [ocrPages]
+    () => savedPages ?? toExtractedPages(ocrPages),
+    [savedPages, ocrPages]
   );
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center font-semibold text-lg">
+        <span className="loading loading-spinner loading-md mr-2" />
+        Loading validation session...
+      </div>
+    );
+  }
 
   if (extractedPages.length === 0) {
     return (
-      <div className="flex h-screen items-center justify-center font-semibold text-lg">
-        Loading...
+      <div className="flex h-screen flex-col items-center justify-center gap-2 font-semibold text-base-content/60">
+        <p className="text-lg">No validation data found for this session.</p>
+        <p className="text-sm">Try processing the document again from the upload screen.</p>
       </div>
     );
   }
@@ -93,14 +127,17 @@ function ValidationPage() {
   return (
     <ValidationWorkspace
       pages={extractedPages}
-      syncKey={`${ocrPages.length}:${ocrPages.map((p) => p.page_num).join(',')}`}
-      ocrPages={ocrPages.map((p) => p.components)}
+      syncKey={
+        savedPages
+          ? `saved:${savedPages.length}:${savedPages.map((p) => p.pageIndex).join(',')}`
+          : `${ocrPages.length}:${ocrPages.map((p) => p.pageIndex).join(',')}`
+      }
+      ocrPages={ocrPages.map((p) => p.blocks)}
       imageUrls={imageUrls}
       fileMetadata={fileMetadata}
+      docType={docType}
       onPersist={saveExtractionSession}
       heightClassName="lg:h-[calc(100vh-72px)]"
     />
   );
 }
-
-export default ValidationPage;

@@ -3,15 +3,24 @@ import { randomUUID } from 'crypto';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { supabase } from '../services/supabaseClient';
 import {
-  generateUploadUrl,
   generateDownloadUrl,
   getObjectBuffer,
   deleteObject,
   deletePrefix,
+  putObject,
 } from '../services/r2Client';
-import { parseTableWithRetries } from '../services/ocr/ocr';
+import { processImage } from '../services/imageProcessor';
+import { parseDocumentWithRetries } from '../services/ocr/ocr';
+import type { DocType } from '../models/Document';
+import {
+  hasValidFileSignature,
+  INVALID_FILE_CONTENTS_ERROR,
+  UNSUPPORTED_FILE_TYPE_ERROR,
+} from '../services/security/fileValidation';
 import type { ExtractedPage } from '../models/TableData';
 import type { PageSelection, ProcessedPageResult } from '../models/Project.ts';
+import type { HistoryEntry } from '../models/HistoryEntry';
+import { PageReview } from '../models/IssueReview';
 
 /**
  * Verifies the caller owns the project that (transitively) owns `documentId`,
@@ -30,22 +39,170 @@ async function getOwnedDocument(documentId: string, ownerId: string) {
   return document;
 }
 
+const VALID_DOC_TYPES: ReadonlySet<string> = new Set<DocType>([
+  'table',
+  'receipt',
+  'invoice',
+  'generic',
+]);
+
+const chunk = (size: number) => (arr: any[]) =>
+  Array.from({ length: Math.ceil(arr.length / size) }, (_: any, i: number) =>
+    arr.slice(i * size, i * size + size)
+  );
+
+async function processPage(
+  selection: PageSelection,
+  ownerId: string
+): Promise<ProcessedPageResult[]> {
+  const documentId = selection.documentId;
+  const pageIndices: number[] = selection.pages ?? selection.pageIndices ?? [];
+  const force = selection.force;
+  // Optional hint from the client; skips classification in the OCR pipeline.
+  // Validated because it ends up in a model prompt.
+  const docType: DocType | undefined =
+    selection.docType && VALID_DOC_TYPES.has(selection.docType) ? selection.docType : undefined;
+
+  const document = await getOwnedDocument(documentId, ownerId);
+  if (!document) {
+    return Promise.all(
+      pageIndices.map(async (pageIndex) => {
+        return {
+          documentId,
+          pageIndex,
+          status: 'error',
+          errorMessage: 'Document not found or access denied.',
+        };
+      })
+    );
+  }
+
+  const { data: pageRows, error: pagesError } = await supabase
+    .from('document_pages')
+    .select('*')
+    .eq('document_id', documentId)
+    .in('page_index', pageIndices);
+
+  if (pagesError) {
+    console.error('Failed to fetch document_pages for processing:', pagesError);
+    return Promise.all(
+      pageIndices.map(async (pageIndex) => {
+        return {
+          documentId,
+          pageIndex,
+          status: 'error',
+          errorMessage: pagesError.message,
+        };
+      })
+    );
+  }
+
+  const pageByIndex = new Map((pageRows || []).map((p) => [p.page_index, p]));
+
+  const t: Promise<ProcessedPageResult[]> = Promise.all(
+    pageIndices.map(async (pageIndex) => {
+      const pageRow = pageByIndex.get(pageIndex);
+
+      // Skip pages already validated, unless the caller forces a redo.
+      if (pageRow && pageRow.status === 'done' && !force) {
+        return {
+          documentId,
+          pageIndex,
+          status: 'done',
+          rawResult: pageRow.raw_ocr_result,
+          skipped: true,
+        };
+      }
+
+      await supabase
+        .from('document_pages')
+        .update({ status: 'processing' })
+        .eq('document_id', documentId)
+        .eq('page_index', pageIndex);
+
+      try {
+        const key = `${document.storage_path}/page-${pageIndex}.png`;
+        const buffer = await getObjectBuffer(key);
+
+        // The object was stored before OCR. Reject bytes that are not a real PNG.
+        if (!hasValidFileSignature(buffer, 'image/png')) {
+          try {
+            await deleteObject(key);
+          } catch {
+            // Best-effort cleanup; still reject the page.
+          }
+
+          await supabase
+            .from('document_pages')
+            .update({ status: 'error', error_message: INVALID_FILE_CONTENTS_ERROR })
+            .eq('document_id', documentId)
+            .eq('page_index', pageIndex);
+
+          return {
+            documentId,
+            pageIndex,
+            status: 'error',
+            errorMessage: INVALID_FILE_CONTENTS_ERROR,
+          };
+        }
+
+        // rawResult is a StructuredDocument. pageOffset is the REAL page index
+        // so the blocks' regions/pageIndex line up with this page's image.
+        const rawResult = await parseDocumentWithRetries(buffer, {
+          docType,
+          pageOffset: pageIndex,
+        });
+
+        // Persist immediately — this is the fix for "crash mid-validation
+        // means re-OCR everything." Raw OCR output is stored as-is; the
+        // user's validated edits are saved separately via saveExtractedData.
+        await supabase
+          .from('document_pages')
+          .update({
+            status: 'done',
+            raw_ocr_result: rawResult,
+            error_message: null,
+            review_state: null,
+          })
+          .eq('document_id', documentId)
+          .eq('page_index', pageIndex);
+
+        return { documentId, pageIndex, status: 'done', rawResult };
+      } catch (ocrError: any) {
+        const errorMessage =
+          ocrError?.message || 'OCR processing failed. Check credentials and document format.';
+        console.error(`OCR failed for ${documentId} page ${pageIndex}:`, ocrError);
+
+        await supabase
+          .from('document_pages')
+          .update({ status: 'error', error_message: errorMessage })
+          .eq('document_id', documentId)
+          .eq('page_index', pageIndex);
+
+        return { documentId, pageIndex, status: 'error', errorMessage };
+      }
+    })
+  );
+  return t;
+}
+
 export default {
   /**
-   * POST /api/documents/upload-url
-   * Generates a presigned PUT URL for a single page's PNG in R2, and ensures
+   * POST /api/documents/upload-page
+   * Uploads a single page's image, processes it, stores it in R2, and ensures
    * both the parent `documents` row and this page's `document_pages` row
-   * exist (status defaults to 'pending' — a fresh upload has no OCR yet).
+   * exist (status defaults to 'pending').
    *
-   * Body: { projectId, filename, contentType?, pageIndex, documentId? }
+   * Body (FormData): projectId, filename, pageIndex, documentId?, file
    */
-  getUploadUrl: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  uploadPage: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const { projectId, filename, contentType, pageIndex, documentId: existingDocId } = req.body;
+      const { projectId, filename, pageIndex, documentId: existingDocId } = req.body;
       const ownerId = req.userId;
+      const file = req.file;
 
-      if (!projectId || !filename) {
-        res.status(400).json({ error: 'projectId and filename are required.' });
+      if (!projectId || !filename || !file) {
+        res.status(400).json({ error: 'projectId, filename, and file are required.' });
         return;
       }
 
@@ -61,6 +218,25 @@ export default {
         return;
       }
 
+      const allowedPageTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/tiff',
+        'image/webp',
+        'image/heic',
+        'image/heif',
+      ];
+      if (!allowedPageTypes.includes(file.mimetype)) {
+        res.status(400).json({ error: UNSUPPORTED_FILE_TYPE_ERROR });
+        return;
+      }
+
+      // The client can label any file as an image. Check the bytes before storing it.
+      if (!hasValidFileSignature(file.buffer, file.mimetype)) {
+        res.status(400).json({ error: INVALID_FILE_CONTENTS_ERROR });
+        return;
+      }
+
       const { data: project, error: projectError } = await supabase
         .from('projects')
         .select('id')
@@ -73,14 +249,17 @@ export default {
         return;
       }
 
-      const mimeType = contentType || 'image/png';
       const docId = existingDocId || randomUUID();
       const numericPageIndex = Number(pageIndex);
 
       const storageKey = `${ownerId}/${projectId}/${docId}/page-${numericPageIndex}.png`;
       const baseStoragePath = `${ownerId}/${projectId}/${docId}`;
 
-      const uploadUrl = await generateUploadUrl(storageKey, mimeType, 300);
+      // 1. Process Image
+      const { buffer, qualityFlags } = await processImage(file.buffer);
+
+      // 2. Upload directly to R2
+      await putObject(storageKey, buffer, 'image/png');
 
       if (!existingDocId) {
         const { error: insertError } = await supabase.from('documents').insert({
@@ -97,15 +276,18 @@ export default {
         }
       }
 
-      // Ensure this page has a row to hang status/OCR data off of. If it
-      // already exists (e.g. re-upload of the same page), leave it alone —
-      // upsert with ignoreDuplicates so we don't clobber existing OCR state.
-      const { error: pageInsertError } = await supabase
-        .from('document_pages')
-        .upsert(
-          { document_id: docId, page_index: numericPageIndex, status: 'pending' },
-          { onConflict: 'document_id,page_index', ignoreDuplicates: true }
-        );
+      // Ensure this page has a row to hang status/OCR data off of.
+      // We upsert and DO NOT ignore duplicates, so if they re-upload page 1,
+      // it resets status to 'pending' and updates quality flags.
+      const { error: pageInsertError } = await supabase.from('document_pages').upsert(
+        {
+          document_id: docId,
+          page_index: numericPageIndex,
+          status: 'pending',
+          quality_flags: qualityFlags,
+        },
+        { onConflict: 'document_id,page_index' }
+      );
 
       if (pageInsertError) {
         console.error('Failed to create document_pages record:', pageInsertError);
@@ -114,13 +296,13 @@ export default {
       }
 
       res.status(201).json({
-        uploadUrl,
         documentId: docId,
         pageIndex: numericPageIndex,
         storageKey,
+        qualityFlags,
       });
     } catch (err: any) {
-      console.error('Error generating upload URL:', err);
+      console.error('Error in uploadPage:', err);
       res.status(500).json({ error: err.message || 'Internal server error.' });
     }
   },
@@ -244,97 +426,18 @@ export default {
         return;
       }
 
-      const results: ProcessedPageResult[] = [];
+      const MAX_CHUNK_SIZE = 5;
+      const chunks = chunk(MAX_CHUNK_SIZE)(selections);
+      const resultsMatrix: ProcessedPageResult[][] = await chunks.reduce<
+        Promise<ProcessedPageResult[][]>
+      >(async (acc, chnk) => {
+        const accResolved = await acc;
+        const chunkRes = await Promise.all(chnk.map((selctin) => processPage(selctin, ownerId)));
+        accResolved.push(chunkRes.flat());
+        return acc;
+      }, Promise.resolve([]));
 
-      for (const selection of selections) {
-        const { documentId, pageIndices, force } = selection;
-
-        const document = await getOwnedDocument(documentId, ownerId);
-        if (!document) {
-          for (const pageIndex of pageIndices) {
-            results.push({
-              documentId,
-              pageIndex,
-              status: 'error',
-              errorMessage: 'Document not found or access denied.',
-            });
-          }
-          continue;
-        }
-
-        const { data: pageRows, error: pagesError } = await supabase
-          .from('document_pages')
-          .select('*')
-          .eq('document_id', documentId)
-          .in('page_index', pageIndices);
-
-        if (pagesError) {
-          console.error('Failed to fetch document_pages for processing:', pagesError);
-          for (const pageIndex of pageIndices) {
-            results.push({
-              documentId,
-              pageIndex,
-              status: 'error',
-              errorMessage: pagesError.message,
-            });
-          }
-          continue;
-        }
-
-        const pageByIndex = new Map((pageRows || []).map((p) => [p.page_index, p]));
-
-        for (const pageIndex of pageIndices) {
-          const pageRow = pageByIndex.get(pageIndex);
-
-          // Skip pages already validated, unless the caller forces a redo.
-          if (pageRow && pageRow.status === 'done' && !force) {
-            results.push({
-              documentId,
-              pageIndex,
-              status: 'done',
-              rawResult: pageRow.raw_ocr_result,
-              skipped: true,
-            });
-            continue;
-          }
-
-          await supabase
-            .from('document_pages')
-            .update({ status: 'processing' })
-            .eq('document_id', documentId)
-            .eq('page_index', pageIndex);
-
-          try {
-            const key = `${document.storage_path}/page-${pageIndex}.png`;
-            const buffer = await getObjectBuffer(key);
-            const rawResult = await parseTableWithRetries(buffer);
-
-            // Persist immediately — this is the fix for "crash mid-validation
-            // means re-OCR everything." Status goes back to 'pending' (not
-            // 'done') because raw OCR output still needs user validation
-            // before it's trustworthy.
-            await supabase
-              .from('document_pages')
-              .update({ status: 'done', raw_ocr_result: rawResult, error_message: null })
-              .eq('document_id', documentId)
-              .eq('page_index', pageIndex);
-
-            results.push({ documentId, pageIndex, status: 'done', rawResult });
-          } catch (ocrError: any) {
-            const errorMessage =
-              ocrError?.message || 'OCR processing failed. Check credentials and document format.';
-            console.error(`OCR failed for ${documentId} page ${pageIndex}:`, ocrError);
-
-            await supabase
-              .from('document_pages')
-              .update({ status: 'error', error_message: errorMessage })
-              .eq('document_id', documentId)
-              .eq('page_index', pageIndex);
-
-            results.push({ documentId, pageIndex, status: 'error', errorMessage });
-          }
-        }
-      }
+      const results: ProcessedPageResult[] = resultsMatrix.flatMap((_) => _);
 
       res.json({ success: true, results });
     } catch (err: any) {
@@ -345,14 +448,17 @@ export default {
 
   /**
    * PATCH /api/documents/:id/pages/:pageIndex/data
-   * Persists flattened/validated ExtractedData for ONE page and marks it done.
-   * Called after initial OCR flattening and on every subsequent user edit to
-   * that page.
+   * Persists extracted data and/or history entries for ONE page and marks it done.
    */
   saveExtractedData: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { id, pageIndex } = req.params as { id: string; pageIndex: string };
-      const { extractedData } = req.body as { extractedData?: ExtractedPage };
+      const { extractedData, historyEntries, history } = req.body as {
+        extractedData?: ExtractedPage;
+        historyEntries?: HistoryEntry[];
+        history?: HistoryEntry[];
+      };
+      const entriesToSave = historyEntries ?? history;
       const ownerId = req.userId;
 
       if (!ownerId) {
@@ -360,8 +466,18 @@ export default {
         return;
       }
 
-      if (!extractedData || typeof extractedData !== 'object' || Array.isArray(extractedData)) {
+      if (!extractedData && entriesToSave === undefined) {
+        res.status(400).json({ error: 'extractedData or historyEntries must be provided.' });
+        return;
+      }
+
+      if (extractedData && (typeof extractedData !== 'object' || Array.isArray(extractedData))) {
         res.status(400).json({ error: 'extractedData must be a single ExtractedData object.' });
+        return;
+      }
+
+      if (entriesToSave !== undefined && !Array.isArray(entriesToSave)) {
+        res.status(400).json({ error: 'historyEntries must be an array.' });
         return;
       }
 
@@ -371,9 +487,19 @@ export default {
         return;
       }
 
+      const updateData: Record<string, any> = {};
+      if (extractedData) {
+        updateData.extracted_data = extractedData;
+        updateData.status = 'done';
+        updateData.error_message = null;
+      }
+      if (entriesToSave !== undefined) {
+        updateData.history_entries = entriesToSave;
+      }
+
       const { data: updatedPage, error: updateError } = await supabase
         .from('document_pages')
-        .update({ extracted_data: extractedData, status: 'done', error_message: null })
+        .update(updateData)
         .eq('document_id', id)
         .eq('page_index', Number(pageIndex))
         .select()
@@ -393,7 +519,60 @@ export default {
       res.status(500).json({ error: err.message || 'Internal server error.' });
     }
   },
+  /**
+   * PATCH /api/documents/:id/pages/:pageIndex/review
+   * Persists which issues were flagged and resolved on a page.
+   */
+  saveReviewState: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { id, pageIndex } = req.params as { id: string; pageIndex: string };
+      const { reviewState } = req.body as { reviewState?: PageReview | null };
+      const ownerId = req.userId;
 
+      if (!ownerId) {
+        res.status(401).json({ error: 'Unauthorized.' });
+        return;
+      }
+
+      const isValid =
+        reviewState === null ||
+        (typeof reviewState === 'object' &&
+          !Array.isArray(reviewState) &&
+          reviewState.version === 1 &&
+          typeof reviewState.scannedAt === 'string' &&
+          Array.isArray(reviewState.issues));
+
+      if (!isValid) {
+        res.status(400).json({ error: 'reviewState must be a PageReview object or null.' });
+        return;
+      }
+
+      const document = await getOwnedDocument(id, ownerId);
+      if (!document) {
+        res.status(404).json({ error: 'Document not found or access denied.' });
+        return;
+      }
+
+      const { data: updatedPage, error: updateError } = await supabase
+        .from('document_pages')
+        .update({ review_state: reviewState })
+        .eq('document_id', id)
+        .eq('page_index', Number(pageIndex))
+        .select()
+        .single();
+
+      if (updateError || !updatedPage) {
+        console.error('Failed to save review state:', updateError);
+        res.status(500).json({ error: updateError?.message || 'Failed to persist review state.' });
+        return;
+      }
+
+      res.json({ success: true, documentId: id, page: updatedPage });
+    } catch (err: any) {
+      console.error('Error saving review state:', err);
+      res.status(500).json({ error: err.message || 'Internal server error.' });
+    }
+  },
   /**
    * DELETE /api/documents/:id/pages/:pageIndex
    * Removes the page image from R2 and deletes its document_pages row
@@ -433,7 +612,30 @@ export default {
         console.error('Failed to delete document_pages row:', deleteError);
       }
 
-      res.json({ success: true, documentId: id, pageIndex: Number(pageIndex) });
+      // Clean up orphaned document if no pages remain
+      const { count: remainingPages } = await supabase
+        .from('document_pages')
+        .select('*', { count: 'exact', head: true })
+        .eq('document_id', id);
+
+      let documentDeleted = false;
+      if (remainingPages === 0) {
+        try {
+          await deletePrefix(`${document.storage_path}/`);
+          await deleteObject(document.storage_path);
+        } catch (r2Err) {
+          console.error('Failed to delete objects from R2:', r2Err);
+        }
+
+        const { error: deleteDocError } = await supabase.from('documents').delete().eq('id', id);
+        if (deleteDocError) {
+          console.error('Failed to delete now-empty document row:', deleteDocError);
+        } else {
+          documentDeleted = true;
+        }
+      }
+
+      res.json({ success: true, documentId: id, pageIndex: Number(pageIndex), documentDeleted });
     } catch (err: any) {
       console.error('Error deleting page:', err);
       res.status(500).json({ error: err.message || 'Internal server error.' });

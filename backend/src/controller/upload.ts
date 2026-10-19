@@ -1,15 +1,32 @@
 import { Request, Response } from 'express';
-import { parseTableWithRetries } from '../services/ocr/ocr';
+import { parseDocumentWithRetries } from '../services/ocr/ocr';
 import { DocumentJob } from '../models/Job';
+import {
+  hasValidFileSignature,
+  INVALID_FILE_CONTENTS_ERROR,
+  INVALID_UPLOAD_PATH_ERROR,
+  isSafeDocumentId,
+  isSafePageIndex,
+} from '../services/security/fileValidation';
+import {
+  ProcessedPagesByDocument,
+  ProcessedPageUpdate,
+  retainProcessedPages,
+  type SessionDocuments,
+} from '../services/upload/processedPageSession';
+import type { StructuredPage } from '../models/Document';
 import 'express-session';
 import 'multer';
 import fs from 'fs';
 import path from 'path';
+import { processImage, QualityFlags } from '../services/imageProcessor';
 
 declare module 'express-session' {
   interface SessionData {
     extraction?: {
-      ocrData: any[];
+      // Pages from every completed job, in upload order. pageIndex is renumbered
+      // 0..n-1 across the whole batch so it lines up with processedImages.
+      ocrData: StructuredPage[];
       processedImages?: string[];
       createdAt: number;
       updatedAt: number;
@@ -17,31 +34,81 @@ declare module 'express-session' {
     documents?: {
       [documentId: string]: {
         label?: string;
-        pages: { [pageIndex: string]: string };
+        pages: {
+          [pageIndex: string]: {
+            relativePath: string;
+            qualityFlags: QualityFlags;
+          };
+        };
       };
     };
     jobs?: DocumentJob[];
     batchId?: string;
     activeJobIndex?: number;
+    processedPages?: ProcessedPagesByDocument;
   }
 }
 
-function calculateAverageConfidence(ocrData: any[]): number {
-  const componentsWithConfidence = ocrData.filter((comp) => typeof comp.confidence === 'number');
-  if (componentsWithConfidence.length === 0) return 0;
-  const total = componentsWithConfidence.reduce((sum, comp) => sum + comp.confidence, 0);
-  return total / componentsWithConfidence.length;
+function saveRetainedExtraction(req: Request, updates: ProcessedPageUpdate[] = []) {
+  const retained = retainProcessedPages({
+    documents: (req.session.documents || {}) as unknown as SessionDocuments,
+    processedPages: req.session.processedPages,
+    updates,
+    createdAt: req.session.extraction?.createdAt,
+  });
+  const ocrData = retained.ocrData.map((page, i) => ({ ...page, pageIndex: i }));
+  req.session.processedPages = retained.processedPages;
+  req.session.jobs = retained.jobs;
+  req.session.extraction = {
+    ocrData,
+    processedImages: retained.processedImages,
+    createdAt: retained.createdAt,
+    updatedAt: retained.updatedAt,
+  };
+  return { ...retained, ocrData };
+}
+
+function calculateAverageConfidence(pages: StructuredPage[]): number {
+  const blocks = pages.flatMap((p) => p.blocks).filter((b) => typeof b.confidence === 'number');
+  if (blocks.length === 0) return 0;
+  return blocks.reduce((sum, b) => sum + b.confidence, 0) / blocks.length;
 }
 
 export default {
   // Upload a single page
-  uploadPage: (req: Request, res: Response) => {
+  uploadPage: async (req: Request, res: Response) => {
     const file = req.file;
     const documentId = req.query.documentId as string;
     const pageIndex = req.query.pageIndex as string;
 
     if (!file || !documentId || !pageIndex) {
       res.status(400).json({ error: 'Missing file, documentId, or pageIndex.' });
+      return;
+    }
+
+    if (!isSafeDocumentId(documentId) || !isSafePageIndex(pageIndex)) {
+      res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+      return;
+    }
+
+    // Multer already wrote the file. Check the real bytes before we keep it.
+    let contents: Buffer;
+    try {
+      contents = fs.readFileSync(file.path);
+    } catch {
+      res.status(400).json({ error: INVALID_FILE_CONTENTS_ERROR });
+      return;
+    }
+
+    if (!hasValidFileSignature(contents, file.mimetype)) {
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      } catch {
+        // Best-effort cleanup; still reject the upload.
+      }
+      res.status(400).json({ error: INVALID_FILE_CONTENTS_ERROR });
       return;
     }
 
@@ -55,24 +122,43 @@ export default {
     // Save the file's relative path so we can retrieve it later
     const sessionId = req.session.id;
     const relativePath = path.join(sessionId, documentId, file.filename);
-    req.session.documents[documentId].pages[pageIndex] = relativePath;
 
-    // Save document label if sent (only needed once per document)
-    if (req.body.label && !req.session.documents[documentId].label) {
-      req.session.documents[documentId].label = req.body.label;
+    try {
+      // Process the image on disk using OpenCV
+      const { buffer, qualityFlags } = await processImage(fs.readFileSync(file.path));
+      fs.writeFileSync(file.path, buffer);
+
+      req.session.documents[documentId].pages[pageIndex] = {
+        relativePath,
+        qualityFlags,
+      };
+
+      // Save document label if sent (only needed once per document)
+      if (req.body.label && !req.session.documents[documentId].label) {
+        req.session.documents[documentId].label = req.body.label;
+      }
+
+      res.json({ success: true, path: relativePath, qualityFlags });
+    } catch (error) {
+      console.error('Failed to process image:', error);
+      res.status(500).json({ error: 'Failed to process image' });
     }
-
-    res.json({ success: true, path: relativePath });
   },
 
   // Delete a specific page
   deletePage: (req: Request, res: Response) => {
     const documentId = req.params.documentId as string;
     const pageIndex = req.params.pageIndex as string;
+
+    if (!isSafeDocumentId(documentId) || !isSafePageIndex(pageIndex)) {
+      res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+      return;
+    }
+
     const doc = req.session.documents?.[documentId];
 
     if (doc && doc.pages[pageIndex]) {
-      const relativePath = doc.pages[pageIndex];
+      const relativePath = doc.pages[pageIndex].relativePath;
       const absolutePath = path.join(process.cwd(), 'uploads', relativePath);
 
       if (fs.existsSync(absolutePath)) {
@@ -97,12 +183,18 @@ export default {
         delete req.session.documents![documentId];
       }
     }
+    if (req.session.processedPages) saveRetainedExtraction(req);
     res.json({ success: true });
   },
 
   // Delete an entire document
   deleteDocument: (req: Request, res: Response) => {
     const documentId = req.params.documentId as string;
+
+    if (!isSafeDocumentId(documentId)) {
+      res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+      return;
+    }
 
     if (req.session.documents?.[documentId]) {
       const sessionId = req.session.id;
@@ -118,13 +210,13 @@ export default {
 
       delete req.session.documents[documentId];
     }
+    if (req.session.processedPages) saveRetainedExtraction(req);
     res.json({ success: true });
   },
 
   // Process selected documents/pages with OCR, tracked as a batch of per-document jobs
   processDocuments: async (req: Request, res: Response) => {
-    const selected: { documentId: string; pages: string[] }[] =
-      req.body.selected || [];
+    const selected: { documentId: string; pages: string[] }[] = req.body.selected || [];
 
     if (!selected || selected.length === 0) {
       res.status(400).json({ error: 'No documents selected for processing.' });
@@ -143,14 +235,16 @@ export default {
 
     for (const selection of selected) {
       const { documentId, pages } = selection;
+      if (!isSafeDocumentId(documentId)) continue;
       const doc = sessionDocs[documentId];
       if (!doc) continue;
 
       const files: { pageIndex: string; path: string }[] = [];
       for (const pageIndex of pages) {
-        const relativePath = doc.pages[pageIndex];
-        if (relativePath) {
-          const absolutePath = path.join(process.cwd(), 'uploads', relativePath);
+        if (!isSafePageIndex(pageIndex)) continue;
+        const pageObj = doc.pages[pageIndex];
+        if (pageObj && pageObj.relativePath) {
+          const absolutePath = path.join(process.cwd(), 'uploads', pageObj.relativePath);
           if (fs.existsSync(absolutePath)) {
             files.push({ pageIndex, path: absolutePath });
           }
@@ -181,7 +275,7 @@ export default {
       res.setHeader('Transfer-Encoding', 'chunked');
 
       // Process each *document* (which may span multiple pages) as one job in the batch
-      const jobs: DocumentJob[] = await Promise.all(
+      const outcomes = await Promise.all(
         documentsToProcess.map(async (docEntry, index) => {
           const { documentId, label, files } = docEntry;
           const fileName = label || documentId;
@@ -201,38 +295,46 @@ export default {
           console.log(`Processing batch job ${index + 1}/${totalDocuments}: ${fileName}`);
 
           try {
-            // Run OCR on every page belonging to this document, in parallel,
-            // then combine the results into a single set of components.
+            // Run OCR on every page belonging to this document, in parallel.
+            // pageOffset is the page's real index so blocks/regions stay correct
+            // even when only a subset of the document's pages was selected.
             const pageResults = await Promise.all(
               files.map(async (file) => {
+                const pageOffset = Number(file.pageIndex);
                 const buffer = fs.readFileSync(file.path);
-                const text = await parseTableWithRetries(buffer, (attempt, max) => {
-                  res.write(
-                    JSON.stringify({
-                      type: 'retry',
-                      jobId,
-                      fileName,
-                      pageIndex: file.pageIndex,
-                      attempt,
-                      maxRetries: max,
-                    }) + '\n'
-                  );
-                });
-                return text;
+                const result = await parseDocumentWithRetries(
+                  buffer,
+                  { pageOffset },
+                  (attempt, maxRetries) => {
+                    res.write(
+                      JSON.stringify({ type: 'retry', jobId, fileName, attempt, maxRetries }) + '\n'
+                    );
+                  }
+                );
+                // One image should yield one page; keep a placeholder if the
+                // pipeline returns none so page order stays aligned with images.
+                const ocrData =
+                  result.pages.length > 0
+                    ? result.pages
+                    : [{ pageIndex: pageOffset, blocks: [] }];
+                return { pageIndex: file.pageIndex, ocrData };
               })
             );
 
-            const ocrComponents = pageResults.flat();
+            // Promise.all preserves input order, so pages stay in the same order as
+            // `files` (and therefore as the processed image URLs built below).
+            const ocrComponents: StructuredPage[] = pageResults.flatMap((page) => page.ocrData);
             const confidence = calculateAverageConfidence(ocrComponents);
 
             const job: DocumentJob = {
               id: jobId,
+              documentId,
               index,
               fileName,
               imageIndex: index,
               imageUrl: `/api/upload/image/${documentId}/${files[0].pageIndex}`,
               status: 'completed',
-              ocrData: ocrComponents as any,
+              ocrData: ocrComponents,
               confidence,
               createdAt: Date.now(),
               updatedAt: Date.now(),
@@ -249,7 +351,14 @@ export default {
               }) + '\n'
             );
 
-            return job;
+            return {
+              job,
+              pages: pageResults.map((page) => ({
+                documentId,
+                pageIndex: page.pageIndex,
+                ocrData: page.ocrData,
+              })),
+            };
           } catch (e: any) {
             console.error(
               `OCR failed for batch job ${index + 1}/${totalDocuments} (${fileName})`,
@@ -273,6 +382,7 @@ export default {
 
             const job: DocumentJob = {
               id: jobId,
+              documentId,
               index,
               fileName,
               imageIndex: index,
@@ -285,30 +395,20 @@ export default {
               updatedAt: Date.now(),
             };
 
-            return job;
+            return { job, pages: [] as ProcessedPageUpdate[] };
           }
         })
       );
 
-      // Save jobs array to session
-      req.session.jobs = jobs;
-
-      // Save combined extraction into session for single-doc / backward compatibility
-      const combinedOcrData = jobs.flatMap((job) => job.ocrData);
-
-      // Get every single page from all processed documents
-      const allProcessedImages = documentsToProcess.flatMap((doc) =>
-        doc.files.map((file) => `/api/upload/image/${doc.documentId}/${file.pageIndex}`)
+      const retained = saveRetainedExtraction(
+        req,
+        outcomes.flatMap((outcome) => outcome.pages)
       );
+      const combinedOcrData = retained.ocrData;
 
-      req.session.extraction = {
-        ocrData: combinedOcrData,
-        processedImages: allProcessedImages,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-
-      const debugPath = path.join(process.cwd(), 'combined-ocr-output.json');
+      const debugDir = path.join(process.cwd(), 'tmp');
+      fs.mkdirSync(debugDir, { recursive: true });
+      const debugPath = path.join(debugDir, 'combined-ocr-output.json');
 
       fs.writeFileSync(debugPath, JSON.stringify(combinedOcrData, null, 2), 'utf8');
 
@@ -319,7 +419,7 @@ export default {
             success: true,
             batchId,
             pageCount: totalDocuments,
-            jobs,
+            jobs: outcomes.map((outcome) => outcome.job),
             ocrData: combinedOcrData,
           },
         }) + '\n'
@@ -330,13 +430,13 @@ export default {
       if (!res.headersSent) {
         res.status(500).json({
           error:
-            'OCR batch processing failed. Check that your Google Vision credentials are configured.',
+            'OCR batch processing failed. Check that your Azure and Gemini credentials are configured.',
         });
       } else {
         res.write(
           JSON.stringify({
             type: 'error',
-            message: 'OCR batch processing failed. Check your Google Vision credentials.',
+            message: 'OCR batch processing failed. Check your Azure and Gemini credentials.',
           }) + '\n'
         );
         res.end();
@@ -348,9 +448,10 @@ export default {
   getDocuments: (req: Request, res: Response) => {
     const docs = req.session.documents || {};
     const result = Object.entries(docs).map(([documentId, doc]) => {
-      const pages = Object.keys(doc.pages).map(
-        (pageIndex) => `/api/upload/image/${documentId}/${pageIndex}`
-      );
+      const pages = Object.entries(doc.pages).map(([pageIndex, pageObj]) => ({
+        url: `/api/upload/image/${documentId}/${pageIndex}`,
+        qualityFlags: pageObj.qualityFlags,
+      }));
       return {
         documentId,
         label: doc.label,
@@ -372,14 +473,21 @@ export default {
   getImage: (req: Request, res: Response) => {
     const documentId = req.params.documentId as string;
     const pageIndex = req.params.pageIndex as string;
+
+    if (!isSafeDocumentId(documentId) || !isSafePageIndex(pageIndex)) {
+      res.status(400).json({ error: INVALID_UPLOAD_PATH_ERROR });
+      return;
+    }
+
     const doc = req.session.documents?.[documentId];
 
-    if (!doc || !doc.pages[pageIndex]) {
+    const pageObj = doc?.pages[pageIndex];
+    if (!pageObj || !pageObj.relativePath) {
       res.status(404).json({ error: 'Image not found in session.' });
       return;
     }
 
-    const filePath = path.join(process.cwd(), 'uploads', doc.pages[pageIndex]);
+    const filePath = path.join(process.cwd(), 'uploads', pageObj.relativePath);
     if (!fs.existsSync(filePath)) {
       res.status(404).json({ error: 'Image file not found on disk.' });
       return;
@@ -400,10 +508,13 @@ export default {
       const doc = docs[docId];
       const pageKeys = Object.keys(doc.pages);
       if (pageKeys.length > 0) {
-        const filePath = path.join(process.cwd(), 'uploads', doc.pages[pageKeys[0]]);
-        if (fs.existsSync(filePath)) {
-          res.sendFile(filePath);
-          return;
+        const pageObj = doc.pages[pageKeys[0]];
+        if (pageObj && pageObj.relativePath) {
+          const filePath = path.join(process.cwd(), 'uploads', pageObj.relativePath);
+          if (fs.existsSync(filePath)) {
+            res.sendFile(filePath);
+            return;
+          }
         }
       }
     }

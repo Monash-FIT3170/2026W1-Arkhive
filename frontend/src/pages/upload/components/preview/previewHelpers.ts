@@ -7,7 +7,6 @@
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs";
 import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import type { PreviewItem } from "../../types";
-import { analyzeImageFileQuality, analyzeImageQualityFromCanvas } from "./ImageQuality";
 
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
@@ -75,8 +74,6 @@ export async function buildPreviewItemsForFiles(
           canvas.height = Math.floor(viewport.height);
           await page.render({ canvas, canvasContext: context, viewport }).promise;
           
-          const quality = analyzeImageQualityFromCanvas(canvas);
-
           nextItems.push({
             label: file.name,
             subtitle: `Page ${pageNumber}`,
@@ -84,9 +81,6 @@ export async function buildPreviewItemsForFiles(
             isImage: true,
             hasFile: true,
             fileIndex,
-            isBlurry: quality.isBlurry,
-            isDark: quality.isDark,
-            shouldWarn: quality.shouldWarn,
           });
         } catch (err) {
           console.error(`[preview] PDF page render failed: ${file.name} p.${pageNumber}`, err);
@@ -106,27 +100,12 @@ if (file.type.startsWith("image/")) {
   const objectUrl = URL.createObjectURL(file);
   createdObjectUrls.push(objectUrl);
 
-  let quality = {
-    isBlurry: false,
-    isDark: false,
-    shouldWarn: false,
-  };
-
-  try {
-    quality = await analyzeImageFileQuality(file);
-  } catch (err) {
-    console.error("[preview] Image quality check failed:", file.name, err);
-  }
-
   nextItems.push({
     label: file.name,
     previewSrc: objectUrl,
     isImage: true,
     hasFile: true,
     fileIndex,
-    isBlurry: quality.isBlurry,
-    isDark: quality.isDark,
-    shouldWarn: quality.shouldWarn,
   });
   continue;
 }

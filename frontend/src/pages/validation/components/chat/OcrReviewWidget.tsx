@@ -13,8 +13,9 @@ import {
 
 // Acknowledgement: Google Gemini was used to help generate this file
 
-import { buildSlides } from '../../../../utils/ocrReviewUtils';
+import { buildSlides } from '../../../../utils/review/ocrReviewUtils';
 import type { OcrIssue } from '../../../../models/IssueReview';
+import IssueTypeHeader from './IssueTypeHeader';
 
 interface OcrReviewWidgetProps {
   issues: OcrIssue[];
@@ -28,9 +29,15 @@ interface OcrReviewWidgetProps {
     fields: { fieldId: string; rowId: string | number; ocrValue: string }[],
     formatRegex?: string
   ) => Promise<Record<string, string> | null>;
-  resolvedIds?: Set<string>;
-  onResolveIds?: (ids: string[]) => void;
+  /** True when the LLM format check failed for the current page. */
+  formatCheckFailed?: boolean;
 }
+
+// fieldId (`rowId:column`) is only unique per page, so cache suggestions by
+// page + field + value. Otherwise page 2 reuses page 1's suggestion, and a
+// re-scan could serve a suggestion for a value that has since changed.
+const suggestionKey = (issue: OcrIssue) =>
+  `${issue.pageIndex ?? ''}:${issue.fieldId}:${issue.ocrValue}`;
 
 export default function OcrReviewWidget({
   issues,
@@ -40,8 +47,7 @@ export default function OcrReviewWidget({
   onSlideChange,
   onFetchSuggestion,
   onFetchBulkSuggestion,
-  resolvedIds,
-  onResolveIds,
+  formatCheckFailed,
 }: OcrReviewWidgetProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [manualValue, setManualValue] = useState('');
@@ -50,11 +56,9 @@ export default function OcrReviewWidget({
   const [suggestions, setSuggestions] = useState<Record<string, string | null>>({});
   const [fetchingId, setFetchingId] = useState<string | null>(null);
 
-  // Filter out issues that have already been resolved
-  const unresolvedIssues = useMemo(
-    () => issues.filter((issue) => !resolvedIds?.has(issue.fieldId)),
-    [issues, resolvedIds]
-  );
+  // The parent only ever passes open issues; resolved ones are tracked and
+  // persisted by useReviewQueue.
+  const unresolvedIssues = issues;
 
   // Make review slide per ocr issue
   const slides = useMemo(() => buildSlides(unresolvedIssues), [unresolvedIssues]);
@@ -74,11 +78,11 @@ export default function OcrReviewWidget({
           : currentSlide.issues[0]?.pageIndex;
       onSlideChange(fieldIds, pageIndex);
     }
-  }, [currentIndex, currentSlide]);
+  }, [currentIndex, currentSlide, onSlideChange, slides.length]);
 
   // Whenever the slide list shrinks (or changes) for any reason — resolving an
   // issue, the parent updating `issues`, — make sure currentIndex still
-  // points at a real slide instead of relying on markResolved's one-off math.
+  // points at a real slide instead of relying on one-off index math at each call site.
   useEffect(() => {
     if (slides.length === 0) return;
     if (currentIndex > slides.length - 1) {
@@ -89,29 +93,30 @@ export default function OcrReviewWidget({
 
   // OCR ISSUE - SINGLE FIELD - ISSUE/SUGGESTION
   const currentSingle = currentSlide?.kind === 'single' ? currentSlide.issue : undefined; // If issue is single -> current issues
-  const currentSuggestion = currentSingle ? suggestions[currentSingle.fieldId] : undefined; // If issue is signle -> current suggestion
-  const isFetchingCurrent = currentSingle ? fetchingId === currentSingle.fieldId : false; // If issue is signel -> is suggestion being fetched?
+  const currentSuggestion = currentSingle ? suggestions[suggestionKey(currentSingle)] : undefined; // If issue is signle -> current suggestion
+  const isFetchingCurrent = currentSingle ? fetchingId === suggestionKey(currentSingle) : false; // If issue is signel -> is suggestion being fetched?
 
   // Trigger a fetch for the current issue
   const handleRequestSuggestion = () => {
     if (!currentSingle || !onFetchSuggestion) return;
-    const fieldId = currentSingle.fieldId;
-    if (suggestions[fieldId] !== undefined || fetchingId === fieldId) return;
+    const { fieldId } = currentSingle;
+    const key = suggestionKey(currentSingle);
+    if (suggestions[key] !== undefined || fetchingId === key) return;
 
-    setFetchingId(fieldId);
+    setFetchingId(key);
     onFetchSuggestion(fieldId)
       .then((val) => {
-        setSuggestions((s) => ({ ...s, [fieldId]: val }));
-        setFetchingId((current) => (current === fieldId ? null : current));
+        setSuggestions((s) => ({ ...s, [key]: val }));
+        setFetchingId((current) => (current === key ? null : current));
       })
-      .catch(() => setFetchingId((current) => (current === fieldId ? null : current)));
+      .catch(() => setFetchingId((current) => (current === key ? null : current)));
   };
 
   // BULK OCR ISSUE - CURRENT GROUP - SUGGESTION
   const currentGroup = currentSlide?.kind === 'group' ? currentSlide : undefined; // If group --> current slide
   const isFetchingGroup = currentGroup ? fetchingId === currentGroup.groupId : false; // if group --> is fetching suggestion?
   const groupSuggestionsFetched =
-    !!currentGroup && currentGroup.issues.every((i) => suggestions[i.fieldId] !== undefined); // Boolean on whether it has been fetched (only if every issue in group has been fetched)
+    !!currentGroup && currentGroup.issues.every((i) => suggestions[suggestionKey(i)] !== undefined); // Boolean on whether it has been fetched (only if every issue in group has been fetched)
 
   const handleRequestBulkSuggestion = () => {
     if (!currentGroup || !onFetchBulkSuggestion) return;
@@ -137,7 +142,7 @@ export default function OcrReviewWidget({
           groupIssues.forEach((i) => {
             // Per-row fallback: if this specific row wasn't in the map, mark it
             // null so the UI falls back to the original OCR value for just that row.
-            next[i.fieldId] = map[String(i.rowId)] ?? null;
+            next[suggestionKey(i)] = map[String(i.rowId)] ?? null;
           });
           return next;
         });
@@ -164,11 +169,6 @@ export default function OcrReviewWidget({
     setManualValue('');
   };
 
-  const markResolved = (fieldIds: string[]) => {
-    onResolveIds?.(fieldIds);
-    resetEditState();
-  };
-
   // Handlers matching requirements
   const handleAcceptClick = () => {
     if (!currentSlide) return;
@@ -178,17 +178,18 @@ export default function OcrReviewWidget({
         ? [
             {
               fieldId: currentSlide.issue.fieldId,
-              newValue: suggestions[currentSlide.issue.fieldId] || currentSlide.issue.ocrValue,
+              newValue:
+                suggestions[suggestionKey(currentSlide.issue)] || currentSlide.issue.ocrValue,
             },
           ]
         : currentSlide.issues.map((issue) => ({
             fieldId: issue.fieldId,
-            newValue: suggestions[issue.fieldId] || issue.ocrValue,
+            newValue: suggestions[suggestionKey(issue)] || issue.ocrValue,
           }));
 
     onAccept(updates);
 
-    markResolved(updates.map((update) => update.fieldId));
+    resetEditState();
   };
 
   const handleRejectClick = () => {
@@ -201,18 +202,27 @@ export default function OcrReviewWidget({
 
     onReject(fieldIds);
 
-    markResolved(fieldIds);
+    resetEditState();
   };
 
   const handleManualSubmit = () => {
     if (!currentSingle || !manualValue.trim()) return;
     onManualEdit(currentSingle.fieldId, manualValue.trim());
-    markResolved([currentSingle.fieldId]);
+    resetEditState();
   };
 
   return (
     <div className="flex-1 flex flex-col h-full bg-base-200/30 overflow-hidden font-sans min-w-0">
       <div className="p-4 h-full flex flex-col relative min-w-0">
+        {formatCheckFailed && (
+          <div className="flex items-center gap-2 mb-3 p-2.5 rounded-xl bg-warning/10 border border-warning/30 text-xs text-warning shrink-0">
+            <AlertCircle size={14} className="shrink-0" />
+            <span>
+              Format check failed on this page. Use the &quot;Re-scan Page&quot; button in the top
+              bar to retry.
+            </span>
+          </div>
+        )}
         {unresolvedIssues.length === 0 ? (
           // Success State
           <div className="flex-1 flex flex-col items-center justify-center text-success gap-4 animate-in fade-in zoom-in duration-500">
@@ -240,28 +250,25 @@ export default function OcrReviewWidget({
                 {currentSlide?.kind === 'single'
                   ? currentSlide.issue.fieldName
                   : currentSlide?.fieldName}
-                {currentSlide?.kind === 'group' && (
-                  <span className="ml-2 text-base-content/50 normal-case font-medium">
-                    · {currentSlide.issues.length} cells
-                  </span>
-                )}
               </div>
 
               {currentSlide?.kind === 'single' ? (
                 <div className="w-full relative group space-y-4 text-left min-w-0">
                   {/* SLIDE FOR SINGLE ISSUES */}
+                  {/* Issue type: same layout for confidence and format issues */}
+                  <IssueTypeHeader
+                    type={currentSlide.issue.issueType ?? 'confidence'}
+                    detail={
+                      currentSlide.issue.issueType === 'format'
+                        ? undefined
+                        : `${(currentSlide.issue.confidenceScore * 100).toFixed(0)}%`
+                    }
+                  />
+
                   {/* Detected Value */}
                   <div>
-                    <p className="text-xs text-base-content/60 font-semibold mb-1 uppercase tracking-wider ml-1 flex justify-between items-center">
-                      {currentSlide.issue.issueType === 'format'
-                        ? 'Format Inconsistency'
-                        : 'Detected Data'}
-                      {currentSlide.issue.issueType !== 'format' && (
-                        <span className="text-[10px] font-medium text-warning flex items-center gap-1 bg-warning/10 px-2 py-0.5 rounded-full">
-                          <AlertCircle size={12} />
-                          {(currentSlide.issue.confidenceScore * 100).toFixed(0)}%
-                        </span>
-                      )}
+                    <p className="text-xs text-base-content/60 font-semibold mb-1 uppercase tracking-wider ml-1">
+                      Detected value
                     </p>
                     <div className="bg-base-100 relative p-4 rounded-xl w-full border border-base-300 shadow-sm">
                       <p className="text-lg font-medium break-all text-base-content line-through opacity-60">
@@ -308,9 +315,7 @@ export default function OcrReviewWidget({
               ) : currentSlide?.kind === 'group' ? (
                 <div className="w-full text-left space-y-3 min-w-0">
                   {/* SLIDE FOR GROUP ISSUES */}
-                  <p className="text-xs text-base-content/60 font-semibold uppercase tracking-wider ml-1">
-                    Format Inconsistency · {currentSlide.issues.length} cells flagged in this column
-                  </p>
+                  <IssueTypeHeader type="format" detail={`${currentSlide.issues.length} cells`} />
 
                   {/* AI Suggestion */}
                   {!groupSuggestionsFetched && !isFetchingGroup ? (
@@ -340,7 +345,7 @@ export default function OcrReviewWidget({
                             "{item.ocrValue}"
                           </span>
                           <span className="text-sm font-bold text-primary break-all">
-                            "{suggestions[item.fieldId] || item.ocrValue}"
+                            "{suggestions[suggestionKey(item)] || item.ocrValue}"
                           </span>
                         </div>
                       ))}
@@ -439,7 +444,9 @@ export default function OcrReviewWidget({
                         resetEditState();
                       }}
                       className={`h-2 flex-shrink-0 rounded-full transition-all duration-300 p-0 border-0 cursor-pointer ${
-                        idx === currentIndex ? 'w-6 bg-primary' : 'w-2 bg-base-300 hover:bg-base-content/40'
+                        idx === currentIndex
+                          ? 'w-6 bg-primary'
+                          : 'w-2 bg-base-300 hover:bg-base-content/40'
                       }`}
                     />
                   ))

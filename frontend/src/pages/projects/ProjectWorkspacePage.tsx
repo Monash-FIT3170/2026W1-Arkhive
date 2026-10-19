@@ -1,49 +1,67 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, FileText, Trash2, Columns2 } from 'lucide-react';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { ArrowLeft, Trash2, Columns2, FileText as FilesTabIcon } from 'lucide-react';
 import { getProject } from '../../services/projectService';
 import {
   uploadPageToR2,
   getDownloadUrl,
-  processPages,
   saveExtractedData,
   deletePage,
   deleteDocument,
+  saveReviewState,
 } from '../../services/documentService';
 import { buildPreviewItemsForFiles } from '../upload/components/preview/previewHelpers';
 import EmptyUploadView from '../upload/components/EmptyUploadView';
 import UploadMoreButton from '../upload/components/actions/UploadMoreButton';
+import ScanQrButton from '../upload/components/actions/ScanQrButton';
+import { getUploadedDocuments, deleteDocumentFromBackend } from '../../services/uploadService';
+import PreviewCard from '../upload/components/preview/PreviewCard';
+import PageToolbar, { type ToolbarAction } from '../upload/components/preview/PageToolbar';
+import PageGroupSection from '../upload/components/preview/PageGroupSection';
 import ValidationWorkspace from '../validation/components/ValidationWorkspace';
-import { flatten } from '../../utils/flattener';
-import type {
-  ProjectDetail,
-  DocumentRecord,
-  PageStatus,
-  PageSelection,
-} from '../../models/Project';
+import Toast from '../validation/components/modals/Toast';
+import { pageToExtractedPage } from '../../utils/flattener';
+import {
+  filterValidFiles,
+  partitionBySize,
+  MAX_FILE_SIZE_MB,
+} from '../upload/components/dropzone/dropZoneUtils';
+import type { ProjectDetail, DocumentRecord, PageStatus } from '../../models/Project';
 import type { ExtractedPage } from '../../models/TableData';
-import type { OCRComponent } from '../../models/OCRComponent';
+import type { Block, StructuredPage } from '../../models/Document';
+import { makePageKey, parsePageKey } from '../../utils/keys';
+import type { PageReview } from '../../models/IssueReview';
+import type { HistoryEntry } from '../../models/HistoryEntry';
+import OcrProgressPopup from '../../components/ocr-progress/OcrProgressPopup';
+import { useOcrProgress } from '../../context/OcrProgressContext';
 
-// The OCR backend stores one page's result per document_pages row, but the
-// real Azure/Gemini pipeline wraps it as `Pages` — [{ page_num, components }]
-// — while the OCR_MODE=mock fixture returns a flat OCRComponent[] instead.
-// Unwrap defensively so either shape renders correctly.
-function extractComponents(raw: unknown): OCRComponent[] {
-  if (!Array.isArray(raw) || raw.length === 0) return [];
-  const first = raw[0] as any;
-  if (first && typeof first === 'object' && Array.isArray(first.components)) {
-    return first.components as OCRComponent[];
-  }
-  return raw as OCRComponent[];
+function isBlock(x: unknown): x is Block {
+  const kind = (x as { kind?: unknown } | null)?.kind;
+  return kind === 'table' || kind === 'field' || kind === 'text';
 }
 
-// Project workspace: upload pages into the project, batch-process them with
-// OCR, then validate/edit the extracted table per page. The validate mode
-// renders <ValidationWorkspace>, the same component ValidationPage uses —
-// this page's job is just knowing where the data comes from (documents/pages
-// on the project) and where edits get saved (saveExtractedData, per page).
-// Pages are flattened across all of the project's documents for validation
-// (one continuous carousel).
+function extractStructuredPage(raw: unknown, pageIndex: number): StructuredPage {
+  const empty: StructuredPage = { pageIndex, blocks: [] };
+  if (!raw || typeof raw !== 'object') return empty;
+
+  if (Array.isArray(raw)) {
+    if (raw.every(isBlock)) return { pageIndex, blocks: raw };
+    console.warn('raw_ocr_result is in a legacy shape; reprocess this page to view it.');
+    return empty;
+  }
+
+  const obj = raw as { blocks?: unknown; pages?: unknown };
+
+  if (Array.isArray(obj.blocks)) return { pageIndex, blocks: obj.blocks.filter(isBlock) };
+
+  if (Array.isArray(obj.pages)) {
+    const pages = obj.pages as StructuredPage[];
+    const match = pages.find((p) => p?.pageIndex === pageIndex) ?? pages[0];
+    return { pageIndex, blocks: Array.isArray(match?.blocks) ? match.blocks.filter(isBlock) : [] };
+  }
+
+  return empty;
+}
 
 function statusBadgeClass(status: PageStatus): string {
   switch (status) {
@@ -58,13 +76,11 @@ function statusBadgeClass(status: PageStatus): string {
   }
 }
 
-function pageKey(documentId: string, pageIndex: number): string {
-  return `${documentId}:${pageIndex}`;
-}
-
 export default function ProjectWorkspacePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { enqueue: enqueueOcr } = useOcrProgress();
+  const location = useLocation();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -73,30 +89,51 @@ export default function ProjectWorkspacePage() {
 
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingKeys, setProcessingKeys] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
   const [showReprocessConfirm, setShowReprocessConfirm] = useState(false);
+  const [showWarningConfirm, setShowWarningConfirm] = useState(false);
 
-  // Delete confirmation covers both a single hover-triggered card delete and
-  // the toolbar's bulk "Delete Selected" action, sharing one modal/handler.
   const [deleteTarget, setDeleteTarget] = useState<
     { type: 'single'; documentId: string; pageIndex: number } | { type: 'bulk' } | null
   >(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [mode, setMode] = useState<'files' | 'validate'>('files');
+  const navState = location.state as { mode?: string } | null;
+  const initialMode = navState?.mode === 'validate' ? 'validate' : 'files';
+  const [mode, setMode] = useState<'files' | 'validate'>(initialMode);
 
   const [imageUrlMap, setImageUrlMap] = useState<Record<string, string>>({});
   const createdUrlsRef = useRef<string[]>([]);
 
-  // Keeps track of which (documentId, pageIndex) each index in the flat
-  // pages array passed to <ValidationWorkspace> corresponds to, so
-  // persistPages can save each edited page back to the right place.
-  const validationListRef = useRef<typeof validationList>([]);
-  const [hasEnteredValidate, setHasEnteredValidate] = useState(false);
+  const validationListRef = useRef<{ documentId: string; pageIndex: number; filename: string }[]>(
+    []
+  );
+  const [hasEnteredValidate, setHasEnteredValidate] = useState<boolean>(initialMode === 'validate');
+  const [dataVersion, setDataVersion] = useState(0);
 
-  // ── Load project ───────────────────────────────────────────────────────
+  // Force the mode to update if the user clicks the popup while already on this page
+  useEffect(() => {
+    const currentState = location.state as { mode?: string } | null;
+    if (currentState?.mode === 'validate') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMode('validate');
+      setHasEnteredValidate(true);
+    }
+  }, [location]);
+
+  // Fallback to files mode if trapped in validate mode with nothing to validate
+  useEffect(() => {
+    if (mode === 'validate' && documents.length > 0) {
+      const hasProcessedPages = documents.some((doc) =>
+        (doc.pages || []).some((page) => page.raw_ocr_result || page.extracted_data)
+      );
+      if (!hasProcessedPages) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setMode('files');
+      }
+    }
+  }, [mode, documents]);
+
   useEffect(() => {
     if (!id) return;
     let isMounted = true;
@@ -107,10 +144,6 @@ export default function ProjectWorkspacePage() {
         if (!isMounted) return;
         setProject(data);
         setDocuments(data.documents || []);
-        // Seed hasEnteredValidate from already-processed pages (e.g. reopening
-        // a project from a previous session) — otherwise it only ever flips on
-        // after a successful in-session "Process" call, leaving the Validate
-        // tab blank for documents that were already processed earlier.
         const hasProcessedPages = (data.documents || []).some((doc) =>
           (doc.pages || []).some((page) => page.raw_ocr_result || page.extracted_data)
         );
@@ -127,7 +160,6 @@ export default function ProjectWorkspacePage() {
     };
   }, [id]);
 
-  // Clean up any object URLs created for local previews when leaving.
   useEffect(() => {
     const urls = createdUrlsRef.current;
     return () => {
@@ -135,7 +167,6 @@ export default function ProjectWorkspacePage() {
     };
   }, []);
 
-  // Every page across every document, sorted for stable rendering.
   const allPages = useMemo(() => {
     const list: {
       document: DocumentRecord;
@@ -159,7 +190,6 @@ export default function ProjectWorkspacePage() {
     return list;
   }, [documents]);
 
-  // Pages ready for validation, flattened across all documents.
   const validationList = useMemo(() => {
     const list: { documentId: string; pageIndex: number; filename: string }[] = [];
     documents.forEach((doc) => {
@@ -192,18 +222,13 @@ export default function ProjectWorkspacePage() {
     validationListRef.current = validationList;
   }, [validationList]);
 
-  // A cheap signature of *which* pages are validate-able (not their content),
-  // so the flat extractedPages array only gets rebuilt from `documents` when
-  // pages are added/removed — not on every edit (edits flow the other way,
-  // through persistPages, so they aren't clobbered by this effect).
-  const validationKeysSignature = validationList
-    .map((entry) => pageKey(entry.documentId, entry.pageIndex))
-    .join('|');
+  const validationKeysSignature =
+    validationList.map((entry) => makePageKey(entry.documentId, entry.pageIndex)).join('|') +
+    `#${dataVersion}`;
 
-  // Lazily resolve a viewable image URL for every known page.
   useEffect(() => {
     allPages.forEach(({ document, pageIndex }) => {
-      const key = pageKey(document.id, pageIndex);
+      const key = makePageKey(document.id, pageIndex);
       if (imageUrlMap[key]) return;
       getDownloadUrl(document.id, pageIndex)
         .then((url) => setImageUrlMap((prev) => (prev[key] ? prev : { ...prev, [key]: url })))
@@ -212,26 +237,26 @@ export default function ProjectWorkspacePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPages]);
 
-  function findPage(documentId: string, pageIndex: number) {
-    const doc = documents.find((d) => d.id === documentId);
-    return doc?.pages?.find((p) => p.page_index === pageIndex);
-  }
+  const { validationPages, validationBlocks } = useMemo(() => {
+    const validationPages: ExtractedPage[] = [];
+    const validationBlocks: Block[][] = [];
+    if (!hasEnteredValidate) return { validationPages, validationBlocks };
 
-  function getExtractedData(documentId: string, pageIndex: number): ExtractedPage | null {
-    const page = findPage(documentId, pageIndex);
-    if (!page) return null;
-    if (page.extracted_data) return page.extracted_data;
-    if (page.raw_ocr_result)
-      return { ...flatten(extractComponents(page.raw_ocr_result)), pageIndex };
-    return null;
-  }
+    validationList.forEach((entry) => {
+      const page = documents
+        .find((d) => d.id === entry.documentId)
+        ?.pages?.find((p) => p.page_index === entry.pageIndex);
+      const structured = extractStructuredPage(page?.raw_ocr_result, entry.pageIndex);
+      validationBlocks.push(structured.blocks);
+      validationPages.push(
+        page?.extracted_data
+          ? { ...page.extracted_data, pageIndex: entry.pageIndex }
+          : pageToExtractedPage(structured)
+      );
+    });
+    return { validationPages, validationBlocks };
+  }, [documents, validationList, hasEnteredValidate]);
 
-  // Persist a full pages array back to each page's document/pageIndex pair
-  // (the project workspace saves per-page, unlike ValidationPage's single
-  // saveExtractionSession call), and mirror the change into `documents` so
-  // the Files view and future validate-mode entries stay in sync. This is
-  // the one bit of domain knowledge <ValidationWorkspace> doesn't have —
-  // everything else about editing/review lives there.
   const persistPages = useCallback((pages: ExtractedPage[]) => {
     const entries = validationListRef.current;
 
@@ -261,13 +286,62 @@ export default function ProjectWorkspacePage() {
     });
   }, []);
 
-  // ── Upload ─────────────────────────────────────────────────────────────
-  async function handleFilesCaptured(files: File[]) {
-    if (!project) return;
+  async function handleQrUploaded(docId?: string) {
     setIsUploading(true);
+    setMode('files');
     setActionError(null);
     try {
-      const items = await buildPreviewItemsForFiles(files, createdUrlsRef.current, 0);
+      const sessionDocs = await getUploadedDocuments();
+      const targetDocs = docId ? sessionDocs.filter((d) => d.documentId === docId) : sessionDocs;
+
+      if (targetDocs.length === 0) {
+        setIsUploading(false);
+        return;
+      }
+
+      const files: File[] = [];
+      for (const doc of targetDocs) {
+        for (let i = 0; i < doc.pages.length; i++) {
+          const page = doc.pages[i];
+          const pageUrl = typeof page === 'string' ? page : page.url;
+          const blob = await (await fetch(pageUrl)).blob();
+          const filename = doc.label || `qr_capture_${doc.documentId}_${i}.png`;
+          files.push(new File([blob], filename, { type: blob.type }));
+        }
+        await deleteDocumentFromBackend(doc.documentId).catch(console.error);
+      }
+
+      setIsUploading(false);
+      if (files.length > 0) {
+        await handleFilesCaptured(files);
+      }
+    } catch (err) {
+      setActionError('Failed to import photos from phone.');
+      console.error(err);
+      setIsUploading(false);
+    }
+  }
+
+  async function handleFilesCaptured(capturedFiles: File[]) {
+    console.log('Files captured:', capturedFiles);
+    if (!project) return;
+    setIsUploading(true);
+    setMode('files');
+    setActionError(null);
+
+    const validFiles = filterValidFiles(capturedFiles);
+    const { accepted, rejected } = partitionBySize(validFiles);
+
+    if (rejected.length > 0) {
+      setActionError(`One or more files are too large. Maximum size is ${MAX_FILE_SIZE_MB} MB.`);
+      if (accepted.length === 0) {
+        setIsUploading(false);
+        return;
+      }
+    }
+
+    try {
+      const items = await buildPreviewItemsForFiles(accepted, createdUrlsRef.current, 0);
 
       const byFile = new Map<number, typeof items>();
       items.forEach((item) => {
@@ -280,6 +354,8 @@ export default function ProjectWorkspacePage() {
         let documentId: string | undefined;
         const filename = group[0]?.label ?? 'document';
 
+        const pageFlags = new Map<number, any>();
+
         for (let pageIndex = 0; pageIndex < group.length; pageIndex++) {
           const item = group[pageIndex];
           if (!item.hasFile || !item.previewSrc) continue;
@@ -291,10 +367,10 @@ export default function ProjectWorkspacePage() {
             blob,
             pageFilename,
             pageIndex,
-            'image/png',
             documentId
           );
           documentId = result.documentId;
+          pageFlags.set(pageIndex, result.qualityFlags);
         }
 
         if (documentId) {
@@ -308,6 +384,7 @@ export default function ProjectWorkspacePage() {
                 document_id: finalDocumentId,
                 page_index: pageIndex,
                 status: 'pending' as PageStatus,
+                quality_flags: pageFlags.get(pageIndex),
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               }));
@@ -337,9 +414,8 @@ export default function ProjectWorkspacePage() {
     }
   }
 
-  // ── Selection ──────────────────────────────────────────────────────────
   function toggleSelected(documentId: string, pageIndex: number) {
-    const key = pageKey(documentId, pageIndex);
+    const key = makePageKey(documentId, pageIndex);
     setSelectedKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -349,22 +425,18 @@ export default function ProjectWorkspacePage() {
   }
 
   function selectAll() {
-    setSelectedKeys(new Set(allPages.map((p) => pageKey(p.document.id, p.pageIndex))));
+    setSelectedKeys(new Set(allPages.map((p) => makePageKey(p.document.id, p.pageIndex))));
   }
 
   function deselectAll() {
     setSelectedKeys(new Set());
   }
 
-  // ── Process ────────────────────────────────────────────────────────────
-  // Counts how many currently-selected pages are already 'done' — used to
-  // decide whether processing needs an "are you sure" confirmation, since
-  // reprocessing overwrites their existing extracted data.
   function countSelectedAlreadyProcessed(): number {
     let count = 0;
     documents.forEach((doc) => {
       (doc.pages || []).forEach((page) => {
-        if (selectedKeys.has(pageKey(doc.id, page.page_index)) && page.status === 'done') {
+        if (selectedKeys.has(makePageKey(doc.id, page.page_index)) && page.status === 'done') {
           count++;
         }
       });
@@ -372,11 +444,32 @@ export default function ProjectWorkspacePage() {
     return count;
   }
 
-  // Entry point for the "Process" button — routes through a confirmation
-  // modal first if any selected page would be reprocessed (overwriting
-  // existing data), otherwise processes immediately like before.
   function handleProcessClick() {
-    if (selectedKeys.size === 0 || isProcessing) return;
+    if (selectedKeys.size === 0) return;
+
+    let hasWarnings = false;
+    documents.forEach((doc) => {
+      (doc.pages || []).forEach((page) => {
+        if (selectedKeys.has(makePageKey(doc.id, page.page_index))) {
+          const flags = page.quality_flags;
+          if (flags && flags.shouldWarn) {
+            hasWarnings = true;
+          }
+        }
+      });
+    });
+
+    if (hasWarnings) {
+      setShowWarningConfirm(true);
+    } else if (countSelectedAlreadyProcessed() > 0) {
+      setShowReprocessConfirm(true);
+    } else {
+      handleProcessSelected();
+    }
+  }
+
+  function handleWarningConfirm() {
+    setShowWarningConfirm(false);
     if (countSelectedAlreadyProcessed() > 0) {
       setShowReprocessConfirm(true);
     } else {
@@ -385,71 +478,121 @@ export default function ProjectWorkspacePage() {
   }
 
   async function handleProcessSelected() {
-    if (selectedKeys.size === 0 || isProcessing) return;
+    if (selectedKeys.size === 0) return;
     setShowReprocessConfirm(false);
-    setIsProcessing(true);
-    setProcessingKeys(new Set(selectedKeys));
     setActionError(null);
 
-    try {
-      const byDoc = new Map<string, number[]>();
-      selectedKeys.forEach((key) => {
-        const [documentId, pageIndexStr] = key.split(':');
-        if (!byDoc.has(documentId)) byDoc.set(documentId, []);
-        byDoc.get(documentId)!.push(Number(pageIndexStr));
-      });
+    const queuedKeys = new Set(selectedKeys);
+    const byDoc = new Map<string, number[]>();
 
-      // force:true is a no-op for pages that aren't already 'done', so it's
-      // safe to set unconditionally — it only matters for the reprocess case.
-      const selections: PageSelection[] = Array.from(byDoc.entries()).map(
-        ([documentId, pageIndices]) => ({ documentId, pageIndices, force: true })
-      );
+    selectedKeys.forEach((key) => {
+      const parts = key.split(':');
+      const documentId = parts[0];
+      const pageIdx = parseInt(parts[1], 10);
+      if (!byDoc.has(documentId)) byDoc.set(documentId, []);
+      if (!isNaN(pageIdx)) byDoc.get(documentId)!.push(pageIdx);
+    });
 
-      const { results } = await processPages(selections);
+    const selection = Array.from(byDoc.entries()).map(([documentId, pages]) => ({
+      documentId,
+      pages,
+      force: true,
+    }));
 
-      setDocuments((prev) =>
-        prev.map((doc) => {
-          const docResults = results.filter((r) => r.documentId === doc.id);
-          if (docResults.length === 0) return doc;
-          return {
-            ...doc,
-            pages: (doc.pages || []).map((page) => {
-              const result = docResults.find((r) => r.pageIndex === page.page_index);
-              if (!result) return page;
-              return {
-                ...page,
-                status: result.status,
-                raw_ocr_result: result.rawResult ?? page.raw_ocr_result,
-                error_message: result.errorMessage,
-              };
-            }),
-          };
-        })
-      );
+    setDocuments((prev) =>
+      prev.map((doc) => {
+        if (!byDoc.has(doc.id)) return doc;
+        return {
+          ...doc,
+          pages: (doc.pages || []).map((page) =>
+            queuedKeys.has(makePageKey(doc.id, page.page_index))
+              ? { ...page, status: 'processing' as PageStatus }
+              : page
+          ),
+        };
+      })
+    );
 
-      const anySucceeded = results.some((r) => r.status !== 'error');
-      setSelectedKeys(new Set());
-      if (anySucceeded) {
-        setMode('validate');
-        setHasEnteredValidate(true);
-      }
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to process pages.');
-    } finally {
-      setIsProcessing(false);
-      setProcessingKeys(new Set());
-    }
+    setSelectedKeys(new Set());
+
+    enqueueOcr({
+      projectId: project?.id ?? id ?? '',
+      selection,
+      label: project?.name ? `${project.name} (${selection.length} files)` : 'Project Documents',
+      onSettled: (task, result) => {
+        const rawJobs = (result as any)?.results ?? (result as any)?.jobs ?? [];
+        const jobs = Array.isArray(rawJobs) ? rawJobs : [];
+
+        setDocuments((prev) =>
+          prev.map((doc) => {
+            if (!byDoc.has(doc.id)) return doc;
+            return {
+              ...doc,
+              pages: (doc.pages || []).map((page) => {
+                const pageKey = makePageKey(doc.id, page.page_index);
+                if (!queuedKeys.has(pageKey)) return page;
+
+                const job =
+                  jobs.find(
+                    (j: any) => j.documentId === doc.id && j.pageIndex === page.page_index
+                  ) || jobs.find((j: any) => j.documentId === doc.id);
+                if (job) {
+                  return {
+                    ...page,
+                    status:
+                      job.status === 'failed' || job.status === 'error'
+                        ? ('error' as PageStatus)
+                        : ('done' as PageStatus),
+                    error_message: job.errorMessage,
+                    raw_ocr_result: job.rawResult ?? page.raw_ocr_result,
+                  };
+                }
+
+                return {
+                  ...page,
+                  status:
+                    task.status === 'completed' ? ('done' as PageStatus) : ('error' as PageStatus),
+                  error_message: task.error,
+                };
+              }),
+            };
+          })
+        );
+
+        const currentProjectId = project?.id ?? id;
+        if (currentProjectId) {
+          getProject(currentProjectId)
+            .then((data) => {
+              setProject(data);
+              setDocuments(data.documents || []);
+              const hasProcessedPages = (data.documents || []).some((doc) =>
+                (doc.pages || []).some((p) => p.raw_ocr_result || p.extracted_data)
+              );
+              if (hasProcessedPages) {
+                setHasEnteredValidate(true);
+              }
+            })
+            .catch((err) => console.error('Failed to reload project data after OCR:', err));
+        }
+
+        if (task.status === 'completed') {
+          setDataVersion((v) => v + 1);
+          setHasEnteredValidate(true);
+        } else if (task.error) {
+          setActionError(task.error);
+        }
+      },
+    });
   }
 
-  // ── Delete ─────────────────────────────────────────────────────────────
-  // Removes deleted pages from `documents`, dropping a document entirely once
-  // its last page is gone so the Files view doesn't show an empty section.
   function removePagesFromState(keys: Set<string>) {
     setDocuments((prev) =>
       prev
         .map((doc) => ({
           ...doc,
-          pages: (doc.pages || []).filter((page) => !keys.has(pageKey(doc.id, page.page_index))),
+          pages: (doc.pages || []).filter(
+            (page) => !keys.has(makePageKey(doc.id, page.page_index))
+          ),
         }))
         .filter((doc) => (doc.pages || []).length > 0)
     );
@@ -468,7 +611,7 @@ export default function ProjectWorkspacePage() {
     try {
       const keys =
         deleteTarget.type === 'single'
-          ? [pageKey(deleteTarget.documentId, deleteTarget.pageIndex)]
+          ? [makePageKey(deleteTarget.documentId, deleteTarget.pageIndex)]
           : Array.from(selectedKeys);
 
       const byDoc = new Map<string, number[]>();
@@ -481,8 +624,6 @@ export default function ProjectWorkspacePage() {
       await Promise.all(
         Array.from(byDoc.entries()).map(([documentId, pageIndices]) => {
           const totalPages = documents.find((d) => d.id === documentId)?.pages?.length ?? 0;
-          // Deleting every page of a document removes the document row too,
-          // instead of leaving an empty orphan that resurfaces on reload.
           if (totalPages > 0 && pageIndices.length === totalPages) {
             return deleteDocument(documentId);
           }
@@ -499,7 +640,40 @@ export default function ProjectWorkspacePage() {
     }
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────
+  const initialReviews = useMemo(
+    () =>
+      Object.fromEntries(
+        (project?.documents ?? []).flatMap((doc) =>
+          (doc.pages ?? [])
+            .filter((p) => p.review_state)
+            .map((p) => [makePageKey(doc.id, p.page_index), p.review_state!] as const)
+        )
+      ),
+    [project]
+  );
+
+  const initialHistory = useMemo(() => {
+    const entries: HistoryEntry[] = [];
+    (documents ?? []).forEach((doc) => {
+      (doc.pages ?? []).forEach((page) => {
+        if (Array.isArray(page.history_entries)) {
+          entries.push(...page.history_entries);
+        }
+      });
+    });
+    return entries.sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, [documents]);
+
+  const handleReviewChange = useCallback((pageKey: string, review: PageReview) => {
+    const parsed = parsePageKey(pageKey);
+    if (!parsed) return;
+    saveReviewState(parsed.documentId, parsed.pageIndex, review).catch((err) =>
+      console.error('Failed to save review state', err)
+    );
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-24">
@@ -522,7 +696,10 @@ export default function ProjectWorkspacePage() {
   const header = (
     <div className="flex items-center justify-between px-6 h-12 border-b border-base-300 shrink-0">
       <div className="flex items-center gap-2 min-w-0">
-        <button className="btn btn-ghost btn-sm gap-1.0 p-1.0" onClick={() => navigate('/projects')}>
+        <button
+          className="btn btn-ghost btn-sm gap-1.0 p-1.0"
+          onClick={() => navigate('/projects')}
+        >
           <ArrowLeft className="w-4 h-4" /> Projects
         </button>
         <span className="text-base-content/40 p-0">/</span>
@@ -534,7 +711,7 @@ export default function ProjectWorkspacePage() {
             className={`btn btn-sm join-item gap-1.5 ${mode === 'files' ? 'btn-active' : ''}`}
             onClick={() => setMode('files')}
           >
-            <FileText className="w-4 h-4" />
+            <FilesTabIcon className="w-4 h-4" />
             Files
           </button>
           <button
@@ -553,209 +730,133 @@ export default function ProjectWorkspacePage() {
     return (
       <div className="flex-1 flex flex-col">
         {header}
-        <EmptyUploadView onFilesCaptured={handleFilesCaptured} onError={setActionError} />
-        {actionError && (
-          <div className="toast toast-top toast-center z-50 mt-16">
-            <div className="alert alert-error shadow-lg">{actionError}</div>
-          </div>
-        )}
+        <EmptyUploadView
+          onFilesCaptured={handleFilesCaptured}
+          onError={setActionError}
+          onQrUploaded={handleQrUploaded}
+        />
+        <Toast
+          open={!!actionError}
+          message={actionError || ''}
+          type="error"
+          onDismiss={() => setActionError(null)}
+        />
       </div>
     );
   }
 
-  const pages = hasEnteredValidate
-    ? validationList
-        .map((entry) => getExtractedData(entry.documentId, entry.pageIndex))
-        .filter((page): page is ExtractedPage => page !== null)
-    : [];
-  const ocrPages = hasEnteredValidate
-    ? validationList.map((entry) =>
-        extractComponents(findPage(entry.documentId, entry.pageIndex)?.raw_ocr_result)
-      )
-    : [];
   const imageUrls = hasEnteredValidate
-    ? validationList.map((e) => imageUrlMap[pageKey(e.documentId, e.pageIndex)] || '')
-    : [];
-  // stable per-page identity for useReviewQueue, so appending pages later
-  // doesn't retrigger detection on pages already processed
-  const pageKeys = hasEnteredValidate
-    ? validationList.map((e) => pageKey(e.documentId, e.pageIndex))
+    ? validationList.map((e) => imageUrlMap[makePageKey(e.documentId, e.pageIndex)] || '')
     : [];
 
-  // ── Files/Validation view ─────────────────────────────────────────────────────────
+  const pageKeys = hasEnteredValidate
+    ? validationList.map((e) => makePageKey(e.documentId, e.pageIndex))
+    : [];
+
+  const filesToolbarActions: ToolbarAction[] = [
+    {
+      key: 'delete',
+      label: `Delete (${selectedKeys.size})`,
+      icon: <Trash2 className="w-3.5 h-3.5" />,
+      tone: 'error',
+      disabled: isDeleting,
+      onClick: () => setDeleteTarget({ type: 'bulk' }),
+    },
+    {
+      key: 'process',
+      label: `Process (${selectedKeys.size})`,
+      tone: 'primary',
+      text: 'text-base-100',
+      disabled: isDeleting,
+      onClick: handleProcessClick,
+    },
+  ];
+
   return (
     <div className="flex-1 flex flex-col">
       {header}
 
-      {actionError && (
-        <div className="toast toast-top toast-center z-50 mt-16">
-          <div className="alert alert-error shadow-lg">{actionError}</div>
-        </div>
-      )}
-      {/* FILE VIEW AND UPLOAD */}
+      <Toast
+        open={!!actionError}
+        message={actionError || ''}
+        type="error"
+        onDismiss={() => setActionError(null)}
+      />
       <div className={mode === 'files' ? 'flex-1 flex flex-col' : 'hidden'}>
-        <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg bg-base-200/40 px-4 py-2.5">
-          <div className="flex items-center gap-3">
-            {selectedKeys.size > 0 ? (
-              <>
-                <span className="text-sm font-medium text-base-content/70">
-                  selected ({selectedKeys.size})
-                </span>
-                <button className="btn btn-ghost btn-xs" onClick={deselectAll}>
-                  Clear
-                </button>
-              </>
-            ) : (
-              <button className="btn btn-ghost btn-sm" onClick={selectAll}>
-                Select all
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {selectedKeys.size > 0 && (
-              <>
-                <button
-                  className="btn btn-sm btn-error btn-outline gap-1.5"
-                  disabled={isProcessing || isDeleting}
-                  onClick={() => setDeleteTarget({ type: 'bulk' })}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  {`Delete (${selectedKeys.size})`}
-                </button>
-                <button
-                  className="btn btn-sm btn-primary"
-                  disabled={isProcessing || isDeleting}
-                  onClick={handleProcessClick}
-                >
-                  {isProcessing ? (
-                    <span className="loading loading-spinner loading-sm" />
-                  ) : (
-                    `Process (${selectedKeys.size})`
-                  )}
-                </button>
-              </>
-            )}
-            <div className="w-40">
-              <UploadMoreButton onFilesSelected={handleFilesCaptured} />
+        <PageToolbar
+          selectedCount={selectedKeys.size}
+          onSelectAll={selectAll}
+          onDeselectAll={deselectAll}
+          actions={filesToolbarActions}
+          trailing={
+            <div className="flex items-center gap-2">
+              <ScanQrButton onUploaded={handleQrUploaded} className="btn btn-outline btn-sm" />
+              <div className="w-40">
+                <UploadMoreButton onFilesSelected={handleFilesCaptured} onError={setActionError} />
+              </div>
             </div>
-          </div>
-        </div>
+          }
+        />
 
         {isUploading && (
           <div className="px-6 py-2 text-sm text-base-content/60 flex items-center gap-2">
             <span className="loading loading-spinner loading-xs" /> Uploading...
           </div>
         )}
-
         <div className="flex-1 overflow-y-auto p-6">
           <div className="flex flex-col gap-6">
             {documents
               .filter((doc) => (doc.pages || []).length > 0)
               .map((doc) => (
-              <section
-                key={doc.id}
-                className="rounded-lg border border-base-300 bg-base-200/40 p-4"
-              >
-                <h3 className="mb-3 text-sm font-semibold text-base-content/70 flex items-center gap-2">
-                  <FileText className="w-4 h-4" /> {doc.filename}
-                </h3>
-                <div className="flex flex-wrap gap-4">
+                <PageGroupSection key={doc.id} label={doc.filename}>
                   {(doc.pages || [])
                     .slice()
                     .sort((a, b) => a.page_index - b.page_index)
                     .map((page) => {
-                      const key = pageKey(doc.id, page.page_index);
+                      const key = makePageKey(doc.id, page.page_index);
                       const imageUrl = imageUrlMap[key];
-                      const isBeingProcessed = processingKeys.has(key);
+                      const isBeingProcessed = page.status === 'processing';
                       return (
-                        <div
+                        <PreviewCard
                           key={key}
-                          className={`group w-[160px] shrink-0 rounded-lg border border-base-300 bg-base-100 overflow-hidden transition-opacity ${
-                            isBeingProcessed ? 'animate-pulse opacity-80' : ''
-                          }`}
-                        >
-                          <div
-                            className={`relative h-[120px] bg-base-300 ${
-                              isBeingProcessed ? 'cursor-not-allowed' : 'cursor-pointer'
-                            }`}
-                            onClick={() => {
-                              if (isBeingProcessed) return;
-                              toggleSelected(doc.id, page.page_index);
-                            }}
-                          >
-                            {imageUrl ? (
-                              <img
-                                src={imageUrl}
-                                alt={`Page ${page.page_index + 1}`}
-                                className={`w-full h-full object-cover transition-[filter] ${
-                                  isBeingProcessed ? 'grayscale' : ''
-                                }`}
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span className="loading loading-spinner loading-sm" />
-                              </div>
-                            )}
-                            <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/25" />
-                            <input
-                              type="checkbox"
-                              className={`checkbox checkbox-sm checkbox-primary absolute border-2 top-2 left-2 transition-opacity ${
-                                selectedKeys.has(key) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                              }`}
-                              checked={selectedKeys.has(key)}
-                              disabled={isBeingProcessed}
-                              onChange={() => toggleSelected(doc.id, page.page_index)}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-xs btn-circle absolute top-2 right-2 bg-base-100/80 text-error opacity-0 transition-opacity group-hover:opacity-100"
-                              title="Delete page"
-                              disabled={isBeingProcessed}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteTarget({
-                                  type: 'single',
-                                  documentId: doc.id,
-                                  pageIndex: page.page_index,
-                                });
-                              }}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                          <div className="p-2 flex items-center justify-between text-xs">
-                            <span>Page {page.page_index + 1}</span>
-                            <span className={`badge badge-xs ${statusBadgeClass(page.status)}`}>
-                              {page.status}
-                            </span>
-                          </div>
-                          {page.error_message && (
-                            <div
-                              className="px-2 pb-2 text-xs text-error truncate"
-                              title={page.error_message}
-                            >
-                              {page.error_message}
-                            </div>
-                          )}
-                        </div>
+                          title={`${doc.filename} - Page ${page.page_index + 1}`}
+                          caption={`Page ${page.page_index + 1}`}
+                          isSelected={selectedKeys.has(key)}
+                          thumbnailUrl={imageUrl}
+                          isBusy={isBeingProcessed}
+                          status={{
+                            text: page.status,
+                            className: statusBadgeClass(page.status),
+                          }}
+                          warningText={warningTextForPage(page.quality_flags)}
+                          errorText={page.error_message}
+                          onToggle={() => toggleSelected(doc.id, page.page_index)}
+                          onRemove={() =>
+                            setDeleteTarget({
+                              type: 'single',
+                              documentId: doc.id,
+                              pageIndex: page.page_index,
+                            })
+                          }
+                        />
                       );
                     })}
-                </div>
-              </section>
-            ))}
+                </PageGroupSection>
+              ))}
           </div>
         </div>
       </div>
 
-      {/* VALIDATION WORKSPACE */}
       {hasEnteredValidate && validationList.length > 0 && (
         <div className={mode === 'validate' ? 'flex-1 flex flex-col' : 'hidden'}>
           <ValidationWorkspace
-            pages={pages}
-            ocrPages={ocrPages}
+            pages={validationPages}
+            ocrPages={validationBlocks}
             imageUrls={imageUrls}
             pageKeys={pageKeys}
+            initialReviews={initialReviews}
+            onReviewChange={handleReviewChange}
+            initialHistory={initialHistory}
             fileMetadata={fileMetadata}
             syncKey={validationKeysSignature}
             onPersist={persistPages}
@@ -764,7 +865,6 @@ export default function ProjectWorkspacePage() {
         </div>
       )}
 
-      {/* Delete confirmation */}
       {deleteTarget && (
         <div className="modal modal-open z-50">
           <div className="modal-box">
@@ -793,7 +893,6 @@ export default function ProjectWorkspacePage() {
         </div>
       )}
 
-      {/* Reprocess confirmation */}
       {showReprocessConfirm && (
         <div className="modal modal-open z-50">
           <div className="modal-box">
@@ -802,25 +901,48 @@ export default function ProjectWorkspacePage() {
               {`${countSelectedAlreadyProcessed()} of the ${selectedKeys.size} selected page(s) have already been processed. Reprocessing will overwrite their existing extracted data. This cannot be undone.`}
             </p>
             <div className="modal-action">
-              <button
-                className="btn btn-ghost"
-                onClick={() => setShowReprocessConfirm(false)}
-                disabled={isProcessing}
-              >
+              <button className="btn btn-ghost" onClick={() => setShowReprocessConfirm(false)}>
                 Cancel
               </button>
-              <button
-                className="btn btn-warning"
-                onClick={handleProcessSelected}
-                disabled={isProcessing}
-              >
-                {isProcessing ? <span className="loading loading-spinner loading-sm" /> : 'Reprocess'}
+              <button className="btn btn-warning" onClick={handleProcessSelected}>
+                Reprocess
               </button>
             </div>
           </div>
           <div className="modal-backdrop" onClick={() => setShowReprocessConfirm(false)} />
         </div>
       )}
+
+      {showWarningConfirm && (
+        <div className="modal modal-open z-50">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg text-warning">Warning: Low Quality Images</h3>
+            <p className="py-4 text-sm">
+              You have selected images that are flagged for low quality (e.g. blurry, dark, or
+              invalid size). Processing these images might produce poor or unexpected OCR results.
+              Are you sure you want to continue?
+            </p>
+            <div className="modal-action">
+              <button className="btn btn-ghost" onClick={() => setShowWarningConfirm(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleWarningConfirm}>
+                Yes, process anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <OcrProgressPopup filterOwnerType="user" />
     </div>
   );
+}
+
+function warningTextForPage(flags: any): string | undefined {
+  if (!flags || !flags.shouldWarn) return undefined;
+  if (flags.isInvalidSize) return 'Invalid size';
+  if (flags.isBlurry && flags.isDark) return 'Blurry and too dark';
+  if (flags.isBlurry) return 'Might be blurry';
+  return 'Might be too dark';
 }

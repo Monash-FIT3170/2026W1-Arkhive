@@ -1,3 +1,5 @@
+import type { HistoryEntry } from './HistoryEntry';
+import type { PageReview } from './IssueReview';
 import type { ExtractedPage } from './TableData';
 
 export interface Project {
@@ -5,6 +7,9 @@ export interface Project {
   name: string;
   owner_id: string;
   created_at: string;
+  document_count?: number;
+  page_count?: number;
+  documents?: DocumentRecord[];
 }
 
 export type PageStatus = 'pending' | 'processing' | 'done' | 'error';
@@ -16,6 +21,8 @@ export interface DocumentPageRecord {
   document_id: string;
   page_index: number;
   status: PageStatus;
+  /** Which issues were flagged / resolved. null = never scanned. */
+  review_state?: PageReview | null;
   /** Raw per-page OCR output, persisted as soon as OCR completes for this page. */
   raw_ocr_result?: any;
   /**
@@ -26,6 +33,13 @@ export interface DocumentPageRecord {
    */
   extracted_data?: ExtractedPage;
   error_message?: string;
+  history_entries?: HistoryEntry[];
+  quality_flags?: {
+    isBlurry: boolean;
+    isDark: boolean;
+    isInvalidSize: boolean;
+    shouldWarn: boolean;
+  };
   created_at: string;
   updated_at: string;
 }
@@ -66,6 +80,7 @@ export interface PageSelection {
   pageIndices: number[];
   /** If true, re-run OCR even on pages already marked 'done'. Default false. */
   force?: boolean;
+  docType?: any;
 }
 
 // Result for one page after a batch process call.
