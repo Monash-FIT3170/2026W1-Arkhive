@@ -15,6 +15,7 @@ import {
   renderReceiptCsv,
   renderFormCsv,
 } from './csvTemplates';
+import { renderInvoiceTxt, renderReceiptTxt, renderFormTxt } from './txtTemplates';
 
 /**
  * The template registry. The modal renders cards from TEMPLATES and the planner
@@ -114,7 +115,7 @@ const jsonDefault: ExportTemplate = {
   format: 'json',
   label: 'Default Template',
   description: 'Nested: pages → fields, texts, tables (with row indent levels).',
-  previewSrc: '/export_images/sample3.png',
+  previewSrc: '/export_images/json/json_default.png',
   extension: 'json',
   mime: 'application/json;charset=utf-8',
   fileSuffix: 'default',
@@ -159,7 +160,7 @@ const txtDefault: ExportTemplate = {
   format: 'txt',
   label: 'Default Template',
   description: 'Readable records: "Column: value", with confidence.',
-  previewSrc: '/export_images/sample1.png',
+  previewSrc: '/export_images/txt/txt_default.png',
   extension: 'txt',
   mime: 'text/plain;charset=utf-8',
   fileSuffix: 'default',
@@ -191,6 +192,48 @@ const txtDefault: ExportTemplate = {
   },
 };
 
+const txtInvoice: ExportTemplate = {
+  id: 'txt.invoice',
+  format: 'txt',
+  label: 'Invoice Template',
+  description: 'Formatted with invoice header, vendor & billing details, line items table, and totals.',
+  previewSrc: '/export_images/txt/txt_invoice.png',
+  extension: 'txt',
+  mime: 'text/plain;charset=utf-8',
+  fileSuffix: 'invoice',
+  form: true,
+  docType: 'invoice',
+  render: (unit, opts) => renderInvoiceTxt(buildExportDoc(unit, opts.include), opts.include),
+};
+
+const txtReceipt: ExportTemplate = {
+  id: 'txt.receipt',
+  format: 'txt',
+  label: 'Receipt Template',
+  description: 'Formatted with merchant info, transaction metadata, itemized list, and payment totals.',
+  previewSrc: '/export_images/txt/txt_receipt.png',
+  extension: 'txt',
+  mime: 'text/plain;charset=utf-8',
+  fileSuffix: 'receipt',
+  form: true,
+  docType: 'receipt',
+  render: (unit, opts) => renderReceiptTxt(buildExportDoc(unit, opts.include), opts.include),
+};
+
+const txtForm: ExportTemplate = {
+  id: 'txt.form',
+  format: 'txt',
+  label: 'Form / Record Template',
+  description: 'Structured form layout with key-value record sections and schedule tables.',
+  previewSrc: '/export_images/txt/txt_form.png',
+  extension: 'txt',
+  mime: 'text/plain;charset=utf-8',
+  fileSuffix: 'form',
+  form: true,
+  docType: 'form',
+  render: (unit, opts) => renderFormTxt(buildExportDoc(unit, opts.include), opts.include),
+};
+
 // ───────────── XLSX ─────────────
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -212,7 +255,7 @@ const xlsxDefault: ExportTemplate = {
   format: 'xlsx',
   label: 'Default Template',
   description: 'One sheet per section: Fields, each table, Text.',
-  previewSrc: '/export_images/sample3.png',
+  previewSrc: '/export_images/xlsx/xlsx_default.png',
   extension: 'xlsx',
   mime: XLSX_MIME,
   fileSuffix: 'default',
@@ -226,7 +269,7 @@ export function makeXlsxTemplate(spec: WorkbookSpec): ExportTemplate {
     format: 'xlsx',
     label: spec.label,
     description: `Fills the ${spec.label.toLowerCase()} layout. Anything it can't place goes on "Other data".`,
-    previewSrc: spec.previewSrc ?? '/export_images/sample3.png',
+    previewSrc: spec.previewSrc ?? `/export_images/xlsx/xlsx_${spec.id}.png`,
     extension: 'xlsx',
     mime: XLSX_MIME,
     fileSuffix: spec.id,
@@ -245,6 +288,9 @@ export const TEMPLATES: ExportTemplate[] = [
   csvForm,
   jsonDefault,
   txtDefault,
+  txtInvoice,
+  txtReceipt,
+  txtForm,
   xlsxDefault,
   ...XLSX_PROFILES.map(makeXlsxTemplate),
 ];

@@ -10,7 +10,7 @@ import { useOcrProgress } from '../../context/OcrProgressContext';
 import { isTaskActive, type OcrTask } from '../../models/OcrTask';
 import { useFloatingWindow } from '../../hooks/useFloatingWindow';
 import { estimateRemainingMs, formatRemaining, progressPercent } from '../../utils/ocrProgress';
-
+// Add this import (adjust the path if stepGuard.ts is located elsewhere)
 function progressClass(task: OcrTask): string {
   switch (task.status) {
     case 'completed':
@@ -28,38 +28,64 @@ function TaskRow({
   task,
   now,
   onCancel,
+  onClick,
 }: {
   task: OcrTask;
   now: number;
   onCancel: (id: string) => void;
+  onClick: (task: OcrTask) => void;
 }) {
   const percent = progressPercent(task, now);
   const remainingMs = estimateRemainingMs(task, now);
   const remaining = remainingMs === null ? null : formatRemaining(remainingMs);
   const pagesText = `${task.totalPages} ${task.totalPages === 1 ? 'page' : 'pages'}`;
+  const isCompleted = task.status === 'completed';
 
   return (
-    <li className="rounded-lg border border-base-300 bg-base-100 p-3" data-testid="ocr-task-row">
+    <li
+      onClick={(e) => {
+        e.stopPropagation();
+        if (isCompleted) onClick(task);
+      }}
+      className={`rounded-lg border p-3 transition-all ${
+        isCompleted
+          ? 'cursor-pointer border-base-300 bg-base-100 hover:border-primary/50 hover:bg-base-200'
+          : 'border-base-300 bg-base-100'
+      }`}
+      data-testid="ocr-task-row"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold" title={task.label}>
-            {task.label}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="truncate text-sm font-semibold" title={task.label}>
+              {task.label}
+            </p>
+            <p>{task.projectId? "project" : "guest"}</p>
+            {isCompleted && <span className="badge badge-success badge-xs shrink-0">Ready</span>}
+          </div>
           <p className="text-xs text-base-content/60">
             {pagesText}
             {remaining ? ` · ${remaining}` : ''}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <span className="text-sm font-bold tabular-nums">{task.status === 'queued' ? '—' : `${percent}%`}</span>
+          <span className="text-sm font-bold tabular-nums">
+            {task.status === 'queued' ? '—' : `${percent}%`}
+          </span>
           {isTaskActive(task) && (
             <button
               type="button"
               className="btn btn-ghost btn-xs text-error"
-              onClick={() => onCancel(task.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancel(task.id);
+              }}
             >
               Cancel
             </button>
+          )}
+          {isCompleted && (
+            <span className="text-xs font-semibold text-primary">Review →</span>
           )}
         </div>
       </div>
@@ -72,21 +98,40 @@ function TaskRow({
 
       <p
         className={`mt-1.5 truncate text-xs ${
-          task.status === 'failed' ? 'text-error' : task.failedDocuments > 0 ? 'text-warning' : 'text-base-content/60'
+          task.status === 'failed'
+            ? 'text-error'
+            : task.failedDocuments > 0
+              ? 'text-warning'
+              : 'text-base-content/60'
         }`}
         title={task.error ?? task.message}
       >
-        {task.status === 'failed' && task.error ? task.error : task.message}
+        {task.status === 'failed' && task.error
+          ? task.error
+          : isCompleted
+            ? 'Click to validate results'
+            : task.message}
       </p>
     </li>
   );
 }
 
-export default function OcrProgressPopup() {
+interface OcrProgressPopupProps {
+  filterOwnerType?: 'user' | 'guest';
+}
+
+export default function OcrProgressPopup({ filterOwnerType }: OcrProgressPopupProps = {}) {
   const navigate = useNavigate();
-  const { tasks, isMinimised, setMinimised, cancelTask, cancelAll, clearFinished } = useOcrProgress();
+  const context = useOcrProgress() as any;
+  const { isMinimised, setMinimised, cancelTask, cancelAll, clearFinished } = context;
+
+  const tasks: OcrTask[] =
+    filterOwnerType && context.allTasks
+      ? context.allTasks.filter((t: OcrTask) => t.ownerType === filterOwnerType)
+      : context.tasks;
+
   const { rect, dragProps, resizeProps } = useFloatingWindow({
-    storageKey: 'arkhive_ocr_progress_window',
+    storageKey: `arkhive_ocr_progress_window_${filterOwnerType ?? 'default'}`,
     defaultSize: { width: 380, height: 360 },
     minSize: { width: 320, height: 220 },
   });
@@ -94,13 +139,47 @@ export default function OcrProgressPopup() {
   const active = tasks.filter(isTaskActive);
   const hasProcessing = tasks.some((task) => task.status === 'processing');
 
-  // Tick once a second so the "time left" estimate keeps moving between backend events.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!hasProcessing) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [hasProcessing]);
+
+  function handleTaskClick(task: OcrTask) {
+    if (task.status !== 'completed') return;
+
+    setMinimised(true);
+
+    // Extract the actual backend job/batch ID from task result if available
+    const resultId = (task as any).result?.batchId || (task as any).result?.id || task.id;
+
+    if (task.projectId) {
+      navigate(`/projects/${task.projectId}`, {
+        state: { mode: 'validate', taskId: resultId },
+      });
+    } else {
+      navigate('/validation', {
+        state: { taskId: resultId },
+      });
+    }
+  }
+
+  function reviewResults() {
+    setMinimised(true);
+
+    const completedTasks = tasks.filter((t) => t.status === 'completed');
+    if (completedTasks.length === 0) return;
+
+    // Pick the latest finished task
+    const latestTask = completedTasks.reduce((latest, current) => {
+      const currentFinished = current.finishedAt ?? current.createdAt;
+      const latestFinished = latest.finishedAt ?? latest.createdAt;
+      return currentFinished > latestFinished ? current : latest;
+    }, completedTasks[completedTasks.length - 1]);
+
+    handleTaskClick(latestTask);
+  }
 
   if (tasks.length === 0) return null;
 
@@ -109,7 +188,10 @@ export default function OcrProgressPopup() {
   const hasResults = tasks.some((task) => task.status === 'completed');
 
   const totalPages = active.reduce((sum, task) => sum + task.totalPages, 0);
-  const weightedPercent = active.reduce((sum, task) => sum + progressPercent(task, now) * task.totalPages, 0);
+  const weightedPercent = active.reduce(
+    (sum, task) => sum + progressPercent(task, now) * task.totalPages,
+    0
+  );
   const overallPercent = totalPages > 0 ? Math.round(weightedPercent / totalPages) : 0;
 
   const statusLabel = isRunning
@@ -119,12 +201,6 @@ export default function OcrProgressPopup() {
       : 'STATUS: COMPLETE';
   const statusClass = isRunning ? 'badge-info' : hasErrors ? 'badge-warning' : 'badge-success';
 
-  function reviewResults() {
-    setMinimised(true);
-    navigate('/validation');
-  }
-
-  // ── Minimised pill ──────────────────────────────────────────────────────────
   if (isMinimised) {
     return (
       <button
@@ -151,7 +227,6 @@ export default function OcrProgressPopup() {
     );
   }
 
-  // ── Expanded window ─────────────────────────────────────────────────────────
   return (
     <div
       className="fixed z-40 flex flex-col overflow-hidden rounded-xl border border-base-300 bg-base-200 shadow-2xl"
@@ -186,7 +261,13 @@ export default function OcrProgressPopup() {
 
       <ul className="flex-1 space-y-2 overflow-y-auto p-3">
         {tasks.map((task) => (
-          <TaskRow key={task.id} task={task} now={now} onCancel={cancelTask} />
+          <TaskRow
+            key={task.id}
+            task={task}
+            now={now}
+            onCancel={cancelTask}
+            onClick={handleTaskClick}
+          />
         ))}
       </ul>
 
@@ -209,7 +290,6 @@ export default function OcrProgressPopup() {
         )}
       </div>
 
-      {/* Resize handle (bottom-right) */}
       <div
         {...resizeProps('se')}
         className="absolute bottom-0 right-0 z-10 h-4 w-4 cursor-nwse-resize touch-none"

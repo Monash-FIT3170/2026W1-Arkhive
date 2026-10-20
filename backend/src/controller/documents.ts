@@ -12,8 +12,14 @@ import {
 import { processImage } from '../services/imageProcessor';
 import { parseDocumentWithRetries } from '../services/ocr/ocr';
 import type { DocType } from '../models/Document';
+import {
+  hasValidFileSignature,
+  INVALID_FILE_CONTENTS_ERROR,
+  UNSUPPORTED_FILE_TYPE_ERROR,
+} from '../services/security/fileValidation';
 import type { ExtractedPage } from '../models/TableData';
 import type { PageSelection, ProcessedPageResult } from '../models/Project.ts';
+import type { HistoryEntry } from '../models/HistoryEntry';
 import { PageReview } from '../models/IssueReview';
 
 /**
@@ -49,7 +55,9 @@ async function processPage(
   selection: PageSelection,
   ownerId: string
 ): Promise<ProcessedPageResult[]> {
-  const { documentId, pageIndices, force } = selection;
+  const documentId = selection.documentId;
+  const pageIndices: number[] = selection.pages ?? selection.pageIndices ?? [];
+  const force = selection.force;
   // Optional hint from the client; skips classification in the OCR pipeline.
   // Validated because it ends up in a model prompt.
   const docType: DocType | undefined =
@@ -115,6 +123,29 @@ async function processPage(
       try {
         const key = `${document.storage_path}/page-${pageIndex}.png`;
         const buffer = await getObjectBuffer(key);
+
+        // The object was stored before OCR. Reject bytes that are not a real PNG.
+        if (!hasValidFileSignature(buffer, 'image/png')) {
+          try {
+            await deleteObject(key);
+          } catch {
+            // Best-effort cleanup; still reject the page.
+          }
+
+          await supabase
+            .from('document_pages')
+            .update({ status: 'error', error_message: INVALID_FILE_CONTENTS_ERROR })
+            .eq('document_id', documentId)
+            .eq('page_index', pageIndex);
+
+          return {
+            documentId,
+            pageIndex,
+            status: 'error',
+            errorMessage: INVALID_FILE_CONTENTS_ERROR,
+          };
+        }
+
         // rawResult is a StructuredDocument. pageOffset is the REAL page index
         // so the blocks' regions/pageIndex line up with this page's image.
         const rawResult = await parseDocumentWithRetries(buffer, {
@@ -184,6 +215,25 @@ export default {
 
       if (!ownerId) {
         res.status(401).json({ error: 'Unauthorized.' });
+        return;
+      }
+
+      const allowedPageTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/tiff',
+        'image/webp',
+        'image/heic',
+        'image/heif',
+      ];
+      if (!allowedPageTypes.includes(file.mimetype)) {
+        res.status(400).json({ error: UNSUPPORTED_FILE_TYPE_ERROR });
+        return;
+      }
+
+      // The client can label any file as an image. Check the bytes before storing it.
+      if (!hasValidFileSignature(file.buffer, file.mimetype)) {
+        res.status(400).json({ error: INVALID_FILE_CONTENTS_ERROR });
         return;
       }
 
@@ -398,12 +448,17 @@ export default {
 
   /**
    * PATCH /api/documents/:id/pages/:pageIndex/data
-   * Persists extracted data for ONE page and marks it done.
+   * Persists extracted data and/or history entries for ONE page and marks it done.
    */
   saveExtractedData: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { id, pageIndex } = req.params as { id: string; pageIndex: string };
-      const { extractedData } = req.body as { extractedData?: ExtractedPage };
+      const { extractedData, historyEntries, history } = req.body as {
+        extractedData?: ExtractedPage;
+        historyEntries?: HistoryEntry[];
+        history?: HistoryEntry[];
+      };
+      const entriesToSave = historyEntries ?? history;
       const ownerId = req.userId;
 
       if (!ownerId) {
@@ -411,8 +466,18 @@ export default {
         return;
       }
 
-      if (!extractedData || typeof extractedData !== 'object' || Array.isArray(extractedData)) {
+      if (!extractedData && entriesToSave === undefined) {
+        res.status(400).json({ error: 'extractedData or historyEntries must be provided.' });
+        return;
+      }
+
+      if (extractedData && (typeof extractedData !== 'object' || Array.isArray(extractedData))) {
         res.status(400).json({ error: 'extractedData must be a single ExtractedData object.' });
+        return;
+      }
+
+      if (entriesToSave !== undefined && !Array.isArray(entriesToSave)) {
+        res.status(400).json({ error: 'historyEntries must be an array.' });
         return;
       }
 
@@ -422,9 +487,19 @@ export default {
         return;
       }
 
+      const updateData: Record<string, any> = {};
+      if (extractedData) {
+        updateData.extracted_data = extractedData;
+        updateData.status = 'done';
+        updateData.error_message = null;
+      }
+      if (entriesToSave !== undefined) {
+        updateData.history_entries = entriesToSave;
+      }
+
       const { data: updatedPage, error: updateError } = await supabase
         .from('document_pages')
-        .update({ extracted_data: extractedData, status: 'done', error_message: null })
+        .update(updateData)
         .eq('document_id', id)
         .eq('page_index', Number(pageIndex))
         .select()

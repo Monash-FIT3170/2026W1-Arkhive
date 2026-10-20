@@ -7,19 +7,20 @@ steps:
       - '--build-arg'
       - 'VITE_SUPABASE_ANON_KEY=${_VITE_SUPABASE_ANON_KEY}'
       - '-t'
-      - '${_IMAGE}:${COMMIT_SHA}'
+      - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/${REPO_NAME}/${_SERVICE_NAME}:${COMMIT_SHA}'
       - '.'
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '${_IMAGE}:${COMMIT_SHA}']
+    args: ['push', '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/${REPO_NAME}/${_SERVICE_NAME}:${COMMIT_SHA}']
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - run
       - deploy
       - '${_SERVICE_NAME}'
-      - '--image=${_IMAGE}:${COMMIT_SHA}'
-      - '--region=${_REGION}'
+      - '--image=${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/${REPO_NAME}/${_SERVICE_NAME}:${COMMIT_SHA}'
+      - '--region=${_DEPLOY_REGION}'
+      - '--platform=${_PLATFORM}'
 images:
-  - '${_IMAGE}:${COMMIT_SHA}'
+  - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/${REPO_NAME}/${_SERVICE_NAME}:${COMMIT_SHA}'
 options:
   logging: CLOUD_LOGGING_ONLY

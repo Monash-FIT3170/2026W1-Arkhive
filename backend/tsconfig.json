@@ -10,5 +10,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["app.ts", "src"]
+  "include": ["app.ts", "src", "scripts"]
 }

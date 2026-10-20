@@ -1,3 +1,4 @@
+import type { HistoryEntry } from './HistoryEntry';
 import type { PageReview } from './IssueReview';
 import type { ExtractedPage } from './TableData';
 
@@ -29,6 +30,7 @@ export interface DocumentPageRecord {
    */
   extracted_data?: ExtractedPage;
   error_message?: string;
+  history_entries?: HistoryEntry[];
   created_at: string;
   updated_at: string;
 }
@@ -67,6 +69,8 @@ export interface DownloadUrlResponse {
 export interface PageSelection {
   documentId: string;
   pageIndices: number[];
+  /** Optional alias for pageIndices */
+  pages?: number[];
   /** If true, re-run OCR even on pages already marked 'done'. Default false. */
   force?: boolean;
   docType?: any;

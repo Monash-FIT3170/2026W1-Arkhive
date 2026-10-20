@@ -13,6 +13,7 @@ import {
 import type { Project } from '../../../models/Project';
 import ProjectPreviewPanel from './ProjectPreviewPanel';
 import { pageCount, type PreviewState } from '../../../hooks/useProjectPreview';
+import { useOcrProgress } from '../../../context/OcrProgressContext';
 
 interface ProjectCardProps {
   project: Project;
@@ -42,6 +43,8 @@ export default function ProjectCard({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
   const [isSaving, setIsSaving] = useState(false);
+  const { getProjectProgress } = useOcrProgress();
+  const progress = getProjectProgress(project.id);
 
   function startRename() {
     setRenameValue(project.name);
@@ -200,9 +203,17 @@ export default function ProjectCard({
               </button>
             </div>
           ) : (
-            <span className="font-semibold text-base text-base-content truncate block text-left group-hover:text-primary transition-colors max-w-full">
-              {project.name}
-            </span>
+            <div className="flex items-center gap-2 max-w-full">
+              <span className="font-semibold text-base text-base-content truncate block text-left group-hover:text-primary transition-colors">
+                {project.name}
+              </span>
+              {progress.isProcessing && (
+                <span className="badge badge-primary badge-xs gap-1 shrink-0 font-mono animate-pulse">
+                  <span className="loading loading-spinner loading-xs" />
+                  {progress.overallProgressPercent}%
+                </span>
+              )}
+            </div>
           )}
 
           <div className="flex items-center justify-start gap-2 text-xs text-base-content/50 text-left">

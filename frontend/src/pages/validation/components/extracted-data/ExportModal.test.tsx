@@ -64,8 +64,8 @@ describe('ExportModal Component', () => {
     expect(screen.getAllByText('TXT').length).toBeGreaterThan(0);
 
     // Specialized CSV templates should be rendered
-    expect(screen.getByText('Invoice Template')).toBeInTheDocument();
-    expect(screen.getByText('Receipt Template')).toBeInTheDocument();
+    expect(screen.getAllByText('Invoice Template').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Receipt Template').length).toBeGreaterThan(0);
   });
 
   it('triggers deliver function when download button is clicked', () => {
