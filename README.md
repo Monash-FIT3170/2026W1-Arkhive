@@ -33,7 +33,7 @@ Ensure the following software components and cloud service accounts are set up b
 - **Object Storage:** Cloudflare R2 (S3-compatible bucket with direct client-side presigned uploads)
 - **OCR Engine:** Azure Document Intelligence (`prebuilt-layout`) with OpenCV Unsharp Masking & Profile-Driven Extraction
 - **LLM Engine:** Google Gemini Flash Lite (`gemini-flash-lite-latest` & `gemini-3.5-flash-lite`)
-- **Testing:** Vitest, Testing Library, Supertest, Playwright (E2E), Husky
+- **Testing:** Vitest, Testing Library, Supertest, Playwright (E2E), Selenium (Java E2E), Husky
 
 ---
 
@@ -78,6 +78,7 @@ cd 2026W1-Arkhive
    2. `backend/supabase/migrations/20260911051055_create_document_pages.sql` (creates `document_pages` table and per-page tracking)
    3. `backend/supabase/migrations/20260928093858_add_review_state.sql` (adds `review_state` JSONB column for validation issue tracking)
    4. `backend/supabase/migrations/20261004_add_quality_flags.sql` (adds `quality_flags` JSONB column for OpenCV/Sharp image quality warnings)
+   5. `backend/supabase/migrations/20261017000000_add_history_entries.sql` (adds `history_entries` JSONB column to persist page edit history)
 
 3. **Configure Authentication Redirects:**
    - In the Supabase Dashboard, go to **Authentication > URL Configuration**.
@@ -379,6 +380,7 @@ A Pull Request can only be merged once it satisfies **all** of the following cri
   - `frontend-tests`: ESLint, TypeScript build check, and Vitest unit tests pass.
   - `backend-tests`: ESLint, `tsc --noEmit` typecheck, and Vitest unit tests pass.
   - `backend-integration-tests` & `frontend-integration-tests`: End-to-end API and component integration suites pass.
+  - `e2e-tests`: Playwright end-to-end browser test suite running against an ephemeral local Supabase instance.
   - `docker-build`: Multi-stage Docker image builds cleanly and passes **Aquasecurity Trivy** container and filesystem vulnerability scans.
 - **Peer Code Review:** At least **one approval** from another team member who did not author the PR, with all review comments and discussions resolved.
 - **Clean Merge State:** The branch must be up-to-date with the target branch with zero merge conflicts before merging.
