@@ -100,7 +100,11 @@ async function processPage(selection: PageSelection, ownerId: string): Promise<P
     try {
       const key = `${document.storage_path}/page-${pageIndex}.png`;
       const buffer = await getObjectBuffer(key);
-      const rawResult = await parseTableWithRetries(buffer);
+      const rawResult = await parseTableWithRetries(buffer, {
+        documentId,
+        pageIndex: String(pageIndex),
+        fileName: document.name || documentId,
+      });
 
       // Persist immediately — this is the fix for "crash mid-validation
       // means re-OCR everything." Status goes back to 'pending' (not

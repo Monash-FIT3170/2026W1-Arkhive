@@ -226,17 +226,23 @@ export default {
             const pageResults = await Promise.all(
               files.map(async (file) => {
                 const buffer = fs.readFileSync(file.path);
-                const text = await parseTableWithRetries(buffer, (attempt, max) => {
-                  res.write(
-                    JSON.stringify({
-                      type: 'retry',
-                      jobId,
-                      fileName,
-                      pageIndex: file.pageIndex,
-                      attempt,
-                      maxRetries: max,
-                    }) + '\n'
-                  );
+                const text = await parseTableWithRetries(buffer, {
+                  documentId,
+                  pageIndex: file.pageIndex,
+                  fileName,
+                  filePath: file.path,
+                  onRetry: (attempt, max) => {
+                    res.write(
+                      JSON.stringify({
+                        type: 'retry',
+                        jobId,
+                        fileName,
+                        pageIndex: file.pageIndex,
+                        attempt,
+                        maxRetries: max,
+                      }) + '\n'
+                    );
+                  },
                 });
                 return text;
               })

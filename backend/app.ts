@@ -2,9 +2,13 @@ import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import app from './src/app';
+import { maybeStartWorker } from './src/temporal/worker.js';
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server is running locally at ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server is running locally at ${PORT}`);
+  maybeStartWorker();
+});
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;

@@ -23,13 +23,13 @@ const client: DocumentIntelligenceClient = DocumentIntelligence(
   { apiVersion: '2024-11-30' }
 );
 
-export async function analyse_result(buffer: Buffer) {
+export async function analyzeAzureLayout(buffer: Buffer): Promise<AnalyzeOperationOutput> {
   const request = await client.path('/documentModels/{modelId}:analyze', 'prebuilt-layout').post({
     contentType: 'application/octet-stream',
     body: buffer,
     queryParameters: {
-    outputContentFormat: 'markdown',
-  },
+      outputContentFormat: 'markdown',
+    },
   });
 
   if (isUnexpected(request)) {
@@ -38,9 +38,15 @@ export async function analyse_result(buffer: Buffer) {
 
   const poller = getLongRunningPoller(client, request);
   const response = await poller.pollUntilDone();
+  return response.body as AnalyzeOperationOutput;
+}
 
-  const result = response.body as AnalyzeOperationOutput;
+export async function mapAzureResultToPages(result: AnalyzeOperationOutput) {
   const tester = await mapOCRtoPages(geminiSchemaBBoxPromptSimplified);
-  const output = await tester(result);
-  return output;
+  return await tester(result);
+}
+
+export async function analyse_result(buffer: Buffer) {
+  const result = await analyzeAzureLayout(buffer);
+  return await mapAzureResultToPages(result);
 }

@@ -91,13 +91,75 @@ async function parseTable(imageBuffer: Buffer) {
   return analyse_result(preprocessedBuffer);
 }
 
+import { isTemporalReachable, executeOcrWorkflow } from '../../temporal/client.js';
+import { randomUUID } from 'crypto';
+
+export interface OcrExecutionOptions {
+  documentId?: string;
+  pageIndex?: string;
+  fileName?: string;
+  filePath?: string;
+  onRetry?: (attempt: number, maxRetries: number) => void;
+}
+
 /*
  @author Harsha Sharma (33879303)
 */
 export async function parseTableWithRetries(
   imageBuffer: Buffer,
-  onRetry?: (attempt: number, maxRetries: number) => void
+  optionsOrOnRetry?:
+    | ((attempt: number, maxRetries: number) => void)
+    | OcrExecutionOptions
 ) {
+  const onRetry =
+    typeof optionsOrOnRetry === 'function'
+      ? optionsOrOnRetry
+      : optionsOrOnRetry?.onRetry;
+
+  const options: OcrExecutionOptions =
+    typeof optionsOrOnRetry === 'object' && optionsOrOnRetry !== null
+      ? optionsOrOnRetry
+      : {};
+
+  // Check if Temporal is available for durable workflow orchestration & timing visualization
+  const useTemporal = await isTemporalReachable(1000);
+  if (useTemporal) {
+    let tempInputPath: string | undefined;
+    if (!options.filePath) {
+      const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      tempInputPath = path.join(tempDir, `ocr-input-${Date.now()}-${randomUUID()}.png`);
+      fs.writeFileSync(tempInputPath, imageBuffer);
+    }
+
+    try {
+      return await executeOcrWorkflow({
+        documentId: options.documentId,
+        pageIndex: options.pageIndex,
+        fileName: options.fileName,
+        filePath: options.filePath,
+        tempInputPath,
+        isMock: process.env.OCR_MODE === 'mock',
+      });
+    } catch (temporalError) {
+      console.warn(
+        '[Temporal] Workflow execution failed, falling back to direct execution:',
+        temporalError
+      );
+    } finally {
+      if (tempInputPath && fs.existsSync(tempInputPath)) {
+        try {
+          fs.unlinkSync(tempInputPath);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
+  // In-process fallback
   return await withRetry(() => parseTable(imageBuffer), 1, 3000, onRetry);
 }
 
