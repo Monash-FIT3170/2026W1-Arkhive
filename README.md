@@ -162,6 +162,12 @@ cd 2026W1-Arkhive
    R2_ACCESS_KEY_ID=your_r2_access_key_id_here
    R2_SECRET_ACCESS_KEY=your_r2_secret_access_key_here
    R2_BUCKET_NAME=your_r2_bucket_name_here
+
+   # Mobile QR Upload Base URL
+   # Public URL used to build QR upload links for mobile scanning.
+   # Leave unset for local development (defaults to http://localhost:5173).
+   # In production/cloud deployments, set this to the deployed app's URL (e.g. https://arkhive-app.run.app).
+   PUBLIC_APP_URL=http://localhost:5173
    ```
 
 3. **Install Frontend dependencies and configure environment variables:**
@@ -227,6 +233,7 @@ Arkhive includes a multi-stage [`Dockerfile`](./Dockerfile) and Google Cloud Bui
 2. **Automated Cloud Deployment (Google Cloud Run):**
    - Triggered via Google Cloud Build using [`cloudbuild.yaml`](./cloudbuild.yaml).
    - Builds the production image with `_VITE_SUPABASE_URL` and `_VITE_SUPABASE_ANON_KEY` substitution variables, pushes `${_IMAGE}:${COMMIT_SHA}` to Google Container Registry / Artifact Registry, and deploys the service to Google Cloud Run (`gcloud run deploy`).
+   - Ensure backend runtime environment variables are set in Cloud Run (or Secret Manager), specifically configuring `PUBLIC_APP_URL` to your production service URL so mobile QR code uploads resolve to the cloud deployment.
 
 ---
 
