@@ -26,6 +26,7 @@ flowchart TD
       C_DOC_SVC["documentService.ts"]
       C_PROJ_SVC["projectService.ts"]
       C_UPL_SVC["uploadService.ts"]
+      C_EXT_SVC["extractionService.ts"]
       C_LLM_SVC["llmService.ts"]
       C_EXP_SVC["export/ (batchExportService, templates, writers)"]
       C_SUBA_SDK["supabaseClient.ts (Anon Key)"]
@@ -106,14 +107,18 @@ flowchart TD
   VAL_WS --> SCANNER
   VAL_WS --> C_LLM_SVC
   VAL_WS --> C_EXP_SVC
+  VAL_WS --> C_EXT_SVC
 
   %% Client to Backend Gateway
   C_PROJ_SVC -->|"Bearer JWT"| R_PROJ
   C_DOC_SVC -->|"Bearer JWT + Multipart"| R_DOC
   C_UPL_SVC -->|"Session Cookie"| R_UPL
+  C_EXT_SVC -->|"Session Cookie"| R_EXT
   C_LLM_SVC --> R_LLM
 
   %% Gateway routing & middleware
+  ENTRY -.->|"Mounts Routers"| ROUTES
+  ENTRY -.->|"Applies Middleware"| SESS_MID
   R_PROJ --> AUTH_MID --> C_PROJ
   R_DOC --> AUTH_MID --> C_DOC
   R_UPL --> SESS_MID --> C_UPL
@@ -129,6 +134,7 @@ flowchart TD
   C_DOC --> OCR_COORD
   C_UPL --> IMG_PROC
   C_UPL --> OCR_COORD
+  C_EXT -->|"Guest Session State"| SESS_MID
   C_QR --> QR_SVC
   C_LLM --> AI_SVC
 
