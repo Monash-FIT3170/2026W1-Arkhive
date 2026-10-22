@@ -15,7 +15,7 @@ An intelligent document processing application that converts photos of documents
 
 Ensure the following software components and cloud service accounts are set up before proceeding:
 
-- **Node.js:** `v22` or higher
+- **Node.js:** `v24` or higher
 - **Package Manager:** `npm` (v10.0.0+)
 - **Cloud Accounts & Credentials:**
   - **Supabase Account:** For User Authentication and PostgreSQL database.
@@ -28,12 +28,12 @@ Ensure the following software components and cloud service accounts are set up b
 ## 🛠️ Tech Stack
 
 - **Frontend:** React.js, TypeScript, Vite, Tailwind CSS, DaisyUI, Lucide Icons, PDF.js
-- **Backend:** Node.js, Express, TypeScript, AWS SDK (S3 client for R2)
+- **Backend:** Node.js, Express, TypeScript, AWS SDK (S3 client for R2), OpenCV (`@techstark/opencv-js`), Sharp
 - **Database & Authentication:** Supabase (PostgreSQL with Row-Level Security, Supabase Auth)
 - **Object Storage:** Cloudflare R2 (S3-compatible bucket with direct client-side presigned uploads)
-- **OCR Engine:** Azure Document Intelligence
-- **LLM Engine:** Google Gemini API
-- **Testing:** Vitest, Testing Library, Supertest
+- **OCR Engine:** Azure Document Intelligence (`prebuilt-layout`) with OpenCV Unsharp Masking & Profile-Driven Extraction
+- **LLM Engine:** Google Gemini Flash Lite (`gemini-flash-lite-latest` & `gemini-3.5-flash-lite`)
+- **Testing:** Vitest, Testing Library, Supertest, Playwright (E2E), Selenium (Java E2E), Husky
 
 ---
 
@@ -44,10 +44,12 @@ Ensure the following software components and cloud service accounts are set up b
 - **Direct Cloud Storage:** Secure, high-performance direct browser-to-R2 image uploads using presigned URLs.
 - **Project & Document Management:** Persistent user workspaces with projects, documents, and individual page tracking.
 - **Authentication & User Profiles:** Supabase Auth supporting Email/Password, Google OAuth, and isolated Guest mode.
-- **Intelligent OCR & Table Extraction:** Extraction of raw text, tabular structures (rows/columns), and per-cell confidence scoring.
-- **Interactive AI Chat:** Side-by-side verification allowing users to ask Google Gemini questions to refine columns, fix formatting, or extract specific metrics.
+- **Intelligent Pre-OCR Filtering:** OpenCV-powered Unsharp Masking and grayscale noise reduction to crispen text strokes and table lines.
+- **Profile-Driven OCR Pipeline:** Specialized profiles (`table`, `receipt`, `invoice`, `generic`) combining Azure Document Intelligence with Gemini Flash Lite for field extraction, floating tables, and parent-child row hierarchies.
+- **Real-Time OCR Progress Tracking:** Background tracking across document pages with persistent toasts and status dialogs.
+- **Interactive AI Chat:** Side-by-side verification allowing users to ask Google Gemini Flash Lite questions to refine columns, fix formatting, or resolve review queue issues.
 - **Reprocessing & Granular Control:** Re-run OCR on specific document pages without re-uploading.
-- **Flexible Data Export:** Export verified data into CSV (with headers) or raw TXT formats.
+- **Modular Data Export:** Export verified data into CSV, formatted Excel (`.XLSX`), JSON, or raw TXT with customizable business templates.
 
 ---
 
@@ -74,6 +76,9 @@ cd 2026W1-Arkhive
    Navigate to the **SQL Editor** in your Supabase project dashboard, open the following migration files in order, and run their SQL contents:
    1. `backend/supabase/migrations/20260908100628_create_projects_and_documents.sql` (creates `projects`, `documents` tables and RLS policies)
    2. `backend/supabase/migrations/20260911051055_create_document_pages.sql` (creates `document_pages` table and per-page tracking)
+   3. `backend/supabase/migrations/20260928093858_add_review_state.sql` (adds `review_state` JSONB column for validation issue tracking)
+   4. `backend/supabase/migrations/20261004_add_quality_flags.sql` (adds `quality_flags` JSONB column for OpenCV/Sharp image quality warnings)
+   5. `backend/supabase/migrations/20261017000000_add_history_entries.sql` (adds `history_entries` JSONB column to persist page edit history)
 
 3. **Configure Authentication Redirects:**
    - In the Supabase Dashboard, go to **Authentication > URL Configuration**.
@@ -121,19 +126,22 @@ cd 2026W1-Arkhive
 
 ---
 
-### 3. Backend Setup
+### 3. Root, Backend & Frontend Setup
 
-1. **Navigate to the backend directory and install dependencies:**
+1. **Install root developer tooling (Husky hooks, ESLint, Prettier):**
+
+   ```bash
+   npm install
+   ```
+
+2. **Install Backend dependencies and configure environment variables:**
 
    ```bash
    cd backend
    npm install
    ```
 
-2. **Configure environment variables:**
-   Create a `.env` file in the `backend/` directory:
-
-   Populate `backend/.env` with your credentials:
+   Create a `.env` file in the `backend/` directory (refer to `.env.example` in the root directory) and populate it with your credentials (You may also use a secrets manager for this):
 
    ```env
    # LLM & OCR Service Credentials
@@ -154,23 +162,22 @@ cd 2026W1-Arkhive
    R2_ACCESS_KEY_ID=your_r2_access_key_id_here
    R2_SECRET_ACCESS_KEY=your_r2_secret_access_key_here
    R2_BUCKET_NAME=your_r2_bucket_name_here
+
+   # Mobile QR Upload Base URL
+   # Public URL used to build QR upload links for mobile scanning.
+   # Leave unset for local development (defaults to http://localhost:5173).
+   # In production/cloud deployments, set this to the deployed app's URL (e.g. https://arkhive-app.run.app).
+   PUBLIC_APP_URL=http://localhost:5173
    ```
 
----
-
-### 4. Frontend Setup
-
-1. **Navigate to the frontend directory and install dependencies:**
+3. **Install Frontend dependencies and configure environment variables:**
 
    ```bash
    cd ../frontend
    npm install
    ```
 
-2. **Configure environment variables:**
-   Create a `.env` file in the `frontend/` directory:
-
-   Populate `frontend/.env` with your public Supabase credentials:
+   Create a `.env` file in the `frontend/` directory and populate it with your public Supabase credentials:
 
    ```env
    # Supabase Configuration
@@ -181,7 +188,7 @@ cd 2026W1-Arkhive
 
 ---
 
-## 📖 Usage & Development
+## 📖 Usage, Deployment & Development
 
 ### Running the Application Locally
 
@@ -208,6 +215,28 @@ cd 2026W1-Arkhive
 
 ---
 
+### Production Deployment (Docker & Google Cloud Run)
+
+Arkhive includes a multi-stage [`Dockerfile`](./Dockerfile) and Google Cloud Build configuration ([`cloudbuild.yaml`](./cloudbuild.yaml)) that compiles the React frontend into static assets served directly by the Express backend on port `3000`.
+
+1. **Build and Run with Docker:**
+
+   ```bash
+   docker build \
+     --build-arg VITE_SUPABASE_URL=https://your-project-ref.supabase.co \
+     --build-arg VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here \
+     -t arkhive:latest .
+
+   docker run -p 3000:3000 --env-file backend/.env arkhive:latest
+   ```
+
+2. **Automated Cloud Deployment (Google Cloud Run):**
+   - Triggered via Google Cloud Build using [`cloudbuild.yaml`](./cloudbuild.yaml).
+   - Builds the production image with `_VITE_SUPABASE_URL` and `_VITE_SUPABASE_ANON_KEY` substitution variables, pushes `${_IMAGE}:${COMMIT_SHA}` to Google Container Registry / Artifact Registry, and deploys the service to Google Cloud Run (`gcloud run deploy`).
+   - Ensure backend runtime environment variables are set in Cloud Run (or Secret Manager), specifically configuring `PUBLIC_APP_URL` to your production service URL so mobile QR code uploads resolve to the cloud deployment.
+
+---
+
 ### Running Tests & Verification
 
 - **Backend Unit Tests:**
@@ -218,9 +247,17 @@ cd 2026W1-Arkhive
   ```bash
   cd backend && npm run test:integration
   ```
-- **Frontend Tests:**
+- **Frontend Unit Tests:**
   ```bash
   cd frontend && npm test
+  ```
+- **Frontend Integration Tests:**
+  ```bash
+  cd frontend && npm run test:integration
+  ```
+- **Frontend End-to-End Tests (Playwright):**
+  ```bash
+  cd frontend && npm run test:e2e
   ```
 - **Typechecking & Linting:**
   ```bash
@@ -232,11 +269,128 @@ cd 2026W1-Arkhive
 
 ### Using the Application Workflow
 
-1. **Create or Open a Project:** Create a new project in the dashboard to organize your uploaded files.
-2. **Upload Documents:** Upload single or multi-page documents (PDF, JPG, PNG, HEIC, HEIF up to 10MB). The frontend splits PDFs into individual page previews and uploads each page securely to Cloudflare R2.
-3. **Run OCR & Table Extraction:** Select documents or specific pages and trigger processing. Review extracted tables alongside the original document in the side-by-side viewer.
-4. **Interactive Verification & Chat:** Use Google Gemini in the verification chat to refine detected column headers, query specific rows, or correct formatting.
-5. **Export:** Export finalized tabular data to `.CSV` or `.TXT`.
+1. **Create or Open a Project:** Create a new project in the dashboard to organize your uploaded files, or use **Guest Mode** / **Mobile QR Capture** for quick ephemeral sessions.
+2. **Upload Documents:** Upload single or multi-page documents (PDF, JPG, PNG, HEIC, HEIF up to 10MB). The frontend splits PDFs into individual page previews, checks image quality (blur/glare/contrast), and uploads each page to Cloudflare R2 (or local session storage for guests).
+3. **Run OCR & Table Extraction:** Select documents or specific pages and trigger processing. Review extracted tables and bounding boxes alongside the original document in the side-by-side viewer. Background progress is tracked in real-time across pages.
+4. **Interactive Verification & Chat:** Use Google Gemini Flash Lite in the verification chat to refine detected column headers, query specific rows, or resolve low-confidence cells in the review queue.
+5. **Export:** Export finalized tabular data to `.CSV`, `.XLSX`, `.JSON`, or `.TXT` using modular templates.
+
+---
+
+## 🏗️ System Architecture & Developer Onboarding
+
+For an in-depth technical reference on how Arkhive is structured and how data flows across the system, see **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** and the companion system topology diagram (**[`ARCHITECTURE_DIAGRAM.mmd`](./ARCHITECTURE_DIAGRAM.mmd)** / **[`ARCHITECTURE_DIAGRAM.pdf`](./ARCHITECTURE_DIAGRAM.pdf)**).
+
+New developers joining the project should review **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** for:
+
+- **Repository Layout & Directory Roles:** Detailed breakdown of [`frontend/`](./frontend) (`pages`, `components`, `context`, `hooks`, `services/export`, `utils`, `models`, `e2e`) and [`backend/`](./backend) (`middleware`, `routes`, `controller`, `services/ocr/pipeline`, `services/llm`, `supabase/migrations`).
+- **State Management & API Conventions:** How [`AuthProvider`](./frontend/src/context/AuthProvider.tsx) manages Supabase JWTs and Guest sessions, how [`OcrProgressProvider`](./frontend/src/context/OcrProgressProvider.tsx) coordinates background page tasks, how custom hooks (`useTableEditor`, `useUndoRedo`, `useReviewQueue`) manage local state, and how `frontend/src/services/` communicates with the Express backend.
+- **Modular OCR & Computer Vision Pipeline:** How images are preprocessed via Sharp and OpenCV unsharp masking, analyzed via Azure Document Intelligence (`prebuilt-layout`), and structured using profile-driven extractors with **Google Gemini Flash Lite** (`gemini-flash-lite-latest` and `gemini-3.5-flash-lite`).
+- **Dual Workflow Architecture:** Comparison between the **Authenticated Cloud Pipeline** (Supabase PostgreSQL with Row-Level Security + Cloudflare R2 persistent storage) and the **Ephemeral Guest & Mobile QR Pipeline** (`express-session` + temporary disk storage with automated 12-hour cleanup).
+- **"Where Do I Put...?" Decision Matrix:** A practical cheat sheet in [Section 7 of `ARCHITECTURE.md`](./ARCHITECTURE.md#7-where-do-i-put-decision-matrix) answering where to add new API endpoints, UI screens, database migrations, document profiles, export formats/templates, OpenCV heuristics, and Gemini LLM tools.
+
+---
+
+## 🏷️ Versioning Strategy
+
+Arkhive follows **[Semantic Versioning 2.0.0 (SemVer)](https://semver.org/)** for all releases, formatted as **`MAJOR.MINOR.PATCH`** (e.g., `v1.2.0`):
+
+| Version Component     | Increment Trigger                                                                                                                 | Examples in Arkhive                                                                                                                                             |
+| :-------------------- | :-------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`MAJOR` (`X.0.0`)** | Incompatible REST API changes, breaking database schema alterations, or major architectural overhauls requiring manual migration. | Removing or renaming `/api/documents` endpoints, breaking changes to `TableData` JSON schemas stored in Supabase, or replacing core authentication providers.   |
+| **`MINOR` (`0.X.0`)** | Backwards-compatible new features, endpoints, or user-facing workflows.                                                           | Adding mobile QR code upload, adding new export formats (e.g., Excel/JSON), introducing OpenCV quality heuristics, or adding new Gemini assistant capabilities. |
+| **`PATCH` (`0.0.X`)** | Backwards-compatible bug fixes, security patches, performance optimizations, or documentation updates.                            | Fixing cell-editor text overlap, resolving APCA contrast ratios, updating dependencies flagged by Trivy security scans, or refining OCR prompt formatting.      |
+
+### Release & Tagging Workflow
+
+1. **Pre-Release Identifiers:** Major milestone drafts or staging builds undergoing User Acceptance Testing (UAT) on the `dev` branch may be suffixed with `-alpha.N`, `-beta.N`, or `-rc.N` (e.g., `v1.0.0-rc.1`).
+2. **Version Synchronization:** Before cutting a release, version numbers in `backend/package.json` and `frontend/package.json` are bumped in lockstep using `npm version <major|minor|patch>`.
+3. **Git Tagging & GitHub Releases:** Once a release PR from `dev` is merged into `main` and passes all CI checks, an annotated Git tag is created and pushed:
+   ```bash
+   git checkout main && git pull origin main
+   git tag -a v1.0.0 -m "Release v1.0.0"
+   git push origin v1.0.0
+   ```
+   A corresponding GitHub Release is published summarizing new features, database migrations required, and bug fixes since the previous tag.
+
+---
+
+## 🔀 Pull Request (PR) Strategy & Contribution Guide
+
+To maintain code quality, stability, and security across the full stack, all contributions must follow the branching and Pull Request workflow outlined below.
+
+### 1. Branching Strategy
+
+- **`main`:** Protected production branch containing stable, release-ready code. Direct pushes to `main` are prohibited; updates only occur via release PRs from `dev` or critical hotfix PRs.
+- **`dev`:** Primary integration branch where completed features and bug fixes are merged and verified together.
+- **Topic / Feature Branches:** All development work must take place on a dedicated branch created from the latest `dev` branch using descriptive naming prefixes:
+  - `feat-<scope>-<short-description>` — New features (e.g., `feat-team2-phone-camera-QR-upload`, `feat-simon-column-rename`)
+  - `fix--<short-description>` — Bug fixes (e.g., `fix--undo-redo-validation`, `fix--upload-security`)
+  - `refactor-<scope>` — Code restructuring without changing external behavior
+  - `docs-<scope>` — Documentation-only additions or updates
+
+### 2. Commit Message Conventions
+
+Follow the **[Conventional Commits](https://www.conventionalcommits.org/)** specification so git history remains readable and auditable:
+
+- `feat: <description>` — Introduces a new feature
+- `fix: <description>` — Patches a bug
+- `refactor: <description>` — Refactors existing code
+- `test: <description>` — Adds or updates unit/integration tests
+- `docs: <description>` — Updates `README.md`, `ARCHITECTURE.md`, or inline docs
+- `chore: <description>` — Updates build scripts, dependencies, or CI configuration
+
+### 3. Local Pre-Push Verification
+
+The repository uses **Husky** ([`.husky/pre-push`](./.husky/pre-push)) and **lint-staged** ([`package.json`](./package.json)) to enforce code formatting (Prettier) and quality checks locally before code reaches GitHub. Before opening a PR, ensure all checks pass locally:
+
+1. **Frontend Lint, Typecheck, Build & Tests:**
+   ```bash
+   cd frontend
+   npm run lint
+   npm run build
+   npm test
+   npm run test:integration
+   ```
+2. **Backend Lint, Typecheck & Tests:**
+   ```bash
+   cd ../backend
+   npm run lint
+   npm run typecheck
+   npm test
+   npm run test:integration
+   ```
+
+### 4. Submitting a Pull Request
+
+1. **Sync with `dev`:** Pull the latest changes from `origin/dev` into your feature branch and resolve any merge conflicts locally:
+   ```bash
+   git fetch origin
+   git merge origin/dev
+   ```
+2. **Push Your Branch:**
+   ```bash
+   git push -u origin <your-branch-name>
+   ```
+3. **Open the Pull Request on GitHub:**
+   - Set the **base branch** to `dev` (or `main` only for approved release/hotfix merges) and the **compare branch** to your feature branch.
+   - Provide a clear title and include the following in the PR description:
+     - **Summary of Changes:** What was added, modified, or fixed and why.
+     - **Architecture / Database Impact:** Note any new environment variables added to `.env.example` or new SQL migrations added to `backend/supabase/migrations/`.
+     - **Verification & Testing:** List new unit/integration tests added and manual verification steps performed (attach screenshots or screen recordings for UI changes).
+
+### 5. CI Pipeline & Code Review Requirements
+
+A Pull Request can only be merged once it satisfies **all** of the following criteria:
+
+- **Automated CI Pipeline Passes ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)):**
+  - `frontend-tests`: ESLint, TypeScript build check, and Vitest unit tests pass.
+  - `backend-tests`: ESLint, `tsc --noEmit` typecheck, and Vitest unit tests pass.
+  - `backend-integration-tests` & `frontend-integration-tests`: End-to-end API and component integration suites pass.
+  - `e2e-tests`: Playwright end-to-end browser test suite running against an ephemeral local Supabase instance.
+  - `docker-build`: Multi-stage Docker image builds cleanly and passes **Aquasecurity Trivy** container and filesystem vulnerability scans.
+- **Peer Code Review:** At least **one approval** from another team member who did not author the PR, with all review comments and discussions resolved.
+- **Clean Merge State:** The branch must be up-to-date with the target branch with zero merge conflicts before merging.
 
 ---
 
