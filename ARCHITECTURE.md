@@ -92,6 +92,20 @@ The frontend is a single-page application built with **React 19**, **TypeScript*
    - Functions automatically attach the current Supabase JWT Bearer token to request headers via `getAuthHeaders()` when interacting with authenticated routes.
    - The base URL is configured via [`apiBase.ts`](./frontend/src/services/apiBase.ts), which defaults to relative `/api/*` paths during local development and production (proxied by Vite or served by Express).
 
+### AI Validation & Issue Review Pipeline (`frontend/src/utils/review/` & `/api/llm`)
+
+Arkhive employs a two-tier review pipeline to detect and correct extraction errors prior to export:
+
+1. **Low-Confidence OCR Detection (Client-Side Heuristic):**
+   - Evaluates `_cellConfidence` scores returned by Azure Document Intelligence.
+   - Uses dynamic statistical thresholds based on table-wide median and Median Absolute Deviation (MAD) in [`detectReviewFields.ts`](./frontend/src/utils/review/detectReviewFields.ts) to flag outlier cells without extra API overhead.
+2. **Format Inconsistency Detection (Gemini LLM Profiling):**
+   - Samples non-empty column entries and queries `POST /api/llm/chat/detect-format`.
+   - Google Gemini Flash Lite infers expected column patterns (regex). Cells failing pattern validation are flagged as formatting inconsistencies and assigned a `groupId` for bulk remediation.
+3. **Assisted Remediation ([`OcrReviewWidget`](./frontend/src/pages/validation/components/chat/OcrReviewWidget.tsx)):**
+   - Flagged issues are queued and managed across custom hooks ([`useReviewQueue`](./frontend/src/hooks/review/useReviewQueue.ts), [`useReviewScanner`](./frontend/src/hooks/review/useReviewScanner.ts), [`useReviewSuggestions`](./frontend/src/hooks/review/useReviewSuggestions.ts)).
+   - Gemini proposes single-cell or bulk column corrections via `POST /api/llm/chat/review-field` and `POST /api/llm/chat/review-field-bulk`, applied deterministically to the table editor with full undo/redo history.
+
 ---
 
 ## 4. Backend Breakdown (`backend/`)
@@ -161,7 +175,17 @@ Arkhive supports two primary execution pipelines:
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        AUTHENTICATED CLOUD FLOW                        │
-│ User Login ──> /projects ──> /api/documents/upload-page                │
+│ User Login ──> /projects                                               │
+│                  │                                                     │
+│                  ├──> Desktop Dropzone / File Picker ─────────┐        │
+│                  │                                            │        │
+│                  └──> Scan QR Code ──> Mobile Capture         │        │
+│                         (/api/qr)       (/upload/mobile)      │        │
+│                                            │                  │        │
+│                                            ▼ (import to WS)   │        │
+│                                  ┌─────────┴──────────────────┘        │
+│                                  ▼                                     │
+│                     POST /api/documents/upload-page                    │
 │                                  │                                     │
 │                                  ├──> Sharp/OpenCV Quality Analysis    │
 │                                  ├──> Cloudflare R2 (Persistent PNG)   │
@@ -169,13 +193,24 @@ Arkhive supports two primary execution pipelines:
 │                                  │                                     │
 │               POST /api/documents/process (OCR + Gemini)               │
 │                                  │                                     │
-│               PATCH /api/documents/:id/pages/:idx/data (Save edits)   │
+│               PATCH /api/documents/:id/pages/:idx/data (Save edits)    │
 └────────────────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        EPHEMERAL GUEST & QR FLOW                       │
-│ Guest Mode / Mobile QR Scan ──> /upload ──> /api/upload/page           │
-│                                  │                                     │
+│ Guest Mode ──> /upload                                                 │
+│                  │                                                     │
+│                  ├──> Desktop Dropzone / File Picker ─────────┐        │
+│                  │       (POST /api/upload/page)              │        │
+│                  │                                            │        │
+│                  └──> Scan QR Code ──> Mobile Capture         │        │
+│                         (/api/qr)       (/upload/mobile)      │        │
+│                                            │                  │        │
+│                                            ▼                  │        │
+│                                (POST /api/qr/:token/upload)   │        │
+│                                  ┌─────────┴──────────────────┘        │
+│                                  ▼                                     │
+│                                  ├──> Sharp/OpenCV Quality Analysis    │
 │                                  ├──> Multer Disk Storage (uploads/)   │
 │                                  └──> Express Session (req.session)    │
 │                                  │                                     │
@@ -187,13 +222,15 @@ Arkhive supports two primary execution pipelines:
 
 1. **Persistent Cloud Pipeline (`/projects` & `/api/documents`):**
    - Requires Supabase user authentication.
+   - Ingestion supports direct desktop upload (file picker/drag-and-drop) **or** mobile companion capture via QR pairing ([`ScanQrButton.tsx`](./frontend/src/pages/upload/components/actions/ScanQrButton.tsx)). When using QR upload, mobile photos are staged temporarily via `/api/qr/`, imported by the desktop project workspace, and committed to the project via `/api/documents/upload-page`.
    - Files are stored in Cloudflare R2 at `{owner_id}/{project_id}/{document_id}/page-{index}.png`.
    - Records are stored across `projects`, `documents`, and `document_pages` tables in PostgreSQL with strict Row Level Security.
    - Preserves state across browser sessions and crashes.
 2. **Ephemeral Guest & Mobile Flow (`/upload` & `/api/upload` / `/api/qr`):**
    - Requires no Supabase login.
-   - Mobile phones capture pictures via QR code token ([`MobileCapture.tsx`](./frontend/src/pages/upload/MobileCapture.tsx)) and upload to the desktop user's local session directory on the backend server.
-   - Results are held in `req.session` and temporary files are pruned after 3 days.
+   - Ingestion supports direct desktop upload (file picker/drag-and-drop via `/api/upload/page`) **or** mobile companion capture via QR pairing ([`MobileCapture.tsx`](./frontend/src/pages/upload/MobileCapture.tsx) via `/api/qr/:token/upload`).
+   - Uploaded pages are analyzed by Sharp and OpenCV (`processImage`), generating `qualityFlags` and caching optimized images on local disk (`backend/uploads/{sessionId}/{documentId}/`).
+   - Results and extracted data are held in `req.session` and temporary files are pruned after 3 days.
 
 ---
 
