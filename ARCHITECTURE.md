@@ -198,8 +198,19 @@ Arkhive supports two primary execution pipelines:
 
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        EPHEMERAL GUEST & QR FLOW                       │
-│ Guest Mode / Mobile QR Scan ──> /upload ──> /api/upload/page           │
-│                                  │                                     │
+│ Guest Mode ──> /upload                                                 │
+│                  │                                                     │
+│                  ├──> Desktop Dropzone / File Picker ─────────┐        │
+│                  │       (POST /api/upload/page)              │        │
+│                  │                                            │        │
+│                  └──> Scan QR Code ──> Mobile Capture         │        │
+│                         (/api/qr)       (/upload/mobile)      │        │
+│                                            │                  │        │
+│                                            ▼                  │        │
+│                                (POST /api/qr/:token/upload)   │        │
+│                                  ┌─────────┴──────────────────┘        │
+│                                  ▼                                     │
+│                                  ├──> Sharp/OpenCV Quality Analysis    │
 │                                  ├──> Multer Disk Storage (uploads/)   │
 │                                  └──> Express Session (req.session)    │
 │                                  │                                     │
@@ -217,8 +228,9 @@ Arkhive supports two primary execution pipelines:
    - Preserves state across browser sessions and crashes.
 2. **Ephemeral Guest & Mobile Flow (`/upload` & `/api/upload` / `/api/qr`):**
    - Requires no Supabase login.
-   - Mobile phones capture pictures via QR code token ([`MobileCapture.tsx`](./frontend/src/pages/upload/MobileCapture.tsx)) and upload to the desktop user's local session directory on the backend server.
-   - Results are held in `req.session` and temporary files are pruned after 3 days.
+   - Ingestion supports direct desktop upload (file picker/drag-and-drop via `/api/upload/page`) **or** mobile companion capture via QR pairing ([`MobileCapture.tsx`](./frontend/src/pages/upload/MobileCapture.tsx) via `/api/qr/:token/upload`).
+   - Uploaded pages are analyzed by Sharp and OpenCV (`processImage`), generating `qualityFlags` and caching optimized images on local disk (`backend/uploads/{sessionId}/{documentId}/`).
+   - Results and extracted data are held in `req.session` and temporary files are pruned after 3 days.
 
 ---
 
